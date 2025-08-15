@@ -9,7 +9,13 @@ import (
 type HelpState struct{}
 
 func (s *HelpState) Handle(context *Bot, update *tgbotapi.Update) {
-	context.Telegram.SendMessage(update.Message.Chat.ID, message.Help)
+	chatID := update.Message.Chat.ID
+	context.Telegram.DeleteMessage(chatID, update.Message.MessageID)
+	messageId, err := context.Telegram.SendMessage(chatID, message.Help)
+	if err != nil || messageId == 0 {
+		return
+	}
+	context.LastMessageID = messageId
 }
 
 func (s *HelpState) GetName() string {

@@ -18,18 +18,21 @@ func NewTelegram(token string) (*Telegram, error) {
 	return &Telegram{Bot: bot}, nil
 }
 
-func (t *Telegram) SendMessage(chatID int64, text string) {
+func (t *Telegram) SendMessage(chatID int64, text string) (int, error) {
 	msg := tgbotapi.NewMessage(chatID, text)
-	_, err := t.Bot.Send(msg)
+	sentMsg, err := t.Bot.Send(msg)
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
+		return 0, err
 	}
+
+	return sentMsg.MessageID, err
 }
 
 func (t *Telegram) SendMessageWithReplyKeyboard(
 	chatID int64,
 	text string,
-	buttons [][]string) {
+	buttons [][]string) (int, error) {
 	var rows [][]tgbotapi.KeyboardButton
 	for _, buttonRow := range buttons {
 		var row []tgbotapi.KeyboardButton
@@ -43,8 +46,20 @@ func (t *Telegram) SendMessageWithReplyKeyboard(
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = keyboard
 
-	_, err := t.Bot.Send(msg)
+	sentMsg, err := t.Bot.Send(msg)
 	if err != nil {
+		log.Printf("Failed to send message with reply keyboard: %v", err)
+		return 0, err
+	}
+
+	return sentMsg.MessageID, nil
+}
+
+func (t *Telegram) DeleteMessage(chatID int64, messageID int) {
+	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+	_, err := t.Bot.Request(deleteMsg)
+	if err != nil {
+		log.Printf("Failed to delete message: %v", err)
 	}
 }
 

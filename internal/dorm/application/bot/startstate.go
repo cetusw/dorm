@@ -3,7 +3,6 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
-	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -11,18 +10,35 @@ import (
 type StartState struct{}
 
 func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
+	chatId := update.Message.Chat.ID
+	context.Telegram.DeleteMessage(chatId, context.LastMessageID)
 	user, err := context.UserService.GetUser(update.Message.From.ID)
 	if err != nil {
-		log.Println(err)
-		context.Telegram.SendMessage(update.Message.Chat.ID, message.RegistrationFail)
+		messageId, err := context.Telegram.SendMessage(chatId, message.RegistrationFail)
+		if err != nil || messageId == 0 {
+			return
+		}
+		context.LastMessageID = messageId
 	}
-	if user != nil {
-		context.Telegram.SendMessageWithReplyKeyboard(update.Message.Chat.ID, message.Welcome, keyboard.TaskAction)
-		context.SetState(&TaskActionState{})
+	if user == nil {
+		messageId, err := context.Telegram.SendMessage(chatId, message.Registration)
+		if err != nil || messageId == 0 {
+			return
+		}
+		context.LastMessageID = messageId
+		context.SetState(&RegistrationState{})
 		return
 	}
-	context.Telegram.SendMessage(update.Message.Chat.ID, message.Registration)
-	context.SetState(&WaitingForFullNameState{})
+	messageId, err := context.Telegram.SendMessageWithReplyKeyboard(
+		chatId,
+		message.Welcome,
+		keyboard.MainMenu,
+	)
+	if err != nil || messageId == 0 {
+		return
+	}
+	context.LastMessageID = messageId
+	context.SetState(&MainState{})
 }
 
 func (s *StartState) GetName() string {
