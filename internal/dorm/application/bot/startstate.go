@@ -7,7 +7,9 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type StartState struct{}
+type StartState struct {
+	baseState
+}
 
 func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
 	chatId := update.Message.Chat.ID
@@ -31,8 +33,8 @@ func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
 	}
 	messageId, err := context.Telegram.SendMessageWithReplyKeyboard(
 		chatId,
-		message.Welcome,
-		keyboard.MainMenu,
+		message.MainState,
+		keyboard.MainState,
 	)
 	if err != nil || messageId == 0 {
 		return
@@ -40,8 +42,6 @@ func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
 	context.LastMessageID = messageId
 	context.SetState(&MainState{})
 }
-
-func (s *StartState) HandleCallback(context *Bot, update *tgbotapi.Update) {}
 
 func (s *StartState) GetName() string {
 	return "StartState"

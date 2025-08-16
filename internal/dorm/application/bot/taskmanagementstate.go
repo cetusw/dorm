@@ -7,46 +7,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type TaskManagementState struct{}
-
-func (s *TaskManagementState) Handle(context *Bot, update *tgbotapi.Update) {
-	chatID := update.Message.Chat.ID
-	var text string
-	var buttons [][]string
-	var nextState State
-	context.Telegram.ClearDialogue(chatID, update.Message.MessageID, context.LastMessageID)
-	switch update.Message.Text {
-	case message.Tasks:
-		text = message.Tasks
-		buttons = keyboard.TaskManagementMenu
-		nextState = &TaskManagementState{}
-	case message.Team:
-		text = message.Team
-		buttons = keyboard.TeamManagementMenu
-		nextState = &TeamManagementState{}
-		break
-	case message.Payment:
-		text = message.PaymentLink
-		buttons = keyboard.BackMenu
-		nextState = &PaymentManagementState{}
-	case message.Profile:
-		text = message.Profile // TODO: сделать профиль
-		buttons = keyboard.BackMenu
-		nextState = &ProfileManagementState{}
-	default:
-		messageID, err := context.Telegram.SendMessage(chatID, message.Please)
-		if err != nil || messageID == 0 {
-			return
-		}
-		context.LastMessageID = messageID
-		return
-	}
-	messageId, err := context.Telegram.SendMessageWithInlineKeyboard(chatID, text, buttons)
-	if err != nil || messageId == 0 {
-		return
-	}
-	context.LastMessageID = messageId
-	context.SetState(nextState)
+type TaskManagementState struct {
+	baseState
 }
 
 func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Update) {
@@ -58,20 +20,18 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 	var nextState State
 
 	switch update.CallbackQuery.Data {
-	case message.Reservation:
-		text = message.ChooseReservationZone
-		buttons = keyboard.ReservationManagementMenu
-		nextState = &ReservationManagementState{}
 	case message.ConfirmExecution:
-		text = message.ChooseConfirmationZone
-		buttons = keyboard.BackMenu // TODO: сформировать список задач
-		nextState = &ConfirmationManagementState{}
-	case message.Back:
-		fallthrough
-	default:
-		text = "Главное меню:"
-		buttons = keyboard.MainMenu
-		nextState = &MainState{}
+		text = message.ConfirmExecutionState
+		buttons = keyboard.ConfirmExecutionState // TODO: сформировать список задач
+		nextState = &ConfirmExecutionState{}
+	case message.AssignTask:
+		text = message.AreaSelectionState
+		buttons = keyboard.AreaSelectionState
+		nextState = &AreaSelectionState{}
+	case message.UnassignTask:
+		text = message.TaskUnassignmentState
+		buttons = keyboard.TaskUnassignmentState
+		nextState = &TaskUnassignmentState{}
 	}
 
 	context.Telegram.EditMessageTextAndKeyboard(chatID, context.LastMessageID, text, buttons)

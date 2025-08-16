@@ -7,11 +7,11 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type PaymentManagementState struct {
+type TaskUnassignmentState struct {
 	baseState
 }
 
-func (s *PaymentManagementState) HandleCallback(context *Bot, update *tgbotapi.Update) {
+func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Update) {
 	chatID := update.CallbackQuery.Message.Chat.ID
 	callbackQueryID := update.CallbackQuery.ID
 	context.Telegram.AnswerCallbackQuery(callbackQueryID, "")
@@ -20,14 +20,14 @@ func (s *PaymentManagementState) HandleCallback(context *Bot, update *tgbotapi.U
 	var nextState State
 	switch update.CallbackQuery.Data {
 	case message.Back:
-		text = message.MainState
-		buttons = keyboard.MainState
-		nextState = &MainState{}
+		text = message.TaskManagementState
+		buttons = keyboard.TaskManagementState
+		nextState = &TaskManagementState{}
 	}
 	context.Telegram.EditMessageTextAndKeyboard(chatID, context.LastMessageID, text, buttons)
 	context.SetState(nextState)
 }
 
-func (s *PaymentManagementState) GetName() string {
-	return "PaymentManagementState"
+func (s *TaskUnassignmentState) GetName() string {
+	return "TaskUnassignmentState"
 }

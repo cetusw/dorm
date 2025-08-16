@@ -7,54 +7,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type TeamManagementState struct{}
-
-func (s *TeamManagementState) Handle(context *Bot, update *tgbotapi.Update) {
-	chatID := update.Message.Chat.ID
-	var text string
-	var buttons [][]string
-	var nextState State
-	context.Telegram.ClearDialogue(chatID, update.Message.MessageID, context.LastMessageID)
-	switch update.Message.Text {
-	case message.Tasks:
-		text = message.Tasks
-		buttons = keyboard.TaskManagementMenu
-		nextState = &TaskManagementState{}
-	case message.Team:
-		text = message.Team
-		buttons = keyboard.TeamManagementMenu
-		nextState = &TeamManagementState{}
-		break
-	case message.Payment:
-		text = message.PaymentLink
-		buttons = keyboard.BackMenu
-		nextState = &PaymentManagementState{}
-	case message.Profile:
-		text = message.Profile // TODO: сделать профиль
-		buttons = keyboard.BackMenu
-		nextState = &ProfileManagementState{}
-	default:
-		//messageID, err := context.Telegram.SendMessageWithReplyKeyboard(
-		//	chatID,
-		//	message.Please,
-		//	keyboard.MainMenu,
-		//)
-		//if err != nil || messageID == 0 {
-		//	return
-		//}
-		messageID, err := context.Telegram.SendMessage(chatID, message.Please)
-		if err != nil || messageID == 0 {
-			return
-		}
-		context.LastMessageID = messageID
-		return
-	}
-	messageId, err := context.Telegram.SendMessageWithInlineKeyboard(chatID, text, buttons)
-	if err != nil || messageId == 0 {
-		return
-	}
-	context.LastMessageID = messageId
-	context.SetState(nextState)
+type TeamManagementState struct {
+	baseState
 }
 
 func (s *TeamManagementState) HandleCallback(context *Bot, update *tgbotapi.Update) {
@@ -65,9 +19,9 @@ func (s *TeamManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 	var buttons [][]string
 	var nextState State
 	switch update.CallbackQuery.Data {
-	default:
-		text = message.Back
-		buttons = keyboard.MainMenu
+	case message.Back:
+		text = message.MainState
+		buttons = keyboard.MainState
 		nextState = &MainState{}
 	}
 	context.Telegram.EditMessageTextAndKeyboard(chatID, context.LastMessageID, text, buttons)
