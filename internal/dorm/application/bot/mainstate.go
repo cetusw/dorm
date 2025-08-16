@@ -11,35 +11,45 @@ type MainState struct{}
 
 func (s *MainState) Handle(context *Bot, update *tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	text := ""
-	buttons := keyboard.MainMenu
-	context.Telegram.DeleteMessage(chatID, context.LastMessageID)
+	var text string
+	var buttons [][]string
+	var nextState State
 	context.Telegram.DeleteMessage(chatID, update.Message.MessageID)
 	switch update.Message.Text {
 	case message.Tasks:
 		text = message.Tasks
 		buttons = keyboard.TaskManagementMenu
-		context.SetState(&TaskManagementState{})
+		nextState = &TaskManagementState{}
 	case message.Team:
 		text = message.Team
 		buttons = keyboard.TeamManagementMenu
-		context.SetState(&TeamManagementState{})
+		nextState = &TeamManagementState{}
 		break
 	case message.Payment:
 		text = message.PaymentLink
 		buttons = keyboard.BackMenu
-		context.SetState(&PaymentManagementState{})
+		nextState = &PaymentManagementState{}
 	case message.Profile:
 		text = message.Profile // TODO: сделать профиль
 		buttons = keyboard.BackMenu
-		context.SetState(&ProfileManagementState{})
+		nextState = &ProfileManagementState{}
+	default:
+		messageID, err := context.Telegram.SendMessage(chatID, message.Please)
+		if err != nil || messageID == 0 {
+			return
+		}
+		context.LastMessageID = messageID
+		return
 	}
-	messageId, err := context.Telegram.SendMessageWithReplyKeyboard(chatID, text, buttons)
+	messageId, err := context.Telegram.SendMessageWithInlineKeyboard(chatID, text, buttons)
 	if err != nil || messageId == 0 {
 		return
 	}
 	context.LastMessageID = messageId
+	context.SetState(nextState)
 }
+
+func (s *MainState) HandleCallback(context *Bot, update *tgbotapi.Update) {}
 
 func (s *MainState) GetName() string {
 	return "MainState"

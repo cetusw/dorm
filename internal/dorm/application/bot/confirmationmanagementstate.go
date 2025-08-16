@@ -21,13 +21,30 @@ func (s *ConfirmationManagementState) Handle(context *Bot, update *tgbotapi.Upda
 		buttons = keyboard.MainMenu
 		context.SetState(&MainState{})
 	}
-	messageId, err := context.Telegram.SendMessageWithReplyKeyboard(chatID, text, buttons)
+	messageId, err := context.Telegram.SendMessageWithInlineKeyboard(chatID, text, buttons)
 	if err != nil || messageId == 0 {
 		return
 	}
 	context.LastMessageID = messageId
 }
 
+func (s *ConfirmationManagementState) HandleCallback(context *Bot, update *tgbotapi.Update) {
+	chatID := update.CallbackQuery.Message.Chat.ID
+	callbackQueryID := update.CallbackQuery.ID
+	context.Telegram.AnswerCallbackQuery(callbackQueryID, "")
+	var text string
+	var buttons [][]string
+	var nextState State
+	switch update.Message.Text {
+	default:
+		text = message.Back
+		buttons = keyboard.MainMenu
+		nextState = &MainState{}
+	}
+	context.Telegram.EditMessageTextAndKeyboard(chatID, context.LastMessageID, text, buttons)
+	context.SetState(nextState)
+}
+
 func (s *ConfirmationManagementState) GetName() string {
-	return "HelpState"
+	return "ConfirmationManagementState"
 }

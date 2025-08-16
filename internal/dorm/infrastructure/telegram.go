@@ -32,7 +32,8 @@ func (t *Telegram) SendMessage(chatID int64, text string) (int, error) {
 func (t *Telegram) SendMessageWithReplyKeyboard(
 	chatID int64,
 	text string,
-	buttons [][]string) (int, error) {
+	buttons [][]string,
+) (int, error) {
 	var rows [][]tgbotapi.KeyboardButton
 	for _, buttonRow := range buttons {
 		var row []tgbotapi.KeyboardButton
@@ -55,12 +56,79 @@ func (t *Telegram) SendMessageWithReplyKeyboard(
 	return sentMsg.MessageID, nil
 }
 
+func (t *Telegram) SendMessageWithInlineKeyboard(
+	chatID int64,
+	text string,
+	buttons [][]string,
+) (int, error) {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	for _, buttonRow := range buttons {
+		var row []tgbotapi.InlineKeyboardButton
+		for _, buttonText := range buttonRow {
+			btn := tgbotapi.NewInlineKeyboardButtonData(buttonText, buttonText)
+			row = append(row, btn)
+		}
+		rows = append(rows, row)
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ReplyMarkup = keyboard
+
+	sentMsg, err := t.Bot.Send(msg)
+	if err != nil {
+		log.Printf("Failed to send message with inline keyboard: %v", err)
+		return 0, err
+	}
+	return sentMsg.MessageID, nil
+}
+
+func (t *Telegram) EditMessageTextAndKeyboard(
+	chatID int64,
+	messageID int,
+	text string,
+	buttons [][]string,
+) {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, buttonRow := range buttons {
+		var row []tgbotapi.InlineKeyboardButton
+		for _, buttonText := range buttonRow {
+			btn := tgbotapi.NewInlineKeyboardButtonData(buttonText, buttonText)
+			row = append(row, btn)
+		}
+		rows = append(rows, row)
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	editMsg := tgbotapi.NewEditMessageTextAndMarkup(chatID, messageID, text, keyboard)
+
+	_, err := t.Bot.Send(editMsg)
+	if err != nil {
+		log.Printf("Failed to edit message: %v", err)
+	}
+}
+
+func (t *Telegram) AnswerCallbackQuery(callbackQueryID string, text string) {
+	config := tgbotapi.NewCallback(callbackQueryID, text)
+	_, err := t.Bot.Request(config)
+	if err != nil {
+		log.Printf("Failed to answer callback query: %v", err)
+	}
+}
+
 func (t *Telegram) DeleteMessage(chatID int64, messageID int) {
 	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
 	_, err := t.Bot.Request(deleteMsg)
 	if err != nil {
 		log.Printf("Failed to delete message: %v", err)
 	}
+}
+
+func (t *Telegram) ClearDialogue(chatID int64, firstMessageID int, secondMessageID int) {
+	t.DeleteMessage(chatID, firstMessageID)
+	t.DeleteMessage(chatID, secondMessageID)
 }
 
 func (t *Telegram) GetUpdates(bot *tgbotapi.BotAPI) tgbotapi.UpdatesChannel {

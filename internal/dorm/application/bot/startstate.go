@@ -11,7 +11,7 @@ type StartState struct{}
 
 func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
 	chatId := update.Message.Chat.ID
-	context.Telegram.DeleteMessage(chatId, context.LastMessageID)
+	context.Telegram.DeleteMessage(chatId, update.Message.MessageID)
 	user, err := context.UserService.GetUser(update.Message.From.ID)
 	if err != nil {
 		messageId, err := context.Telegram.SendMessage(chatId, message.RegistrationFail)
@@ -40,6 +40,8 @@ func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
 	context.LastMessageID = messageId
 	context.SetState(&MainState{})
 }
+
+func (s *StartState) HandleCallback(context *Bot, update *tgbotapi.Update) {}
 
 func (s *StartState) GetName() string {
 	return "StartState"

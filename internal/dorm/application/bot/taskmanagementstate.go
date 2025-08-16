@@ -11,33 +11,71 @@ type TaskManagementState struct{}
 
 func (s *TaskManagementState) Handle(context *Bot, update *tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	text := ""
-	buttons := keyboard.MainMenu
-	context.Telegram.DeleteMessage(chatID, context.LastMessageID)
-	context.Telegram.DeleteMessage(chatID, update.Message.MessageID)
+	var text string
+	var buttons [][]string
+	var nextState State
+	context.Telegram.ClearDialogue(chatID, update.Message.MessageID, context.LastMessageID)
 	switch update.Message.Text {
-	case message.Reservation:
-		text = message.Reservation
-		buttons = keyboard.ReservationManagementMenu
-		context.SetState(&ReservationManagementState{})
-	case message.ConfirmExecution:
-		text = message.ConfirmExecution
-		buttons = keyboard.BackMenu // TODO: сформировать список задач и вставить его в клавиатуру
-		context.SetState(&ConfirmationManagementState{})
-	case message.Back:
-		text = message.Back
-		buttons = keyboard.MainMenu
-		context.SetState(&MainState{})
+	case message.Tasks:
+		text = message.Tasks
+		buttons = keyboard.TaskManagementMenu
+		nextState = &TaskManagementState{}
+	case message.Team:
+		text = message.Team
+		buttons = keyboard.TeamManagementMenu
+		nextState = &TeamManagementState{}
+		break
+	case message.Payment:
+		text = message.PaymentLink
+		buttons = keyboard.BackMenu
+		nextState = &PaymentManagementState{}
+	case message.Profile:
+		text = message.Profile // TODO: сделать профиль
+		buttons = keyboard.BackMenu
+		nextState = &ProfileManagementState{}
 	default:
-		text = message.Back
-		buttons = keyboard.MainMenu
-		context.SetState(&MainState{})
+		messageID, err := context.Telegram.SendMessage(chatID, message.Please)
+		if err != nil || messageID == 0 {
+			return
+		}
+		context.LastMessageID = messageID
+		return
 	}
-	messageId, err := context.Telegram.SendMessageWithReplyKeyboard(chatID, text, buttons)
+	messageId, err := context.Telegram.SendMessageWithInlineKeyboard(chatID, text, buttons)
 	if err != nil || messageId == 0 {
 		return
 	}
 	context.LastMessageID = messageId
+	context.SetState(nextState)
+}
+
+func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Update) {
+	chatID := update.CallbackQuery.Message.Chat.ID
+	callbackQueryID := update.CallbackQuery.ID
+	context.Telegram.AnswerCallbackQuery(callbackQueryID, "")
+	var text string
+	var buttons [][]string
+	var nextState State
+
+	switch update.CallbackQuery.Data {
+	case message.Reservation:
+		text = message.ChooseReservationZone
+		buttons = keyboard.ReservationManagementMenu
+		nextState = &ReservationManagementState{}
+	case message.ConfirmExecution:
+		text = message.ChooseConfirmationZone
+		buttons = keyboard.BackMenu // TODO: сформировать список задач
+		nextState = &ConfirmationManagementState{}
+	case message.Back:
+		fallthrough
+	default:
+		text = "Главное меню:"
+		buttons = keyboard.MainMenu
+		nextState = &MainState{}
+	}
+
+	context.Telegram.EditMessageTextAndKeyboard(chatID, context.LastMessageID, text, buttons)
+	context.SetState(nextState)
 }
 
 func (s *TaskManagementState) GetName() string {

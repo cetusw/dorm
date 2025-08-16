@@ -12,17 +12,14 @@ var (
 	TaskManagementMenu = [][]string{
 		{message.Reservation},
 		{message.ConfirmExecution},
-		{message.Back},
 	}
 	TeamManagementMenu = [][]string{
 		{message.TeamMembers},
 		{message.DutySchedule},
-		{message.Back},
 	}
 	ReservationManagementMenu = [][]string{
 		{message.ReserveTask},
 		{message.ConfirmExecution},
-		{message.Back},
 	}
 	BackMenu = [][]string{
 		{message.Back},

@@ -46,10 +46,12 @@ func main() {
 	updates := telegram.GetUpdates(telegram.Bot)
 
 	for update := range updates {
-		if update.Message == nil {
-			continue
+		log.Println(botContext.State.GetName())
+		if update.Message != nil {
+			botContext.State.Handle(botContext, &update)
+		} else if update.CallbackQuery != nil {
+			botContext.State.HandleCallback(botContext, &update)
 		}
-		botContext.State.Handle(botContext, &update)
 	}
 
 	c := cron.New()
