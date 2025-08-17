@@ -4,10 +4,10 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `area`;
 CREATE TABLE `area`
 (
-    `area_id`   INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `area_name` VARCHAR(255) NOT NULL,
-    PRIMARY KEY (`area_id`),
-    UNIQUE KEY `uq_area_name` (`area_name`)
+    `area_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `floor`   INT DEFAULT NULL,
+    `name`    VARCHAR(255) NOT NULL,
+    PRIMARY KEY (`area_id`)
 )
     ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
@@ -32,10 +32,10 @@ CREATE TABLE `dormitory`
 DROP TABLE IF EXISTS `role`;
 CREATE TABLE `role`
 (
-    `role_id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `role_level`       INT UNSIGNED NOT NULL,
     `role_name`        VARCHAR(255) NOT NULL,
     `role_description` TEXT DEFAULT NULL,
-    PRIMARY KEY (`role_id`),
+    PRIMARY KEY (`role_level`),
     UNIQUE KEY `uq_role_name` (`role_name`)
 )
     ENGINE = InnoDB
@@ -66,14 +66,14 @@ CREATE TABLE `user`
     `team_id`      INT UNSIGNED DEFAULT NULL,
     `room_number`  VARCHAR(50)  DEFAULT NULL,
     `dormitory_id` INT UNSIGNED DEFAULT NULL,
-    `role_id`      INT UNSIGNED NOT NULL,
+    `role_level`   INT UNSIGNED NOT NULL,
     `created_at`   DATETIME     DEFAULT CURRENT_TIMESTAMP,
     `deleted_at`   DATETIME     DEFAULT NULL,
     PRIMARY KEY (`user_id`),
     UNIQUE KEY `uq_telegram_id` (`telegram_id`),
     CONSTRAINT `fk_user_team` FOREIGN KEY (`team_id`) REFERENCES `team` (`team_id`) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT `fk_user_dormitory` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitory` (`dormitory_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT `fk_user_role` FOREIGN KEY (`role_id`) REFERENCES `role` (`role_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT `fk_user_role` FOREIGN KEY (`role_level`) REFERENCES `role` (`role_level`) ON DELETE RESTRICT ON UPDATE CASCADE
 )
     ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
