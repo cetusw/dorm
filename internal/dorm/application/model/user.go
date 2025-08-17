@@ -15,6 +15,7 @@ type User struct {
 	TeamId      uuid.UUID
 	RoomNumber  int
 	DormitoryId uuid.UUID
+	RoleLevel   int
 	CreatedAt   []uint8
 	DeletedAt   sql.Null[[]uint8]
 }

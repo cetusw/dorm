@@ -40,6 +40,7 @@ func (s *UserService) RegisterUser(fullName string, chatId int64) error {
 		TelegramId: chatId,
 		FirstName:  parts[0],
 		LastName:   parts[1],
+		RoleLevel:  1,
 	}
 	if len(parts) == 3 {
 		user.MiddleName = parts[2]

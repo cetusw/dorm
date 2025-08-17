@@ -1,8 +1,10 @@
 package main
 
 import (
+	"database/sql"
 	"dorm/internal/dorm/application/bot"
 	"dorm/internal/dorm/application/service"
+	"fmt"
 	"log"
 	"os"
 
@@ -19,18 +21,8 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 	log.Printf(".env file loaded successfully.")
-	userRepository, err := repository.NewUserRepository(
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASS"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"),
-	)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	log.Printf("Database connection established.")
-	defer userRepository.Close()
+	db := connectDatabase()
+	userRepository := repository.NewUserRepository(db)
 
 	telegram, err := infrastructure.NewTelegram(os.Getenv("BOT_TOKEN"))
 	if err != nil {
@@ -62,4 +54,26 @@ func main() {
 
 	log.Println("Dorm cleaning bot started...")
 	select {}
+}
+
+func connectDatabase() *sql.DB {
+	connStr := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true",
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASS"),
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_NAME"),
+	)
+	db, err := sql.Open("mysql", connStr)
+	if err != nil {
+		log.Fatalf("failed to open db connection: %v", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("failed to ping db: %v", err)
+	}
+	log.Println("Database connection successful!")
+
+	return db
 }

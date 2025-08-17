@@ -13,25 +13,13 @@ type UserRepository struct {
 	db *sql.DB
 }
 
-func NewUserRepository(dbUser, dbPass, dbHost, dbPort, dbName string) (*UserRepository, error) {
-	connStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPass, dbHost, dbPort, dbName)
-	db, err := sql.Open("mysql", connStr)
-	if err != nil {
-		return nil, err
-	}
-	if err := db.Ping(); err != nil {
-		return nil, err
-	}
-	return &UserRepository{db: db}, nil
-}
-
-func (r *UserRepository) Close() {
-	r.db.Close()
+func NewUserRepository(db *sql.DB) *UserRepository {
+	return &UserRepository{db: db}
 }
 
 func (r *UserRepository) Store(user *model.User) error {
-	query := "INSERT INTO user (user_id, telegram_id, first_name, last_name) VALUES (UUID_TO_BIN(?), ?, ?, ?)"
-	_, err := r.db.Exec(query, user.UserId, user.TelegramId, user.FirstName, user.LastName)
+	query := "INSERT INTO user (user_id, telegram_id, first_name, last_name, role_level) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)"
+	_, err := r.db.Exec(query, user.UserId, user.TelegramId, user.FirstName, user.LastName, user.RoleLevel)
 	if err != nil {
 		return fmt.Errorf("failed to save user: %w", err)
 	}
@@ -40,7 +28,7 @@ func (r *UserRepository) Store(user *model.User) error {
 
 func (r *UserRepository) Find(telegramId int64) (*model.User, error) {
 	user := &model.User{}
-	query := "SELECT user_id, telegram_id, first_name, last_name, middle_name, team_id, room_number, dormitory_id, created_at, deleted_at FROM user WHERE telegram_id = ?"
+	query := "SELECT user_id, telegram_id, first_name, last_name, middle_name, team_id, room_number, dormitory_id, role_level, deleted_at FROM user WHERE telegram_id = ?"
 
 	err := r.db.QueryRow(query, telegramId).Scan(
 		&user.UserId,
@@ -51,6 +39,7 @@ func (r *UserRepository) Find(telegramId int64) (*model.User, error) {
 		&user.TeamId,
 		&user.RoomNumber,
 		&user.DormitoryId,
+		&user.RoleLevel,
 		&user.CreatedAt,
 		&user.DeletedAt,
 	)
