@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"dorm/internal/dorm/application/bot"
+	"dorm/internal/dorm/application/scheduler"
 	"dorm/internal/dorm/application/service"
 	"fmt"
 	"log"
@@ -12,7 +13,6 @@ import (
 	"dorm/internal/dorm/infrastructure/mysql/repository"
 
 	"github.com/joho/godotenv"
-	"github.com/robfig/cron/v3"
 )
 
 func main() {
@@ -23,17 +23,29 @@ func main() {
 	log.Printf(".env file loaded successfully.")
 	db := connectDatabase()
 	userRepository := repository.NewUserRepository(db)
+	dutyRepository := repository.NewDutyRepository(db)
+	teamRepository := repository.NewTeamRepository(db)
 
 	telegram, err := infrastructure.NewTelegram(os.Getenv("BOT_TOKEN"))
 	if err != nil {
 		log.Fatalf("Failed to create Telegram client: %v", err)
 	}
-	//sheets, err := infrastructure.NewSheets(os.Getenv("SHEETS_CREDENTIALS"))
-	//if err != nil {
-	//	log.Fatalf("Failed to create Sheets client: %v", err)
-	//}
-	userService := service.NewUserService(userRepository, telegram)
+
+	sheets, err := infrastructure.NewSheets(os.Getenv("SHEETS_CREDENTIALS"), os.Getenv("SPREADSHEET_ID"))
+	if err != nil {
+		log.Fatalf("Failed to create Sheets client: %v", err)
+	}
+
+	userService := service.NewUserService(userRepository)
+	dutyService := service.NewDutyService(dutyRepository)
+	teamService := service.NewTeamService(teamRepository)
+	sheetsService := service.NewSheetsService(sheets)
+	cleaningService := service.NewCleaningService(sheetsService, dutyService, teamService)
 	botContext := bot.NewBot(telegram, userService)
+
+	s := scheduler.NewScheduler(cleaningService)
+	s.RegisterJobs()
+	s.Start()
 
 	updates := telegram.GetUpdates(telegram.Bot)
 
@@ -45,15 +57,6 @@ func main() {
 			botContext.State.HandleCallback(botContext, &update)
 		}
 	}
-
-	c := cron.New()
-	c.AddFunc("30 7 * * TUE,THU,SAT", func() {
-	})
-
-	c.Start()
-
-	log.Println("Dorm cleaning bot started...")
-	select {}
 }
 
 func connectDatabase() *sql.DB {

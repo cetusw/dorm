@@ -22,11 +22,10 @@ func (t *Telegram) SendMessage(chatID int64, text string) (int, error) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	sentMsg, err := t.Bot.Send(msg)
 	if err != nil {
-		log.Printf("Failed to send message: %v", err)
 		return 0, err
 	}
 
-	return sentMsg.MessageID, err
+	return sentMsg.MessageID, nil
 }
 
 func (t *Telegram) SendMessageWithReplyKeyboard(

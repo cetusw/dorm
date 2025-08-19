@@ -18,8 +18,8 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 }
 
 func (r *UserRepository) Store(user *model.User) error {
-	query := "INSERT INTO user (user_id, telegram_id, first_name, last_name, role_level) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)"
-	_, err := r.db.Exec(query, user.UserId, user.TelegramId, user.FirstName, user.LastName, user.RoleLevel)
+	query := "INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)"
+	_, err := r.db.Exec(query, user.UserId, user.TelegramId, user.FirstName, user.LastName, user.RoleID)
 	if err != nil {
 		return fmt.Errorf("failed to save user: %w", err)
 	}
@@ -28,7 +28,7 @@ func (r *UserRepository) Store(user *model.User) error {
 
 func (r *UserRepository) Find(telegramId int64) (*model.User, error) {
 	user := &model.User{}
-	query := "SELECT user_id, telegram_id, first_name, last_name, middle_name, team_id, room_number, dormitory_id, role_level, deleted_at FROM user WHERE telegram_id = ?"
+	query := "SELECT user_id, telegram_id, first_name, last_name, middle_name, team_id, room_number, dormitory_id, role_id, deleted_at FROM user WHERE telegram_id = ?"
 
 	err := r.db.QueryRow(query, telegramId).Scan(
 		&user.UserId,
@@ -39,7 +39,7 @@ func (r *UserRepository) Find(telegramId int64) (*model.User, error) {
 		&user.TeamId,
 		&user.RoomNumber,
 		&user.DormitoryId,
-		&user.RoleLevel,
+		&user.RoleID,
 		&user.CreatedAt,
 		&user.DeletedAt,
 	)

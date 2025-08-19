@@ -3,6 +3,7 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
+	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -16,6 +17,7 @@ func (s *RegistrationState) Handle(context *Bot, update *tgbotapi.Update) {
 	context.Telegram.ClearDialogue(chatID, update.Message.MessageID, context.LastMessageID)
 	err := context.UserService.RegisterUser(update.Message.Text, update.Message.From.ID)
 	if err != nil {
+		log.Println(err)
 		messageId, err := context.Telegram.SendMessage(chatID, message.RegistrationFail)
 		if err != nil || messageId == 0 {
 			return

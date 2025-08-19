@@ -2,7 +2,6 @@ package service
 
 import (
 	"dorm/internal/dorm/application/model"
-	"dorm/internal/dorm/infrastructure"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
 	"errors"
 	"strings"
@@ -12,13 +11,11 @@ import (
 
 type UserService struct {
 	userRepository *repository.UserRepository
-	telegram       *infrastructure.Telegram
 }
 
-func NewUserService(userRepository *repository.UserRepository, telegram *infrastructure.Telegram) *UserService {
+func NewUserService(userRepository *repository.UserRepository) *UserService {
 	return &UserService{
 		userRepository: userRepository,
-		telegram:       telegram,
 	}
 }
 
@@ -40,7 +37,7 @@ func (s *UserService) RegisterUser(fullName string, chatId int64) error {
 		TelegramId: chatId,
 		FirstName:  parts[0],
 		LastName:   parts[1],
-		RoleLevel:  1,
+		RoleID:     1,
 	}
 	if len(parts) == 3 {
 		user.MiddleName = parts[2]
