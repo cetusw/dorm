@@ -7,14 +7,14 @@ import (
 )
 
 type User struct {
-	UserId      uuid.UUID
-	TelegramId  int64
+	UserID      uuid.UUID
+	TelegramID  int64
 	FirstName   string
 	LastName    string
 	MiddleName  string
-	TeamId      uuid.UUID
+	TeamID      uuid.UUID
 	RoomNumber  int
-	DormitoryId uuid.UUID
+	DormitoryID uuid.UUID
 	RoleID      int
 	CreatedAt   []uint8
 	DeletedAt   sql.Null[[]uint8]

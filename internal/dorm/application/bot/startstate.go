@@ -12,34 +12,34 @@ type StartState struct {
 }
 
 func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
-	chatId := update.Message.Chat.ID
-	context.Telegram.DeleteMessage(chatId, update.Message.MessageID)
+	chatID := update.Message.Chat.ID
+	context.Telegram.DeleteMessage(chatID, update.Message.MessageID)
 	user, err := context.UserService.GetUser(update.Message.From.ID)
 	if err != nil {
-		messageId, err := context.Telegram.SendMessage(chatId, message.RegistrationFail)
-		if err != nil || messageId == 0 {
+		messageID, err := context.Telegram.SendMessage(chatID, message.RegistrationFail)
+		if err != nil || messageID == 0 {
 			return
 		}
-		context.LastMessageID = messageId
+		context.LastMessageID = messageID
 	}
 	if user == nil {
-		messageId, err := context.Telegram.SendMessage(chatId, message.Registration)
-		if err != nil || messageId == 0 {
+		messageID, err := context.Telegram.SendMessage(chatID, message.Registration)
+		if err != nil || messageID == 0 {
 			return
 		}
-		context.LastMessageID = messageId
+		context.LastMessageID = messageID
 		context.SetState(&RegistrationState{})
 		return
 	}
-	messageId, err := context.Telegram.SendMessageWithReplyKeyboard(
-		chatId,
+	messageID, err := context.Telegram.SendMessageWithReplyKeyboard(
+		chatID,
 		message.MainState,
 		keyboard.MainState,
 	)
-	if err != nil || messageId == 0 {
+	if err != nil || messageID == 0 {
 		return
 	}
-	context.LastMessageID = messageId
+	context.LastMessageID = messageID
 	context.SetState(&MainState{})
 }
 

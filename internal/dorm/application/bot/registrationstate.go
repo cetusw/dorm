@@ -18,22 +18,22 @@ func (s *RegistrationState) Handle(context *Bot, update *tgbotapi.Update) {
 	err := context.UserService.RegisterUser(update.Message.Text, update.Message.From.ID)
 	if err != nil {
 		log.Println(err)
-		messageId, err := context.Telegram.SendMessage(chatID, message.RegistrationFail)
-		if err != nil || messageId == 0 {
+		messageID, err := context.Telegram.SendMessage(chatID, message.RegistrationFail)
+		if err != nil || messageID == 0 {
 			return
 		}
-		context.LastMessageID = messageId
+		context.LastMessageID = messageID
 		return
 	}
-	messageId, err := context.Telegram.SendMessageWithReplyKeyboard(
+	messageID, err := context.Telegram.SendMessageWithReplyKeyboard(
 		chatID,
 		message.RegistrationSuccess,
 		keyboard.MainState,
 	)
-	if err != nil || messageId == 0 {
+	if err != nil || messageID == 0 {
 		return
 	}
-	context.LastMessageID = messageId
+	context.LastMessageID = messageID
 	context.SetState(&MainState{})
 }
 

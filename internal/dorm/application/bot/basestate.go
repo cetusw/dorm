@@ -42,11 +42,11 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) {
 		return
 	}
 
-	messageId, err := context.Telegram.SendMessageWithInlineKeyboard(chatID, text, buttons)
-	if err != nil || messageId == 0 {
+	messageID, err := context.Telegram.SendMessageWithInlineKeyboard(chatID, text, buttons)
+	if err != nil || messageID == 0 {
 		return
 	}
-	context.LastMessageID = messageId
+	context.LastMessageID = messageID
 	context.SetState(nextState)
 }
 

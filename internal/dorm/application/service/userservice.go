@@ -19,8 +19,8 @@ func NewUserService(userRepository *repository.UserRepository) *UserService {
 	}
 }
 
-func (s *UserService) RegisterUser(fullName string, chatId int64) error {
-	user, err := s.userRepository.Find(chatId)
+func (s *UserService) RegisterUser(fullName string, chatID int64) error {
+	user, err := s.userRepository.Find(chatID)
 	if err != nil {
 		return err
 	}
@@ -33,8 +33,8 @@ func (s *UserService) RegisterUser(fullName string, chatId int64) error {
 		return errors.New("invalid full name")
 	}
 	user = &model.User{
-		UserId:     uuid.New(),
-		TelegramId: chatId,
+		UserID:     uuid.New(),
+		TelegramID: chatID,
 		FirstName:  parts[0],
 		LastName:   parts[1],
 		RoleID:     1,
