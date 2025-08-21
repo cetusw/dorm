@@ -98,7 +98,7 @@ func (s *DutyTaskService) GetDutyTasks(dutyID uuid.UUID) ([]model.DutyTaskReadab
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating team rows: %w", err)
+		return nil, fmt.Errorf("error iterating tasksReadable rows: %w", err)
 	}
 
 	return dutyTasksReadable, nil

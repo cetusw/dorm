@@ -10,6 +10,7 @@ import (
 
 type CleaningService struct {
 	sheetsService   *SheetsService
+	userService     *UserService
 	dutyService     *DutyService
 	dutyTaskService *DutyTaskService
 	teamService     *TeamService
@@ -17,12 +18,14 @@ type CleaningService struct {
 
 func NewCleaningService(
 	sheetsService *SheetsService,
+	userService *UserService,
 	dutyService *DutyService,
 	dutyTaskService *DutyTaskService,
 	teamService *TeamService,
 ) *CleaningService {
 	return &CleaningService{
 		sheetsService:   sheetsService,
+		userService:     userService,
 		dutyService:     dutyService,
 		dutyTaskService: dutyTaskService,
 		teamService:     teamService,
@@ -54,7 +57,14 @@ func (s *CleaningService) StartNewWeek() error {
 	}
 	var dutyTasks []model.DutyTaskReadable
 	dutyTasks, err = s.dutyTaskService.GetDutyTasks(newDutyID)
-	err = s.sheetsService.CreateWeeklySheet(sheetTitle, teamColor, newDutyTeamID, dutyTasks)
+	if err != nil {
+		return err
+	}
+	users, err := s.userService.GetAllUsers()
+	if err != nil {
+		return err
+	}
+	err = s.sheetsService.CreateWeeklySheet(sheetTitle, teamColor, newDutyTeamID, dutyTasks, users)
 	if err != nil {
 		return err
 	}

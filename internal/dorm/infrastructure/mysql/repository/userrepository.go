@@ -52,3 +52,27 @@ func (r *UserRepository) Find(telegramID int64) (*model.User, error) {
 	}
 	return user, nil
 }
+
+func (r *UserRepository) FindAll() (*sql.Rows, error) {
+	query := `
+	SELECT 
+	    user_id, 
+	    telegram_id, 
+	    first_name, 
+	    last_name, 
+	    middle_name, 
+	    team_id, 
+	    room_number, 
+	    dormitory_id, 
+	    role_id, 
+	    created_at, 
+	    deleted_at 
+	FROM user`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users: %w", err)
+	}
+
+	return rows, nil
+}

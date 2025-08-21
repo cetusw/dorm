@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"golang.org/x/oauth2/google"
@@ -63,10 +64,44 @@ func (c *Sheets) WriteRange(sheetTitle, startCell string, data [][]interface{}) 
 		ValueInputOption("USER_ENTERED").
 		Do()
 
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to write data: %w", err)
+	}
+
+	return nil
 }
 
-func (c *Sheets) UpdateCell(sheetName, cell, value string) error {
-	// TODO: дописать логику для обновления ячейки
-	return nil
+func (c *Sheets) CreateSheetAndGetID(title string, color *sheets.Color) (*sheets.Sheet, error) {
+	properties := &sheets.SheetProperties{Title: title}
+	if color != nil {
+		properties.TabColor = color
+	}
+	req := &sheets.Request{
+		AddSheet: &sheets.AddSheetRequest{Properties: properties},
+	}
+	batchUpdateReq := &sheets.BatchUpdateSpreadsheetRequest{
+		Requests:                     []*sheets.Request{req},
+		IncludeSpreadsheetInResponse: true,
+	}
+	resp, err := c.srv.Spreadsheets.BatchUpdate(c.spreadsheetID, batchUpdateReq).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sheet: %w", err)
+	}
+	for _, s := range resp.UpdatedSpreadsheet.Sheets {
+		if s.Properties.Title == title {
+			return s, nil
+		}
+	}
+	return nil, fmt.Errorf("cannot find sheet '%s'", title)
+}
+
+func (c *Sheets) BatchUpdate(requests []*sheets.Request) error {
+	if len(requests) == 0 {
+		return nil
+	}
+	batchUpdateReq := &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: requests,
+	}
+	_, err := c.srv.Spreadsheets.BatchUpdate(c.spreadsheetID, batchUpdateReq).Do()
+	return err
 }

@@ -48,7 +48,7 @@ func main() {
 	)
 	teamService := service.NewTeamService(teamRepository)
 	sheetsService := service.NewSheetsService(sheets)
-	cleaningService := service.NewCleaningService(sheetsService, dutyService, dutyTaskService, teamService)
+	cleaningService := service.NewCleaningService(sheetsService, userService, dutyService, dutyTaskService, teamService)
 	botContext := bot.NewBot(telegram, userService)
 
 	s := scheduler.NewScheduler(cleaningService)
