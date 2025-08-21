@@ -19,7 +19,7 @@ func NewTaskRepository(db *sql.DB) *TaskRepository {
 }
 
 func (r *TaskRepository) Store(task *model.Task) error {
-	query := "INSERT INTO task (task_id, area_id, title, cost) VALUES (UUID_TO_BIN(?), ?, ?, ?)"
+	query := "INSERT INTO task (task_id, area_id, task_title, task_cost) VALUES (UUID_TO_BIN(?), ?, ?, ?)"
 	_, err := r.db.Exec(query, task.TaskID, task.AreaID, task.Title, task.Cost)
 	if err != nil {
 		return fmt.Errorf("failed to save task: %w", err)
@@ -29,7 +29,7 @@ func (r *TaskRepository) Store(task *model.Task) error {
 
 func (r *TaskRepository) Find(taskID uuid.UUID) (*model.Task, error) {
 	task := &model.Task{}
-	query := "SELECT task_id, area_id, title, cost FROM task WHERE task_id = ?"
+	query := "SELECT task_id, area_id, task_title, task_cost FROM task WHERE task_id = ?"
 
 	err := r.db.QueryRow(query, taskID).Scan(&task.TaskID, &task.AreaID, &task.Title, &task.Cost)
 
@@ -42,8 +42,8 @@ func (r *TaskRepository) Find(taskID uuid.UUID) (*model.Task, error) {
 	return task, nil
 }
 
-func (r *DutyRepository) FindAll() ([]model.Task, error) {
-	query := "SELECT task_id, area_id, title, cost FROM task"
+func (r *TaskRepository) FindAll() ([]model.Task, error) {
+	query := "SELECT task_id, area_id, task_title, task_cost FROM task"
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -67,4 +67,28 @@ func (r *DutyRepository) FindAll() ([]model.Task, error) {
 	}
 
 	return tasks, nil
+}
+
+func (r *TaskRepository) FindAllIDs() ([]uuid.UUID, error) {
+	query := "SELECT task_id FROM task"
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all task IDs: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan task ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating task IDs: %w", err)
+	}
+
+	return ids, nil
 }

@@ -30,13 +30,13 @@ func (s *TeamService) GetSortedTeamIDs() ([]int, error) {
 	return teamIDs, nil
 }
 
-func (s *TeamService) GetTeamColor(teamID int) (int, error) {
+func (s *TeamService) GetTeamColor(teamID int) (string, error) {
 	team, err := s.teamRepository.Find(teamID)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	if team == nil {
-		return 0, nil
+		return "", nil
 	}
 	return team.Color, nil
 }

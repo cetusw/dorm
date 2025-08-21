@@ -1,0 +1,29 @@
+package model
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type DutyTask struct {
+	DutyTaskID       uuid.UUID
+	DutyID           uuid.UUID
+	TaskID           uuid.UUID
+	AssigneeID       *uuid.UUID
+	ReviewerID       uuid.UUID
+	AssignmentDate   *time.Time
+	CompletionDate   *time.Time
+	VerificationDate *time.Time
+}
+
+type DutyTaskReadable struct {
+	AreaFloor         int
+	AreaName          string
+	TaskTitle         string
+	TaskCost          int
+	AssigneeFirstName *string
+	AssigneeLastName  *string
+	CompletionDate    *time.Time
+	VerificationDate  *time.Time
+}

@@ -18,7 +18,7 @@ func NewTeamRepository(db *sql.DB) *TeamRepository {
 }
 
 func (r *TeamRepository) Store(team *model.Team) error {
-	query := "INSERT INTO team (team_id, team_leader_id, color) VALUES (?, ?, ?)"
+	query := "INSERT INTO team (team_id, team_leader_id, team_color) VALUES (?, ?, ?)"
 	_, err := r.db.Exec(query, team.TeamLeaderID, team.Color)
 	if err != nil {
 		return fmt.Errorf("failed to save team: %w", err)
@@ -28,13 +28,13 @@ func (r *TeamRepository) Store(team *model.Team) error {
 
 func (r *TeamRepository) Find(teamID int) (*model.Team, error) {
 	team := &model.Team{}
-	query := "SELECT team_id, team_leader_id, color FROM team WHERE team_id = ?"
+	query := "SELECT team_id, team_leader_id, team_color FROM team WHERE team_id = ?"
 
 	err := r.db.QueryRow(query, teamID).Scan(&team.TeamID, &team.TeamLeaderID, &team.Color)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, fmt.Errorf("no rows in team: %w", err)
 		}
 		return nil, fmt.Errorf("failed to get team: %w", err)
 	}
@@ -42,7 +42,7 @@ func (r *TeamRepository) Find(teamID int) (*model.Team, error) {
 }
 
 func (r *TeamRepository) FindAll() ([]model.Team, error) {
-	query := "SELECT team_id, team_leader_id, color FROM team"
+	query := "SELECT team_id, team_leader_id, team_color FROM team"
 
 	rows, err := r.db.Query(query)
 	if err != nil {

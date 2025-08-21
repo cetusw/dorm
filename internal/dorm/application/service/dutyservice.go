@@ -18,15 +18,16 @@ func NewDutyService(dutyRepository *repository.DutyRepository) *DutyService {
 	}
 }
 
-func (s *DutyService) CreateNewDuty(teamID int, start time.Time, end time.Time) error {
+func (s *DutyService) CreateNewDuty(teamID int, start time.Time, end time.Time) (uuid.UUID, error) {
+	newDutyID := uuid.New()
 	duty := &model.Duty{
-		DutyID: uuid.New(),
+		DutyID: newDutyID,
 		TeamID: teamID,
 		Start:  start,
 		End:    end,
 	}
 
-	return s.dutyRepository.Store(duty)
+	return newDutyID, s.dutyRepository.Store(duty)
 }
 
 func (s *DutyService) GetLastDutyTeamID() (int, error) {

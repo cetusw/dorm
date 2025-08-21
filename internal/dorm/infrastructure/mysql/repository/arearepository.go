@@ -18,7 +18,7 @@ func NewAreaRepository(db *sql.DB) *AreaRepository {
 }
 
 func (r *AreaRepository) Store(area *model.Area) error {
-	query := "INSERT INTO area (floor, name) VALUES (?, ?)"
+	query := "INSERT INTO area (area_floor, area_name) VALUES (?, ?)"
 	_, err := r.db.Exec(query, area.Floor, area.Name)
 	if err != nil {
 		return fmt.Errorf("failed to save area: %w", err)
@@ -28,7 +28,7 @@ func (r *AreaRepository) Store(area *model.Area) error {
 
 func (r *AreaRepository) Find(areaFloor int, areaName string) (*model.Area, error) {
 	area := &model.Area{}
-	query := "SELECT area_id, floor, name FROM area WHERE floor = ? AND name = ?"
+	query := "SELECT area_id, area_floor, area_name FROM area WHERE area_floor = ? AND area_name = ?"
 
 	err := r.db.QueryRow(query, areaFloor, areaName).Scan(&area.AreaID, &area.Floor, &area.Name)
 

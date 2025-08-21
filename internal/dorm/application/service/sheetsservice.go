@@ -1,9 +1,11 @@
 package service
 
 import (
+	"dorm/internal/common/consts"
 	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure"
+	"fmt"
 )
 
 type SheetsService struct {
@@ -16,22 +18,44 @@ func NewSheetsService(sheets *infrastructure.Sheets) *SheetsService {
 	}
 }
 
-func (s *SheetsService) CreateWeeklySheet(title string, colorInt int, tasks []model.Task) error {
-	sheetsColor := utils.IntToSheetsColor(colorInt)
-	err := s.sheets.CreateSheet(title, sheetsColor)
+func (s *SheetsService) CreateWeeklySheet(title string, hexColor string, teamID int, dutyTasksReadable []model.DutyTaskReadable) error {
+	sheetsColor, err := utils.HexToSheetsColor(hexColor)
+	if err != nil {
+		return err
+	}
+	err = s.sheets.CreateSheet(title, sheetsColor)
 	if err != nil {
 		return err
 	}
 
 	var dataToWrite [][]interface{}
 
-	header := []interface{}{"Задача", "Описание", "Статус"}
-	dataToWrite = append(dataToWrite, header)
+	firstRowHeader := []interface{}{fmt.Sprintf(consts.CurrentTeamID, teamID)}
+	secondRowHeader := []interface{}{consts.Area, consts.Task, consts.Cost, consts.Assignee, consts.State}
+	dataToWrite = append(dataToWrite, firstRowHeader, secondRowHeader)
 
-	for _, task := range tasks {
+	for _, dutyTaskReadable := range dutyTasksReadable {
+		assignee := "Никто"
+		if dutyTaskReadable.AssigneeFirstName != nil && dutyTaskReadable.AssigneeLastName != nil {
+			firstName := *dutyTaskReadable.AssigneeFirstName
+			lastName := *dutyTaskReadable.AssigneeLastName
+			assignee = fmt.Sprintf("%s %s.", firstName, string([]rune(lastName)[0]))
+		}
+
+		state := "Не сделано"
+		if dutyTaskReadable.CompletionDate != nil {
+			state = "Сделано"
+		}
+		if dutyTaskReadable.VerificationDate != nil {
+			state = "Проверено"
+		}
+
 		row := []interface{}{
-			task.AreaID,
-			task.Title, // TODO: сделать нормальные данные
+			fmt.Sprintf("%d этаж. %s", dutyTaskReadable.AreaFloor, dutyTaskReadable.AreaName),
+			dutyTaskReadable.TaskTitle,
+			dutyTaskReadable.TaskCost,
+			assignee,
+			state,
 		}
 		dataToWrite = append(dataToWrite, row)
 	}

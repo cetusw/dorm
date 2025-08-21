@@ -4,9 +4,9 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `area`;
 CREATE TABLE `area`
 (
-    `area_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `floor`   INT DEFAULT NULL,
-    `name`    VARCHAR(255) NOT NULL,
+    `area_id`    INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `area_floor` INT DEFAULT NULL,
+    `area_name`  VARCHAR(255) NOT NULL,
     PRIMARY KEY (`area_id`)
 )
     ENGINE = InnoDB
@@ -48,7 +48,7 @@ CREATE TABLE `team`
 (
     `team_id`        INT UNSIGNED NOT NULL,
     `team_leader_id` BINARY(16) DEFAULT NULL,
-    `color`          INT        DEFAULT NULL,
+    `team_color`     VARCHAR(6) DEFAULT NULL,
     PRIMARY KEY (`team_id`)
 )
     ENGINE = InnoDB
@@ -87,10 +87,10 @@ ALTER TABLE `team`
 DROP TABLE IF EXISTS `task`;
 CREATE TABLE `task`
 (
-    `task_id` BINARY(16)   NOT NULL,
-    `area_id` INT UNSIGNED NOT NULL,
-    `title`   VARCHAR(255) NOT NULL,
-    `cost`    INT          NOT NULL DEFAULT 0,
+    `task_id`    BINARY(16)   NOT NULL,
+    `area_id`    INT UNSIGNED NOT NULL,
+    `task_title` VARCHAR(255) NOT NULL,
+    `task_cost`  INT          NOT NULL DEFAULT 0,
     PRIMARY KEY (`task_id`),
     CONSTRAINT `fk_task_area` FOREIGN KEY (`area_id`) REFERENCES `area` (`area_id`) ON DELETE RESTRICT ON UPDATE CASCADE
 )
@@ -102,10 +102,10 @@ CREATE TABLE `task`
 DROP TABLE IF EXISTS `duty`;
 CREATE TABLE `duty`
 (
-    `duty_id`    BINARY(16)   NOT NULL,
-    `team_id`    INT UNSIGNED NOT NULL,
-    `start_date` TIMESTAMP    NOT NULL,
-    `end_date`   TIMESTAMP    NOT NULL,
+    `duty_id`         BINARY(16)   NOT NULL,
+    `team_id`         INT UNSIGNED NOT NULL,
+    `duty_start_date` TIMESTAMP    NOT NULL,
+    `duty_end_date`   TIMESTAMP    NOT NULL,
     PRIMARY KEY (`duty_id`),
     CONSTRAINT `fk_duty_team` FOREIGN KEY (`team_id`) REFERENCES `team` (`team_id`) ON DELETE CASCADE ON UPDATE CASCADE
 )
@@ -117,12 +117,12 @@ CREATE TABLE `duty`
 DROP TABLE IF EXISTS `penalty`;
 CREATE TABLE `penalty`
 (
-    `penalty_id`  BINARY(16) NOT NULL,
-    `user_id`     BINARY(16) NOT NULL,
-    `reason`      TEXT       NOT NULL,
-    `resolution`  TEXT                DEFAULT NULL,
-    `created_at`  TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `resolved_at` TIMESTAMP           DEFAULT NULL,
+    `penalty_id`         BINARY(16) NOT NULL,
+    `user_id`            BINARY(16) NOT NULL,
+    `penalty_reason`     TEXT       NOT NULL,
+    `penalty_resolution` TEXT                DEFAULT NULL,
+    `created_at`         TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `resolved_at`        TIMESTAMP           DEFAULT NULL,
     PRIMARY KEY (`penalty_id`),
     CONSTRAINT `fk_penalty_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 )
@@ -134,11 +134,11 @@ CREATE TABLE `penalty`
 DROP TABLE IF EXISTS `user_availability`;
 CREATE TABLE `user_availability`
 (
-    `availability_id` BINARY(16) NOT NULL,
-    `user_id`         BINARY(16) NOT NULL,
-    `start_date`      TIMESTAMP  NOT NULL,
-    `end_date`        TIMESTAMP  NOT NULL,
-    `isAvailable`     BOOLEAN    NOT NULL DEFAULT TRUE,
+    `availability_id`   BINARY(16) NOT NULL,
+    `user_id`           BINARY(16) NOT NULL,
+    `start_date`        TIMESTAMP  NOT NULL,
+    `end_date`          TIMESTAMP  NOT NULL,
+    `is_user_available` BOOLEAN    NOT NULL DEFAULT TRUE,
     PRIMARY KEY (`availability_id`),
     CONSTRAINT `fk_availability_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 )
@@ -153,9 +153,9 @@ CREATE TABLE `duty_task`
     `duty_task_id`      BINARY(16) NOT NULL,
     `duty_id`           BINARY(16) NOT NULL,
     `task_id`           BINARY(16) NOT NULL,
-    `assignee_id`       BINARY(16) NOT NULL,
+    `assignee_id`       BINARY(16) DEFAULT NULL,
     `reviewer_id`       BINARY(16) DEFAULT NULL,
-    `assignment_date`   TIMESTAMP  NOT NULL,
+    `assignment_date`   TIMESTAMP  DEFAULT NULL,
     `completion_date`   TIMESTAMP  DEFAULT NULL,
     `verification_date` TIMESTAMP  DEFAULT NULL,
     PRIMARY KEY (`duty_task_id`),

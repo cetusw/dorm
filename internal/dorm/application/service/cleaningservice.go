@@ -4,23 +4,28 @@ import (
 	"dorm/internal/dorm/application/model"
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type CleaningService struct {
-	sheetsService *SheetsService
-	dutyService   *DutyService
-	teamService   *TeamService
+	sheetsService   *SheetsService
+	dutyService     *DutyService
+	dutyTaskService *DutyTaskService
+	teamService     *TeamService
 }
 
 func NewCleaningService(
 	sheetsService *SheetsService,
 	dutyService *DutyService,
+	dutyTaskService *DutyTaskService,
 	teamService *TeamService,
 ) *CleaningService {
 	return &CleaningService{
-		sheetsService: sheetsService,
-		dutyService:   dutyService,
-		teamService:   teamService,
+		sheetsService:   sheetsService,
+		dutyService:     dutyService,
+		dutyTaskService: dutyTaskService,
+		teamService:     teamService,
 	}
 }
 
@@ -33,17 +38,23 @@ func (s *CleaningService) StartNewWeek() error {
 	if err != nil {
 		return err
 	}
-	err = s.dutyService.CreateNewDuty(newDutyTeamID, startTime, endTime)
+	var newDutyID uuid.UUID
+	newDutyID, err = s.dutyService.CreateNewDuty(newDutyTeamID, startTime, endTime)
 	if err != nil {
 		return err
 	}
-	var teamColor int
+	err = s.dutyTaskService.SetDutyTasks(newDutyID)
+	if err != nil {
+		return err
+	}
+	var teamColor string
 	teamColor, err = s.teamService.GetTeamColor(newDutyTeamID)
 	if err != nil {
 		return err
 	}
-	var tasks []model.Task
-	err = s.sheetsService.CreateWeeklySheet(sheetTitle, teamColor)
+	var dutyTasks []model.DutyTaskReadable
+	dutyTasks, err = s.dutyTaskService.GetDutyTasks(newDutyID)
+	err = s.sheetsService.CreateWeeklySheet(sheetTitle, teamColor, newDutyTeamID, dutyTasks)
 	if err != nil {
 		return err
 	}
