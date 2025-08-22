@@ -25,10 +25,10 @@ func (s *RegistrationState) Handle(context *Bot, update *tgbotapi.Update) {
 		context.LastMessageID = messageID
 		return
 	}
-	messageID, err := context.Telegram.SendMessageWithReplyKeyboard(
+	messageID, err := context.Telegram.SendMessageWithMarkup(
 		chatID,
 		message.RegistrationSuccess,
-		keyboard.MainState,
+		keyboard.BuildMainStateKeyboard(),
 	)
 	if err != nil || messageID == 0 {
 		return

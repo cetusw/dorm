@@ -40,3 +40,39 @@ func (r *AreaRepository) Find(areaFloor int, areaName string) (*model.Area, erro
 	}
 	return area, nil
 }
+
+func (r *AreaRepository) FindAll() ([]model.Area, error) {
+	query := `
+		SELECT 
+		    area_id, 
+		    area_floor, 
+		    area_name 
+		FROM area 
+		ORDER BY area_floor DESC, area_name DESC`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query areas: %w", err)
+	}
+	defer rows.Close()
+
+	var areas []model.Area
+
+	for rows.Next() {
+		var area model.Area
+		if err := rows.Scan(
+			&area.AreaID,
+			&area.Floor,
+			&area.Name,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan area row: %w", err)
+		}
+		areas = append(areas, area)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating area rows: %w", err)
+	}
+
+	return areas, nil
+}

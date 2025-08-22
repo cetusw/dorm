@@ -71,35 +71,10 @@ func (s *DutyTaskService) SetDutyTasks(dutyID uuid.UUID) error {
 	return nil
 }
 
-func (s *DutyTaskService) GetDutyTasks(dutyID uuid.UUID) ([]model.DutyTaskReadable, error) {
-	rows, err := s.dutyTaskRepository.GetDutyTaskRows(dutyID)
-	if err != nil {
-		return nil, err
-	}
+func (s *DutyTaskService) GetDutyTasksReadable(dutyID uuid.UUID) ([]model.DutyTaskReadable, error) {
+	return s.dutyTaskRepository.FindReadableTasksByDutyID(dutyID)
+}
 
-	var dutyTasksReadable []model.DutyTaskReadable
-
-	for rows.Next() {
-		var dutyTaskReadable model.DutyTaskReadable
-		if err := rows.Scan(
-			&dutyTaskReadable.AreaFloor,
-			&dutyTaskReadable.AreaName,
-			&dutyTaskReadable.TaskTitle,
-			&dutyTaskReadable.TaskCost,
-			&dutyTaskReadable.AssigneeFirstName,
-			&dutyTaskReadable.AssigneeLastName,
-			&dutyTaskReadable.CompletionDate,
-			&dutyTaskReadable.VerificationDate,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan tasksReadable row: %w", err)
-		}
-
-		dutyTasksReadable = append(dutyTasksReadable, dutyTaskReadable)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating tasksReadable rows: %w", err)
-	}
-
-	return dutyTasksReadable, nil
+func (s *DutyTaskService) GetCurrentDutyTasksByAssigneeID(assigneeID uuid.UUID) ([]model.DutyTask, error) {
+	return s.dutyTaskRepository.FindCurrentDutyTasksByAssigneeID(assigneeID)
 }

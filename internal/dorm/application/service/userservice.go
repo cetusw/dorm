@@ -4,7 +4,6 @@ import (
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -53,37 +52,5 @@ func (s *UserService) GetUser(id int64) (*model.User, error) {
 }
 
 func (s *UserService) GetAllUsers() ([]model.User, error) {
-	rows, err := s.userRepository.FindAll()
-	if err != nil {
-		return nil, err
-	}
-
-	var users []model.User
-
-	for rows.Next() {
-		var user model.User
-		if err := rows.Scan(
-			&user.UserID,
-			&user.TelegramID,
-			&user.FirstName,
-			&user.LastName,
-			&user.MiddleName,
-			&user.TeamID,
-			&user.RoomNumber,
-			&user.DormitoryID,
-			&user.RoleID,
-			&user.CreatedAt,
-			&user.DeletedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan users row: %w", err)
-		}
-
-		users = append(users, user)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating user rows: %w", err)
-	}
-
-	return users, nil
+	return s.userRepository.FindAll()
 }

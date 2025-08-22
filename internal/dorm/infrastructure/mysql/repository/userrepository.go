@@ -28,7 +28,21 @@ func (r *UserRepository) Store(user *model.User) error {
 
 func (r *UserRepository) Find(telegramID int64) (*model.User, error) {
 	user := &model.User{}
-	query := "SELECT user_id, telegram_id, first_name, last_name, middle_name, team_id, room_number, dormitory_id, role_id, deleted_at FROM user WHERE telegram_id = ?"
+	query := `
+		SELECT 
+		    user_id, 
+		    telegram_id, 
+		    first_name, 
+		    last_name, 
+		    middle_name, 
+		    team_id, 
+		    room_number, 
+		    dormitory_id, 
+		    role_id,
+		    created_at,
+		    deleted_at 
+		FROM user 
+		WHERE telegram_id = ?`
 
 	err := r.db.QueryRow(query, telegramID).Scan(
 		&user.UserID,
@@ -53,26 +67,53 @@ func (r *UserRepository) Find(telegramID int64) (*model.User, error) {
 	return user, nil
 }
 
-func (r *UserRepository) FindAll() (*sql.Rows, error) {
+func (r *UserRepository) FindAll() ([]model.User, error) {
 	query := `
-	SELECT 
-	    user_id, 
-	    telegram_id, 
-	    first_name, 
-	    last_name, 
-	    middle_name, 
-	    team_id, 
-	    room_number, 
-	    dormitory_id, 
-	    role_id, 
-	    created_at, 
-	    deleted_at 
-	FROM user`
+		SELECT 
+			user_id, 
+			telegram_id, 
+			first_name, 
+			last_name, 
+			middle_name, 
+			team_id, 
+			room_number, 
+			dormitory_id, 
+			role_id, 
+			created_at, 
+			deleted_at 
+		FROM user`
 
 	rows, err := r.db.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query users: %w", err)
+		return nil, fmt.Errorf("failed to query all users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []model.User
+
+	for rows.Next() {
+		var user model.User
+		if err := rows.Scan(
+			&user.UserID,
+			&user.TelegramID,
+			&user.FirstName,
+			&user.LastName,
+			&user.MiddleName,
+			&user.TeamID,
+			&user.RoomNumber,
+			&user.DormitoryID,
+			&user.RoleID,
+			&user.CreatedAt,
+			&user.DeletedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan user row: %w", err)
+		}
+		users = append(users, user)
 	}
 
-	return rows, nil
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating user rows: %w", err)
+	}
+
+	return users, nil
 }

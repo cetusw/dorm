@@ -28,79 +28,28 @@ func (t *Telegram) SendMessage(chatID int64, text string) (int, error) {
 	return sentMsg.MessageID, nil
 }
 
-func (t *Telegram) SendMessageWithReplyKeyboard(
+func (t *Telegram) SendMessageWithMarkup(
 	chatID int64,
 	text string,
-	buttons [][]string,
+	keyboard interface{},
 ) (int, error) {
-	var rows [][]tgbotapi.KeyboardButton
-	for _, buttonRow := range buttons {
-		var row []tgbotapi.KeyboardButton
-		for _, buttonText := range buttonRow {
-			row = append(row, tgbotapi.NewKeyboardButton(buttonText))
-		}
-		rows = append(rows, row)
-	}
-
-	keyboard := tgbotapi.NewReplyKeyboard(rows...)
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = keyboard
 
 	sentMsg, err := t.Bot.Send(msg)
 	if err != nil {
-		log.Printf("Failed to send message with reply keyboard: %v", err)
-		return 0, err
-	}
-
-	return sentMsg.MessageID, nil
-}
-
-func (t *Telegram) SendMessageWithInlineKeyboard(
-	chatID int64,
-	text string,
-	buttons [][]string,
-) (int, error) {
-	var rows [][]tgbotapi.InlineKeyboardButton
-
-	for _, buttonRow := range buttons {
-		var row []tgbotapi.InlineKeyboardButton
-		for _, buttonText := range buttonRow {
-			btn := tgbotapi.NewInlineKeyboardButtonData(buttonText, buttonText)
-			row = append(row, btn)
-		}
-		rows = append(rows, row)
-	}
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
-
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ReplyMarkup = keyboard
-
-	sentMsg, err := t.Bot.Send(msg)
-	if err != nil {
-		log.Printf("Failed to send message with inline keyboard: %v", err)
+		log.Printf("Failed to send message with markup: %v", err)
 		return 0, err
 	}
 	return sentMsg.MessageID, nil
 }
 
-func (t *Telegram) EditMessageTextAndKeyboard(
+func (t *Telegram) EditMessageWithMarkup(
 	chatID int64,
 	messageID int,
 	text string,
-	buttons [][]string,
+	keyboard tgbotapi.InlineKeyboardMarkup,
 ) {
-	var rows [][]tgbotapi.InlineKeyboardButton
-	for _, buttonRow := range buttons {
-		var row []tgbotapi.InlineKeyboardButton
-		for _, buttonText := range buttonRow {
-			btn := tgbotapi.NewInlineKeyboardButtonData(buttonText, buttonText)
-			row = append(row, btn)
-		}
-		rows = append(rows, row)
-	}
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
 	editMsg := tgbotapi.NewEditMessageTextAndMarkup(chatID, messageID, text, keyboard)
 
 	_, err := t.Bot.Send(editMsg)

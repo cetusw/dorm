@@ -16,15 +16,15 @@ func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Up
 	callbackQueryID := update.CallbackQuery.ID
 	context.Telegram.AnswerCallbackQuery(callbackQueryID, "")
 	var text string
-	var buttons [][]string
+	var buttons tgbotapi.InlineKeyboardMarkup
 	var nextState State
 	switch update.CallbackQuery.Data {
 	case message.Back:
 		text = message.TaskManagementState
-		buttons = keyboard.TaskManagementState
+		buttons = keyboard.BuildTaskManagementKeyboard()
 		nextState = &TaskManagementState{}
 	}
-	context.Telegram.EditMessageTextAndKeyboard(chatID, context.LastMessageID, text, buttons)
+	context.Telegram.EditMessageWithMarkup(chatID, context.LastMessageID, text, buttons)
 	context.SetState(nextState)
 }
 

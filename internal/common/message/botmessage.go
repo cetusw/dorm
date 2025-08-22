@@ -10,6 +10,12 @@ const (
 	TeamManagementState    = "Здесь вы можете узнать подробнее о своей команде и график уборок"
 	AreaSelectionState     = "Выберите зону уборки:"
 	ConfirmExecutionState  = "Выберите задачу для подтверждения:"
+	TaskAssignmentState    = "Выберите задачу, которую готовы выполнить:"
 	TaskUnassignmentState  = "Выберите задачу для снятия бронирования.\nВаши баллы: 0" // TODO: сделать динамический подсчёт баллов
 	TaskManagementState    = "Здесь вы можете управлять своими задачами по уборке"
+)
+
+const (
+	ErrorWhileGettingArea      = "Ошибка получения зон уборки, повторите позже"
+	ErrorWhileGettingDutyTasks = "Ошибка получения задач текущего дежурства, повторите позже"
 )

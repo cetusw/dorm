@@ -55,8 +55,8 @@ func (s *CleaningService) StartNewWeek() error {
 	if err != nil {
 		return err
 	}
-	var dutyTasks []model.DutyTaskReadable
-	dutyTasks, err = s.dutyTaskService.GetDutyTasks(newDutyID)
+	var dutyTasksReadable []model.DutyTaskReadable
+	dutyTasksReadable, err = s.dutyTaskService.GetDutyTasksReadable(newDutyID)
 	if err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func (s *CleaningService) StartNewWeek() error {
 	if err != nil {
 		return err
 	}
-	err = s.sheetsService.CreateWeeklySheet(sheetTitle, teamColor, newDutyTeamID, dutyTasks, users)
+	err = s.sheetsService.CreateWeeklySheet(sheetTitle, teamColor, newDutyTeamID, dutyTasksReadable, users)
 	if err != nil {
 		return err
 	}

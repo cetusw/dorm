@@ -5,6 +5,7 @@ import (
 	"dorm/internal/dorm/application/model"
 	"fmt"
 	"strings"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
@@ -60,27 +61,102 @@ func (r *DutyTaskRepository) StoreBatch(dutyTasks []model.DutyTask) error {
 	return nil
 }
 
-func (r *DutyTaskRepository) GetDutyTaskRows(dutyID uuid.UUID) (*sql.Rows, error) {
+func (r *DutyTaskRepository) FindReadableTasksByDutyID(dutyID uuid.UUID) ([]model.DutyTaskReadable, error) {
 	query := `
-	SELECT 
-	    a.area_floor,
-	    a.area_name, 
-	    t.task_title, 
-	    t.task_cost, 
-	    u.first_name, 
-	    u.last_name, 
-	    dt.completion_date, 
-	    dt.verification_date 
-	FROM duty_task dt 
-	    INNER JOIN task t ON dt.task_id = t.task_id 
-	    INNER JOIN area a ON a.area_id = t.area_id 
-	    LEFT JOIN user u ON u.user_id = dt.assignee_id 
-	WHERE dt.duty_id = UUID_TO_BIN(?)`
+		SELECT 
+			a.area_floor, 
+			a.area_name, 
+			t.task_title, 
+			t.task_cost, 
+			u.first_name, 
+			u.last_name, 
+			dt.completion_date, 
+			dt.verification_date 
+		FROM duty_task dt 
+			INNER JOIN task t ON dt.task_id = t.task_id 
+			INNER JOIN area a ON a.area_id = t.area_id 
+			LEFT JOIN user u ON u.user_id = dt.assignee_id 
+		WHERE dt.duty_id = ?`
 
 	rows, err := r.db.Query(query, dutyID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query tasksReadable: %w", err)
+		return nil, fmt.Errorf("failed to query readable tasks for duty %s: %w", dutyID, err)
+	}
+	defer rows.Close()
+
+	var tasksReadable []model.DutyTaskReadable
+
+	for rows.Next() {
+		var taskReadable model.DutyTaskReadable
+		if err := rows.Scan(
+			&taskReadable.AreaFloor,
+			&taskReadable.AreaName,
+			&taskReadable.TaskTitle,
+			&taskReadable.TaskCost,
+			&taskReadable.AssigneeFirstName,
+			&taskReadable.AssigneeLastName,
+			&taskReadable.CompletionDate,
+			&taskReadable.VerificationDate,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan readable task row: %w", err)
+		}
+
+		tasksReadable = append(tasksReadable, taskReadable)
 	}
 
-	return rows, nil
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating readable task rows: %w", err)
+	}
+
+	return tasksReadable, nil
+}
+
+// TODO: придумать, что делать, если дежурство прошло, но человек всё равно хочет увидеть задачи за прошлую неделю, которые он не выполнил
+func (r *DutyTaskRepository) FindCurrentDutyTasksByAssigneeID(assigneeID uuid.UUID) ([]model.DutyTask, error) {
+	now := time.Now()
+	query := `
+		SELECT 
+		    dt.duty_task_id, 
+		    dt.duty_id, 
+		    dt.task_id, 
+		    dt.assignee_id, 
+		    dt.reviewer_id, 
+		    dt.assignment_date, 
+		    dt.completion_date, 
+		    dt.verification_date
+		FROM duty_task dt
+			INNER JOIN duty d ON dt.duty_id = d.duty_id
+		WHERE d.duty_start_date < ? AND d.duty_end_date > ? AND dt.assignee_id = ?`
+
+	rows, err := r.db.Query(query, now, now, assigneeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query current duty_task by assignee id %s: %w", assigneeID, err)
+	}
+	defer rows.Close()
+
+	var dutyTasks []model.DutyTask
+
+	for rows.Next() {
+		var dutyTask model.DutyTask
+		if err := rows.Scan(
+			&dutyTask.DutyTaskID,
+			&dutyTask.DutyID,
+			&dutyTask.TaskID,
+			&dutyTask.AssigneeID,
+			&dutyTask.ReviewerID,
+			&dutyTask.AssignmentDate,
+			&dutyTask.CompletionDate,
+			&dutyTask.VerificationDate,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan current duty_task row: %w", err)
+		}
+
+		dutyTasks = append(dutyTasks, dutyTask)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating readable task rows: %w", err)
+	}
+
+	return dutyTasks, nil
 }

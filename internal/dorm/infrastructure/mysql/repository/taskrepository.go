@@ -92,3 +92,40 @@ func (r *TaskRepository) FindAllIDs() ([]uuid.UUID, error) {
 
 	return ids, nil
 }
+
+func (r *TaskRepository) FindTasksByAreaID(areaID int) ([]model.Task, error) {
+	query := `
+		SELECT 
+		    task_id,
+		    area_id,
+		    task_title,
+		    task_cost
+		FROM task
+		WHERE area_id = ?`
+	rows, err := r.db.Query(query, areaID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []model.Task
+
+	for rows.Next() {
+		var task model.Task
+		if err := rows.Scan(
+			&task.TaskID,
+			&task.AreaID,
+			&task.Title,
+			&task.Cost,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan task row: %w", err)
+		}
+		tasks = append(tasks, task)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating task rows: %w", err)
+	}
+
+	return tasks, nil
+}

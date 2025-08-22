@@ -27,6 +27,7 @@ func main() {
 	dutyTaskRepository := repository.NewDutyTaskRepository(db)
 	teamRepository := repository.NewTeamRepository(db)
 	taskRepository := repository.NewTaskRepository(db)
+	areaRepository := repository.NewAreaRepository(db)
 
 	telegram, err := infrastructure.NewTelegram(os.Getenv("BOT_TOKEN"))
 	if err != nil {
@@ -47,9 +48,23 @@ func main() {
 		teamRepository,
 	)
 	teamService := service.NewTeamService(teamRepository)
+	taskService := service.NewTaskService(taskRepository)
 	sheetsService := service.NewSheetsService(sheets)
-	cleaningService := service.NewCleaningService(sheetsService, userService, dutyService, dutyTaskService, teamService)
-	botContext := bot.NewBot(telegram, userService)
+	cleaningService := service.NewCleaningService(
+		sheetsService,
+		userService,
+		dutyService,
+		dutyTaskService,
+		teamService,
+	)
+	areaService := service.NewAreaService(areaRepository)
+	botContext := bot.NewBot(
+		telegram,
+		userService,
+		areaService,
+		taskService,
+		dutyTaskService,
+	)
 
 	s := scheduler.NewScheduler(cleaningService)
 	s.RegisterJobs()

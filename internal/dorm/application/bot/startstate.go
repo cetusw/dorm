@@ -31,10 +31,10 @@ func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
 		context.SetState(&RegistrationState{})
 		return
 	}
-	messageID, err := context.Telegram.SendMessageWithReplyKeyboard(
+	messageID, err := context.Telegram.SendMessageWithMarkup(
 		chatID,
 		message.MainState,
-		keyboard.MainState,
+		keyboard.BuildMainStateKeyboard(),
 	)
 	if err != nil || messageID == 0 {
 		return
