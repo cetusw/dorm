@@ -16,7 +16,7 @@ const (
 )
 
 func BuildMainStateKeyboard() tgbotapi.ReplyKeyboardMarkup {
-	keyboard := buildReplyKeyboard(
+	return buildReplyKeyboard(
 		[]buttonInfo{
 			{message.Tasks, message.Tasks},
 			{message.Team, message.Team},
@@ -24,8 +24,6 @@ func BuildMainStateKeyboard() tgbotapi.ReplyKeyboardMarkup {
 			{message.Profile, message.Profile},
 		},
 	)
-	keyboard.OneTimeKeyboard = false
-	return keyboard
 }
 
 func BuildTaskManagementKeyboard() tgbotapi.InlineKeyboardMarkup {
@@ -62,7 +60,7 @@ func BuildAreaKeyboard(areas []model.Area) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-func BuildTaskAssignmentKeyboard(unassignedTasks []model.DutyTaskReadable) tgbotapi.InlineKeyboardMarkup {
+func BuildTaskAssignmentKeyboard(unassignedTasks []model.DutyTaskView) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, task := range unassignedTasks {
 		callbackData := fmt.Sprintf("%s%s", CallbackPrefixAssign, task.TaskID)
@@ -73,11 +71,11 @@ func BuildTaskAssignmentKeyboard(unassignedTasks []model.DutyTaskReadable) tgbot
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-func BuildConfirmExecutionKeyboard(assignedTasks []model.DutyTaskReadable) tgbotapi.InlineKeyboardMarkup {
+func BuildConfirmExecutionKeyboard(assignedTasks []model.DutyTaskView) tgbotapi.InlineKeyboardMarkup {
 	return buildAssignedTaskKeyboard(assignedTasks, CallbackPrefixConfirm)
 }
 
-func BuildTaskUnassignmentKeyboard(assignedTasks []model.DutyTaskReadable) tgbotapi.InlineKeyboardMarkup {
+func BuildTaskUnassignmentKeyboard(assignedTasks []model.DutyTaskView) tgbotapi.InlineKeyboardMarkup {
 	return buildAssignedTaskKeyboard(assignedTasks, CallbackPrefixUnassign)
 }
 
@@ -109,7 +107,7 @@ func buildReplyKeyboard(buttons []buttonInfo) tgbotapi.ReplyKeyboardMarkup {
 	return keyboard
 }
 
-func buildAssignedTaskKeyboard(dutyTasks []model.DutyTaskReadable, callbackPrefix string) tgbotapi.InlineKeyboardMarkup {
+func buildAssignedTaskKeyboard(dutyTasks []model.DutyTaskView, callbackPrefix string) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, dutyTask := range dutyTasks {
 		buttonText := fmt.Sprintf("%d этаж %s: %s", dutyTask.AreaFloor, dutyTask.AreaName, dutyTask.TaskTitle)

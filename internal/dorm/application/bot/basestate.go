@@ -5,6 +5,8 @@ import (
 	"dorm/internal/common/message"
 	"dorm/internal/dorm/application/model"
 	"fmt"
+	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
@@ -42,7 +44,48 @@ func (s *baseState) SendReplyAndGo(context *Bot, chatID int64, text string, butt
 	context.SetState(next)
 }
 
-func (s *baseState) GetUncompletedDutyTasksReadable(context *Bot, update *tgbotapi.Update) ([]model.DutyTaskReadable, error) {
+func (s *AreaSelectionState) GetAreaID(callbackData string) (int, error) {
+	areaIDStr := strings.TrimPrefix(callbackData, keyboard.CallbackPrefixArea)
+	areaID, err := strconv.Atoi(areaIDStr)
+	if err != nil {
+		return 0, fmt.Errorf("ERROR: invalid area ID in callback: %v", err)
+	}
+
+	return areaID, nil
+}
+
+func (s *AreaSelectionState) GetCurrentDuty(context *Bot) (*model.Duty, error) {
+	duty, err := context.DutyService.GetCurrentDuty()
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: failed to get last duty: %v", err)
+	}
+
+	return duty, nil
+}
+
+func (s *AreaSelectionState) GetUnassignedTasks(
+	context *Bot,
+	areaID int,
+	dutyID uuid.UUID,
+) ([]model.DutyTaskView, error) {
+	tasks, err := context.DutyTaskService.GetUnassignedDutyTasksView(areaID, dutyID)
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: failed to get unassigned tasks for area %d: %v", areaID, err)
+	}
+
+	return tasks, nil
+}
+
+func (s *AreaSelectionState) GetUser(context *Bot, chatID int64) (*model.User, error) {
+	user, err := context.UserService.GetUser(chatID)
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
+	}
+
+	return user, nil
+}
+
+func (s *baseState) GetUncompletedDutyTasksView(context *Bot, update *tgbotapi.Update) ([]model.DutyTaskView, error) {
 	user, err := context.UserService.GetUser(update.CallbackQuery.From.ID)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
@@ -51,7 +94,7 @@ func (s *baseState) GetUncompletedDutyTasksReadable(context *Bot, update *tgbota
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: failed to get last duty tasks: %v", err)
 	}
-	dutyTasksReadable, err := context.DutyTaskService.GetUncompletedDutyTasksReadableByAssigneeIDAndDutyID(user.UserID, lastDuty.DutyID)
+	dutyTasksReadable, err := context.DutyTaskService.GetUncompletedDutyTasksView(user.UserID, lastDuty.DutyID)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: failed to get areas for keyboard: %v", err)
 	}
@@ -83,7 +126,7 @@ func (s *baseState) GetPointsSummary(
 	return up, all / len(teamUsers), nil
 }
 
-func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) {
+func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 	chatID := update.Message.Chat.ID
 	var text string
 	context.Telegram.DeleteMessage(chatID, update.Message.MessageID)
@@ -92,30 +135,28 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) {
 	case message.Tasks:
 		text = message.TaskManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
-		return
 	case message.Team:
 		text = message.TeamManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTeamManagementKeyboard(), &TeamManagementState{})
-		return
 	case message.Payment:
 		text = message.PaymentManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildBackKeyboard(), &PaymentManagementState{})
-		return
 	case message.Profile:
 		text = message.Profile // TODO: сделать профиль
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildBackKeyboard(), &ProfileManagementState{})
-		return
 	default:
 		messageID, err := context.Telegram.SendMessage(chatID, message.Please)
 		if err != nil || messageID == 0 {
-			return
+			return err
 		}
 		context.LastMessageID = messageID
-		return
 	}
+
+	return nil
 }
 
-func (s *baseState) HandleCallback(context *Bot, update *tgbotapi.Update) {
+func (s *baseState) HandleCallback(context *Bot, update *tgbotapi.Update) error {
 	chatID := s.AckCallbackAndChatID(context, update)
 	s.SendReplyAndGo(context, chatID, message.MainState, keyboard.BuildMainStateKeyboard(), &MainState{})
+	return nil
 }

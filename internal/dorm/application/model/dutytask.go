@@ -17,7 +17,7 @@ type DutyTask struct {
 	VerificationDate *time.Time
 }
 
-type DutyTaskReadable struct {
+type DutyTaskView struct {
 	AreaFloor         int
 	AreaName          string
 	TaskID            uuid.UUID

@@ -3,7 +3,6 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
-	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -12,18 +11,17 @@ type RegistrationState struct {
 	baseState
 }
 
-func (s *RegistrationState) Handle(context *Bot, update *tgbotapi.Update) {
+func (s *RegistrationState) Handle(context *Bot, update *tgbotapi.Update) error {
 	chatID := update.Message.Chat.ID
 	context.Telegram.ClearDialogue(chatID, update.Message.MessageID, context.LastMessageID)
 	err := context.UserService.RegisterUser(update.Message.Text, update.Message.From.ID)
 	if err != nil {
-		log.Println(err)
 		messageID, err := context.Telegram.SendMessage(chatID, message.RegistrationFail)
 		if err != nil || messageID == 0 {
-			return
+			return err
 		}
 		context.LastMessageID = messageID
-		return
+		return err
 	}
 	s.SendReplyAndGo(
 		context,
@@ -32,6 +30,8 @@ func (s *RegistrationState) Handle(context *Bot, update *tgbotapi.Update) {
 		keyboard.BuildMainStateKeyboard(),
 		&MainState{},
 	)
+
+	return nil
 }
 
 func (s *RegistrationState) GetName() string {

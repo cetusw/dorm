@@ -12,22 +12,21 @@ type DutyService struct {
 	dutyRepository *repository.DutyRepository
 }
 
-func NewDutyService(dutyRepository *repository.DutyRepository) *DutyService {
+func NewDutyService(repository *repository.DutyRepository) *DutyService {
 	return &DutyService{
-		dutyRepository: dutyRepository,
+		dutyRepository: repository,
 	}
 }
 
-func (s *DutyService) CreateNewDuty(teamID int, start time.Time, end time.Time) (uuid.UUID, error) {
-	newDutyID := uuid.New()
+func (s *DutyService) CreateNewDuty(teamID int, start time.Time, end time.Time) (*model.Duty, error) {
 	duty := &model.Duty{
-		DutyID: newDutyID,
+		DutyID: uuid.New(),
 		TeamID: teamID,
 		Start:  start,
 		End:    end,
 	}
 
-	return newDutyID, s.dutyRepository.Store(duty)
+	return duty, s.dutyRepository.Store(duty)
 }
 
 func (s *DutyService) GetLastDutyTeamID() (int, error) {

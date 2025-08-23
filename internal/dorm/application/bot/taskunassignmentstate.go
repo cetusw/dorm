@@ -3,7 +3,6 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
-	"log"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -14,7 +13,7 @@ type TaskUnassignmentState struct {
 	baseState
 }
 
-func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Update) {
+func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Update) error {
 	chatID := s.AckCallbackAndChatID(context, update)
 	callbackData := update.CallbackQuery.Data
 
@@ -26,31 +25,30 @@ func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Up
 			keyboard.BuildTaskManagementKeyboard(),
 			&TaskManagementState{},
 		)
-		return
+		return nil
 	}
 
 	if strings.HasPrefix(callbackData, keyboard.CallbackPrefixUnassign) {
 		taskID := strings.TrimPrefix(callbackData, keyboard.CallbackPrefixUnassign)
 		taskUUID, err := uuid.Parse(taskID)
 		if err != nil {
-			log.Printf("ERROR: failed to parse task ID from callback data '%s': %v", callbackData, err)
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
 		}
 		currentDuty, err := context.DutyService.GetCurrentDuty()
 		if err != nil {
-			log.Printf("ERROR: failed to get last duty: %v", err)
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
 		}
-		err = context.DutyTaskService.SetDutyTaskAssigneeIDByDutyID(nil, taskUUID, currentDuty.DutyID)
+		err = context.DutyTaskService.SetDutyTaskAssigneeID(nil, taskUUID, currentDuty.DutyID)
 		if err != nil {
-			log.Printf("ERROR: failed to set current duty task assignee: %v", err)
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
 		}
-		dutyTasksReadable, err := s.GetUncompletedDutyTasksReadable(context, update)
+		dutyTasksReadable, err := s.GetUncompletedDutyTasksView(context, update)
 		if err != nil {
-			log.Println(err)
-			s.SendReplyAndGo(context, chatID, message.ErrorWhileGettingDutyTasks, keyboard.BuildMainStateKeyboard(), &MainState{})
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
 		}
 
 		s.EditInlineAndGo(
@@ -62,10 +60,11 @@ func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Up
 		)
 		err = context.CleaningService.UpdateCurrentSheet(currentDuty)
 		if err != nil {
-			log.Printf("ERROR: failed to update sheet: %v", err)
-			return
+			return nil
 		}
 	}
+
+	return nil
 }
 
 func (s *TaskUnassignmentState) GetName() string {

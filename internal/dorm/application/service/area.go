@@ -7,14 +7,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type AreaService struct {
-	areaRepository *repository.AreaRepository
+func NewAreaService(repository *repository.AreaRepository) *AreaService {
+	return &AreaService{
+		areaRepository: repository,
+	}
 }
 
-func NewAreaService(areaRepository *repository.AreaRepository) *AreaService {
-	return &AreaService{
-		areaRepository: areaRepository,
-	}
+type AreaService struct {
+	areaRepository *repository.AreaRepository
 }
 
 func (s *AreaService) GetAllAreas() ([]model.Area, error) {

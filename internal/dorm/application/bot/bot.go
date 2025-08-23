@@ -7,7 +7,6 @@ import (
 
 type Bot struct {
 	Telegram        *infrastructure.Telegram
-	LastMessageID   int
 	UserService     *service.UserService
 	AreaService     *service.AreaService
 	TaskService     *service.TaskService
@@ -15,6 +14,7 @@ type Bot struct {
 	DutyTaskService *service.DutyTaskService
 	CleaningService *service.CleaningService
 	State           State
+	LastMessageID   int
 }
 
 func NewBot(

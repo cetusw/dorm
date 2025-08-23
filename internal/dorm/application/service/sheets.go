@@ -24,7 +24,7 @@ func (s *SheetsService) CreateWeeklySheet(
 	title string,
 	hexColor string,
 	teamID int,
-	tasks []model.DutyTaskReadable,
+	tasks []model.DutyTaskView,
 	users []model.User,
 ) error {
 	teamColor, err := utils.HexToSheetsColor(hexColor)
@@ -48,7 +48,7 @@ func (s *SheetsService) CreateWeeklySheet(
 	return s.sheets.BatchUpdate(requests)
 }
 
-func (s *SheetsService) UpdateWeeklySheet(title string, tasks []model.DutyTaskReadable) error {
+func (s *SheetsService) UpdateWeeklySheet(title string, tasks []model.DutyTaskView) error {
 	var dataToWrite [][]interface{}
 	for _, task := range tasks {
 		row := s.formatTaskRow(task)
@@ -72,7 +72,7 @@ func (s *SheetsService) UpdateWeeklySheet(title string, tasks []model.DutyTaskRe
 
 func (s *SheetsService) prepareSheetData(
 	teamID int,
-	tasks []model.DutyTaskReadable,
+	tasks []model.DutyTaskView,
 ) ([][]interface{}, map[string][2]int) {
 	var dataToWrite [][]interface{}
 	dataToWrite = append(dataToWrite, []interface{}{fmt.Sprintf(consts.SheetHeaderTeam, teamID)})
@@ -101,7 +101,7 @@ func (s *SheetsService) prepareSheetData(
 	return dataToWrite, zoneMergeRanges
 }
 
-func (s *SheetsService) formatTaskRow(task model.DutyTaskReadable) []interface{} {
+func (s *SheetsService) formatTaskRow(task model.DutyTaskView) []interface{} {
 	assignee := consts.DefaultAssignee
 	if task.AssigneeFirstName != nil && task.AssigneeLastName != nil {
 		assignee = fmt.Sprintf("%s %s.", *task.AssigneeFirstName, string([]rune(*task.AssigneeLastName)[0]))

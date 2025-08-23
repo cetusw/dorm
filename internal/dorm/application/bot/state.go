@@ -5,7 +5,7 @@ import (
 )
 
 type State interface {
-	Handle(context *Bot, update *tgbotapi.Update)
-	HandleCallback(context *Bot, update *tgbotapi.Update)
+	Handle(context *Bot, update *tgbotapi.Update) error
+	HandleCallback(context *Bot, update *tgbotapi.Update) error
 	GetName() string
 }

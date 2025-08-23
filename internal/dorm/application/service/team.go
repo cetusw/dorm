@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
 	"sort"
 )
@@ -9,10 +10,14 @@ type TeamService struct {
 	teamRepository *repository.TeamRepository
 }
 
-func NewTeamService(teamRepository *repository.TeamRepository) *TeamService {
+func NewTeamService(repository *repository.TeamRepository) *TeamService {
 	return &TeamService{
-		teamRepository: teamRepository,
+		teamRepository: repository,
 	}
+}
+
+func (s *TeamService) GetTeam(teamID int) (*model.Team, error) {
+	return s.teamRepository.Find(teamID)
 }
 
 func (s *TeamService) GetSortedTeamIDs() ([]int, error) {

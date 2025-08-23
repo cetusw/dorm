@@ -4,8 +4,6 @@ import (
 	"dorm/internal/dorm/application/model"
 	"fmt"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type CleaningService struct {
@@ -14,6 +12,7 @@ type CleaningService struct {
 	dutyService     *DutyService
 	dutyTaskService *DutyTaskService
 	teamService     *TeamService
+	taskService     *TaskService
 }
 
 func NewCleaningService(
@@ -22,6 +21,7 @@ func NewCleaningService(
 	dutyService *DutyService,
 	dutyTaskService *DutyTaskService,
 	teamService *TeamService,
+	taskService *TaskService,
 ) *CleaningService {
 	return &CleaningService{
 		sheetsService:   sheetsService,
@@ -29,6 +29,7 @@ func NewCleaningService(
 		dutyService:     dutyService,
 		dutyTaskService: dutyTaskService,
 		teamService:     teamService,
+		taskService:     taskService,
 	}
 }
 
@@ -41,12 +42,20 @@ func (s *CleaningService) StartNewWeek() error {
 	if err != nil {
 		return err
 	}
-	var newDutyID uuid.UUID
-	newDutyID, err = s.dutyService.CreateNewDuty(newDutyTeamID, startTime, endTime)
+	var duty *model.Duty
+	duty, err = s.dutyService.CreateNewDuty(newDutyTeamID, startTime, endTime)
 	if err != nil {
 		return err
 	}
-	err = s.dutyTaskService.SetDutyTasks(newDutyID)
+	team, err := s.teamService.GetTeam(duty.TeamID)
+	if err != nil {
+		return err
+	}
+	taskIDs, err := s.taskService.GetAllTaskIDs()
+	if err != nil {
+		return err
+	}
+	err = s.dutyTaskService.SetDutyTasks(duty.DutyID, taskIDs, team.TeamLeaderID)
 	if err != nil {
 		return err
 	}
@@ -55,8 +64,8 @@ func (s *CleaningService) StartNewWeek() error {
 	if err != nil {
 		return err
 	}
-	var dutyTasksReadable []model.DutyTaskReadable
-	dutyTasksReadable, err = s.dutyTaskService.GetDutyTasksReadable(newDutyID)
+	var dutyTasksReadable []model.DutyTaskView
+	dutyTasksReadable, err = s.dutyTaskService.GetDutyTasksReadable(duty.DutyID)
 	if err != nil {
 		return err
 	}

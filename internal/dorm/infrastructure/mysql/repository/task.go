@@ -69,30 +69,6 @@ func (r *TaskRepository) FindAll() ([]model.Task, error) {
 	return tasks, nil
 }
 
-func (r *TaskRepository) FindAllIDs() ([]uuid.UUID, error) {
-	query := "SELECT task_id FROM task"
-	rows, err := r.db.Query(query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query all task IDs: %w", err)
-	}
-	defer rows.Close()
-
-	var ids []uuid.UUID
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("failed to scan task ID: %w", err)
-		}
-		ids = append(ids, id)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating task IDs: %w", err)
-	}
-
-	return ids, nil
-}
-
 func (r *TaskRepository) FindTasksByAreaID(areaID int) ([]model.Task, error) {
 	query := `
 		SELECT 

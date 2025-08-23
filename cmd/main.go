@@ -41,12 +41,7 @@ func main() {
 
 	userService := service.NewUserService(userRepository)
 	dutyService := service.NewDutyService(dutyRepository)
-	dutyTaskService := service.NewDutyTaskService(
-		dutyTaskRepository,
-		taskRepository,
-		dutyRepository,
-		teamRepository,
-	)
+	dutyTaskService := service.NewDutyTaskService(dutyTaskRepository)
 	teamService := service.NewTeamService(teamRepository)
 	taskService := service.NewTaskService(taskRepository)
 	sheetsService := service.NewSheetsService(sheets)
@@ -56,6 +51,7 @@ func main() {
 		dutyService,
 		dutyTaskService,
 		teamService,
+		taskService,
 	)
 	areaService := service.NewAreaService(areaRepository)
 	botContext := bot.NewBot(

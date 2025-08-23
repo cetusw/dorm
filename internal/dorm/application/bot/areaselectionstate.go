@@ -4,8 +4,6 @@ import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
 	"fmt"
-	"log"
-	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -15,7 +13,7 @@ type AreaSelectionState struct {
 	baseState
 }
 
-func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Update) {
+func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Update) error {
 	chatID := s.AckCallbackAndChatID(context, update)
 	callbackData := update.CallbackQuery.Data
 
@@ -27,35 +25,34 @@ func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Updat
 			keyboard.BuildTaskManagementKeyboard(),
 			&TaskManagementState{},
 		)
-		return
+		return nil
 	}
 
 	if strings.HasPrefix(callbackData, keyboard.CallbackPrefixArea) {
-		areaIDStr := strings.TrimPrefix(callbackData, keyboard.CallbackPrefixArea)
-		areaID, err := strconv.Atoi(areaIDStr)
+		areaID, err := s.GetAreaID(callbackData)
 		if err != nil {
-			log.Printf("ERROR: invalid area ID in callback: %v", err)
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
 		}
-		currentDuty, err := context.DutyService.GetCurrentDuty()
+		duty, err := s.GetCurrentDuty(context)
 		if err != nil {
-			log.Printf("ERROR: failed to get last duty: %v", err)
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
 		}
-		tasks, err := context.DutyTaskService.GetUnassignedDutyTasksReadableByAreaIDAndDutyID(areaID, currentDuty.DutyID)
+		tasks, err := s.GetUnassignedTasks(context, areaID, duty.DutyID)
 		if err != nil {
-			log.Printf("ERROR: failed to get unassigned tasks for area %d: %v", areaID, err)
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
 		}
-		user, err := context.UserService.GetUser(chatID)
+		user, err := s.GetUser(context, chatID)
 		if err != nil {
-			log.Printf("ERROR: failed to get user while getting duty tasks: %v", err)
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
 		}
-		userPoints, pointsPerUser, err := s.GetPointsSummary(context, *user.TeamID, user.UserID, currentDuty.DutyID)
+		userPoints, pointsPerUser, err := s.GetPointsSummary(context, *user.TeamID, user.UserID, duty.DutyID)
 		if err != nil {
-			log.Printf("ERROR: failed to compute points summary: %v", err)
-			return
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return nil
 		}
 
 		s.EditInlineAndGo(
@@ -66,6 +63,8 @@ func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Updat
 			&TaskAssignmentState{AreaID: areaID},
 		)
 	}
+
+	return nil
 }
 
 func (s *AreaSelectionState) GetName() string {

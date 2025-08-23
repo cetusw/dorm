@@ -8,10 +8,6 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
-func RGBToInt(r, g, b uint8) int {
-	return (int(r) << 16) | (int(g) << 8) | int(b)
-}
-
 func HexToSheetsColor(hexString string) (*sheets.Color, error) {
 	cleanHex := strings.TrimPrefix(hexString, "#")
 

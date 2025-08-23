@@ -63,7 +63,7 @@ func (r *DutyTaskRepository) StoreBatch(dutyTasks []model.DutyTask) error {
 
 func (r *DutyTaskRepository) FindDutyTasksReadableByDutyID(
 	dutyID uuid.UUID,
-) ([]model.DutyTaskReadable, error) {
+) ([]model.DutyTaskView, error) {
 	query := `
 		SELECT 
 			a.area_floor, 
@@ -88,10 +88,10 @@ func (r *DutyTaskRepository) FindDutyTasksReadableByDutyID(
 	}
 	defer rows.Close()
 
-	var dutyTasksReadable []model.DutyTaskReadable
+	var dutyTasksReadable []model.DutyTaskView
 
 	for rows.Next() {
-		var dutyTaskReadable model.DutyTaskReadable
+		var dutyTaskReadable model.DutyTaskView
 		if err := rows.Scan(
 			&dutyTaskReadable.AreaFloor,
 			&dutyTaskReadable.AreaName,
@@ -118,10 +118,10 @@ func (r *DutyTaskRepository) FindDutyTasksReadableByDutyID(
 }
 
 // TODO: придумать, что делать, если дежурство прошло, но человек всё равно хочет увидеть задачи за прошлую неделю, которые он не выполнил
-func (r *DutyTaskRepository) FindUncompletedDutyTasksReadableByAssigneeIDAndDutyID(
+func (r *DutyTaskRepository) FindUncompletedDutyTasksView(
 	assigneeID uuid.UUID,
 	dutyID uuid.UUID,
-) ([]model.DutyTaskReadable, error) {
+) ([]model.DutyTaskView, error) {
 	query := `
 		SELECT 
 			a.area_floor, 
@@ -147,10 +147,10 @@ func (r *DutyTaskRepository) FindUncompletedDutyTasksReadableByAssigneeIDAndDuty
 	}
 	defer rows.Close()
 
-	var dutyTasksReadable []model.DutyTaskReadable
+	var dutyTasksReadable []model.DutyTaskView
 
 	for rows.Next() {
-		var dutyTaskReadable model.DutyTaskReadable
+		var dutyTaskReadable model.DutyTaskView
 		if err := rows.Scan(
 			&dutyTaskReadable.AreaFloor,
 			&dutyTaskReadable.AreaName,
@@ -175,10 +175,10 @@ func (r *DutyTaskRepository) FindUncompletedDutyTasksReadableByAssigneeIDAndDuty
 	return dutyTasksReadable, nil
 }
 
-func (r *DutyTaskRepository) FindUnassignedDutyTasksReadableByAreaIDAndDutyID(
+func (r *DutyTaskRepository) FindUnassignedDutyTasksView(
 	areaID int,
 	dutyID uuid.UUID,
-) ([]model.DutyTaskReadable, error) {
+) ([]model.DutyTaskView, error) {
 	query := `
 		SELECT 
 			a.area_floor, 
@@ -201,9 +201,9 @@ func (r *DutyTaskRepository) FindUnassignedDutyTasksReadableByAreaIDAndDutyID(
 	}
 	defer rows.Close()
 
-	var dutyTasksReadable []model.DutyTaskReadable
+	var dutyTasksReadable []model.DutyTaskView
 	for rows.Next() {
-		var dutyTaskReadable model.DutyTaskReadable
+		var dutyTaskReadable model.DutyTaskView
 		if err := rows.Scan(
 			&dutyTaskReadable.AreaFloor,
 			&dutyTaskReadable.AreaName,
@@ -226,10 +226,10 @@ func (r *DutyTaskRepository) FindUnassignedDutyTasksReadableByAreaIDAndDutyID(
 	return dutyTasksReadable, nil
 }
 
-func (r *DutyTaskRepository) UpdateCurrentDutyTaskAssigneeIDByTaskIDAndDutyID(
+func (r *DutyTaskRepository) UpdateDutyTaskAssigneeID(
 	assigneeID *uuid.UUID,
-	taskID uuid.UUID,
 	dutyID uuid.UUID,
+	taskID uuid.UUID,
 ) error {
 	query := `
 		UPDATE duty_task dt
@@ -254,10 +254,10 @@ func (r *DutyTaskRepository) UpdateCurrentDutyTaskAssigneeIDByTaskIDAndDutyID(
 	return nil
 }
 
-func (r *DutyTaskRepository) UpdateDutyTaskCompletionDateByDutyIDAndTaskID(dutyID uuid.UUID, taskID uuid.UUID) error {
+func (r *DutyTaskRepository) UpdateDutyTaskCompletionDate(dutyID uuid.UUID, taskID uuid.UUID) error {
 	now := time.Now()
 	query := `
-		UPDATE duty_task 
+		UPDATE duty_task
 		SET completion_date = ?
 		WHERE duty_id = UUID_TO_BIN(?)
 		  AND task_id = UUID_TO_BIN(?)`
