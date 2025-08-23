@@ -118,7 +118,7 @@ func (r *DutyTaskRepository) FindDutyTasksReadableByDutyID(
 }
 
 // TODO: придумать, что делать, если дежурство прошло, но человек всё равно хочет увидеть задачи за прошлую неделю, которые он не выполнил
-func (r *DutyTaskRepository) FindDutyTasksReadableByAssigneeIDAndDutyID(
+func (r *DutyTaskRepository) FindUncompletedDutyTasksReadableByAssigneeIDAndDutyID(
 	assigneeID uuid.UUID,
 	dutyID uuid.UUID,
 ) ([]model.DutyTaskReadable, error) {
@@ -137,7 +137,9 @@ func (r *DutyTaskRepository) FindDutyTasksReadableByAssigneeIDAndDutyID(
 			INNER JOIN task t ON dt.task_id = t.task_id 
 			INNER JOIN area a ON a.area_id = t.area_id
 			LEFT JOIN user u ON u.user_id = dt.assignee_id
-		WHERE dt.assignee_id = ? AND dt.duty_id = ?`
+		WHERE dt.completion_date IS NULL 
+		  AND dt.assignee_id = UUID_TO_BIN(?) 
+		  AND dt.duty_id = UUID_TO_BIN(?)`
 
 	rows, err := r.db.Query(query, assigneeID, dutyID)
 	if err != nil {
@@ -225,18 +227,15 @@ func (r *DutyTaskRepository) FindUnassignedDutyTasksReadableByAreaIDAndDutyID(
 }
 
 func (r *DutyTaskRepository) UpdateCurrentDutyTaskAssigneeIDByTaskIDAndDutyID(
-	assigneeID uuid.UUID,
+	assigneeID *uuid.UUID,
 	taskID uuid.UUID,
 	dutyID uuid.UUID,
 ) error {
 	query := `
 		UPDATE duty_task dt
-			JOIN duty d ON dt.duty_id = d.duty_id
-		SET 
-			dt.assignee_id = UUID_TO_BIN(?) 
-		WHERE 
-			dt.task_id = UUID_TO_BIN(?)
-			AND dt.duty_id = UUID_TO_BIN(?);`
+		SET dt.assignee_id = UUID_TO_BIN(?) 
+		WHERE dt.task_id = UUID_TO_BIN(?)
+		  AND dt.duty_id = UUID_TO_BIN(?);`
 
 	result, err := r.db.Exec(query, assigneeID, taskID, dutyID)
 	if err != nil {
@@ -255,17 +254,14 @@ func (r *DutyTaskRepository) UpdateCurrentDutyTaskAssigneeIDByTaskIDAndDutyID(
 	return nil
 }
 
-func (r *DutyTaskRepository) UpdateDutyTaskCompletionDateByTaskIDAndDutyID(taskID uuid.UUID, dutyID uuid.UUID) error {
+func (r *DutyTaskRepository) UpdateDutyTaskCompletionDateByDutyIDAndTaskID(dutyID uuid.UUID, taskID uuid.UUID) error {
 	now := time.Now()
 	query := `
-		UPDATE duty_task dt
-		    JOIN duty d ON dt.duty_id = d.duty_id
-		SET dt.completion_date = ? 
-		WHERE dt.task_id = UUID_TO_BIN(?)
-		  AND d.duty_start_date < ? 
-		  AND d.duty_end_date > ?`
-
-	result, err := r.db.Exec(query, now, taskID, now, now)
+		UPDATE duty_task 
+		SET completion_date = ?
+		WHERE duty_id = UUID_TO_BIN(?)
+		  AND task_id = UUID_TO_BIN(?)`
+	result, err := r.db.Exec(query, now, dutyID, taskID)
 	if err != nil {
 		return fmt.Errorf("failed to execute update for task_id %d: %w", taskID, err)
 	}

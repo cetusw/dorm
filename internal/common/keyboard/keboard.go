@@ -16,7 +16,7 @@ const (
 )
 
 func BuildMainStateKeyboard() tgbotapi.ReplyKeyboardMarkup {
-	return buildReplyKeyboard(
+	keyboard := buildReplyKeyboard(
 		[]buttonInfo{
 			{message.Tasks, message.Tasks},
 			{message.Team, message.Team},
@@ -24,6 +24,8 @@ func BuildMainStateKeyboard() tgbotapi.ReplyKeyboardMarkup {
 			{message.Profile, message.Profile},
 		},
 	)
+	keyboard.OneTimeKeyboard = false
+	return keyboard
 }
 
 func BuildTaskManagementKeyboard() tgbotapi.InlineKeyboardMarkup {
@@ -102,9 +104,7 @@ func buildReplyKeyboard(buttons []buttonInfo) tgbotapi.ReplyKeyboardMarkup {
 
 	keyboard := tgbotapi.NewReplyKeyboard(rows...)
 	keyboard.ResizeKeyboard = true
-	// TODO: изучить, что такое keyboard.OneTimeKeyboard
-	// OneTimeKeyboard можно убрать для главного меню, чтобы оно не скрывалось
-	// keyboard.OneTimeKeyboard = true
+	keyboard.OneTimeKeyboard = false
 
 	return keyboard
 }
@@ -112,7 +112,7 @@ func buildReplyKeyboard(buttons []buttonInfo) tgbotapi.ReplyKeyboardMarkup {
 func buildAssignedTaskKeyboard(dutyTasks []model.DutyTaskReadable, callbackPrefix string) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, dutyTask := range dutyTasks {
-		buttonText := fmt.Sprintf("%s: %s", dutyTask.AreaName, dutyTask.TaskTitle)
+		buttonText := fmt.Sprintf("%d этаж %s: %s", dutyTask.AreaFloor, dutyTask.AreaName, dutyTask.TaskTitle)
 		callbackData := fmt.Sprintf("%s%s", callbackPrefix, dutyTask.TaskID)
 		button := tgbotapi.NewInlineKeyboardButtonData(buttonText, callbackData)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))

@@ -3,6 +3,8 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
+	"dorm/internal/dorm/application/model"
+	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
@@ -40,6 +42,23 @@ func (s *baseState) SendReplyAndGo(context *Bot, chatID int64, text string, butt
 	context.SetState(next)
 }
 
+func (s *baseState) GetUncompletedDutyTasksReadable(context *Bot, update *tgbotapi.Update) ([]model.DutyTaskReadable, error) {
+	user, err := context.UserService.GetUser(update.CallbackQuery.From.ID)
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
+	}
+	lastDuty, err := context.DutyService.GetCurrentDuty()
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: failed to get last duty tasks: %v", err)
+	}
+	dutyTasksReadable, err := context.DutyTaskService.GetUncompletedDutyTasksReadableByAssigneeIDAndDutyID(user.UserID, lastDuty.DutyID)
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: failed to get areas for keyboard: %v", err)
+	}
+
+	return dutyTasksReadable, nil
+}
+
 func (s *baseState) GetPointsSummary(
 	context *Bot,
 	teamID int,
@@ -67,7 +86,7 @@ func (s *baseState) GetPointsSummary(
 func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
 	var text string
-	context.Telegram.ClearDialogue(chatID, update.Message.MessageID, context.LastMessageID)
+	context.Telegram.DeleteMessage(chatID, update.Message.MessageID)
 
 	switch update.Message.Text {
 	case message.Tasks:

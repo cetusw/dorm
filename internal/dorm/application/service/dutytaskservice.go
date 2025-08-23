@@ -75,8 +75,8 @@ func (s *DutyTaskService) GetDutyTasksReadable(dutyID uuid.UUID) ([]model.DutyTa
 	return s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
 }
 
-func (s *DutyTaskService) GetDutyTasksReadableByAssigneeIDAndDutyID(assigneeID uuid.UUID, dutyID uuid.UUID) ([]model.DutyTaskReadable, error) {
-	return s.dutyTaskRepository.FindDutyTasksReadableByAssigneeIDAndDutyID(assigneeID, dutyID)
+func (s *DutyTaskService) GetUncompletedDutyTasksReadableByAssigneeIDAndDutyID(assigneeID uuid.UUID, dutyID uuid.UUID) ([]model.DutyTaskReadable, error) {
+	return s.dutyTaskRepository.FindUncompletedDutyTasksReadableByAssigneeIDAndDutyID(assigneeID, dutyID)
 }
 
 func (s *DutyTaskService) GetUnassignedDutyTasksReadableByAreaIDAndDutyID(areaID int, dutyID uuid.UUID) ([]model.DutyTaskReadable, error) {
@@ -111,8 +111,17 @@ func (s *DutyTaskService) GetAllPointsByDutyID(dutyID uuid.UUID) (int, error) {
 	return sum, nil
 }
 
-func (s *DutyTaskService) SetDutyTaskAssigneeIDByDutyID(assigneeID uuid.UUID, taskID uuid.UUID, dutyID uuid.UUID) error {
+func (s *DutyTaskService) SetDutyTaskAssigneeIDByDutyID(assigneeID *uuid.UUID, taskID uuid.UUID, dutyID uuid.UUID) error {
 	err := s.dutyTaskRepository.UpdateCurrentDutyTaskAssigneeIDByTaskIDAndDutyID(assigneeID, taskID, dutyID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *DutyTaskService) CompleteDutyTaskByDutyIDAndTaskID(dutyID uuid.UUID, taskID uuid.UUID) error {
+	err := s.dutyTaskRepository.UpdateDutyTaskCompletionDateByDutyIDAndTaskID(dutyID, taskID)
 	if err != nil {
 		return err
 	}

@@ -53,7 +53,7 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			log.Printf("ERROR: failed to get user while getting duty tasks: %v", err)
 			return
 		}
-		err = context.DutyTaskService.SetDutyTaskAssigneeIDByDutyID(user.UserID, taskUUID, currentDuty.DutyID)
+		err = context.DutyTaskService.SetDutyTaskAssigneeIDByDutyID(&user.UserID, taskUUID, currentDuty.DutyID)
 		if err != nil {
 			log.Printf("ERROR: failed to set current duty task assignee: %v", err)
 			return
