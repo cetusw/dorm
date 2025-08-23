@@ -71,6 +71,7 @@ func (r *DutyTaskRepository) FindDutyTasksReadableByDutyID(
 			t.task_id,
 			t.task_title, 
 			t.task_cost, 
+			u.user_id,
 			u.first_name, 
 			u.last_name, 
 			dt.completion_date, 
@@ -87,32 +88,33 @@ func (r *DutyTaskRepository) FindDutyTasksReadableByDutyID(
 	}
 	defer rows.Close()
 
-	var tasksReadable []model.DutyTaskReadable
+	var dutyTasksReadable []model.DutyTaskReadable
 
 	for rows.Next() {
-		var taskReadable model.DutyTaskReadable
+		var dutyTaskReadable model.DutyTaskReadable
 		if err := rows.Scan(
-			&taskReadable.AreaFloor,
-			&taskReadable.AreaName,
-			&taskReadable.TaskID,
-			&taskReadable.TaskTitle,
-			&taskReadable.TaskCost,
-			&taskReadable.AssigneeFirstName,
-			&taskReadable.AssigneeLastName,
-			&taskReadable.CompletionDate,
-			&taskReadable.VerificationDate,
+			&dutyTaskReadable.AreaFloor,
+			&dutyTaskReadable.AreaName,
+			&dutyTaskReadable.TaskID,
+			&dutyTaskReadable.TaskTitle,
+			&dutyTaskReadable.TaskCost,
+			&dutyTaskReadable.AssigneeID,
+			&dutyTaskReadable.AssigneeFirstName,
+			&dutyTaskReadable.AssigneeLastName,
+			&dutyTaskReadable.CompletionDate,
+			&dutyTaskReadable.VerificationDate,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan readable task row: %w", err)
 		}
 
-		tasksReadable = append(tasksReadable, taskReadable)
+		dutyTasksReadable = append(dutyTasksReadable, dutyTaskReadable)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating readable task rows: %w", err)
 	}
 
-	return tasksReadable, nil
+	return dutyTasksReadable, nil
 }
 
 // TODO: придумать, что делать, если дежурство прошло, но человек всё равно хочет увидеть задачи за прошлую неделю, которые он не выполнил
@@ -200,7 +202,6 @@ func (r *DutyTaskRepository) FindUnassignedDutyTasksReadableByAreaIDAndDutyID(
 	var dutyTasksReadable []model.DutyTaskReadable
 	for rows.Next() {
 		var dutyTaskReadable model.DutyTaskReadable
-		// Сканируем в поля, которые могут быть NULL
 		if err := rows.Scan(
 			&dutyTaskReadable.AreaFloor,
 			&dutyTaskReadable.AreaName,

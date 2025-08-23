@@ -5,6 +5,7 @@ import (
 	"dorm/internal/common/message"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/google/uuid"
 )
 
 type baseState struct{}
@@ -37,6 +38,30 @@ func (s *baseState) SendReplyAndGo(context *Bot, chatID int64, text string, butt
 	}
 	context.LastMessageID = messageID
 	context.SetState(next)
+}
+
+func (s *baseState) GetPointsSummary(
+	context *Bot,
+	teamID int,
+	userID uuid.UUID,
+	dutyID uuid.UUID,
+) (userPoints int, pointsPerUser int, err error) {
+	up, err := context.DutyTaskService.GetUserPointsByDutyID(userID, dutyID)
+	if err != nil {
+		return 0, 0, err
+	}
+	all, err := context.DutyTaskService.GetAllPointsByDuty(dutyID)
+	if err != nil {
+		return 0, 0, err
+	}
+	teamUsers, err := context.UserService.GetUsersByTeamID(teamID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(teamUsers) == 0 {
+		return up, 0, nil
+	}
+	return up, all / len(teamUsers), nil
 }
 
 func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) {

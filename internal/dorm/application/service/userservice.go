@@ -54,3 +54,7 @@ func (s *UserService) GetUser(id int64) (*model.User, error) {
 func (s *UserService) GetAllUsers() ([]model.User, error) {
 	return s.userRepository.FindAll()
 }
+
+func (s *UserService) GetUsersByTeamID(teamID int) ([]model.User, error) {
+	return s.userRepository.FindUsersByTeamID(teamID)
+}

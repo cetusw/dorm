@@ -9,6 +9,6 @@ const (
 	ConfirmExecution = "Подтвердить выполнение"
 	TeamMembers      = "Участники команды"
 	DutySchedule     = "График дежурств"
-	AssignTask       = "Назначить задачу на себя"
+	AssignTask       = "Взять задачу"
 	UnassignTask     = "Снять назначение"
 )

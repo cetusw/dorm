@@ -3,6 +3,7 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
+	"fmt"
 	"log"
 	"strings"
 
@@ -52,24 +53,29 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			log.Printf("ERROR: failed to set current duty task assignee: %v", err)
 			return
 		}
-		err = context.CleaningService.UpdateCurrentSheet(currentDuty)
-		if err != nil {
-			log.Printf("ERROR: failed to handle task assignment: %v", err)
-			return
-		}
 		tasks, err := context.DutyTaskService.GetUnassignedDutyTasksReadableByAreaIDAndDutyID(s.AreaID, currentDuty.DutyID)
 		if err != nil {
 			log.Printf("ERROR: failed to get unassigned tasks for area %d: %v", s.AreaID, err)
+			return
+		}
+		userPoints, pointsPerUser, err := s.GetPointsSummary(context, *user.TeamID, user.UserID, currentDuty.DutyID)
+		if err != nil {
+			log.Printf("ERROR: failed to compute points summary: %v", err)
 			return
 		}
 
 		s.EditInlineAndGo(
 			context,
 			chatID,
-			message.TaskAssignmentState,
+			fmt.Sprintf(message.TaskAssignmentState, userPoints, pointsPerUser),
 			keyboard.BuildTaskAssignmentKeyboard(tasks),
 			&TaskAssignmentState{AreaID: s.AreaID},
 		)
+		err = context.CleaningService.UpdateCurrentSheet(currentDuty)
+		if err != nil {
+			log.Printf("ERROR: failed to update sheet: %v", err)
+			return
+		}
 	}
 }
 

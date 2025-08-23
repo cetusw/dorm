@@ -64,7 +64,7 @@ func BuildTaskAssignmentKeyboard(unassignedTasks []model.DutyTaskReadable) tgbot
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, task := range unassignedTasks {
 		callbackData := fmt.Sprintf("%s%s", CallbackPrefixAssign, task.TaskID)
-		button := tgbotapi.NewInlineKeyboardButtonData(task.TaskTitle, callbackData)
+		button := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s: %d", task.TaskTitle, task.TaskCost), callbackData)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(message.Back, message.Back)))

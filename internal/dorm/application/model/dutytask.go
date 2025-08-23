@@ -23,6 +23,7 @@ type DutyTaskReadable struct {
 	TaskID            uuid.UUID
 	TaskTitle         string
 	TaskCost          int
+	AssigneeID        *uuid.UUID
 	AssigneeFirstName *string
 	AssigneeLastName  *string
 	CompletionDate    *time.Time
