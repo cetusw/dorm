@@ -21,7 +21,12 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 	callbackData := update.CallbackQuery.Data
 
 	if callbackData == message.Back {
-		areas, err := context.AreaService.GetAllAreas()
+		currentDuty, err := context.DutyService.GetCurrentDuty()
+		if err != nil {
+			log.Printf("ERROR: failed to get last duty: %v", err)
+			return
+		}
+		areas, err := context.AreaService.GetUnassignedAreasByDutyID(currentDuty.DutyID)
 		if err != nil {
 			log.Printf("ERROR: failed to get areas for keyboard: %v", err)
 			s.SendReplyAndGo(context, chatID, message.ErrorWhileGettingArea, keyboard.BuildMainStateKeyboard(), &MainState{})
