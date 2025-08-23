@@ -37,7 +37,7 @@ func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Updat
 			log.Printf("ERROR: invalid area ID in callback: %v", err)
 			return
 		}
-		currentDuty, err := context.DutyService.GetLastDuty()
+		currentDuty, err := context.DutyService.GetCurrentDuty()
 		if err != nil {
 			log.Printf("ERROR: failed to get last duty: %v", err)
 			return

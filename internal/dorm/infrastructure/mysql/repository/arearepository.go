@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 )
 
 type AreaRepository struct {
@@ -74,5 +75,38 @@ func (r *AreaRepository) FindAll() ([]model.Area, error) {
 		return nil, fmt.Errorf("error iterating area rows: %w", err)
 	}
 
+	return areas, nil
+}
+
+func (r *AreaRepository) FindUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.Area, error) {
+	query := `
+		SELECT DISTINCT
+			a.area_id,
+			a.area_floor,
+			a.area_name
+		FROM area a
+			INNER JOIN task t ON t.area_id = a.area_id
+		    INNER JOIN duty_task dt ON dt.task_id = t.task_id
+		WHERE dt.duty_id = UUID_TO_BIN(?)
+		  AND dt.assignee_id IS NULL
+		ORDER BY a.area_floor DESC, a.area_name DESC`
+
+	rows, err := r.db.Query(query, dutyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query unassigned areas for duty %s: %w", dutyID, err)
+	}
+	defer rows.Close()
+
+	var areas []model.Area
+	for rows.Next() {
+		var area model.Area
+		if err := rows.Scan(&area.AreaID, &area.Floor, &area.Name); err != nil {
+			return nil, fmt.Errorf("failed to scan area row: %w", err)
+		}
+		areas = append(areas, area)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating unassigned areas rows: %w", err)
+	}
 	return areas, nil
 }

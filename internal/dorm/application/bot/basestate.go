@@ -50,7 +50,7 @@ func (s *baseState) GetPointsSummary(
 	if err != nil {
 		return 0, 0, err
 	}
-	all, err := context.DutyTaskService.GetAllPointsByDuty(dutyID)
+	all, err := context.DutyTaskService.GetAllPointsByDutyID(dutyID)
 	if err != nil {
 		return 0, 0, err
 	}

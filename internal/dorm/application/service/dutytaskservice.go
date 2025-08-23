@@ -98,7 +98,7 @@ func (s *DutyTaskService) GetUserPointsByDutyID(assigneeID uuid.UUID, dutyID uui
 	return sum, nil
 }
 
-func (s *DutyTaskService) GetAllPointsByDuty(dutyID uuid.UUID) (int, error) {
+func (s *DutyTaskService) GetAllPointsByDutyID(dutyID uuid.UUID) (int, error) {
 	dutyTasks, err := s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
 	if err != nil {
 		return 0, err

@@ -38,7 +38,7 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			log.Printf("ERROR: failed to parse task ID from callback data '%s': %v", callbackData, err)
 			return
 		}
-		currentDuty, err := context.DutyService.GetLastDuty()
+		currentDuty, err := context.DutyService.GetCurrentDuty()
 		if err != nil {
 			log.Printf("ERROR: failed to get last duty: %v", err)
 			return

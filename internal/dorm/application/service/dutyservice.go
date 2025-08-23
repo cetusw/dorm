@@ -41,6 +41,6 @@ func (s *DutyService) GetLastDutyTeamID() (int, error) {
 	return lastDuty.TeamID, nil
 }
 
-func (s *DutyService) GetLastDuty() (*model.Duty, error) {
+func (s *DutyService) GetCurrentDuty() (*model.Duty, error) {
 	return s.dutyRepository.FindLast()
 }

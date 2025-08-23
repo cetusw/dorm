@@ -3,6 +3,8 @@ package service
 import (
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
+
+	"github.com/google/uuid"
 )
 
 type AreaService struct {
@@ -17,4 +19,8 @@ func NewAreaService(areaRepository *repository.AreaRepository) *AreaService {
 
 func (s *AreaService) GetAllAreas() ([]model.Area, error) {
 	return s.areaRepository.FindAll()
+}
+
+func (s *AreaService) GetUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.Area, error) {
+	return s.areaRepository.FindUnassignedAreasByDutyID(dutyID)
 }

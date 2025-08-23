@@ -28,7 +28,12 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 		s.EditInlineAndGo(context, chatID, message.ConfirmExecutionState, keyboard.BuildConfirmExecutionKeyboard(dutyTasks), &ConfirmExecutionState{})
 		return
 	case message.AssignTask:
-		areas, err := context.AreaService.GetAllAreas()
+		currentDuty, err := context.DutyService.GetCurrentDuty()
+		if err != nil {
+			log.Printf("ERROR: failed to get last duty: %v", err)
+			return
+		}
+		areas, err := context.AreaService.GetUnassignedAreasByDutyID(currentDuty.DutyID)
 		if err != nil {
 			log.Printf("ERROR: failed to get areas for keyboard: %v", err)
 			s.SendReplyAndGo(context, chatID, message.ErrorWhileGettingArea, keyboard.BuildMainStateKeyboard(), &MainState{})
@@ -53,7 +58,7 @@ func (s *TaskManagementState) getDutyTasksReadable(context *Bot, update *tgbotap
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
 	}
-	lastDuty, err := context.DutyService.GetLastDuty()
+	lastDuty, err := context.DutyService.GetCurrentDuty()
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: failed to get last duty tasks: %v", err)
 	}
