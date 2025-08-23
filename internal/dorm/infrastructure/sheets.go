@@ -71,6 +71,19 @@ func (c *Sheets) WriteRange(sheetTitle, startCell string, data [][]interface{}) 
 	return nil
 }
 
+func (c *Sheets) ClearRange(title string, clearRange string) error {
+	fullRange := fmt.Sprintf("%s!%s", title, clearRange)
+
+	clearRequest := &sheets.ClearValuesRequest{}
+
+	_, err := c.srv.Spreadsheets.Values.Clear(c.spreadsheetID, fullRange, clearRequest).Do()
+	if err != nil {
+		return fmt.Errorf("unable to clear range %s: %w", fullRange, err)
+	}
+
+	return nil
+}
+
 func (c *Sheets) CreateSheetAndGetID(title string, color *sheets.Color) (*sheets.Sheet, error) {
 	properties := &sheets.SheetProperties{Title: title}
 	if color != nil {

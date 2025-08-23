@@ -10,9 +10,9 @@ import (
 
 const (
 	CallbackPrefixArea     = "area_select_"
-	CallbackPrefixTask     = "task_select_"
-	CallbackPrefixConfirm  = "confirm_task_"
+	CallbackPrefixAssign   = "assign_task_"
 	CallbackPrefixUnassign = "unassign_task_"
+	CallbackPrefixConfirm  = "confirm_task_"
 )
 
 func BuildMainStateKeyboard() tgbotapi.ReplyKeyboardMarkup {
@@ -32,7 +32,6 @@ func BuildTaskManagementKeyboard() tgbotapi.InlineKeyboardMarkup {
 			{message.ConfirmExecution, message.ConfirmExecution},
 			{message.AssignTask, message.AssignTask},
 			{message.UnassignTask, message.UnassignTask},
-			{message.Back, message.Back},
 		},
 	)
 }
@@ -42,7 +41,6 @@ func BuildTeamManagementKeyboard() tgbotapi.InlineKeyboardMarkup {
 		[]buttonInfo{
 			{message.TeamMembers, message.TeamMembers},
 			{message.DutySchedule, message.DutySchedule},
-			{message.Back, message.Back},
 		},
 	)
 }
@@ -55,29 +53,29 @@ func BuildAreaKeyboard(areas []model.Area) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, area := range areas {
 		callbackData := fmt.Sprintf("%s%d", CallbackPrefixArea, area.AreaID)
-		button := tgbotapi.NewInlineKeyboardButtonData(area.Name, callbackData)
+		button := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%d этаж. %s", area.Floor, area.Name), callbackData)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(message.Back, message.Back)))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-func BuildTaskKeyboard(tasks []model.Task) tgbotapi.InlineKeyboardMarkup {
+func BuildTaskAssignmentKeyboard(unassignedTasks []model.DutyTaskReadable) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
-	for _, task := range tasks {
-		callbackData := fmt.Sprintf("%s%s", CallbackPrefixTask, task.TaskID.String())
-		button := tgbotapi.NewInlineKeyboardButtonData(task.Title, callbackData)
+	for _, task := range unassignedTasks {
+		callbackData := fmt.Sprintf("%s%s", CallbackPrefixAssign, task.TaskID)
+		button := tgbotapi.NewInlineKeyboardButtonData(task.TaskTitle, callbackData)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(message.Back, message.Back)))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-func BuildConfirmExecutionKeyboard(assignedTasks []model.DutyTask) tgbotapi.InlineKeyboardMarkup {
+func BuildConfirmExecutionKeyboard(assignedTasks []model.DutyTaskReadable) tgbotapi.InlineKeyboardMarkup {
 	return buildAssignedTaskKeyboard(assignedTasks, CallbackPrefixConfirm)
 }
 
-func BuildTaskUnassignmentKeyboard(assignedTasks []model.DutyTask) tgbotapi.InlineKeyboardMarkup {
+func BuildTaskUnassignmentKeyboard(assignedTasks []model.DutyTaskReadable) tgbotapi.InlineKeyboardMarkup {
 	return buildAssignedTaskKeyboard(assignedTasks, CallbackPrefixUnassign)
 }
 
@@ -111,10 +109,10 @@ func buildReplyKeyboard(buttons []buttonInfo) tgbotapi.ReplyKeyboardMarkup {
 	return keyboard
 }
 
-func buildAssignedTaskKeyboard(dutyTasks []model.DutyTask, callbackPrefix string) tgbotapi.InlineKeyboardMarkup {
+func buildAssignedTaskKeyboard(dutyTasks []model.DutyTaskReadable, callbackPrefix string) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, dutyTask := range dutyTasks {
-		buttonText := fmt.Sprintf("%s: %s", dutyTask.TaskID, dutyTask.TaskID) // TODO: придумать, как получить название задачи из dutyTask. Как-то нужно заюзать GetTaskTitleByTaskID
+		buttonText := fmt.Sprintf("%s: %s", dutyTask.AreaName, dutyTask.TaskTitle)
 		callbackData := fmt.Sprintf("%s%s", callbackPrefix, dutyTask.TaskID)
 		button := tgbotapi.NewInlineKeyboardButtonData(buttonText, callbackData)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))

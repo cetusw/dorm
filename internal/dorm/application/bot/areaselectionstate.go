@@ -37,15 +37,19 @@ func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Updat
 			log.Printf("ERROR: invalid area ID in callback: %v", err)
 			return
 		}
-
-		tasks, err := context.TaskService.GetTasksByAreaID(areaID)
+		lastDuty, err := context.DutyService.GetLastDuty()
 		if err != nil {
-			log.Printf("ERROR: failed to get tasks for area %d: %v", areaID, err)
+			log.Printf("ERROR: failed to get last duty: %v", err)
+			return
+		}
+		tasks, err := context.DutyTaskService.GetUnassignedDutyTasksReadableByAreaIDAndDutyID(areaID, lastDuty.DutyID)
+		if err != nil {
+			log.Printf("ERROR: failed to get unassigned tasks for area %d: %v", areaID, err)
 			return
 		}
 
 		text = message.TaskAssignmentState
-		buttons = keyboard.BuildTaskKeyboard(tasks)
+		buttons = keyboard.BuildTaskAssignmentKeyboard(tasks)
 
 		nextState = &TaskAssignmentState{AreaID: areaID}
 	}

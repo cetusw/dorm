@@ -71,9 +71,34 @@ func (s *CleaningService) StartNewWeek() error {
 	return nil
 }
 
-func (s *CleaningService) HandleTaskBooking(memberID int64, taskID int) {
+func (s *CleaningService) UpdateCurrentSheet(duty *model.Duty) error {
+	sheetTitle := fmt.Sprintf("%s-%s", duty.Start.Format("02.01"), duty.End.Format("02.01"))
+
+	dutyTasksReadable, err := s.dutyTaskService.GetDutyTasksReadable(duty.DutyID)
+	if err != nil {
+		return fmt.Errorf("failed to get readable duty tasks for sheet update: %w", err)
+	}
+
+	err = s.sheetsService.UpdateWeeklySheet(sheetTitle, dutyTasksReadable)
+	if err != nil {
+		return fmt.Errorf("failed to update weekly sheet: %w", err)
+	}
+
+	return nil
 }
 
+func (s *CleaningService) HandleTaskAssignment(chatID int64, taskID uuid.UUID, duty *model.Duty) error {
+	user, err := s.userService.GetUser(chatID)
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
+	}
+	err = s.dutyTaskService.SetDutyTaskAssigneeIDByDutyID(user.UserID, taskID, duty.DutyID)
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to set current duty task assignee: %v", err)
+	}
+
+	return s.UpdateCurrentSheet(duty)
+}
 func (s *CleaningService) HandleTaskCompletion(memberID int64, taskID int) {
 }
 

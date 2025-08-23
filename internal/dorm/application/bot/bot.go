@@ -11,7 +11,9 @@ type Bot struct {
 	UserService     *service.UserService
 	AreaService     *service.AreaService
 	TaskService     *service.TaskService
+	DutyService     *service.DutyService
 	DutyTaskService *service.DutyTaskService
+	CleaningService *service.CleaningService
 	State           State
 }
 
@@ -20,14 +22,18 @@ func NewBot(
 	userService *service.UserService,
 	areaService *service.AreaService,
 	taskService *service.TaskService,
+	dutyService *service.DutyService,
 	dutyTaskService *service.DutyTaskService,
+	cleaningService *service.CleaningService,
 ) *Bot {
 	b := &Bot{
 		Telegram:        telegram,
 		UserService:     userService,
 		AreaService:     areaService,
 		TaskService:     taskService,
+		DutyService:     dutyService,
 		DutyTaskService: dutyTaskService,
+		CleaningService: cleaningService,
 	}
 	b.SetState(&StartState{})
 	return b

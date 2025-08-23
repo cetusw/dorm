@@ -48,6 +48,28 @@ func (s *SheetsService) CreateWeeklySheet(
 	return s.sheets.BatchUpdate(requests)
 }
 
+func (s *SheetsService) UpdateWeeklySheet(title string, tasks []model.DutyTaskReadable) error {
+	var dataToWrite [][]interface{}
+	for _, task := range tasks {
+		row := s.formatTaskRow(task)
+		dataToWrite = append(dataToWrite, row)
+	}
+
+	clearRange := fmt.Sprintf("A%d:E", consts.TasksStartRow)
+	err := s.sheets.ClearRange(title, clearRange)
+	if err != nil {
+		return fmt.Errorf("failed to clear range in sheet '%s': %w", title, err)
+	}
+
+	writeRange := fmt.Sprintf("A%d", consts.TasksStartRow)
+	err = s.sheets.WriteRange(title, writeRange, dataToWrite)
+	if err != nil {
+		return fmt.Errorf("failed to write new data to sheet '%s': %w", title, err)
+	}
+
+	return nil
+}
+
 func (s *SheetsService) prepareSheetData(
 	teamID int,
 	tasks []model.DutyTaskReadable,

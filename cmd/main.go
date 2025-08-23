@@ -63,7 +63,9 @@ func main() {
 		userService,
 		areaService,
 		taskService,
+		dutyService,
 		dutyTaskService,
+		cleaningService,
 	)
 
 	s := scheduler.NewScheduler(cleaningService)

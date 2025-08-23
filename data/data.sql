@@ -49,8 +49,6 @@ VALUES (1, 'Прихожая');
 INSERT INTO area (area_floor, area_name)
 VALUES (-1, 'Прачка');
 
-TRUNCATE TABLE `task`;
-
 INSERT INTO `task` (`task_id`, `area_id`, `task_title`, `task_cost`)
 VALUES (UUID_TO_BIN(UUID()), 1, 'Пропылесосить полы', 2),
        (UUID_TO_BIN(UUID()), 1, 'Помыть полы', 8),

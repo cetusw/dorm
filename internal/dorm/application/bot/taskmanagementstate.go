@@ -24,7 +24,7 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 
 	switch update.CallbackQuery.Data {
 	case message.ConfirmExecution:
-		dutyTasks, err := s.getDutyTasks(context, update)
+		dutyTasks, err := s.getDutyTasksReadable(context, update)
 		if err != nil {
 			log.Println(err)
 			text = message.ErrorWhileGettingDutyTasks
@@ -46,7 +46,7 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 		buttons = keyboard.BuildAreaKeyboard(areas)
 		nextState = &AreaSelectionState{}
 	case message.UnassignTask:
-		dutyTasks, err := s.getDutyTasks(context, update)
+		dutyTasksReadable, err := s.getDutyTasksReadable(context, update)
 		if err != nil {
 			log.Println(err)
 			text = message.ErrorWhileGettingDutyTasks
@@ -54,7 +54,7 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			break
 		}
 		text = message.TaskUnassignmentState
-		buttons = keyboard.BuildTaskUnassignmentKeyboard(dutyTasks)
+		buttons = keyboard.BuildTaskUnassignmentKeyboard(dutyTasksReadable)
 		nextState = &TaskUnassignmentState{}
 	}
 
@@ -62,17 +62,21 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 	context.SetState(nextState)
 }
 
-func (s *TaskManagementState) getDutyTasks(context *Bot, update *tgbotapi.Update) ([]model.DutyTask, error) {
+func (s *TaskManagementState) getDutyTasksReadable(context *Bot, update *tgbotapi.Update) ([]model.DutyTaskReadable, error) {
 	user, err := context.UserService.GetUser(update.Message.From.ID)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
 	}
-	dutyTasks, err := context.DutyTaskService.GetCurrentDutyTasksByAssigneeID(user.UserID)
+	lastDuty, err := context.DutyService.GetLastDuty()
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: failed to get last duty tasks: %v", err)
+	}
+	dutyTasksReadable, err := context.DutyTaskService.GetDutyTasksReadableByAssigneeIDAndDutyID(user.UserID, lastDuty.DutyID)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: failed to get areas for keyboard: %v", err)
 	}
 
-	return dutyTasks, nil
+	return dutyTasksReadable, nil
 }
 
 func (s *TaskManagementState) GetName() string {

@@ -61,11 +61,14 @@ func (r *DutyTaskRepository) StoreBatch(dutyTasks []model.DutyTask) error {
 	return nil
 }
 
-func (r *DutyTaskRepository) FindReadableTasksByDutyID(dutyID uuid.UUID) ([]model.DutyTaskReadable, error) {
+func (r *DutyTaskRepository) FindDutyTasksReadableByDutyID(
+	dutyID uuid.UUID,
+) ([]model.DutyTaskReadable, error) {
 	query := `
 		SELECT 
 			a.area_floor, 
 			a.area_name, 
+			t.task_id,
 			t.task_title, 
 			t.task_cost, 
 			u.first_name, 
@@ -76,7 +79,7 @@ func (r *DutyTaskRepository) FindReadableTasksByDutyID(dutyID uuid.UUID) ([]mode
 			INNER JOIN task t ON dt.task_id = t.task_id 
 			INNER JOIN area a ON a.area_id = t.area_id 
 			LEFT JOIN user u ON u.user_id = dt.assignee_id 
-		WHERE dt.duty_id = ?`
+		WHERE dt.duty_id = UUID_TO_BIN(?)`
 
 	rows, err := r.db.Query(query, dutyID)
 	if err != nil {
@@ -91,6 +94,7 @@ func (r *DutyTaskRepository) FindReadableTasksByDutyID(dutyID uuid.UUID) ([]mode
 		if err := rows.Scan(
 			&taskReadable.AreaFloor,
 			&taskReadable.AreaName,
+			&taskReadable.TaskID,
 			&taskReadable.TaskTitle,
 			&taskReadable.TaskCost,
 			&taskReadable.AssigneeFirstName,
@@ -112,51 +116,167 @@ func (r *DutyTaskRepository) FindReadableTasksByDutyID(dutyID uuid.UUID) ([]mode
 }
 
 // TODO: придумать, что делать, если дежурство прошло, но человек всё равно хочет увидеть задачи за прошлую неделю, которые он не выполнил
-func (r *DutyTaskRepository) FindCurrentDutyTasksByAssigneeID(assigneeID uuid.UUID) ([]model.DutyTask, error) {
-	now := time.Now()
+func (r *DutyTaskRepository) FindDutyTasksReadableByAssigneeIDAndDutyID(
+	assigneeID uuid.UUID,
+	dutyID uuid.UUID,
+) ([]model.DutyTaskReadable, error) {
 	query := `
 		SELECT 
-		    dt.duty_task_id, 
-		    dt.duty_id, 
-		    dt.task_id, 
-		    dt.assignee_id, 
-		    dt.reviewer_id, 
-		    dt.assignment_date, 
-		    dt.completion_date, 
-		    dt.verification_date
-		FROM duty_task dt
-			INNER JOIN duty d ON dt.duty_id = d.duty_id
-		WHERE d.duty_start_date < ? AND d.duty_end_date > ? AND dt.assignee_id = ?`
+			a.area_floor, 
+			a.area_name, 
+			t.task_id,
+			t.task_title, 
+			t.task_cost, 
+			u.first_name, 
+			u.last_name, 
+			dt.completion_date, 
+			dt.verification_date 
+		FROM duty_task dt 
+			INNER JOIN task t ON dt.task_id = t.task_id 
+			INNER JOIN area a ON a.area_id = t.area_id
+			LEFT JOIN user u ON u.user_id = dt.assignee_id
+		WHERE dt.assignee_id = ? AND dt.duty_id = ?`
 
-	rows, err := r.db.Query(query, now, now, assigneeID)
+	rows, err := r.db.Query(query, assigneeID, dutyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query current duty_task by assignee id %s: %w", assigneeID, err)
 	}
 	defer rows.Close()
 
-	var dutyTasks []model.DutyTask
+	var dutyTasksReadable []model.DutyTaskReadable
 
 	for rows.Next() {
-		var dutyTask model.DutyTask
+		var dutyTaskReadable model.DutyTaskReadable
 		if err := rows.Scan(
-			&dutyTask.DutyTaskID,
-			&dutyTask.DutyID,
-			&dutyTask.TaskID,
-			&dutyTask.AssigneeID,
-			&dutyTask.ReviewerID,
-			&dutyTask.AssignmentDate,
-			&dutyTask.CompletionDate,
-			&dutyTask.VerificationDate,
+			&dutyTaskReadable.AreaFloor,
+			&dutyTaskReadable.AreaName,
+			&dutyTaskReadable.TaskID,
+			&dutyTaskReadable.TaskTitle,
+			&dutyTaskReadable.TaskCost,
+			&dutyTaskReadable.AssigneeFirstName,
+			&dutyTaskReadable.AssigneeLastName,
+			&dutyTaskReadable.CompletionDate,
+			&dutyTaskReadable.VerificationDate,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan current duty_task row: %w", err)
 		}
 
-		dutyTasks = append(dutyTasks, dutyTask)
+		dutyTasksReadable = append(dutyTasksReadable, dutyTaskReadable)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating readable task rows: %w", err)
+		return nil, fmt.Errorf("error iterating current duty_task rows: %w", err)
 	}
 
-	return dutyTasks, nil
+	return dutyTasksReadable, nil
+}
+
+func (r *DutyTaskRepository) FindUnassignedDutyTasksReadableByAreaIDAndDutyID(
+	areaID int,
+	dutyID uuid.UUID,
+) ([]model.DutyTaskReadable, error) {
+	query := `
+		SELECT 
+			a.area_floor, 
+			a.area_name, 
+			t.task_id,
+			t.task_title, 
+			t.task_cost,
+			dt.completion_date, 
+			dt.verification_date 
+		FROM duty_task dt 
+			INNER JOIN task t ON dt.task_id = t.task_id 
+			INNER JOIN area a ON a.area_id = t.area_id
+		WHERE dt.assignee_id IS NULL
+		  AND t.area_id = ?
+		  AND dt.duty_id = UUID_TO_BIN(?)`
+
+	rows, err := r.db.Query(query, areaID, dutyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query unassigned duty_tasks by area id %d: %w", areaID, err)
+	}
+	defer rows.Close()
+
+	var dutyTasksReadable []model.DutyTaskReadable
+	for rows.Next() {
+		var dutyTaskReadable model.DutyTaskReadable
+		// Сканируем в поля, которые могут быть NULL
+		if err := rows.Scan(
+			&dutyTaskReadable.AreaFloor,
+			&dutyTaskReadable.AreaName,
+			&dutyTaskReadable.TaskID,
+			&dutyTaskReadable.TaskTitle,
+			&dutyTaskReadable.TaskCost,
+			&dutyTaskReadable.CompletionDate,
+			&dutyTaskReadable.VerificationDate,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan unassigned duty_task row: %w", err)
+		}
+
+		dutyTasksReadable = append(dutyTasksReadable, dutyTaskReadable)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating unassigned duty_task rows: %w", err)
+	}
+
+	return dutyTasksReadable, nil
+}
+
+func (r *DutyTaskRepository) UpdateCurrentDutyTaskAssigneeIDByTaskIDAndDutyID(
+	assigneeID uuid.UUID,
+	taskID uuid.UUID,
+	dutyID uuid.UUID,
+) error {
+	query := `
+		UPDATE duty_task dt
+			JOIN duty d ON dt.duty_id = d.duty_id
+		SET 
+			dt.assignee_id = UUID_TO_BIN(?) 
+		WHERE 
+			dt.task_id = UUID_TO_BIN(?)
+			AND dt.duty_id = UUID_TO_BIN(?);`
+
+	result, err := r.db.Exec(query, assigneeID, taskID, dutyID)
+	if err != nil {
+		return fmt.Errorf("failed to execute update for task_id %d: %w", taskID, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected for task_id %d: %w", taskID, err)
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *DutyTaskRepository) UpdateDutyTaskCompletionDateByTaskIDAndDutyID(taskID uuid.UUID, dutyID uuid.UUID) error {
+	now := time.Now()
+	query := `
+		UPDATE duty_task dt
+		    JOIN duty d ON dt.duty_id = d.duty_id
+		SET dt.completion_date = ? 
+		WHERE dt.task_id = UUID_TO_BIN(?)
+		  AND d.duty_start_date < ? 
+		  AND d.duty_end_date > ?`
+
+	result, err := r.db.Exec(query, now, taskID, now, now)
+	if err != nil {
+		return fmt.Errorf("failed to execute update for task_id %d: %w", taskID, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected for task_id %d: %w", taskID, err)
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }

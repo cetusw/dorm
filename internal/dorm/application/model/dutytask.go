@@ -20,6 +20,7 @@ type DutyTask struct {
 type DutyTaskReadable struct {
 	AreaFloor         int
 	AreaName          string
+	TaskID            uuid.UUID
 	TaskTitle         string
 	TaskCost          int
 	AssigneeFirstName *string
