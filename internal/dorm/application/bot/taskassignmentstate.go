@@ -16,28 +16,21 @@ type TaskAssignmentState struct {
 }
 
 func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Update) {
-	chatID := update.CallbackQuery.Message.Chat.ID
-	callbackQueryID := update.CallbackQuery.ID
-	context.Telegram.AnswerCallbackQuery(callbackQueryID, "")
-	var text string
-	var buttons tgbotapi.InlineKeyboardMarkup
-	var nextState State
-
+	chatID := s.AckCallbackAndChatID(context, update)
 	callbackData := update.CallbackQuery.Data
 
 	if callbackData == message.Back {
 		areas, err := context.AreaService.GetAllAreas()
 		if err != nil {
 			log.Printf("ERROR: failed to get areas for keyboard: %v", err)
-			text = message.ErrorWhileGettingArea
-			nextState = &MainState{}
+			s.SendReplyAndGo(context, chatID, message.ErrorWhileGettingArea, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return
 		}
-		text = message.AreaSelectionState
-		buttons = keyboard.BuildAreaKeyboard(areas)
-		nextState = &AreaSelectionState{}
+		s.EditInlineAndGo(context, chatID, message.AreaSelectionState, keyboard.BuildAreaKeyboard(areas), &AreaSelectionState{})
 		return
-	} else if strings.HasPrefix(callbackData, keyboard.CallbackPrefixAssign) {
+	}
+
+	if strings.HasPrefix(callbackData, keyboard.CallbackPrefixAssign) {
 		taskID := strings.TrimPrefix(callbackData, keyboard.CallbackPrefixAssign)
 		taskUUID, err := uuid.Parse(taskID)
 		if err != nil {
@@ -49,7 +42,17 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			log.Printf("ERROR: failed to get last duty: %v", err)
 			return
 		}
-		err = context.CleaningService.HandleTaskAssignment(chatID, taskUUID, currentDuty)
+		user, err := context.UserService.GetUser(chatID)
+		if err != nil {
+			log.Printf("ERROR: failed to get user while getting duty tasks: %v", err)
+			return
+		}
+		err = context.DutyTaskService.SetDutyTaskAssigneeIDByDutyID(user.UserID, taskUUID, currentDuty.DutyID)
+		if err != nil {
+			log.Printf("ERROR: failed to set current duty task assignee: %v", err)
+			return
+		}
+		err = context.CleaningService.UpdateCurrentSheet(currentDuty)
 		if err != nil {
 			log.Printf("ERROR: failed to handle task assignment: %v", err)
 			return
@@ -60,14 +63,14 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			return
 		}
 
-		text = message.TaskAssignmentState
-		buttons = keyboard.BuildTaskAssignmentKeyboard(tasks)
-
-		nextState = &TaskAssignmentState{AreaID: s.AreaID}
+		s.EditInlineAndGo(
+			context,
+			chatID,
+			message.TaskAssignmentState,
+			keyboard.BuildTaskAssignmentKeyboard(tasks),
+			&TaskAssignmentState{AreaID: s.AreaID},
+		)
 	}
-
-	context.Telegram.EditMessageWithMarkup(chatID, context.LastMessageID, text, buttons)
-	context.SetState(nextState)
 }
 
 func (s *TaskAssignmentState) GetName() string {

@@ -12,20 +12,17 @@ type TaskUnassignmentState struct {
 }
 
 func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Update) {
-	chatID := update.CallbackQuery.Message.Chat.ID
-	callbackQueryID := update.CallbackQuery.ID
-	context.Telegram.AnswerCallbackQuery(callbackQueryID, "")
-	var text string
-	var buttons tgbotapi.InlineKeyboardMarkup
-	var nextState State
+	chatID := s.AckCallbackAndChatID(context, update)
 	switch update.CallbackQuery.Data {
 	case message.Back:
-		text = message.TaskManagementState
-		buttons = keyboard.BuildTaskManagementKeyboard()
-		nextState = &TaskManagementState{}
+		s.EditInlineAndGo(
+			context,
+			chatID,
+			message.TaskManagementState,
+			keyboard.BuildTaskManagementKeyboard(),
+			&TaskManagementState{},
+		)
 	}
-	context.Telegram.EditMessageWithMarkup(chatID, context.LastMessageID, text, buttons)
-	context.SetState(nextState)
 }
 
 func (s *TaskUnassignmentState) GetName() string {

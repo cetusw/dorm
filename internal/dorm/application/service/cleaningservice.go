@@ -87,24 +87,6 @@ func (s *CleaningService) UpdateCurrentSheet(duty *model.Duty) error {
 	return nil
 }
 
-func (s *CleaningService) HandleTaskAssignment(chatID int64, taskID uuid.UUID, duty *model.Duty) error {
-	user, err := s.userService.GetUser(chatID)
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
-	}
-	err = s.dutyTaskService.SetDutyTaskAssigneeIDByDutyID(user.UserID, taskID, duty.DutyID)
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to set current duty task assignee: %v", err)
-	}
-
-	return s.UpdateCurrentSheet(duty)
-}
-func (s *CleaningService) HandleTaskCompletion(memberID int64, taskID int) {
-}
-
-func (s *CleaningService) HandleTaskVerification(memberID int64, taskID int) {
-}
-
 func (s *CleaningService) getNewDutyTeamID() (int, error) {
 	teamIDs, err := s.teamService.GetSortedTeamIDs()
 	if err != nil {

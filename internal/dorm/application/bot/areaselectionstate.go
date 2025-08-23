@@ -15,22 +15,21 @@ type AreaSelectionState struct {
 }
 
 func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Update) {
-	chatID := update.CallbackQuery.Message.Chat.ID
-	callbackQueryID := update.CallbackQuery.ID
-	context.Telegram.AnswerCallbackQuery(callbackQueryID, "")
-
-	var text string
-	var buttons tgbotapi.InlineKeyboardMarkup
-	var nextState State
-
+	chatID := s.AckCallbackAndChatID(context, update)
 	callbackData := update.CallbackQuery.Data
 
 	if callbackData == message.Back {
-		text = message.TaskManagementState
-		buttons = keyboard.BuildTaskManagementKeyboard()
-		nextState = &TaskManagementState{}
+		s.EditInlineAndGo(
+			context,
+			chatID,
+			message.TaskManagementState,
+			keyboard.BuildTaskManagementKeyboard(),
+			&TaskManagementState{},
+		)
 		return
-	} else if strings.HasPrefix(callbackData, keyboard.CallbackPrefixArea) {
+	}
+
+	if strings.HasPrefix(callbackData, keyboard.CallbackPrefixArea) {
 		areaIDStr := strings.TrimPrefix(callbackData, keyboard.CallbackPrefixArea)
 		areaID, err := strconv.Atoi(areaIDStr)
 		if err != nil {
@@ -48,14 +47,14 @@ func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Updat
 			return
 		}
 
-		text = message.TaskAssignmentState
-		buttons = keyboard.BuildTaskAssignmentKeyboard(tasks)
-
-		nextState = &TaskAssignmentState{AreaID: areaID}
+		s.EditInlineAndGo(
+			context,
+			chatID,
+			message.TaskAssignmentState,
+			keyboard.BuildTaskAssignmentKeyboard(tasks),
+			&TaskAssignmentState{AreaID: areaID},
+		)
 	}
-
-	context.Telegram.EditMessageWithMarkup(chatID, context.LastMessageID, text, buttons)
-	context.SetState(nextState)
 }
 
 func (s *AreaSelectionState) GetName() string {

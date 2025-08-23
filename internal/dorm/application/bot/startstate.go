@@ -21,6 +21,7 @@ func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
 			return
 		}
 		context.LastMessageID = messageID
+		return
 	}
 	if user == nil {
 		messageID, err := context.Telegram.SendMessage(chatID, message.Registration)
@@ -31,16 +32,7 @@ func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) {
 		context.SetState(&RegistrationState{})
 		return
 	}
-	messageID, err := context.Telegram.SendMessageWithMarkup(
-		chatID,
-		message.MainState,
-		keyboard.BuildMainStateKeyboard(),
-	)
-	if err != nil || messageID == 0 {
-		return
-	}
-	context.LastMessageID = messageID
-	context.SetState(&MainState{})
+	s.SendReplyAndGo(context, chatID, message.MainState, keyboard.BuildMainStateKeyboard(), &MainState{})
 }
 
 func (s *StartState) GetName() string {

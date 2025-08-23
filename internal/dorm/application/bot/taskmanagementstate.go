@@ -15,55 +15,41 @@ type TaskManagementState struct {
 }
 
 func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Update) {
-	chatID := update.CallbackQuery.Message.Chat.ID
-	callbackQueryID := update.CallbackQuery.ID
-	context.Telegram.AnswerCallbackQuery(callbackQueryID, "")
-	var text string
-	var buttons tgbotapi.InlineKeyboardMarkup
-	var nextState State
+	chatID := s.AckCallbackAndChatID(context, update)
 
 	switch update.CallbackQuery.Data {
 	case message.ConfirmExecution:
 		dutyTasks, err := s.getDutyTasksReadable(context, update)
 		if err != nil {
 			log.Println(err)
-			text = message.ErrorWhileGettingDutyTasks
-			nextState = &MainState{}
-			break
+			s.SendReplyAndGo(context, chatID, message.ErrorWhileGettingDutyTasks, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return
 		}
-		text = message.ConfirmExecutionState
-		buttons = keyboard.BuildConfirmExecutionKeyboard(dutyTasks)
-		nextState = &ConfirmExecutionState{}
+		s.EditInlineAndGo(context, chatID, message.ConfirmExecutionState, keyboard.BuildConfirmExecutionKeyboard(dutyTasks), &ConfirmExecutionState{})
+		return
 	case message.AssignTask:
 		areas, err := context.AreaService.GetAllAreas()
 		if err != nil {
 			log.Printf("ERROR: failed to get areas for keyboard: %v", err)
-			text = message.ErrorWhileGettingArea
-			nextState = &MainState{}
-			break
+			s.SendReplyAndGo(context, chatID, message.ErrorWhileGettingArea, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return
 		}
-		text = message.AreaSelectionState
-		buttons = keyboard.BuildAreaKeyboard(areas)
-		nextState = &AreaSelectionState{}
+		s.EditInlineAndGo(context, chatID, message.AreaSelectionState, keyboard.BuildAreaKeyboard(areas), &AreaSelectionState{})
+		return
 	case message.UnassignTask:
 		dutyTasksReadable, err := s.getDutyTasksReadable(context, update)
 		if err != nil {
 			log.Println(err)
-			text = message.ErrorWhileGettingDutyTasks
-			nextState = &MainState{}
-			break
+			s.SendReplyAndGo(context, chatID, message.ErrorWhileGettingDutyTasks, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return
 		}
-		text = message.TaskUnassignmentState
-		buttons = keyboard.BuildTaskUnassignmentKeyboard(dutyTasksReadable)
-		nextState = &TaskUnassignmentState{}
+		s.EditInlineAndGo(context, chatID, message.TaskUnassignmentState, keyboard.BuildTaskUnassignmentKeyboard(dutyTasksReadable), &TaskUnassignmentState{})
+		return
 	}
-
-	context.Telegram.EditMessageWithMarkup(chatID, context.LastMessageID, text, buttons)
-	context.SetState(nextState)
 }
 
 func (s *TaskManagementState) getDutyTasksReadable(context *Bot, update *tgbotapi.Update) ([]model.DutyTaskReadable, error) {
-	user, err := context.UserService.GetUser(update.Message.From.ID)
+	user, err := context.UserService.GetUser(update.CallbackQuery.From.ID)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
 	}
