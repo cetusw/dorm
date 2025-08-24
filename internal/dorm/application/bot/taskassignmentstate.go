@@ -20,17 +20,23 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 	callbackData := update.CallbackQuery.Data
 
 	if callbackData == message.Back {
-		currentDuty, err := context.DutyService.GetCurrentDuty()
+		unassignedAreas, err := s.GetUnassignedAreas(context)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		areas, err := context.AreaService.GetUnassignedAreasByDutyID(currentDuty.DutyID)
+		progress, err := s.ComputeUserProgress(context, chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		s.EditInlineAndGo(context, chatID, message.AreaSelectionState, keyboard.BuildAreaKeyboard(areas), &AreaSelectionState{})
+		s.EditInlineAndGo(
+			context,
+			chatID,
+			fmt.Sprintf(message.AreaSelectionState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+			keyboard.BuildAreaKeyboard(unassignedAreas),
+			&AreaSelectionState{},
+		)
 		return nil
 	}
 
@@ -41,27 +47,17 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		currentDuty, err := context.DutyService.GetCurrentDuty()
+		err = s.AssignTask(context, chatID, taskUUID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		user, err := context.UserService.GetUser(chatID)
+		unassignedTasks, err := s.GetUnassignedTasks(context, s.AreaID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		err = context.DutyTaskService.SetDutyTaskAssigneeID(&user.UserID, taskUUID, currentDuty.DutyID)
-		if err != nil {
-			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
-			return err
-		}
-		tasks, err := context.DutyTaskService.GetUnassignedDutyTasksView(s.AreaID, currentDuty.DutyID)
-		if err != nil {
-			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
-			return err
-		}
-		userPoints, pointsPerUser, err := s.GetPointsSummary(context, *user.TeamID, user.UserID, currentDuty.DutyID)
+		progress, err := s.ComputeUserProgress(context, chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
@@ -70,11 +66,11 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 		s.EditInlineAndGo(
 			context,
 			chatID,
-			fmt.Sprintf(message.TaskAssignmentState, userPoints, pointsPerUser),
-			keyboard.BuildTaskAssignmentKeyboard(tasks),
+			fmt.Sprintf(message.TaskAssignmentState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+			keyboard.BuildTaskAssignmentKeyboard(unassignedTasks),
 			&TaskAssignmentState{AreaID: s.AreaID},
 		)
-		err = context.CleaningService.UpdateCurrentSheet(currentDuty)
+		err = context.CleaningService.UpdateCurrentSheet()
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err

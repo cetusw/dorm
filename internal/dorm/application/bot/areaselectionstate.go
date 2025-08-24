@@ -29,36 +29,26 @@ func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Updat
 	}
 
 	if strings.HasPrefix(callbackData, keyboard.CallbackPrefixArea) {
-		areaID, err := s.GetAreaID(callbackData)
+		areaID, err := s.GetCallbackID(callbackData, keyboard.CallbackPrefixArea)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		duty, err := s.GetCurrentDuty(context)
+		tasks, err := s.GetUnassignedTasks(context, areaID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		tasks, err := s.GetUnassignedTasks(context, areaID, duty.DutyID)
+		progress, err := s.ComputeUserProgress(context, chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
-		}
-		user, err := s.GetUser(context, chatID)
-		if err != nil {
-			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
-			return err
-		}
-		userPoints, pointsPerUser, err := s.GetPointsSummary(context, *user.TeamID, user.UserID, duty.DutyID)
-		if err != nil {
-			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
-			return nil
 		}
 
 		s.EditInlineAndGo(
 			context,
 			chatID,
-			fmt.Sprintf(message.TaskAssignmentState, userPoints, pointsPerUser),
+			fmt.Sprintf(message.TaskAssignmentState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
 			keyboard.BuildTaskAssignmentKeyboard(tasks),
 			&TaskAssignmentState{AreaID: areaID},
 		)

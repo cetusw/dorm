@@ -3,6 +3,7 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
+	"fmt"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -35,17 +36,17 @@ func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Up
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		currentDuty, err := context.DutyService.GetCurrentDuty()
+		err = s.UnassignTask(context, taskUUID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		err = context.DutyTaskService.SetDutyTaskAssigneeID(nil, taskUUID, currentDuty.DutyID)
+		uncompletedTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		dutyTasksReadable, err := s.GetUncompletedDutyTasksView(context, update)
+		progress, err := s.ComputeUserProgress(context, chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
@@ -54,11 +55,11 @@ func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Up
 		s.EditInlineAndGo(
 			context,
 			chatID,
-			message.TaskUnassignmentState,
-			keyboard.BuildTaskUnassignmentKeyboard(dutyTasksReadable),
+			fmt.Sprintf(message.TaskUnassignmentState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+			keyboard.BuildTaskUnassignmentKeyboard(uncompletedTasks),
 			&TaskUnassignmentState{},
 		)
-		err = context.CleaningService.UpdateCurrentSheet(currentDuty)
+		err = context.CleaningService.UpdateCurrentSheet()
 		if err != nil {
 			return nil
 		}

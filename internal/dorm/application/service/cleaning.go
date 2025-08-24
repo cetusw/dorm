@@ -80,7 +80,11 @@ func (s *CleaningService) StartNewWeek() error {
 	return nil
 }
 
-func (s *CleaningService) UpdateCurrentSheet(duty *model.Duty) error {
+func (s *CleaningService) UpdateCurrentSheet() error {
+	duty, err := s.dutyService.GetCurrentDuty()
+	if err != nil {
+		return err
+	}
 	sheetTitle := fmt.Sprintf("%s-%s", duty.Start.Format("02.01"), duty.End.Format("02.01"))
 
 	dutyTasksReadable, err := s.dutyTaskService.GetDutyTasksReadable(duty.DutyID)

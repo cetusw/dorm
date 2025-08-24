@@ -3,6 +3,7 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
+	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -16,31 +17,64 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 
 	switch update.CallbackQuery.Data {
 	case message.ConfirmExecution:
-		dutyTasks, err := s.GetUncompletedDutyTasksView(context, update)
+		dutyTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
+		if len(dutyTasks) == 0 {
+			s.EditInlineAndGo(context, chatID, message.NoTasksToConfirm, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
+			return nil
+		}
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		s.EditInlineAndGo(context, chatID, message.ConfirmExecutionState, keyboard.BuildConfirmExecutionKeyboard(dutyTasks), &ConfirmExecutionState{})
+		progress, err := s.ComputeUserProgress(context, chatID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+
+		s.EditInlineAndGo(
+			context,
+			chatID,
+			fmt.Sprintf(message.ConfirmExecutionState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+			keyboard.BuildConfirmExecutionKeyboard(dutyTasks),
+			&ConfirmExecutionState{},
+		)
 	case message.AssignTask:
-		currentDuty, err := context.DutyService.GetCurrentDuty()
+		unassignedAreas, err := s.GetUnassignedAreas(context)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		areas, err := context.AreaService.GetUnassignedAreasByDutyID(currentDuty.DutyID)
+		progress, err := s.ComputeUserProgress(context, chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		s.EditInlineAndGo(context, chatID, message.AreaSelectionState, keyboard.BuildAreaKeyboard(areas), &AreaSelectionState{})
+		s.EditInlineAndGo(
+			context,
+			chatID,
+			fmt.Sprintf(message.AreaSelectionState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+			keyboard.BuildAreaKeyboard(unassignedAreas),
+			&AreaSelectionState{},
+		)
 	case message.UnassignTask:
-		dutyTasksReadable, err := s.GetUncompletedDutyTasksView(context, update)
+		uncompletedTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		s.EditInlineAndGo(context, chatID, message.TaskUnassignmentState, keyboard.BuildTaskUnassignmentKeyboard(dutyTasksReadable), &TaskUnassignmentState{})
+		progress, err := s.ComputeUserProgress(context, chatID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		s.EditInlineAndGo(
+			context,
+			chatID,
+			fmt.Sprintf(message.TaskUnassignmentState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+			keyboard.BuildTaskUnassignmentKeyboard(uncompletedTasks),
+			&TaskUnassignmentState{},
+		)
 	}
 
 	return nil

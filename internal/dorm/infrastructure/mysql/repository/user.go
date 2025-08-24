@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 )
 
 type UserRepository struct {
@@ -168,4 +169,27 @@ func (r *UserRepository) FindUsersByTeamID(teamID int) ([]model.User, error) {
 	}
 
 	return users, nil
+}
+
+func (r *UserRepository) FindUserTeamID(userID uuid.UUID) (int, error) {
+	query := `
+		SELECT 
+			team_id 
+		FROM user 
+		WHERE user_id = UUID_TO_BIN(?)`
+
+	var teamID *int
+	err := r.db.QueryRow(query, userID).Scan(&teamID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, sql.ErrNoRows
+		}
+		return 0, fmt.Errorf("failed to get user team_id: %w", err)
+	}
+
+	if teamID == nil {
+		return 0, nil
+	}
+
+	return *teamID, nil
 }

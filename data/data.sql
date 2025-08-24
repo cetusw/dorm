@@ -11,11 +11,22 @@ VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')),
         1);
 
 INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id)
+VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', '')),
+        523562013,
+        'Тест',
+        '2',
+        1);
+
+INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id)
 VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')),
         523562012,
         'Тест',
         'Тестович',
         1);
+
+UPDATE user
+SET team_id = 1
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', ''));
 
 INSERT INTO team (team_id, team_leader_id, team_color)
 VALUES (1,

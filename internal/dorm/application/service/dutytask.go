@@ -55,7 +55,7 @@ func (s *DutyTaskService) GetUnassignedDutyTasksView(
 	return s.dutyTaskRepository.FindUnassignedDutyTasksView(areaID, dutyID)
 }
 
-func (s *DutyTaskService) GetUserPointsByDutyID(assigneeID uuid.UUID, dutyID uuid.UUID) (int, error) {
+func (s *DutyTaskService) GetUserPoints(assigneeID uuid.UUID, dutyID uuid.UUID) (int, error) {
 	dutyTasks, err := s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
 	if err != nil {
 		return 0, err
@@ -70,7 +70,22 @@ func (s *DutyTaskService) GetUserPointsByDutyID(assigneeID uuid.UUID, dutyID uui
 	return sum, nil
 }
 
-func (s *DutyTaskService) GetAllPointsByDutyID(dutyID uuid.UUID) (int, error) {
+func (s *DutyTaskService) GetUserConfirmedPoints(assigneeID uuid.UUID, dutyID uuid.UUID) (int, error) {
+	dutyTasks, err := s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
+	if err != nil {
+		return 0, err
+	}
+	sum := 0
+	for _, task := range dutyTasks {
+		if task.AssigneeID != nil && *task.AssigneeID == assigneeID && task.CompletionDate != nil {
+			sum += task.TaskCost
+		}
+	}
+
+	return sum, nil
+}
+
+func (s *DutyTaskService) GetDutyPoints(dutyID uuid.UUID) (int, error) {
 	dutyTasks, err := s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
 	if err != nil {
 		return 0, err

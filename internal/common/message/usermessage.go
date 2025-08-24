@@ -6,9 +6,13 @@ const (
 	Team             = "Команда"
 	Payment          = "Оплата коливинга"
 	Profile          = "Профиль"
-	ConfirmExecution = "Подтвердить выполнение"
+	ConfirmExecution = "✅ Подтвердить выполнение"
+	AssignTask       = "➕ Взять задачу"
+	UnassignTask     = "✖️ Снять назначение"
 	TeamMembers      = "Участники команды"
 	DutySchedule     = "График дежурств"
-	AssignTask       = "Взять задачу"
-	UnassignTask     = "Снять назначение"
+)
+
+const (
+	StartCommand = "/start"
 )

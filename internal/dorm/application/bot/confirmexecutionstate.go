@@ -3,6 +3,7 @@ package bot
 import (
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
+	"fmt"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -35,17 +36,21 @@ func (s *ConfirmExecutionState) HandleCallback(context *Bot, update *tgbotapi.Up
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		currentDuty, err := context.DutyService.GetCurrentDuty()
+		err = s.ConfirmTask(context, taskUUID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		err = context.DutyTaskService.CompleteDutyTaskByDutyIDAndTaskID(currentDuty.DutyID, taskUUID)
+		dutyTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
+		if len(dutyTasks) == 0 {
+			s.EditInlineAndGo(context, chatID, message.AllTasksConfirmed, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
+			return nil
+		}
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		dutyTasksReadable, err := s.GetUncompletedDutyTasksView(context, update)
+		progress, err := s.ComputeUserProgress(context, chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
@@ -54,11 +59,11 @@ func (s *ConfirmExecutionState) HandleCallback(context *Bot, update *tgbotapi.Up
 		s.EditInlineAndGo(
 			context,
 			chatID,
-			message.ConfirmExecutionState,
-			keyboard.BuildConfirmExecutionKeyboard(dutyTasksReadable),
+			fmt.Sprintf(message.ConfirmExecutionState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+			keyboard.BuildConfirmExecutionKeyboard(dutyTasks),
 			&ConfirmExecutionState{},
 		)
-		err = context.CleaningService.UpdateCurrentSheet(currentDuty)
+		err = context.CleaningService.UpdateCurrentSheet()
 		if err != nil {
 			return err
 		}

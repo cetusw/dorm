@@ -55,6 +55,18 @@ func (s *UserService) GetAllUsers() ([]model.User, error) {
 	return s.userRepository.FindAll()
 }
 
-func (s *UserService) GetUsersByTeamID(teamID int) ([]model.User, error) {
-	return s.userRepository.FindUsersByTeamID(teamID)
+func (s *UserService) GetRequiredUserPoints(userID uuid.UUID, dutyPoints int) (float64, error) {
+	teamID, err := s.userRepository.FindUserTeamID(userID)
+	if err != nil {
+		return 0, err
+	}
+	teamUsers, err := s.userRepository.FindUsersByTeamID(teamID)
+	if err != nil {
+		return 0, err
+	}
+	teamSize := len(teamUsers)
+	if teamSize == 0 {
+		return 0, nil
+	}
+	return float64(dutyPoints) / float64(teamSize), nil
 }
