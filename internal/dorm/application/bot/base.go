@@ -87,15 +87,6 @@ func (s *baseState) UnassignTask(context *Bot, taskID uuid.UUID) error {
 	return context.DutyTaskService.SetDutyTaskAssigneeID(nil, taskID, duty.DutyID)
 }
 
-func (s *baseState) GetUser(context *Bot, chatID int64) (*model.User, error) {
-	user, err := context.UserService.GetUser(chatID)
-	if err != nil {
-		return nil, fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
-	}
-
-	return user, nil
-}
-
 func (s *baseState) GetUncompletedDutyTasksView(context *Bot, userID int64) ([]model.DutyTaskView, error) {
 	user, err := context.UserService.GetUser(userID)
 	if err != nil {
@@ -143,7 +134,7 @@ func (s *baseState) ComputeUserProgress(context *Bot, chatID int64) (*model.User
 	if err != nil {
 		return &model.UserProgress{}, err
 	}
-	user, err := s.GetUser(context, chatID)
+	user, err := context.UserService.GetUser(chatID)
 	if err != nil {
 		return &model.UserProgress{}, err
 	}
@@ -181,15 +172,36 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 	case message.Tasks:
 		text = message.TaskManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
-	case message.Team:
-		text = message.TeamManagementState
-		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTeamManagementKeyboard(), &TeamManagementState{})
 	case message.Payment:
 		text = message.PaymentManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildBackKeyboard(), &PaymentManagementState{})
 	case message.Profile:
-		text = message.Profile // TODO: сделать профиль
-		s.SendInlineAndGo(context, chatID, text, keyboard.BuildBackKeyboard(), &ProfileManagementState{})
+		user, err := context.UserService.GetUser(chatID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		duty, err := context.DutyService.GetCurrentDuty()
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		teamMembers, err := context.UserService.GetUsersByTeamID(*user.TeamID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		progress, err := s.ComputeUserProgress(context, chatID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		text, err := message.BuildProfileText(*user, *duty, teamMembers, *progress)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		s.SendInlineAndGo(context, chatID, text, keyboard.BuildBackKeyboard(), &ProfileInfoState{})
 	default:
 		messageID, err := context.Telegram.SendMessage(chatID, message.Please)
 		if err != nil || messageID == 0 {

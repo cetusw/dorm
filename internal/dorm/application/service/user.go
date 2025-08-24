@@ -55,6 +55,10 @@ func (s *UserService) GetAllUsers() ([]model.User, error) {
 	return s.userRepository.FindAll()
 }
 
+func (s *UserService) GetUsersByTeamID(teamID int) ([]model.User, error) {
+	return s.userRepository.FindUsersByTeamID(teamID)
+}
+
 func (s *UserService) GetRequiredUserPoints(userID uuid.UUID, dutyPoints int) (float64, error) {
 	teamID, err := s.userRepository.FindUserTeamID(userID)
 	if err != nil {

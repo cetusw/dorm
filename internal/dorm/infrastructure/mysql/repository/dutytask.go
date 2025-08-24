@@ -2,10 +2,10 @@ package repository
 
 import (
 	"database/sql"
+	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"fmt"
 	"strings"
-	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
@@ -255,7 +255,7 @@ func (r *DutyTaskRepository) UpdateDutyTaskAssigneeID(
 }
 
 func (r *DutyTaskRepository) UpdateDutyTaskCompletionDate(dutyID uuid.UUID, taskID uuid.UUID) error {
-	now := time.Now()
+	now := utils.NowMoscow()
 	query := `
 		UPDATE duty_task
 		SET completion_date = ?

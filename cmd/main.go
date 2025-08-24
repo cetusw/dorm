@@ -73,16 +73,22 @@ func main() {
 	for update := range updates {
 		log.Println(botContext.State.GetName())
 		if update.Message != nil {
-			botContext.State.Handle(botContext, &update)
+			err := botContext.State.Handle(botContext, &update)
+			if err != nil {
+				log.Printf("Failed to handle update: %v", err)
+			}
 		} else if update.CallbackQuery != nil {
-			botContext.State.HandleCallback(botContext, &update)
+			err := botContext.State.HandleCallback(botContext, &update)
+			if err != nil {
+				log.Printf("Failed to handle update: %v", err)
+			}
 		}
 	}
 }
 
 func connectDatabase() *sql.DB {
 	connStr := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?parseTime=true",
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Europe%%2FMoscow",
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"),
@@ -96,6 +102,9 @@ func connectDatabase() *sql.DB {
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("failed to ping db: %v", err)
+	}
+	if _, err := db.Exec("SET time_zone = '+03:00'"); err != nil {
+		log.Fatalf("failed to set session time zone: %v", err)
 	}
 	log.Println("Database connection successful!")
 

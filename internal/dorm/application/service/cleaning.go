@@ -1,9 +1,9 @@
 package service
 
 import (
+	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"fmt"
-	"time"
 )
 
 type CleaningService struct {
@@ -34,7 +34,7 @@ func NewCleaningService(
 }
 
 func (s *CleaningService) StartNewWeek() error {
-	startTime := time.Now()
+	startTime := utils.NowMoscow()
 	endTime := startTime.AddDate(0, 0, 6)
 	sheetTitle := fmt.Sprintf("%s-%s", startTime.Format("02.01"), endTime.Format("02.01"))
 

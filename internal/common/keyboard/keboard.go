@@ -19,7 +19,6 @@ func BuildMainStateKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	return buildReplyKeyboard(
 		[]buttonInfo{
 			{message.Tasks, message.Tasks},
-			{message.Team, message.Team},
 			{message.Payment, message.Payment},
 			{message.Profile, message.Profile},
 		},
