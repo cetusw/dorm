@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	weekStart = "32 1 * * 1"
+	weekStart = "20 2 * * 3"
 )
 
 type Scheduler struct {
@@ -31,6 +31,10 @@ func (s *Scheduler) startNewWeekJob() {
 	_, err := s.cron.AddFunc(weekStart, func() {
 		log.Println("Cron job triggered: StartNewWeek")
 		err := s.cleaningService.StartNewWeek()
+		if err != nil {
+			log.Println(err)
+		}
+		err = s.cleaningService.AssignSpecialTasks(2)
 		if err != nil {
 			log.Println(err)
 		}

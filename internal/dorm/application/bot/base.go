@@ -170,7 +170,7 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 	case message.StartCommand:
 		s.SendReplyAndGo(context, chatID, message.MainState, keyboard.BuildMainStateKeyboard(), &MainState{})
 	case message.Tasks:
-		text = message.TaskManagementState
+		text = message.TaskManagementState // TODO: сделать проверну на текущую дежурную команду. Если не дежурная, то выводить соответствующее сообщение
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
 	case message.Payment:
 		text = message.PaymentManagementState

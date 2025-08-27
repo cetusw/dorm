@@ -69,6 +69,35 @@ func (r *TaskRepository) FindAll() ([]model.Task, error) {
 	return tasks, nil
 }
 
+func (r *TaskRepository) FindAllByFrequency(freq int) ([]model.Task, error) {
+	query := `
+		SELECT 
+		    task_id, 
+		    area_id, 
+		    task_title, 
+		    task_cost
+		FROM task
+		WHERE frequency = ?`
+	rows, err := r.db.Query(query, freq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tasks by frequency: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []model.Task
+	for rows.Next() {
+		var task model.Task
+		if err := rows.Scan(&task.TaskID, &task.AreaID, &task.Title, &task.Cost); err != nil {
+			return nil, fmt.Errorf("failed to scan task row: %w", err)
+		}
+		tasks = append(tasks, task)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating tasks by frequency: %w", err)
+	}
+	return tasks, nil
+}
+
 func (r *TaskRepository) FindTasksByAreaID(areaID int) ([]model.Task, error) {
 	query := `
 		SELECT 

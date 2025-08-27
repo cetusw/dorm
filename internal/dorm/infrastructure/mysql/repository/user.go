@@ -82,7 +82,8 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 			role_id, 
 			created_at, 
 			deleted_at 
-		FROM user`
+		FROM user
+		ORDER BY first_name, last_name, middle_name`
 
 	rows, err := r.db.Query(query)
 	if err != nil {

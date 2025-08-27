@@ -91,6 +91,7 @@ CREATE TABLE `task`
     `area_id`    INT UNSIGNED NOT NULL,
     `task_title` VARCHAR(255) NOT NULL,
     `task_cost`  INT          NOT NULL DEFAULT 0,
+    `frequency`  INT          NOT NULL DEFAULT 7,
     PRIMARY KEY (`task_id`),
     CONSTRAINT `fk_task_area` FOREIGN KEY (`area_id`) REFERENCES `area` (`area_id`) ON DELETE RESTRICT ON UPDATE CASCADE
 )
@@ -164,6 +165,25 @@ CREATE TABLE `duty_task`
     CONSTRAINT `fk_duty_task_task` FOREIGN KEY (`task_id`) REFERENCES `task` (`task_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT `fk_duty_task_assignee` FOREIGN KEY (`assignee_id`) REFERENCES `user` (`user_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT `fk_duty_task_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `user` (`user_id`) ON DELETE SET NULL ON UPDATE CASCADE
+)
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci
+;
+
+DROP TABLE IF EXISTS `special_task_assignment`;
+CREATE TABLE `special_task_assignment`
+(
+    `assignment_id`   BINARY(16) NOT NULL,
+    `task_id`         BINARY(16) NOT NULL,
+    `assignee_id`     BINARY(16) NOT NULL,
+    `assignment_date` TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `completion_date` TIMESTAMP           DEFAULT NULL,
+    PRIMARY KEY (`assignment_id`),
+    KEY `idx_sta_task_date` (`task_id`, `assignment_date`),
+    KEY `idx_sta_assignee_date` (`assignee_id`, `assignment_date`),
+    CONSTRAINT `fk_sta_task` FOREIGN KEY (`task_id`) REFERENCES `task` (`task_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `fk_sta_assignee` FOREIGN KEY (`assignee_id`) REFERENCES `user` (`user_id`) ON DELETE RESTRICT ON UPDATE CASCADE
 )
     ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4

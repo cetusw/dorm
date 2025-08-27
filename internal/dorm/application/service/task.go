@@ -25,15 +25,14 @@ func (s *TaskService) GetTaskTitleByTaskID(taskID uuid.UUID) (*model.Task, error
 	return s.taskRepository.Find(taskID)
 }
 
-func (s *TaskService) GetAllTaskIDs() ([]uuid.UUID, error) {
-	tasks, err := s.taskRepository.FindAll()
+func (s *TaskService) GetAllTaskIDsByFrequency(freq int) ([]uuid.UUID, error) {
+	tasks, err := s.taskRepository.FindAllByFrequency(freq)
 	if err != nil {
 		return nil, err
 	}
-	var taskIDs []uuid.UUID
-	for _, task := range tasks {
-		taskIDs = append(taskIDs, task.TaskID)
+	out := make([]uuid.UUID, 0, len(tasks))
+	for _, t := range tasks {
+		out = append(out, t.TaskID)
 	}
-
-	return taskIDs, nil
+	return out, nil
 }

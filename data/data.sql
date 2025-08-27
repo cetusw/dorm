@@ -1,3 +1,5 @@
+USE dorm;
+
 INSERT INTO role (role_id, role_name, role_description)
 VALUES (1,
         'Житель',
@@ -24,9 +26,26 @@ VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')),
         'Тестович',
         1);
 
-UPDATE user
-SET team_id = 1
-WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', ''));
+INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id)
+VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', '-', '')),
+        523562016,
+        'Тест',
+        '3',
+        1);
+
+INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id)
+VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', '-', '')),
+        523562015,
+        'Тест',
+        '4',
+        1);
+
+INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id)
+VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a17', '-', '')),
+        523562014,
+        'Тест',
+        '6',
+        1);
 
 INSERT INTO team (team_id, team_leader_id, team_color)
 VALUES (1,
@@ -37,6 +56,10 @@ INSERT INTO team (team_id, team_leader_id, team_color)
 VALUES (2,
         UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')),
         'b4a7d6');
+
+UPDATE user
+SET team_id = 1
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', ''));
 
 UPDATE user
 SET team_id = 1
@@ -125,4 +148,6 @@ VALUES (UUID_TO_BIN(UUID()), 1, 'Пропылесосить полы', 2),
        (UUID_TO_BIN(UUID()), 7, 'Протереть огнетушители', 1),
        (UUID_TO_BIN(UUID()), 7, 'Протереть розетки', 1);
 
+INSERT INTO `task` (`task_id`, `area_id`, `task_title`, `task_cost`, `frequency`)
+VALUES (UUID_TO_BIN(UUID()), 6, 'Пропылесосить ковёр в прихожей', 2, 2)
 
