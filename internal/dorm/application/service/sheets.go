@@ -20,62 +20,56 @@ func NewSheetsService(sheets *infrastructure.Sheets) *SheetsService {
 	}
 }
 
-func (s *SheetsService) CreateWeeklySheet(
-	title string,
-	hexColor string,
-	teamID int,
-	tasks []model.DutyTaskView,
-	users []model.User,
-) error {
-	teamColor, err := utils.HexToSheetsColor(hexColor)
+func (s *SheetsService) CreateDutySheet(sheetData model.SheetData) error {
+	teamColor, err := utils.HexToSheetsColor(sheetData.TeamColor)
 	if err != nil {
 		return err
 	}
-	sheet, err := s.sheets.CreateSheetAndGetID(title, teamColor)
+	sheet, err := s.sheets.CreateSheet(sheetData.Title, teamColor, sheetData.SpreadsheetID)
 	if err != nil {
 		return err
 	}
 	sheetID := sheet.Properties.SheetId
 
-	dataToWrite, zoneMergeRanges := s.prepareSheetData(teamID, tasks)
+	dataToWrite, zoneMergeRanges := s.prepareSheetData(sheetData.Order, sheetData.Tasks)
 
-	err = s.sheets.WriteRange(title, "A1", dataToWrite)
+	err = s.sheets.WriteRange(sheetData, "A1", dataToWrite)
 	if err != nil {
 		return err
 	}
 
-	requests := s.prepareFormattingRequests(sheetID, zoneMergeRanges, teamColor, len(tasks), users)
-	return s.sheets.BatchUpdate(requests)
+	requests := s.prepareFormattingRequests(sheetID, zoneMergeRanges, teamColor, len(sheetData.Tasks), sheetData.Users)
+	return s.sheets.BatchUpdate(sheetData, requests)
 }
 
-func (s *SheetsService) UpdateWeeklySheet(title string, tasks []model.DutyTaskView) error {
+func (s *SheetsService) UpdateDutySheet(sheetData model.SheetData) error {
 	var dataToWrite [][]interface{}
-	for _, task := range tasks {
+	for _, task := range sheetData.Tasks {
 		row := s.formatTaskRow(task)
 		dataToWrite = append(dataToWrite, row)
 	}
 
 	clearRange := fmt.Sprintf("A%d:E", consts.TasksStartRow)
-	err := s.sheets.ClearRange(title, clearRange)
+	err := s.sheets.ClearRange(sheetData, clearRange)
 	if err != nil {
-		return fmt.Errorf("failed to clear range in sheet '%s': %w", title, err)
+		return fmt.Errorf("failed to clear range in sheet '%s': %w", sheetData.Title, err)
 	}
 
 	writeRange := fmt.Sprintf("A%d", consts.TasksStartRow)
-	err = s.sheets.WriteRange(title, writeRange, dataToWrite)
+	err = s.sheets.WriteRange(sheetData, writeRange, dataToWrite)
 	if err != nil {
-		return fmt.Errorf("failed to write new data to sheet '%s': %w", title, err)
+		return fmt.Errorf("failed to write new data to sheet '%s': %w", sheetData.Title, err)
 	}
 
 	return nil
 }
 
 func (s *SheetsService) prepareSheetData(
-	teamID int,
+	order int,
 	tasks []model.DutyTaskView,
 ) ([][]interface{}, map[string][2]int) {
 	var dataToWrite [][]interface{}
-	dataToWrite = append(dataToWrite, []interface{}{fmt.Sprintf(consts.SheetHeaderTeam, teamID)})
+	dataToWrite = append(dataToWrite, []interface{}{fmt.Sprintf(consts.SheetHeaderTeam, order)})
 	dataToWrite = append(dataToWrite, []interface{}{
 		consts.SheetColumnArea,
 		consts.SheetColumnTask,

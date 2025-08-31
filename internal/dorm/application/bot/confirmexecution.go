@@ -36,16 +36,12 @@ func (s *ConfirmExecutionState) HandleCallback(context *Bot, update *tgbotapi.Up
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		err = s.ConfirmTask(context, taskUUID)
+		err = s.ConfirmTask(context, chatID, taskUUID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
 		dutyTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
-		if len(dutyTasks) == 0 {
-			s.EditInlineAndGo(context, chatID, message.AllTasksConfirmed, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
-			return nil
-		}
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
@@ -56,14 +52,22 @@ func (s *ConfirmExecutionState) HandleCallback(context *Bot, update *tgbotapi.Up
 			return err
 		}
 
-		s.EditInlineAndGo(
-			context,
-			chatID,
-			fmt.Sprintf(message.ConfirmExecutionState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
-			keyboard.BuildConfirmExecutionKeyboard(dutyTasks),
-			&ConfirmExecutionState{},
-		)
-		err = context.CleaningService.UpdateCurrentSheet()
+		if len(dutyTasks) == 0 {
+			s.EditInlineAndGo(context, chatID, message.AllTasksConfirmed, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
+		} else {
+			s.EditInlineAndGo(
+				context,
+				chatID,
+				fmt.Sprintf(message.ConfirmExecutionState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+				keyboard.BuildConfirmExecutionKeyboard(dutyTasks),
+				&ConfirmExecutionState{},
+			)
+		}
+		user, err := context.UserService.GetUser(chatID)
+		if err != nil {
+			return err
+		}
+		err = context.CleaningService.UpdateCurrentSheet(*user)
 		if err != nil {
 			return err
 		}

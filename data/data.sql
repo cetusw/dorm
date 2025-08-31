@@ -1,64 +1,106 @@
+-- создание ролей
+
 INSERT INTO role (role_id, role_name, role_description)
-VALUES (1,
-        'Житель',
-        'Живёт в коливинге');
+VALUES (1, 'Житель', 'Живёт в коливинге');
+
+-- создание общежитий
+
+INSERT INTO dormitory (dormitory_id, dormitory_name, dormitory_city, dormitory_street_type, dormitory_street_name,
+                       dormitory_house_number)
+VALUES (1, 'Завод', 'Йошкар-Ола', 'переулок', 'Заводской', '3А'),
+       (2, 'Гагарин', 'Йошкар-Ола', 'улица', 'Волкова', '108');
+
+-- создание моего пользователя
 
 INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id)
-VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')),
-        523562011,
-        'Михаил',
-        'Кугелев',
-        1);
+VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')), 523562011, 'Михаил', 'Кугелев', 1);
+
+-- создание тестовых пользователей
 
 INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id)
-VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', '')),
-        523562013,
-        'Тест',
-        '2',
-        1);
+VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')), 523562012, 'Тест', '1', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', '')), 523562013, 'Тест', '2', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', '-', '')), 523562014, 'Тест', '3', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', '-', '')), 523562015, 'Тест', '4', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a16', '-', '')), 523562016, 'Тест', '5', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a17', '-', '')), 523562017, 'Тест', '6', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a18', '-', '')), 523562018, 'Тест', '2', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a19', '-', '')), 523562019, 'Тест', '2', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a20', '-', '')), 523562020, 'Тест', '2', 1),
+       (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', '-', '')), 523562021, 'Тест', '10', 1);
 
-INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id)
-VALUES (UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')),
-        523562012,
-        'Тест',
-        'Тестович',
-        1);
+-- создание групп команд
+
+INSERT INTO `group` (group_id, dormitory_id, group_name, spreadsheet_id)
+VALUES (UNHEX(REPLACE('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')), 1, 'Мужчины',
+        '1fYSv20bhoiHZlQY7TVR-0OfK8EUKmPsCaoQpEJKxMgo'),
+       (UNHEX(REPLACE('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')), 1, 'Женщины',
+        '1SHtbP1YZvsGEfI-o_JKnk-5NlaLHav_qjyAqKsIuaIY');
+
+-- создание команд
+
+INSERT INTO team (team_id, group_id, team_leader_id, team_color, team_order)
+VALUES (UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')),
+        UNHEX(REPLACE('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')),
+        UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')), 'b6d7a8', 1),
+       (UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')),
+        UNHEX(REPLACE('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')),
+        UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')), 'b4a7d6', 2),
+       (UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', '')),
+        UNHEX(REPLACE('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')),
+        UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', '')), 'fff2cc', 1),
+       (UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', '-', '')),
+        UNHEX(REPLACE('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')),
+        UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', '-', '')), 'e6b8af', 2);
+
+-- распределение пользователей по командам
 
 UPDATE user
-SET team_id = 1
-WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', ''));
-
-INSERT INTO team (team_id, team_leader_id, team_color)
-VALUES (1,
-        UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')),
-        'b6d7a8');
-
-INSERT INTO team (team_id, team_leader_id, team_color)
-VALUES (2,
-        UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', '')),
-        'b4a7d6');
-
-UPDATE user
-SET team_id = 1
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', ''))
 WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', ''));
 UPDATE user
-SET team_id = 2
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a19', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', ''))
 WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a16', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a17', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a20', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', '-', ''));
+UPDATE user
+SET team_id = UNHEX(REPLACE('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', '-', ''))
+WHERE user_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a18', '-', ''));
 
-INSERT INTO area (area_floor, area_name)
-VALUES (3, 'Коридор');
-INSERT INTO area (area_floor, area_name)
-VALUES (3, 'КУИ');
-INSERT INTO area (area_floor, area_name)
-VALUES (1, 'Северная часть кухни');
-INSERT INTO area (area_floor, area_name)
-VALUES (1, 'Северный коридор');
-INSERT INTO area (area_floor, area_name)
-VALUES (1, 'КУИ');
-INSERT INTO area (area_floor, area_name)
-VALUES (1, 'Прихожая');
-INSERT INTO area (area_floor, area_name)
-VALUES (-1, 'Прачка');
+-- создание зон дежурства
+
+INSERT INTO area (area_floor, area_name, is_public)
+VALUES (3, 'Коридор', false),
+       (3, 'КУИ', false),
+       (1, 'Северная часть кухни', false),
+       (1, 'Северный коридор', false),
+       (1, 'КУИ', false),
+       (1, 'Прихожая', true),
+       (-1, 'Прачка', true);
+
+-- создание задач
 
 INSERT INTO `task` (`task_id`, `area_id`, `task_title`, `task_cost`)
 VALUES (UUID_TO_BIN(UUID()), 1, 'Пропылесосить полы', 2),
@@ -124,5 +166,3 @@ VALUES (UUID_TO_BIN(UUID()), 1, 'Пропылесосить полы', 2),
        (UUID_TO_BIN(UUID()), 7, 'Протереть батарею', 1),
        (UUID_TO_BIN(UUID()), 7, 'Протереть огнетушители', 1),
        (UUID_TO_BIN(UUID()), 7, 'Протереть розетки', 1);
-
-

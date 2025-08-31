@@ -36,7 +36,7 @@ func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Up
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		err = s.UnassignTask(context, taskUUID)
+		err = s.UnassignTask(context, chatID, taskUUID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
@@ -59,7 +59,11 @@ func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Up
 			keyboard.BuildTaskUnassignmentKeyboard(uncompletedTasks),
 			&TaskUnassignmentState{},
 		)
-		err = context.CleaningService.UpdateCurrentSheet()
+		user, err := context.UserService.GetUser(chatID)
+		if err != nil {
+			return err
+		}
+		err = context.CleaningService.UpdateCurrentSheet(*user)
 		if err != nil {
 			return nil
 		}

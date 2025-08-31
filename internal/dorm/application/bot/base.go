@@ -1,8 +1,10 @@
 package bot
 
 import (
+	"dorm/internal/common/consts"
 	"dorm/internal/common/keyboard"
 	"dorm/internal/common/message"
+	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"fmt"
 	"strconv"
@@ -54,8 +56,17 @@ func (s *baseState) GetCallbackID(callbackData string, prefix string) (int, erro
 	return ID, nil
 }
 
-func (s *baseState) GetUnassignedTasks(context *Bot, areaID int) ([]model.DutyTaskView, error) {
-	duty, err := context.DutyService.GetCurrentDuty()
+func (s *baseState) GetUnassignedTasks(context *Bot, chatID int64, areaID int) ([]model.DutyTaskView, error) {
+	user, err := context.UserService.GetUser(chatID)
+	if err != nil {
+		return []model.DutyTaskView{}, err
+	}
+	team, err := context.TeamService.GetTeam(*user.TeamID)
+	if err != nil {
+		return []model.DutyTaskView{}, err
+	}
+	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
 	if err != nil {
 		return []model.DutyTaskView{}, err
 	}
@@ -68,19 +79,33 @@ func (s *baseState) GetUnassignedTasks(context *Bot, areaID int) ([]model.DutyTa
 }
 
 func (s *baseState) AssignTask(context *Bot, chatID int64, taskID uuid.UUID) error {
-	duty, err := context.DutyService.GetCurrentDuty()
+	user, err := context.UserService.GetUser(chatID)
 	if err != nil {
 		return err
 	}
-	user, err := context.UserService.GetUser(chatID)
+	team, err := context.TeamService.GetTeam(*user.TeamID)
+	if err != nil {
+		return err
+	}
+	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
 	if err != nil {
 		return err
 	}
 	return context.DutyTaskService.SetDutyTaskAssigneeID(&user.UserID, taskID, duty.DutyID)
 }
 
-func (s *baseState) UnassignTask(context *Bot, taskID uuid.UUID) error {
-	duty, err := context.DutyService.GetCurrentDuty()
+func (s *baseState) UnassignTask(context *Bot, chatID int64, taskID uuid.UUID) error {
+	user, err := context.UserService.GetUser(chatID)
+	if err != nil {
+		return err
+	}
+	team, err := context.TeamService.GetTeam(*user.TeamID)
+	if err != nil {
+		return err
+	}
+	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
 	if err != nil {
 		return err
 	}
@@ -90,34 +115,57 @@ func (s *baseState) UnassignTask(context *Bot, taskID uuid.UUID) error {
 func (s *baseState) GetUncompletedDutyTasksView(context *Bot, userID int64) ([]model.DutyTaskView, error) {
 	user, err := context.UserService.GetUser(userID)
 	if err != nil {
-		return nil, fmt.Errorf("ERROR: failed to get user while getting duty tasks: %v", err)
+		return nil, err
 	}
-	lastDuty, err := context.DutyService.GetCurrentDuty()
+	team, err := context.TeamService.GetTeam(*user.TeamID)
 	if err != nil {
-		return nil, fmt.Errorf("ERROR: failed to get last duty tasks: %v", err)
+		return nil, err
 	}
-	dutyTasksReadable, err := context.DutyTaskService.GetUncompletedDutyTasksView(user.UserID, lastDuty.DutyID)
+	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
 	if err != nil {
-		return nil, fmt.Errorf("ERROR: failed to get areas for keyboard: %v", err)
+		return nil, err
+	}
+	dutyTasksReadable, err := context.DutyTaskService.GetUncompletedDutyTasksView(user.UserID, duty.DutyID)
+	if err != nil {
+		return nil, err
 	}
 
 	return dutyTasksReadable, nil
 }
 
-func (s *baseState) GetUnassignedAreas(context *Bot) ([]model.Area, error) {
-	duty, err := context.DutyService.GetCurrentDuty()
+func (s *baseState) GetUnassignedAreas(context *Bot, chatID int64) ([]model.Area, error) {
+	user, err := context.UserService.GetUser(chatID)
 	if err != nil {
-		return []model.Area{}, err
+		return nil, err
+	}
+	team, err := context.TeamService.GetTeam(*user.TeamID)
+	if err != nil {
+		return nil, err
+	}
+	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
+	if err != nil {
+		return nil, err
 	}
 	areas, err := context.AreaService.GetUnassignedAreasByDutyID(duty.DutyID)
 	if err != nil {
-		return []model.Area{}, err
+		return nil, err
 	}
 	return areas, nil
 }
 
-func (s *baseState) ConfirmTask(context *Bot, taskID uuid.UUID) error {
-	duty, err := context.DutyService.GetCurrentDuty()
+func (s *baseState) ConfirmTask(context *Bot, chatID int64, taskID uuid.UUID) error {
+	user, err := context.UserService.GetUser(chatID)
+	if err != nil {
+		return err
+	}
+	team, err := context.TeamService.GetTeam(*user.TeamID)
+	if err != nil {
+		return err
+	}
+	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
 	if err != nil {
 		return err
 	}
@@ -130,29 +178,43 @@ func (s *baseState) ConfirmTask(context *Bot, taskID uuid.UUID) error {
 }
 
 func (s *baseState) ComputeUserProgress(context *Bot, chatID int64) (*model.UserProgress, error) {
-	duty, err := context.DutyService.GetCurrentDuty()
-	if err != nil {
-		return &model.UserProgress{}, err
-	}
 	user, err := context.UserService.GetUser(chatID)
 	if err != nil {
-		return &model.UserProgress{}, err
+		return nil, err
 	}
-	userPoints, err := context.DutyTaskService.GetUserPoints(user.UserID, duty.DutyID)
+	team, err := context.TeamService.GetTeam(*user.TeamID)
 	if err != nil {
-		return &model.UserProgress{}, err
+		return nil, err
 	}
-	userConfirmedPoints, err := context.DutyTaskService.GetUserConfirmedPoints(user.UserID, duty.DutyID)
+	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
 	if err != nil {
-		return &model.UserProgress{}, err
+		return nil, err
 	}
-	dutyPoints, err := context.DutyTaskService.GetDutyPoints(duty.DutyID)
-	if err != nil {
-		return &model.UserProgress{}, err
-	}
-	userRequiredPoints, err := context.UserService.GetRequiredUserPoints(user.UserID, dutyPoints)
-	if err != nil {
-		return &model.UserProgress{}, err
+	var userPoints int
+	var userConfirmedPoints int
+	var userRequiredPoints float64
+	if duty == nil {
+		userPoints = 0
+		userConfirmedPoints = 0
+		userRequiredPoints = 0
+	} else {
+		userPoints, err = context.DutyTaskService.GetUserPoints(user.UserID, duty.DutyID)
+		if err != nil {
+			return nil, err
+		}
+		userConfirmedPoints, err = context.DutyTaskService.GetUserConfirmedPoints(user.UserID, duty.DutyID)
+		if err != nil {
+			return nil, err
+		}
+		dutyPoints, err := context.DutyTaskService.GetDutyPoints(duty.DutyID)
+		if err != nil {
+			return nil, err
+		}
+		userRequiredPoints, err = context.UserService.GetRequiredUserPoints(user.UserID, dutyPoints)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &model.UserProgress{
 		UserPoints:          userPoints,
@@ -170,6 +232,24 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 	case message.StartCommand:
 		s.SendReplyAndGo(context, chatID, message.MainState, keyboard.BuildMainStateKeyboard(), &MainState{})
 	case message.Tasks:
+		user, err := context.UserService.GetUser(chatID)
+		if err != nil {
+			return err
+		}
+		team, err := context.TeamService.GetTeam(*user.TeamID)
+		if err != nil {
+			return err
+		}
+		lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+		duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		if duty == nil {
+			s.SendReplyAndGo(context, chatID, message.NotOnDutyTeam, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return nil
+		}
 		text = message.TaskManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
 	case message.Payment:
@@ -181,7 +261,13 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		duty, err := context.DutyService.GetCurrentDuty()
+		team, err := context.TeamService.GetTeam(*user.TeamID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+		duty, err := context.DutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
@@ -191,12 +277,17 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		progress, err := s.ComputeUserProgress(context, chatID)
-		if err != nil {
-			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
-			return err
+		var progress *model.UserProgress
+		if duty == nil {
+			progress = &model.UserProgress{}
+		} else {
+			progress, err = s.ComputeUserProgress(context, chatID)
+			if err != nil {
+				s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+				return err
+			}
 		}
-		text, err := message.BuildProfileText(*user, *duty, teamMembers, *progress)
+		text, err := message.BuildProfileText(*user, duty, teamMembers, *progress)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err

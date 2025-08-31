@@ -37,8 +37,12 @@ func (s *DutyTaskService) SetDutyTasks(dutyID uuid.UUID, taskIDs []uuid.UUID, re
 	return nil
 }
 
-func (s *DutyTaskService) GetDutyTasksReadable(dutyID uuid.UUID) ([]model.DutyTaskView, error) {
-	return s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
+func (s *DutyTaskService) SetDutyTasksBatch(dutyTasks []model.DutyTask) error {
+	return s.dutyTaskRepository.StoreBatch(dutyTasks)
+}
+
+func (s *DutyTaskService) GetDutyTasksView(dutyID uuid.UUID) ([]model.DutyTaskView, error) {
+	return s.dutyTaskRepository.FindDutyTaskViewsByDutyID(dutyID)
 }
 
 func (s *DutyTaskService) GetUncompletedDutyTasksView(
@@ -56,7 +60,7 @@ func (s *DutyTaskService) GetUnassignedDutyTasksView(
 }
 
 func (s *DutyTaskService) GetUserPoints(assigneeID uuid.UUID, dutyID uuid.UUID) (int, error) {
-	dutyTasks, err := s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
+	dutyTasks, err := s.dutyTaskRepository.FindDutyTaskViewsByDutyID(dutyID)
 	if err != nil {
 		return 0, err
 	}
@@ -71,7 +75,7 @@ func (s *DutyTaskService) GetUserPoints(assigneeID uuid.UUID, dutyID uuid.UUID) 
 }
 
 func (s *DutyTaskService) GetUserConfirmedPoints(assigneeID uuid.UUID, dutyID uuid.UUID) (int, error) {
-	dutyTasks, err := s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
+	dutyTasks, err := s.dutyTaskRepository.FindDutyTaskViewsByDutyID(dutyID)
 	if err != nil {
 		return 0, err
 	}
@@ -86,7 +90,7 @@ func (s *DutyTaskService) GetUserConfirmedPoints(assigneeID uuid.UUID, dutyID uu
 }
 
 func (s *DutyTaskService) GetDutyPoints(dutyID uuid.UUID) (int, error) {
-	dutyTasks, err := s.dutyTaskRepository.FindDutyTasksReadableByDutyID(dutyID)
+	dutyTasks, err := s.dutyTaskRepository.FindDutyTaskViewsByDutyID(dutyID)
 	if err != nil {
 		return 0, err
 	}
@@ -103,19 +107,9 @@ func (s *DutyTaskService) SetDutyTaskAssigneeID(
 	taskID uuid.UUID,
 	dutyID uuid.UUID,
 ) error {
-	err := s.dutyTaskRepository.UpdateDutyTaskAssigneeID(assigneeID, dutyID, taskID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.dutyTaskRepository.UpdateDutyTaskAssigneeID(assigneeID, dutyID, taskID)
 }
 
 func (s *DutyTaskService) CompleteDutyTaskByDutyIDAndTaskID(dutyID uuid.UUID, taskID uuid.UUID) error {
-	err := s.dutyTaskRepository.UpdateDutyTaskCompletionDate(dutyID, taskID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.dutyTaskRepository.UpdateDutyTaskCompletionDate(dutyID, taskID)
 }

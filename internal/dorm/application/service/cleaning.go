@@ -1,9 +1,13 @@
 package service
 
 import (
+	"dorm/internal/common/consts"
 	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"fmt"
+	"sort"
+
+	"github.com/google/uuid"
 )
 
 type CleaningService struct {
@@ -13,6 +17,8 @@ type CleaningService struct {
 	dutyTaskService *DutyTaskService
 	teamService     *TeamService
 	taskService     *TaskService
+	groupService    *GroupService
+	areaService     *AreaService
 }
 
 func NewCleaningService(
@@ -22,6 +28,8 @@ func NewCleaningService(
 	dutyTaskService *DutyTaskService,
 	teamService *TeamService,
 	taskService *TaskService,
+	groupService *GroupService,
+	areaService *AreaService,
 ) *CleaningService {
 	return &CleaningService{
 		sheetsService:   sheetsService,
@@ -30,69 +38,67 @@ func NewCleaningService(
 		dutyTaskService: dutyTaskService,
 		teamService:     teamService,
 		taskService:     taskService,
+		groupService:    groupService,
+		areaService:     areaService,
 	}
 }
 
 func (s *CleaningService) StartNewWeek() error {
 	startTime := utils.NowMoscow()
 	endTime := startTime.AddDate(0, 0, 6)
-	sheetTitle := fmt.Sprintf("%s-%s", startTime.Format("02.01"), endTime.Format("02.01"))
-
-	newDutyTeamID, err := s.getNewDutyTeamID()
+	newDutyTeams, err := s.getNewDutyTeams()
 	if err != nil {
 		return err
 	}
-	var duty *model.Duty
-	duty, err = s.dutyService.CreateNewDuty(newDutyTeamID, startTime, endTime)
+	duties, err := s.dutyService.CreateNewDuties(newDutyTeams, startTime, endTime)
 	if err != nil {
 		return err
 	}
-	team, err := s.teamService.GetTeam(duty.TeamID)
+	err = s.assignPrivateAreaTasksToDuties(duties)
 	if err != nil {
 		return err
 	}
-	taskIDs, err := s.taskService.GetAllTaskIDs()
+	err = s.assignPublicAreaTasksToDuties(duties)
 	if err != nil {
 		return err
 	}
-	err = s.dutyTaskService.SetDutyTasks(duty.DutyID, taskIDs, team.TeamLeaderID)
-	if err != nil {
-		return err
-	}
-	var teamColor string
-	teamColor, err = s.teamService.GetTeamColor(newDutyTeamID)
-	if err != nil {
-		return err
-	}
-	var dutyTasksReadable []model.DutyTaskView
-	dutyTasksReadable, err = s.dutyTaskService.GetDutyTasksReadable(duty.DutyID)
-	if err != nil {
-		return err
-	}
-	users, err := s.userService.GetAllUsers()
-	if err != nil {
-		return err
-	}
-	err = s.sheetsService.CreateWeeklySheet(sheetTitle, teamColor, newDutyTeamID, dutyTasksReadable, users)
+	err = s.createDutySheets(duties)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *CleaningService) UpdateCurrentSheet() error {
-	duty, err := s.dutyService.GetCurrentDuty()
+func (s *CleaningService) UpdateCurrentSheet(user model.User) error {
+	team, err := s.teamService.GetTeam(*user.TeamID)
 	if err != nil {
 		return err
 	}
-	sheetTitle := fmt.Sprintf("%s-%s", duty.Start.Format("02.01"), duty.End.Format("02.01"))
+	group, err := s.groupService.GetGroup(team.GroupID)
+	if err != nil {
+		return err
+	}
+	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	duty, err := s.dutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
+	if err != nil {
+		return err
+	}
 
-	dutyTasksReadable, err := s.dutyTaskService.GetDutyTasksReadable(duty.DutyID)
+	dutyTasksView, err := s.dutyTaskService.GetDutyTasksView(duty.DutyID)
 	if err != nil {
 		return fmt.Errorf("failed to get readable duty tasks for sheet update: %w", err)
 	}
 
-	err = s.sheetsService.UpdateWeeklySheet(sheetTitle, dutyTasksReadable)
+	sheetData := model.SheetData{
+		SpreadsheetID: group.SpreadsheetID,
+		Title:         s.createSheetTitle(*duty),
+		Tasks:         dutyTasksView,
+		Order:         0,
+		TeamColor:     "",
+		Users:         nil,
+	}
+
+	err = s.sheetsService.UpdateDutySheet(sheetData)
 	if err != nil {
 		return fmt.Errorf("failed to update weekly sheet: %w", err)
 	}
@@ -100,25 +106,219 @@ func (s *CleaningService) UpdateCurrentSheet() error {
 	return nil
 }
 
-func (s *CleaningService) getNewDutyTeamID() (int, error) {
-	teamIDs, err := s.teamService.GetSortedTeamIDs()
+func (s *CleaningService) getNewDutyTeams() ([]model.Team, error) {
+	var dutyTeams []model.Team
+	groups, err := s.groupService.GetAllGroups()
 	if err != nil {
-		return 0, err
-	}
-	var lastDutyTeamID int
-	lastDutyTeamID, err = s.dutyService.GetLastDutyTeamID()
-	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	nextTeamIndex := 0
+	for _, group := range groups {
+		nextDutyTeam, err := s.getNextDutyTeamInGroup(group)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get next duty team for group %s: %w", group.Name, err)
+		}
 
-	for i, id := range teamIDs {
-		if id == lastDutyTeamID {
-			nextTeamIndex = (i + 1) % len(teamIDs)
-			break
+		if nextDutyTeam != nil {
+			dutyTeams = append(dutyTeams, *nextDutyTeam)
 		}
 	}
 
-	return teamIDs[nextTeamIndex], nil
+	return dutyTeams, nil
+}
+
+func (s *CleaningService) getNextDutyTeamInGroup(group model.Group) (*model.Team, error) {
+	teams, err := s.teamService.GetGroupTeams(group.GroupID)
+	if err != nil {
+		return nil, err
+	}
+	if len(teams) == 0 {
+		return nil, fmt.Errorf("no teams found in team group %s", group.GroupID)
+	}
+	sort.Slice(teams, func(i, j int) bool {
+		return teams[i].Order < teams[j].Order
+	})
+	lastDuty, err := s.dutyService.GetGroupLastDuty(group.GroupID)
+	if err != nil {
+		return nil, err
+	}
+	if lastDuty == nil {
+		return &teams[0], nil
+	}
+	lastDutyTeam, err := s.teamService.GetTeam(lastDuty.TeamID)
+	if err != nil {
+		return nil, err
+	}
+	nextOrder, err := s.getNextOrder(lastDutyTeam.Order, len(teams))
+	if err != nil {
+		return nil, err
+	}
+
+	return s.teamService.GetTeamByGroupIDAndOrder(group.GroupID, nextOrder)
+}
+
+func (s *CleaningService) getNextOrder(currentOrder int, totalTeams int) (int, error) {
+	if totalTeams <= 0 {
+		return 0, fmt.Errorf("total teams must be positive")
+	}
+	if currentOrder < 1 || currentOrder > totalTeams {
+		return 0, fmt.Errorf("current order %d is out of bounds [1, %d]", currentOrder, totalTeams)
+	}
+
+	nextOrder := (currentOrder % totalTeams) + 1
+
+	return nextOrder, nil
+}
+
+func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) error {
+	if len(duties) == 0 {
+		return nil
+	}
+	privateTasks, err := s.taskService.GetTasksByScope(false)
+	if err != nil {
+		return err
+	}
+	var dutyTasks []model.DutyTask
+	for _, duty := range duties {
+		team, err := s.teamService.GetTeam(duty.TeamID)
+		if err != nil {
+			return err
+		}
+		for _, task := range privateTasks {
+			dutyTask := model.DutyTask{
+				DutyTaskID: uuid.New(),
+				DutyID:     duty.DutyID,
+				TaskID:     task.TaskID,
+				ReviewerID: team.TeamLeaderID,
+			}
+			dutyTasks = append(dutyTasks, dutyTask)
+		}
+	}
+
+	return s.dutyTaskService.SetDutyTasksBatch(dutyTasks)
+}
+
+func (s *CleaningService) groupPublicTasksByArea() (map[int][]model.Task, error) {
+	publicTasks, err := s.taskService.GetTasksByScope(true)
+	if err != nil {
+		return nil, err
+	}
+
+	tasksByArea := make(map[int][]model.Task)
+	for _, task := range publicTasks {
+		tasksByArea[task.AreaID] = append(tasksByArea[task.AreaID], task)
+	}
+
+	return tasksByArea, nil
+}
+
+func (s *CleaningService) buildDutyToTeamMap(duties []model.Duty) (map[uuid.UUID]model.Team, error) {
+	dutyToTeamMap := make(map[uuid.UUID]model.Team)
+	for _, duty := range duties {
+		team, err := s.teamService.GetTeam(duty.TeamID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get team %s: %w", duty.TeamID, err)
+		}
+		dutyToTeamMap[duty.DutyID] = *team
+	}
+	return dutyToTeamMap, nil
+}
+
+func (s *CleaningService) assignPublicAreaTasksToDuties(duties []model.Duty) error {
+	if len(duties) == 0 {
+		return nil
+	}
+	publicAreas, err := s.areaService.GetPublicAreas()
+	if err != nil || len(publicAreas) == 0 {
+		return err
+	}
+	tasksByArea, err := s.groupPublicTasksByArea()
+	if err != nil {
+		return err
+	}
+	teamForDuty, err := s.buildDutyToTeamMap(duties)
+	if err != nil {
+		return err
+	}
+
+	dutyTasks := s.assignAreasRoundRobin(duties, publicAreas, teamForDuty, tasksByArea)
+
+	return s.dutyTaskService.SetDutyTasksBatch(dutyTasks)
+}
+
+func (s *CleaningService) assignAreasRoundRobin(
+	duties []model.Duty,
+	publicAreas []model.Area,
+	teamForDuty map[uuid.UUID]model.Team,
+	tasksByArea map[int][]model.Task,
+) []model.DutyTask {
+	sort.Slice(publicAreas, func(i, j int) bool {
+		return publicAreas[i].AreaID < publicAreas[j].AreaID
+	})
+
+	currentWeek, err := s.dutyService.GetCurrentWeek()
+	if err != nil {
+		return nil
+	}
+
+	var allDutyTasks []model.DutyTask
+	dutyIndex := currentWeek % len(duties)
+	for _, area := range publicAreas {
+		duty := duties[dutyIndex]
+		team := teamForDuty[duty.DutyID]
+
+		for _, task := range tasksByArea[area.AreaID] {
+			allDutyTasks = append(allDutyTasks, model.DutyTask{
+				DutyTaskID: uuid.New(),
+				DutyID:     duty.DutyID,
+				TaskID:     task.TaskID,
+				ReviewerID: team.TeamLeaderID,
+			})
+		}
+		dutyIndex = (dutyIndex + 1) % len(duties)
+	}
+	return allDutyTasks
+}
+
+func (s *CleaningService) createDutySheets(duties []model.Duty) error {
+	for _, duty := range duties {
+		team, err := s.teamService.GetTeam(duty.TeamID)
+		if err != nil {
+			return err
+		}
+		group, err := s.groupService.GetGroup(team.GroupID)
+		if err != nil {
+			return err
+		}
+		color, err := s.teamService.GetTeamColor(duty.TeamID)
+		if err != nil {
+			return err
+		}
+		dutyTasksView, err := s.dutyTaskService.GetDutyTasksView(duty.DutyID)
+		if err != nil {
+			return err
+		}
+		users, err := s.userService.GetUsersByTeamID(duty.TeamID)
+		if err != nil {
+			return err
+		}
+		dutySheet := model.SheetData{
+			SpreadsheetID: group.SpreadsheetID,
+			Title:         s.createSheetTitle(duty),
+			TeamColor:     color,
+			Order:         team.Order,
+			Tasks:         dutyTasksView,
+			Users:         users,
+		}
+		err = s.sheetsService.CreateDutySheet(dutySheet)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *CleaningService) createSheetTitle(duty model.Duty) string {
+	return fmt.Sprintf("%s-%s", duty.Start.Format("02.01"), duty.End.Format("02.01"))
 }

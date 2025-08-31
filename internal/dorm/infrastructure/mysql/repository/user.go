@@ -18,18 +18,8 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) Store(user *model.User) error {
-	query := "INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)"
-	_, err := r.db.Exec(query, user.UserID, user.TelegramID, user.FirstName, user.LastName, user.RoleID)
-	if err != nil {
-		return fmt.Errorf("failed to save user: %w", err)
-	}
-	return nil
-}
-
 func (r *UserRepository) Find(telegramID int64) (*model.User, error) {
-	user := &model.User{}
-	query := `
+	const sqlQuery = `
 		SELECT 
 		    user_id, 
 		    telegram_id, 
@@ -45,7 +35,8 @@ func (r *UserRepository) Find(telegramID int64) (*model.User, error) {
 		FROM user 
 		WHERE telegram_id = ?`
 
-	err := r.db.QueryRow(query, telegramID).Scan(
+	user := &model.User{}
+	err := r.db.QueryRow(sqlQuery, telegramID).Scan(
 		&user.UserID,
 		&user.TelegramID,
 		&user.FirstName,
@@ -69,7 +60,7 @@ func (r *UserRepository) Find(telegramID int64) (*model.User, error) {
 }
 
 func (r *UserRepository) FindAll() ([]model.User, error) {
-	query := `
+	const sqlQuery = `
 		SELECT 
 			user_id, 
 			telegram_id, 
@@ -84,14 +75,13 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 			deleted_at 
 		FROM user`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(sqlQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query all users: %w", err)
 	}
 	defer rows.Close()
 
 	var users []model.User
-
 	for rows.Next() {
 		var user model.User
 		if err := rows.Scan(
@@ -119,8 +109,8 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 	return users, nil
 }
 
-func (r *UserRepository) FindUsersByTeamID(teamID int) ([]model.User, error) {
-	query := `
+func (r *UserRepository) FindUsersByTeamID(teamID uuid.UUID) ([]model.User, error) {
+	const sqlQuery = `
 		SELECT 
 			user_id, 
 			telegram_id, 
@@ -134,16 +124,15 @@ func (r *UserRepository) FindUsersByTeamID(teamID int) ([]model.User, error) {
 			created_at, 
 			deleted_at 
 		FROM user 
-		WHERE team_id = ?`
+		WHERE team_id = UUID_TO_BIN(?)`
 
-	rows, err := r.db.Query(query, teamID)
+	rows, err := r.db.Query(sqlQuery, teamID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query users by team id: %w", err)
 	}
 	defer rows.Close()
 
 	var users []model.User
-
 	for rows.Next() {
 		var user model.User
 		if err := rows.Scan(
@@ -171,25 +160,36 @@ func (r *UserRepository) FindUsersByTeamID(teamID int) ([]model.User, error) {
 	return users, nil
 }
 
-func (r *UserRepository) FindUserTeamID(userID uuid.UUID) (int, error) {
-	query := `
-		SELECT 
-			team_id 
+func (r *UserRepository) FindUserTeamID(userID uuid.UUID) (*uuid.UUID, error) {
+	const sqlQuery = `
+		SELECT team_id 
 		FROM user 
 		WHERE user_id = UUID_TO_BIN(?)`
 
-	var teamID *int
-	err := r.db.QueryRow(query, userID).Scan(&teamID)
+	var teamID *uuid.UUID
+	err := r.db.QueryRow(sqlQuery, userID).Scan(&teamID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, sql.ErrNoRows
+			return nil, sql.ErrNoRows
 		}
-		return 0, fmt.Errorf("failed to get user team_id: %w", err)
+		return nil, fmt.Errorf("failed to get user team_id: %w", err)
 	}
 
 	if teamID == nil {
-		return 0, nil
+		return nil, nil
 	}
 
-	return *teamID, nil
+	return teamID, nil
+}
+
+func (r *UserRepository) Store(user *model.User) error {
+	const sqlQuery = `
+		INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id) 
+		VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)`
+
+	_, err := r.db.Exec(sqlQuery, user.UserID, user.TelegramID, user.FirstName, user.LastName, user.RoleID)
+	if err != nil {
+		return fmt.Errorf("failed to save user: %w", err)
+	}
+	return nil
 }

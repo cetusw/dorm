@@ -3,7 +3,8 @@ package service
 import (
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
-	"sort"
+
+	"github.com/google/uuid"
 )
 
 type TeamService struct {
@@ -16,26 +17,15 @@ func NewTeamService(repository *repository.TeamRepository) *TeamService {
 	}
 }
 
-func (s *TeamService) GetTeam(teamID int) (*model.Team, error) {
+func (s *TeamService) GetTeam(teamID uuid.UUID) (*model.Team, error) {
 	return s.teamRepository.Find(teamID)
 }
 
-func (s *TeamService) GetSortedTeamIDs() ([]int, error) {
-	teams, err := s.teamRepository.FindAll()
-	if err != nil {
-		return nil, err
-	}
-	var teamIDs []int
-	for _, team := range teams {
-		teamIDs = append(teamIDs, team.TeamID)
-	}
-
-	sort.Ints(teamIDs)
-
-	return teamIDs, nil
+func (s *TeamService) GetTeamByGroupIDAndOrder(groupID uuid.UUID, order int) (*model.Team, error) {
+	return s.teamRepository.FindTeamByGroupIDAndOrder(groupID, order)
 }
 
-func (s *TeamService) GetTeamColor(teamID int) (string, error) {
+func (s *TeamService) GetTeamColor(teamID uuid.UUID) (string, error) {
 	team, err := s.teamRepository.Find(teamID)
 	if err != nil {
 		return "", err
@@ -44,4 +34,8 @@ func (s *TeamService) GetTeamColor(teamID int) (string, error) {
 		return "", nil
 	}
 	return team.Color, nil
+}
+
+func (s *TeamService) GetGroupTeams(groupID uuid.UUID) ([]model.Team, error) {
+	return s.teamRepository.FindTeamsByGroupID(groupID)
 }

@@ -18,28 +18,36 @@ func NewDutyService(repository *repository.DutyRepository) *DutyService {
 	}
 }
 
-func (s *DutyService) CreateNewDuty(teamID int, start time.Time, end time.Time) (*model.Duty, error) {
-	duty := &model.Duty{
-		DutyID: uuid.New(),
-		TeamID: teamID,
-		Start:  start,
-		End:    end,
+func (s *DutyService) CreateNewDuties(teams []model.Team, start time.Time, end time.Time) ([]model.Duty, error) {
+	var duties []model.Duty
+	for _, team := range teams {
+		duty := &model.Duty{
+			DutyID: uuid.New(),
+			TeamID: team.TeamID,
+			Start:  start,
+			End:    end,
+		}
+		duties = append(duties, *duty)
 	}
 
-	return duty, s.dutyRepository.Store(duty)
+	return duties, s.dutyRepository.StoreBatch(duties)
 }
 
-func (s *DutyService) GetLastDutyTeamID() (int, error) {
-	lastDuty, err := s.dutyRepository.FindLast()
+func (s *DutyService) GetDutyByTeamIDAndStartDate(teamID uuid.UUID, startDate time.Time) (*model.Duty, error) {
+	return s.dutyRepository.FindDutyByTeamIDAndStartDate(teamID, startDate)
+}
+
+func (s *DutyService) GetCurrentWeek() (int, error) {
+	return s.dutyRepository.CountDistinctStartDates()
+}
+
+func (s *DutyService) GetGroupLastDuty(groupID uuid.UUID) (*model.Duty, error) {
+	lastDuty, err := s.dutyRepository.FindLastDutyByGroupID(groupID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if lastDuty == nil {
-		return 0, nil
+		return nil, nil
 	}
-	return lastDuty.TeamID, nil
-}
-
-func (s *DutyService) GetCurrentDuty() (*model.Duty, error) {
-	return s.dutyRepository.FindLast()
+	return lastDuty, nil
 }

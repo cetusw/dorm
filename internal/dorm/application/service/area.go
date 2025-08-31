@@ -24,3 +24,7 @@ func (s *AreaService) GetAllAreas() ([]model.Area, error) {
 func (s *AreaService) GetUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.Area, error) {
 	return s.areaRepository.FindUnassignedAreasByDutyID(dutyID)
 }
+
+func (s *AreaService) GetPublicAreas() ([]model.Area, error) {
+	return s.areaRepository.FindAreasByScope(true)
+}

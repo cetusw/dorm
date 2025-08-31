@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"dorm/internal/dorm/application/model"
 	"fmt"
 	"os"
 
@@ -11,11 +12,10 @@ import (
 )
 
 type Sheets struct {
-	srv           *sheets.Service
-	spreadsheetID string
+	srv *sheets.Service
 }
 
-func NewSheets(credentialsFile string, spreadsheetID string) (*Sheets, error) {
+func NewSheets(credentialsFile string) (*Sheets, error) {
 	ctx := context.Background()
 	b, err := os.ReadFile(credentialsFile)
 	if err != nil {
@@ -33,58 +33,10 @@ func NewSheets(credentialsFile string, spreadsheetID string) (*Sheets, error) {
 		return nil, err
 	}
 
-	return &Sheets{srv: srv, spreadsheetID: spreadsheetID}, nil
+	return &Sheets{srv: srv}, nil
 }
 
-func (c *Sheets) CreateSheet(title string, color *sheets.Color) error {
-	properties := &sheets.SheetProperties{Title: title}
-	if color != nil {
-		properties.TabColor = color
-	}
-
-	req := &sheets.Request{
-		AddSheet: &sheets.AddSheetRequest{Properties: properties},
-	}
-
-	batchUpdateReq := &sheets.BatchUpdateSpreadsheetRequest{
-		Requests: []*sheets.Request{req},
-	}
-
-	_, err := c.srv.Spreadsheets.BatchUpdate(c.spreadsheetID, batchUpdateReq).Do()
-	return err
-}
-
-func (c *Sheets) WriteRange(sheetTitle, startCell string, data [][]interface{}) error {
-	valueRange := &sheets.ValueRange{
-		Values: data,
-	}
-
-	rangeStr := sheetTitle + "!" + startCell
-	_, err := c.srv.Spreadsheets.Values.Update(c.spreadsheetID, rangeStr, valueRange).
-		ValueInputOption("USER_ENTERED").
-		Do()
-
-	if err != nil {
-		return fmt.Errorf("failed to write data: %w", err)
-	}
-
-	return nil
-}
-
-func (c *Sheets) ClearRange(title string, clearRange string) error {
-	fullRange := fmt.Sprintf("%s!%s", title, clearRange)
-
-	clearRequest := &sheets.ClearValuesRequest{}
-
-	_, err := c.srv.Spreadsheets.Values.Clear(c.spreadsheetID, fullRange, clearRequest).Do()
-	if err != nil {
-		return fmt.Errorf("unable to clear range %s: %w", fullRange, err)
-	}
-
-	return nil
-}
-
-func (c *Sheets) CreateSheetAndGetID(title string, color *sheets.Color) (*sheets.Sheet, error) {
+func (c *Sheets) CreateSheet(title string, color *sheets.Color, spreadsheetID string) (*sheets.Sheet, error) {
 	properties := &sheets.SheetProperties{Title: title}
 	if color != nil {
 		properties.TabColor = color
@@ -96,7 +48,7 @@ func (c *Sheets) CreateSheetAndGetID(title string, color *sheets.Color) (*sheets
 		Requests:                     []*sheets.Request{req},
 		IncludeSpreadsheetInResponse: true,
 	}
-	resp, err := c.srv.Spreadsheets.BatchUpdate(c.spreadsheetID, batchUpdateReq).Do()
+	resp, err := c.srv.Spreadsheets.BatchUpdate(spreadsheetID, batchUpdateReq).Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sheet: %w", err)
 	}
@@ -105,16 +57,47 @@ func (c *Sheets) CreateSheetAndGetID(title string, color *sheets.Color) (*sheets
 			return s, nil
 		}
 	}
+
 	return nil, fmt.Errorf("cannot find sheet '%s'", title)
 }
 
-func (c *Sheets) BatchUpdate(requests []*sheets.Request) error {
+func (c *Sheets) WriteRange(sheetData model.SheetData, startCell string, data [][]interface{}) error {
+	valueRange := &sheets.ValueRange{
+		Values: data,
+	}
+
+	rangeStr := sheetData.Title + "!" + startCell
+	_, err := c.srv.Spreadsheets.Values.Update(sheetData.SpreadsheetID, rangeStr, valueRange).
+		ValueInputOption("USER_ENTERED").
+		Do()
+
+	if err != nil {
+		return fmt.Errorf("failed to write data: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Sheets) ClearRange(sheetData model.SheetData, clearRange string) error {
+	fullRange := fmt.Sprintf("%s!%s", sheetData.Title, clearRange)
+
+	clearRequest := &sheets.ClearValuesRequest{}
+
+	_, err := c.srv.Spreadsheets.Values.Clear(sheetData.SpreadsheetID, fullRange, clearRequest).Do()
+	if err != nil {
+		return fmt.Errorf("unable to clear range %s: %w", fullRange, err)
+	}
+
+	return nil
+}
+
+func (c *Sheets) BatchUpdate(sheetData model.SheetData, requests []*sheets.Request) error {
 	if len(requests) == 0 {
 		return nil
 	}
 	batchUpdateReq := &sheets.BatchUpdateSpreadsheetRequest{
 		Requests: requests,
 	}
-	_, err := c.srv.Spreadsheets.BatchUpdate(c.spreadsheetID, batchUpdateReq).Do()
+	_, err := c.srv.Spreadsheets.BatchUpdate(sheetData.SpreadsheetID, batchUpdateReq).Do()
 	return err
 }

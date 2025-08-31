@@ -1,12 +1,12 @@
 package model
 
-import (
-	"github.com/google/uuid"
-)
+import "github.com/google/uuid"
 
 type Task struct {
-	TaskID uuid.UUID
-	AreaID int
-	Title  string
-	Cost   int
+	TaskID    uuid.UUID
+	AreaID    int
+	Title     string
+	Cost      int
+	Frequency int
+	Scope     string // "public" or "private"
 }

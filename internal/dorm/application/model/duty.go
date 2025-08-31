@@ -8,7 +8,7 @@ import (
 
 type Duty struct {
 	DutyID uuid.UUID
-	TeamID int
+	TeamID uuid.UUID
 	Start  time.Time
 	End    time.Time
 }

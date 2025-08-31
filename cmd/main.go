@@ -28,13 +28,14 @@ func main() {
 	teamRepository := repository.NewTeamRepository(db)
 	taskRepository := repository.NewTaskRepository(db)
 	areaRepository := repository.NewAreaRepository(db)
+	groupRepository := repository.NewGroupRepository(db)
 
 	telegram, err := infrastructure.NewTelegram(os.Getenv("BOT_TOKEN"))
 	if err != nil {
 		log.Fatalf("Failed to create Telegram client: %v", err)
 	}
 
-	sheets, err := infrastructure.NewSheets(os.Getenv("SHEETS_CREDENTIALS"), os.Getenv("SPREADSHEET_ID"))
+	sheets, err := infrastructure.NewSheets(os.Getenv("SHEETS_CREDENTIALS"))
 	if err != nil {
 		log.Fatalf("Failed to create Sheets client: %v", err)
 	}
@@ -45,6 +46,8 @@ func main() {
 	teamService := service.NewTeamService(teamRepository)
 	taskService := service.NewTaskService(taskRepository)
 	sheetsService := service.NewSheetsService(sheets)
+	groupService := service.NewGroupService(groupRepository)
+	areaService := service.NewAreaService(areaRepository)
 	cleaningService := service.NewCleaningService(
 		sheetsService,
 		userService,
@@ -52,8 +55,9 @@ func main() {
 		dutyTaskService,
 		teamService,
 		taskService,
+		groupService,
+		areaService,
 	)
-	areaService := service.NewAreaService(areaRepository)
 	botContext := bot.NewBot(
 		telegram,
 		userService,
@@ -61,8 +65,16 @@ func main() {
 		taskService,
 		dutyService,
 		dutyTaskService,
+		groupService,
+		teamService,
 		cleaningService,
 	)
+
+	//// TODO: remove
+	//err = cleaningService.StartNewWeek()
+	//if err != nil {
+	//	log.Println(err)
+	//}
 
 	s := scheduler.NewScheduler(cleaningService)
 	s.RegisterJobs()

@@ -1,34 +1,6 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS `area`;
-CREATE TABLE `area`
-(
-    `area_id`    INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `area_floor` INT DEFAULT NULL,
-    `area_name`  VARCHAR(255) NOT NULL,
-    PRIMARY KEY (`area_id`)
-)
-    ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci
-;
-
-DROP TABLE IF EXISTS `dormitory`;
-CREATE TABLE `dormitory`
-(
-    `dormitory_id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `dormitory_name`         VARCHAR(255) NOT NULL,
-    `dormitory_city`         VARCHAR(255) NOT NULL,
-    `dormitory_street`       VARCHAR(255) NOT NULL,
-    `dormitory_house_number` VARCHAR(50)  NOT NULL,
-    PRIMARY KEY (`dormitory_id`)
-)
-    ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci
-;
-
 DROP TABLE IF EXISTS `role`;
 CREATE TABLE `role`
 (
@@ -43,13 +15,61 @@ CREATE TABLE `role`
     COLLATE = utf8mb4_unicode_ci
 ;
 
+DROP TABLE IF EXISTS `area`;
+CREATE TABLE `area`
+(
+    `area_id`    INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `area_floor` INT DEFAULT NULL,
+    `area_name`  VARCHAR(255) NOT NULL,
+    `is_public`  BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (`area_id`)
+)
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci
+;
+
+DROP TABLE IF EXISTS `dormitory`;
+CREATE TABLE `dormitory`
+(
+    `dormitory_id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `dormitory_name`         VARCHAR(255) NOT NULL,
+    `dormitory_city`         VARCHAR(255) NOT NULL,
+    `dormitory_street_type`  VARCHAR(100) NOT NULL,
+    `dormitory_street_name`  VARCHAR(100) NOT NULL,
+    `dormitory_house_number` VARCHAR(50)  NOT NULL,
+    PRIMARY KEY (`dormitory_id`)
+)
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci
+;
+
+DROP TABLE IF EXISTS `group`;
+CREATE TABLE `group`
+(
+    `group_id`       BINARY(16)   NOT NULL,
+    `dormitory_id`   INT UNSIGNED NOT NULL,
+    `group_name`     VARCHAR(255) NOT NULL,
+    `spreadsheet_id` VARCHAR(255) DEFAULT NULL,
+    PRIMARY KEY (`group_id`),
+    CONSTRAINT `fk_team_group_dormitory` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitory` (`dormitory_id`) ON DELETE CASCADE ON UPDATE CASCADE
+)
+    ENGINE = InnoDB
+    DEFAULT CHARSET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci;
+;
+
 DROP TABLE IF EXISTS `team`;
 CREATE TABLE `team`
 (
-    `team_id`        INT UNSIGNED NOT NULL,
-    `team_leader_id` BINARY(16) DEFAULT NULL,
-    `team_color`     VARCHAR(6) DEFAULT NULL,
-    PRIMARY KEY (`team_id`)
+    `team_id`        BINARY(16) NOT NULL,
+    `group_id`       BINARY(16) NOT NULL,
+    `team_leader_id` BINARY(16)   DEFAULT NULL,
+    `team_color`     VARCHAR(6)   DEFAULT NULL,
+    `team_order`     INT UNSIGNED DEFAULT NULL,
+    PRIMARY KEY (`team_id`),
+    CONSTRAINT `fk_team_group` FOREIGN KEY (`group_id`) REFERENCES `group` (`group_id`) ON DELETE CASCADE ON UPDATE CASCADE
 )
     ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
@@ -64,7 +84,8 @@ CREATE TABLE `user`
     `first_name`   VARCHAR(255) NOT NULL,
     `last_name`    VARCHAR(255) NOT NULL,
     `middle_name`  VARCHAR(255) DEFAULT NULL,
-    `team_id`      INT UNSIGNED DEFAULT NULL,
+    `team_id`      BINARY(16)   DEFAULT NULL,
+    `floor_number` INT          DEFAULT NULL,
     `room_number`  VARCHAR(50)  DEFAULT NULL,
     `dormitory_id` INT UNSIGNED DEFAULT NULL,
     `role_id`      INT UNSIGNED NOT NULL,
@@ -87,10 +108,11 @@ ALTER TABLE `team`
 DROP TABLE IF EXISTS `task`;
 CREATE TABLE `task`
 (
-    `task_id`    BINARY(16)   NOT NULL,
-    `area_id`    INT UNSIGNED NOT NULL,
-    `task_title` VARCHAR(255) NOT NULL,
-    `task_cost`  INT          NOT NULL DEFAULT 0,
+    `task_id`        BINARY(16)   NOT NULL,
+    `area_id`        INT UNSIGNED NOT NULL,
+    `task_title`     VARCHAR(255) NOT NULL,
+    `task_cost`      INT          NOT NULL DEFAULT 0,
+    `task_frequency` INT          NOT NULL DEFAULT 7,
     PRIMARY KEY (`task_id`),
     CONSTRAINT `fk_task_area` FOREIGN KEY (`area_id`) REFERENCES `area` (`area_id`) ON DELETE RESTRICT ON UPDATE CASCADE
 )
@@ -102,10 +124,10 @@ CREATE TABLE `task`
 DROP TABLE IF EXISTS `duty`;
 CREATE TABLE `duty`
 (
-    `duty_id`         BINARY(16)   NOT NULL,
-    `team_id`         INT UNSIGNED NOT NULL,
-    `duty_start_date` TIMESTAMP    NOT NULL,
-    `duty_end_date`   TIMESTAMP    NOT NULL,
+    `duty_id`         BINARY(16) NOT NULL,
+    `team_id`         BINARY(16) NOT NULL,
+    `duty_start_date` TIMESTAMP  NOT NULL,
+    `duty_end_date`   TIMESTAMP  NOT NULL,
     PRIMARY KEY (`duty_id`),
     CONSTRAINT `fk_duty_team` FOREIGN KEY (`team_id`) REFERENCES `team` (`team_id`) ON DELETE CASCADE ON UPDATE CASCADE
 )

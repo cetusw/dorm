@@ -10,7 +10,7 @@ type User struct {
 	FirstName   string
 	LastName    string
 	MiddleName  *string
-	TeamID      *int
+	TeamID      *uuid.UUID
 	RoomNumber  *int
 	DormitoryID *uuid.UUID
 	RoleID      int

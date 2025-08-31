@@ -12,6 +12,8 @@ type Bot struct {
 	TaskService     *service.TaskService
 	DutyService     *service.DutyService
 	DutyTaskService *service.DutyTaskService
+	GroupService    *service.GroupService
+	TeamService     *service.TeamService
 	CleaningService *service.CleaningService
 	State           State
 	LastMessageID   int
@@ -24,6 +26,8 @@ func NewBot(
 	taskService *service.TaskService,
 	dutyService *service.DutyService,
 	dutyTaskService *service.DutyTaskService,
+	groupService *service.GroupService,
+	teamService *service.TeamService,
 	cleaningService *service.CleaningService,
 ) *Bot {
 	b := &Bot{
@@ -33,6 +37,8 @@ func NewBot(
 		TaskService:     taskService,
 		DutyService:     dutyService,
 		DutyTaskService: dutyTaskService,
+		GroupService:    groupService,
+		TeamService:     teamService,
 		CleaningService: cleaningService,
 	}
 	b.SetState(&StartState{})

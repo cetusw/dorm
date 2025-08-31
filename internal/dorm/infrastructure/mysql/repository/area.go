@@ -18,20 +18,14 @@ func NewAreaRepository(db *sql.DB) *AreaRepository {
 	return &AreaRepository{db: db}
 }
 
-func (r *AreaRepository) Store(area *model.Area) error {
-	query := "INSERT INTO area (area_floor, area_name) VALUES (?, ?)"
-	_, err := r.db.Exec(query, area.Floor, area.Name)
-	if err != nil {
-		return fmt.Errorf("failed to save area: %w", err)
-	}
-	return nil
-}
-
 func (r *AreaRepository) Find(areaFloor int, areaName string) (*model.Area, error) {
-	area := &model.Area{}
-	query := "SELECT area_id, area_floor, area_name FROM area WHERE area_floor = ? AND area_name = ?"
+	const sqlQuery = `
+		SELECT area_id, area_floor, area_name 
+		FROM area 
+		WHERE area_floor = ? AND area_name = ?`
 
-	err := r.db.QueryRow(query, areaFloor, areaName).Scan(&area.AreaID, &area.Floor, &area.Name)
+	area := &model.Area{}
+	err := r.db.QueryRow(sqlQuery, areaFloor, areaName).Scan(&area.AreaID, &area.Floor, &area.Name)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -43,15 +37,12 @@ func (r *AreaRepository) Find(areaFloor int, areaName string) (*model.Area, erro
 }
 
 func (r *AreaRepository) FindAll() ([]model.Area, error) {
-	query := `
-		SELECT 
-		    area_id, 
-		    area_floor, 
-		    area_name 
+	const sqlQuery = `
+		SELECT area_id, area_floor, area_name 
 		FROM area 
 		ORDER BY area_floor DESC, area_name DESC`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(sqlQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query areas: %w", err)
 	}
@@ -61,11 +52,7 @@ func (r *AreaRepository) FindAll() ([]model.Area, error) {
 
 	for rows.Next() {
 		var area model.Area
-		if err := rows.Scan(
-			&area.AreaID,
-			&area.Floor,
-			&area.Name,
-		); err != nil {
+		if err := rows.Scan(&area.AreaID, &area.Floor, &area.Name); err != nil {
 			return nil, fmt.Errorf("failed to scan area row: %w", err)
 		}
 		areas = append(areas, area)
@@ -79,11 +66,8 @@ func (r *AreaRepository) FindAll() ([]model.Area, error) {
 }
 
 func (r *AreaRepository) FindUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.Area, error) {
-	query := `
-		SELECT DISTINCT
-			a.area_id,
-			a.area_floor,
-			a.area_name
+	const sqlQuery = `
+		SELECT DISTINCT a.area_id, a.area_floor, a.area_name
 		FROM area a
 			INNER JOIN task t ON t.area_id = a.area_id
 		    INNER JOIN duty_task dt ON dt.task_id = t.task_id
@@ -91,7 +75,7 @@ func (r *AreaRepository) FindUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.
 		  AND dt.assignee_id IS NULL
 		ORDER BY a.area_floor DESC, a.area_name DESC`
 
-	rows, err := r.db.Query(query, dutyID)
+	rows, err := r.db.Query(sqlQuery, dutyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query unassigned areas for duty %s: %w", dutyID, err)
 	}
@@ -109,4 +93,45 @@ func (r *AreaRepository) FindUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.
 		return nil, fmt.Errorf("error iterating unassigned areas rows: %w", err)
 	}
 	return areas, nil
+}
+
+func (r *AreaRepository) FindAreasByScope(isPublic bool) ([]model.Area, error) {
+	const sqlQuery = `
+		SELECT area_id, area_floor, area_name, is_public
+		FROM area 
+		WHERE is_public = ?
+		ORDER BY area_floor DESC, area_name DESC`
+
+	rows, err := r.db.Query(sqlQuery, isPublic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query areas by scope: %w", err)
+	}
+	defer rows.Close()
+
+	var areas []model.Area
+
+	for rows.Next() {
+		var area model.Area
+		if err := rows.Scan(&area.AreaID, &area.Floor, &area.Name, &area.IsPublic); err != nil {
+			return nil, fmt.Errorf("failed to scan area row: %w", err)
+		}
+		areas = append(areas, area)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating area rows: %w", err)
+	}
+
+	return areas, nil
+}
+
+func (r *AreaRepository) Store(area *model.Area) error {
+	const sqlQuery = `
+		INSERT INTO area (area_floor, area_name) 
+		VALUES (?, ?)`
+	_, err := r.db.Exec(sqlQuery, area.Floor, area.Name)
+	if err != nil {
+		return fmt.Errorf("failed to save area: %w", err)
+	}
+	return nil
 }

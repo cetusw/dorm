@@ -16,8 +16,8 @@ const (
 	PaymentManagementState = "💳 Оплата проживания\nПерейдите по ссылке для оплаты:\n\nhttps://clck.ru/3Nq23U\n\nПосле оплаты вернитесь в бот."
 	ProfileHeader          = "👤 Профиль\n"
 
-	TaskManagementState = "🧹 Управление задачами."
-
+	TaskManagementState   = "🧹 Управление задачами."
+	NotOnDutyTeam         = "✅ Твоя команда не дежурит на этой неделе, брать задачи ни к чему."
 	AreaSelectionState    = "📍 Выберите зону для уборки.\n\n" + PointsSummary
 	ConfirmExecutionState = "✅ Что подтвердим?\nВыберите задачу, которую уже выполнили.\n\n" + PointsSummary
 	TaskAssignmentState   = "🧩 Выберите задачу, которую готовы выполнить.\n\n" + PointsSummary
@@ -83,10 +83,10 @@ func BuildTeamInfo(teamMembers []model.User) string {
 	return teamBlock
 }
 
-func BuildTeamStatus(user model.User, duty model.Duty) string {
+func BuildTeamStatus(user model.User, duty *model.Duty) string {
 	teamStatus := "Команда: не определена"
 	if user.TeamID != nil {
-		if duty.TeamID == *user.TeamID {
+		if duty != nil && duty.TeamID == *user.TeamID {
 			teamStatus = "Команда: дежурная на этой неделе ❗"
 		} else {
 			teamStatus = "Команда: не дежурит на этой неделе ✅"
@@ -96,9 +96,9 @@ func BuildTeamStatus(user model.User, duty model.Duty) string {
 	return teamStatus
 }
 
-func BuildPointsInfo(user model.User, duty model.Duty, progress model.UserProgress) string {
+func BuildPointsInfo(user model.User, duty *model.Duty, progress model.UserProgress) string {
 	pointsBlock := ""
-	if duty.TeamID == *user.TeamID {
+	if duty != nil && duty.TeamID == *user.TeamID {
 		pointsBlock = "\n" + fmt.Sprintf(PointsSummary, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints)
 	}
 
@@ -107,7 +107,7 @@ func BuildPointsInfo(user model.User, duty model.Duty, progress model.UserProgre
 
 func BuildProfileText(
 	user model.User,
-	duty model.Duty,
+	duty *model.Duty,
 	teamMembers []model.User,
 	progress model.UserProgress,
 ) (string, error) {
