@@ -26,5 +26,5 @@ func (s *AreaService) GetUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.Area
 }
 
 func (s *AreaService) GetPublicAreas() ([]model.Area, error) {
-	return s.areaRepository.FindAreasByScope(true)
+	return s.areaRepository.FindAreasWithoutGroup()
 }

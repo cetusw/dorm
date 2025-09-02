@@ -95,14 +95,14 @@ func (r *AreaRepository) FindUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.
 	return areas, nil
 }
 
-func (r *AreaRepository) FindAreasByScope(isPublic bool) ([]model.Area, error) {
+func (r *AreaRepository) FindAreasWithoutGroup() ([]model.Area, error) {
 	const sqlQuery = `
-		SELECT area_id, area_floor, area_name, is_public
+		SELECT area_id, area_floor, area_name, group_id
 		FROM area 
-		WHERE is_public = ?
+		WHERE group_id IS NULL
 		ORDER BY area_floor DESC, area_name DESC`
 
-	rows, err := r.db.Query(sqlQuery, isPublic)
+	rows, err := r.db.Query(sqlQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query areas by scope: %w", err)
 	}
@@ -112,7 +112,7 @@ func (r *AreaRepository) FindAreasByScope(isPublic bool) ([]model.Area, error) {
 
 	for rows.Next() {
 		var area model.Area
-		if err := rows.Scan(&area.AreaID, &area.Floor, &area.Name, &area.IsPublic); err != nil {
+		if err := rows.Scan(&area.AreaID, &area.Floor, &area.Name, &area.GroupID); err != nil {
 			return nil, fmt.Errorf("failed to scan area row: %w", err)
 		}
 		areas = append(areas, area)

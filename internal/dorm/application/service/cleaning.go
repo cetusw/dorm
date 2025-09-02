@@ -77,7 +77,7 @@ func (s *CleaningService) UpdateCurrentSheet(user model.User) error {
 	if err != nil {
 		return err
 	}
-	duty, err := s.dutyService.GetLastDutyByTeamID(team.TeamID)
+	duty, err := s.dutyService.GetCurrentDuty()
 	if err != nil {
 		return err
 	}
@@ -172,13 +172,13 @@ func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) er
 	if len(duties) == 0 {
 		return nil
 	}
-	privateTasks, err := s.taskService.GetTasksByScope(false)
-	if err != nil {
-		return err
-	}
 	var dutyTasks []model.DutyTask
 	for _, duty := range duties {
 		team, err := s.teamService.GetTeam(duty.TeamID)
+		if err != nil {
+			return err
+		}
+		privateTasks, err := s.taskService.GetGroupTasks(team.GroupID)
 		if err != nil {
 			return err
 		}
@@ -197,7 +197,7 @@ func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) er
 }
 
 func (s *CleaningService) groupPublicTasksByArea() (map[int][]model.Task, error) {
-	publicTasks, err := s.taskService.GetTasksByScope(true)
+	publicTasks, err := s.taskService.GetPublicTasks()
 	if err != nil {
 		return nil, err
 	}

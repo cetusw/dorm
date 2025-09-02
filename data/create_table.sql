@@ -19,10 +19,11 @@ DROP TABLE IF EXISTS `area`;
 CREATE TABLE `area`
 (
     `area_id`    INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `area_floor` INT DEFAULT NULL,
+    `area_floor` INT        DEFAULT NULL,
     `area_name`  VARCHAR(255) NOT NULL,
-    `is_public`  BOOLEAN      NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (`area_id`)
+    `group_id`   BINARY(16) DEFAULT NULL,
+    PRIMARY KEY (`area_id`),
+    CONSTRAINT `fk_area_group` FOREIGN KEY (`group_id`) REFERENCES `group` (`group_id`) ON DELETE CASCADE ON UPDATE CASCADE
 )
     ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4

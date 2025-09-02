@@ -3,6 +3,8 @@ package service
 import (
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
+
+	"github.com/google/uuid"
 )
 
 type TaskService struct {
@@ -15,6 +17,10 @@ func NewTaskService(repository *repository.TaskRepository) *TaskService {
 	}
 }
 
-func (s *TaskService) GetTasksByScope(isPublic bool) ([]model.Task, error) {
-	return s.taskRepository.FindTasksByScope(isPublic)
+func (s *TaskService) GetPublicTasks() ([]model.Task, error) {
+	return s.taskRepository.FindPublicTasks()
+}
+
+func (s *TaskService) GetGroupTasks(groupID uuid.UUID) ([]model.Task, error) {
+	return s.taskRepository.FindGroupTasks(groupID)
 }

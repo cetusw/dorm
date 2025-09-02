@@ -20,7 +20,7 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 	callbackData := update.CallbackQuery.Data
 
 	if callbackData == message.Back {
-		unassignedAreas, err := s.GetUnassignedAreas(context, chatID)
+		unassignedAreas, err := s.GetUnassignedAreas(context)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
@@ -52,7 +52,7 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		unassignedTasks, err := s.GetUnassignedTasks(context, chatID, s.AreaID)
+		unassignedTasks, err := s.GetUnassignedTasks(context, s.AreaID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err

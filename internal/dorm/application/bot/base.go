@@ -54,16 +54,8 @@ func (s *baseState) GetCallbackID(callbackData string, prefix string) (int, erro
 	return ID, nil
 }
 
-func (s *baseState) GetUnassignedTasks(context *Bot, chatID int64, areaID int) ([]model.DutyTaskView, error) {
-	user, err := context.UserService.GetUser(chatID)
-	if err != nil {
-		return []model.DutyTaskView{}, err
-	}
-	team, err := context.TeamService.GetTeam(*user.TeamID)
-	if err != nil {
-		return []model.DutyTaskView{}, err
-	}
-	duty, err := context.DutyService.GetLastDutyByTeamID(team.TeamID)
+func (s *baseState) GetUnassignedTasks(context *Bot, areaID int) ([]model.DutyTaskView, error) {
+	duty, err := context.DutyService.GetCurrentDuty()
 	if err != nil {
 		return []model.DutyTaskView{}, err
 	}
@@ -83,11 +75,7 @@ func (s *baseState) AssignTask(context *Bot, chatID int64, taskID uuid.UUID) err
 	if err != nil {
 		return err
 	}
-	team, err := context.TeamService.GetTeam(*user.TeamID)
-	if err != nil {
-		return err
-	}
-	duty, err := context.DutyService.GetLastDutyByTeamID(team.TeamID)
+	duty, err := context.DutyService.GetCurrentDuty()
 	if err != nil {
 		return err
 	}
@@ -97,16 +85,8 @@ func (s *baseState) AssignTask(context *Bot, chatID int64, taskID uuid.UUID) err
 	return context.DutyTaskService.SetDutyTaskAssigneeID(&user.UserID, taskID, duty.DutyID)
 }
 
-func (s *baseState) UnassignTask(context *Bot, chatID int64, taskID uuid.UUID) error {
-	user, err := context.UserService.GetUser(chatID)
-	if err != nil {
-		return err
-	}
-	team, err := context.TeamService.GetTeam(*user.TeamID)
-	if err != nil {
-		return err
-	}
-	duty, err := context.DutyService.GetLastDutyByTeamID(team.TeamID)
+func (s *baseState) UnassignTask(context *Bot, taskID uuid.UUID) error {
+	duty, err := context.DutyService.GetCurrentDuty()
 	if err != nil {
 		return err
 	}
@@ -121,11 +101,7 @@ func (s *baseState) GetUncompletedDutyTasksView(context *Bot, userID int64) ([]m
 	if err != nil {
 		return nil, err
 	}
-	team, err := context.TeamService.GetTeam(*user.TeamID)
-	if err != nil {
-		return nil, err
-	}
-	duty, err := context.DutyService.GetLastDutyByTeamID(team.TeamID)
+	duty, err := context.DutyService.GetCurrentDuty()
 	if err != nil {
 		return nil, err
 	}
@@ -140,16 +116,8 @@ func (s *baseState) GetUncompletedDutyTasksView(context *Bot, userID int64) ([]m
 	return dutyTasksReadable, nil
 }
 
-func (s *baseState) GetUnassignedAreas(context *Bot, chatID int64) ([]model.Area, error) {
-	user, err := context.UserService.GetUser(chatID)
-	if err != nil {
-		return nil, err
-	}
-	team, err := context.TeamService.GetTeam(*user.TeamID)
-	if err != nil {
-		return nil, err
-	}
-	duty, err := context.DutyService.GetLastDutyByTeamID(team.TeamID)
+func (s *baseState) GetUnassignedAreas(context *Bot) ([]model.Area, error) {
+	duty, err := context.DutyService.GetCurrentDuty()
 	if err != nil {
 		return nil, err
 	}
@@ -163,16 +131,8 @@ func (s *baseState) GetUnassignedAreas(context *Bot, chatID int64) ([]model.Area
 	return areas, nil
 }
 
-func (s *baseState) ConfirmTask(context *Bot, chatID int64, taskID uuid.UUID) error {
-	user, err := context.UserService.GetUser(chatID)
-	if err != nil {
-		return err
-	}
-	team, err := context.TeamService.GetTeam(*user.TeamID)
-	if err != nil {
-		return err
-	}
-	duty, err := context.DutyService.GetLastDutyByTeamID(team.TeamID)
+func (s *baseState) ConfirmTask(context *Bot, taskID uuid.UUID) error {
+	duty, err := context.DutyService.GetCurrentDuty()
 	if err != nil {
 		return err
 	}
@@ -192,11 +152,7 @@ func (s *baseState) ComputeUserProgress(context *Bot, chatID int64) (*model.User
 	if err != nil {
 		return nil, err
 	}
-	team, err := context.TeamService.GetTeam(*user.TeamID)
-	if err != nil {
-		return nil, err
-	}
-	duty, err := context.DutyService.GetLastDutyByTeamID(team.TeamID)
+	duty, err := context.DutyService.GetCurrentDuty()
 	if err != nil {
 		return nil, err
 	}
@@ -247,16 +203,12 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 		if err != nil {
 			return err
 		}
-		team, err := context.TeamService.GetTeam(*user.TeamID)
-		if err != nil {
-			return err
-		}
-		duty, err := context.DutyService.GetLastDutyByTeamID(team.TeamID)
+		duty, err := context.DutyService.GetCurrentDuty()
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		if duty == nil {
+		if duty.TeamID != *user.TeamID {
 			s.SendReplyAndGo(context, chatID, message.NotOnDutyTeam, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return nil
 		}

@@ -62,16 +62,45 @@ func (r *TaskRepository) FindAll() ([]model.Task, error) {
 	return tasks, nil
 }
 
-func (r *TaskRepository) FindTasksByScope(isPublic bool) ([]model.Task, error) {
+func (r *TaskRepository) FindGroupTasks(groupID uuid.UUID) ([]model.Task, error) {
 	const sqlQuery = `
 		SELECT t.task_id, t.area_id, t.task_title, t.task_cost, t.task_frequency
 		FROM task t
 			INNER JOIN area a ON a.area_id = t.area_id
-		WHERE a.is_public = ?`
+		WHERE a.group_id = UUID_TO_BIN(?)`
 
-	rows, err := r.db.Query(sqlQuery, isPublic)
+	rows, err := r.db.Query(sqlQuery, groupID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query task IDs by isPublic %s: %w", isPublic, err)
+		return nil, fmt.Errorf("failed to query tasks by groupID %s: %w", groupID, err)
+	}
+	defer rows.Close()
+
+	var tasks []model.Task
+	for rows.Next() {
+		var task model.Task
+		if err := rows.Scan(&task.TaskID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency); err != nil {
+			return nil, fmt.Errorf("failed to scan task ID row: %w", err)
+		}
+		tasks = append(tasks, task)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating task ID rows: %w", err)
+	}
+
+	return tasks, nil
+}
+
+func (r *TaskRepository) FindPublicTasks() ([]model.Task, error) {
+	const sqlQuery = `
+		SELECT t.task_id, t.area_id, t.task_title, t.task_cost, t.task_frequency
+		FROM task t
+			INNER JOIN area a ON a.area_id = t.area_id
+		WHERE a.group_id IS NULL`
+
+	rows, err := r.db.Query(sqlQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query public tasks: %w", err)
 	}
 	defer rows.Close()
 
