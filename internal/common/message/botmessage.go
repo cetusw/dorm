@@ -84,12 +84,12 @@ func BuildTeamInfo(teamMembers []model.User) string {
 }
 
 func BuildTeamStatus(user model.User, duty *model.Duty) string {
-	teamStatus := "Команда: не определена"
+	teamStatus := "Команда не определена"
 	if user.TeamID != nil {
 		if duty != nil && duty.TeamID == *user.TeamID {
-			teamStatus = "Команда: дежурная на этой неделе ❗"
+			teamStatus = "Команда дежурная на этой неделе ❗"
 		} else {
-			teamStatus = "Команда: не дежурит на этой неделе ✅"
+			teamStatus = "Команда не дежурит на этой неделе ✅"
 		}
 	}
 
@@ -99,7 +99,7 @@ func BuildTeamStatus(user model.User, duty *model.Duty) string {
 func BuildPointsInfo(user model.User, duty *model.Duty, progress model.UserProgress) string {
 	pointsBlock := ""
 	if duty != nil && duty.TeamID == *user.TeamID {
-		pointsBlock = "\n" + fmt.Sprintf(PointsSummary, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints)
+		pointsBlock = "\n\n" + fmt.Sprintf(PointsSummary, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints)
 	}
 
 	return pointsBlock
@@ -116,7 +116,5 @@ func BuildProfileText(
 	teamStatus := BuildTeamStatus(user, duty)
 	pointsBlock := BuildPointsInfo(user, duty, progress)
 
-	return fmt.Sprintf("%s\n%s\n%s\n%s\n\n%s", ProfileHeader, fullName, teamStatus, pointsBlock, teamBlock), nil
+	return fmt.Sprintf("%s\n%s\n%s%s\n\n%s", ProfileHeader, fullName, teamStatus, pointsBlock, teamBlock), nil
 }
-
-// TODO: разобраться с переносами строк при отсутствии блока баллов

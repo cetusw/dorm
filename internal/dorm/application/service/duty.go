@@ -33,8 +33,16 @@ func (s *DutyService) CreateNewDuties(teams []model.Team, start time.Time, end t
 	return duties, s.dutyRepository.StoreBatch(duties)
 }
 
-func (s *DutyService) GetDutyByTeamIDAndStartDate(teamID uuid.UUID, startDate time.Time) (*model.Duty, error) {
-	return s.dutyRepository.FindDutyByTeamIDAndStartDate(teamID, startDate)
+func (s *DutyService) GetLastDutyByTeamID(teamID uuid.UUID) (*model.Duty, error) {
+	//lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
+	//log.Println("lastSaturday: ", lastSaturday)
+	// TODO: убрать тестовые данные
+	lastSaturday := time.Now()
+	return s.dutyRepository.FindDutyByTeamIDAndStartDate(teamID, lastSaturday)
+}
+
+func (s *DutyService) GetCurrentDuty() (*model.Duty, error) {
+	return s.dutyRepository.FindLastDuty()
 }
 
 func (s *DutyService) GetCurrentWeek() (int, error) {

@@ -70,11 +70,11 @@ func main() {
 		cleaningService,
 	)
 
-	//// TODO: remove
-	//err = cleaningService.StartNewWeek()
-	//if err != nil {
-	//	log.Println(err)
-	//}
+	// TODO: remove
+	err = cleaningService.StartNewWeek()
+	if err != nil {
+		log.Println(err)
+	}
 
 	s := scheduler.NewScheduler(cleaningService)
 	s.RegisterJobs()

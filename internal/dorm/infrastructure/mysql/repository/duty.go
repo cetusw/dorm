@@ -42,10 +42,13 @@ func (r *DutyRepository) FindDutyByTeamIDAndStartDate(teamID uuid.UUID, startDat
 		SELECT duty_id, team_id, duty_start_date, duty_end_date 
 		FROM duty
 		WHERE team_id = UUID_TO_BIN(?) 
-		  AND DATE(duty_start_date) = ?`
+		  AND DATE(duty_start_date) = ?
+		ORDER BY duty_start_date DESC
+		LIMIT 1`
 
 	duty := &model.Duty{}
-	err := r.db.QueryRow(sqlQuery, teamID, startDate).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
+	dateString := startDate.Format("2006-01-02")
+	err := r.db.QueryRow(sqlQuery, teamID, dateString).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil

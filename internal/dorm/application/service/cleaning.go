@@ -1,7 +1,6 @@
 package service
 
 import (
-	"dorm/internal/common/consts"
 	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"fmt"
@@ -78,8 +77,7 @@ func (s *CleaningService) UpdateCurrentSheet(user model.User) error {
 	if err != nil {
 		return err
 	}
-	lastSaturday := utils.GetLastWeekDay(consts.StartWeekday)
-	duty, err := s.dutyService.GetDutyByTeamIDAndStartDate(team.TeamID, lastSaturday)
+	duty, err := s.dutyService.GetLastDutyByTeamID(team.TeamID)
 	if err != nil {
 		return err
 	}
