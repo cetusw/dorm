@@ -25,14 +25,24 @@ func BuildMainStateKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	)
 }
 
-func BuildTaskManagementKeyboard() tgbotapi.InlineKeyboardMarkup {
-	return buildSimpleKeyboard(
-		[]buttonInfo{
-			{message.ConfirmExecution, message.ConfirmExecution},
-			{message.AssignTask, message.AssignTask},
-			{message.UnassignTask, message.UnassignTask},
-		},
-	)
+func BuildTaskManagementKeyboard(uncompletedTasks []model.DutyTaskView) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	if len(uncompletedTasks) == 0 {
+		button := tgbotapi.NewInlineKeyboardButtonData(message.AssignTask, message.AssignTask)
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
+
+		return tgbotapi.NewInlineKeyboardMarkup(rows...)
+	}
+
+	button := tgbotapi.NewInlineKeyboardButtonData(message.ConfirmExecution, message.ConfirmExecution)
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
+	button = tgbotapi.NewInlineKeyboardButtonData(message.AssignTask, message.AssignTask)
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
+	button = tgbotapi.NewInlineKeyboardButtonData(message.UnassignTask, message.UnassignTask)
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+
 }
 
 func BuildTeamManagementKeyboard() tgbotapi.InlineKeyboardMarkup {

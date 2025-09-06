@@ -17,14 +17,15 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 
 	switch update.CallbackQuery.Data {
 	case message.ConfirmExecution:
-		dutyTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
-		if len(dutyTasks) == 0 {
-			s.EditInlineAndGo(context, chatID, message.NoTasksToConfirm, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
-			return nil
-		}
+		uncompletedTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
+		}
+
+		if len(uncompletedTasks) == 0 {
+			s.EditInlineAndGo(context, chatID, message.NoTasksToConfirm, keyboard.BuildTaskManagementKeyboard(uncompletedTasks), &TaskManagementState{})
+			return nil
 		}
 		progress, err := s.ComputeUserProgress(context, chatID)
 		if err != nil {
@@ -36,7 +37,7 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			context,
 			chatID,
 			fmt.Sprintf(message.ConfirmExecutionState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
-			keyboard.BuildConfirmExecutionKeyboard(dutyTasks),
+			keyboard.BuildConfirmExecutionKeyboard(uncompletedTasks),
 			&ConfirmExecutionState{},
 		)
 	case message.AssignTask:

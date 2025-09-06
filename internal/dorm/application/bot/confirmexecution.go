@@ -19,11 +19,17 @@ func (s *ConfirmExecutionState) HandleCallback(context *Bot, update *tgbotapi.Up
 	callbackData := update.CallbackQuery.Data
 
 	if callbackData == message.Back {
+		uncompletedTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+
 		s.EditInlineAndGo(
 			context,
 			chatID,
 			message.TaskManagementState,
-			keyboard.BuildTaskManagementKeyboard(),
+			keyboard.BuildTaskManagementKeyboard(uncompletedTasks),
 			&TaskManagementState{},
 		)
 		return nil
@@ -51,9 +57,14 @@ func (s *ConfirmExecutionState) HandleCallback(context *Bot, update *tgbotapi.Up
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
+		uncompletedTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
 
 		if len(dutyTasks) == 0 {
-			s.EditInlineAndGo(context, chatID, message.AllTasksConfirmed, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
+			s.EditInlineAndGo(context, chatID, message.AllTasksConfirmed, keyboard.BuildTaskManagementKeyboard(uncompletedTasks), &TaskManagementState{})
 		} else {
 			s.EditInlineAndGo(
 				context,

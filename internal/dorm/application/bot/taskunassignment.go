@@ -19,11 +19,17 @@ func (s *TaskUnassignmentState) HandleCallback(context *Bot, update *tgbotapi.Up
 	callbackData := update.CallbackQuery.Data
 
 	if callbackData == message.Back {
+		uncompletedTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+
 		s.EditInlineAndGo(
 			context,
 			chatID,
 			message.TaskManagementState,
-			keyboard.BuildTaskManagementKeyboard(),
+			keyboard.BuildTaskManagementKeyboard(uncompletedTasks),
 			&TaskManagementState{},
 		)
 		return nil

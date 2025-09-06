@@ -17,12 +17,18 @@ func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Updat
 	chatID := s.AckCallbackAndChatID(context, update)
 	callbackData := update.CallbackQuery.Data
 
-	if callbackData == message.Back {
+	if callbackData == message.Back { // TODO: подумать над тем, чтобы передавать данные в класс для совершение перехода назад
+		uncompletedTasks, err := s.GetUncompletedDutyTasksView(context, update.CallbackQuery.From.ID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+
 		s.EditInlineAndGo(
 			context,
 			chatID,
 			message.TaskManagementState,
-			keyboard.BuildTaskManagementKeyboard(),
+			keyboard.BuildTaskManagementKeyboard(uncompletedTasks),
 			&TaskManagementState{},
 		)
 		return nil

@@ -212,8 +212,13 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 			s.SendReplyAndGo(context, chatID, message.NotOnDutyTeam, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return nil
 		}
+		uncompletedTasks, err := s.GetUncompletedDutyTasksView(context, update.Message.From.ID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
 		text = message.TaskManagementState
-		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTaskManagementKeyboard(), &TaskManagementState{})
+		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTaskManagementKeyboard(uncompletedTasks), &TaskManagementState{})
 	case message.Payment:
 		text = message.PaymentManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildBackKeyboard(), &PaymentManagementState{})
