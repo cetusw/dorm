@@ -8,18 +8,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"dorm/internal/dorm/infrastructure"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
 	log.Printf(".env file loaded successfully.")
 	db := connectDatabase()
 	userRepository := repository.NewUserRepository(db)
@@ -100,25 +95,36 @@ func main() {
 
 func connectDatabase() *sql.DB {
 	connStr := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Europe%%2FMoscow",
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true",
 		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASS"),
+		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_PORT"),
 		os.Getenv("DB_NAME"),
 	)
-	db, err := sql.Open("mysql", connStr)
-	if err != nil {
-		log.Fatalf("failed to open db connection: %v", err)
+
+	for i := 0; i < 5; i++ {
+		db, err := sql.Open("mysql", connStr)
+		if err != nil {
+			log.Printf("Attempt %d: failed to open db connection: %v", i+1, err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		if err := db.Ping(); err != nil {
+			log.Printf("Attempt %d: failed to ping db: %v", i+1, err)
+			db.Close()
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		if _, err := db.Exec("SET time_zone = '+03:00'"); err != nil {
+			log.Fatalf("failed to set session time zone: %v", err)
+		}
+		log.Println("Database connection successful!")
+		return db
 	}
 
-	if err := db.Ping(); err != nil {
-		log.Fatalf("failed to ping db: %v", err)
-	}
-	if _, err := db.Exec("SET time_zone = '+03:00'"); err != nil {
-		log.Fatalf("failed to set session time zone: %v", err)
-	}
-	log.Println("Database connection successful!")
-
-	return db
+	log.Fatalf("Failed to connect to database after multiple retries")
+	return nil
 }

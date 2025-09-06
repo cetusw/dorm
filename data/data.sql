@@ -1,3 +1,6 @@
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
 -- создание ролей
 
 INSERT INTO role (role_id, role_name, role_description)
@@ -212,3 +215,5 @@ VALUES (UUID_TO_BIN(UUID()), 1, 'Пропылесосить полы', 2),
        (UUID_TO_BIN(UUID()), 11, 'Протереть батарею', 1),
        (UUID_TO_BIN(UUID()), 11, 'Протереть огнетушители', 1),
        (UUID_TO_BIN(UUID()), 11, 'Протереть розетки', 1);
+
+SET FOREIGN_KEY_CHECKS = 1;

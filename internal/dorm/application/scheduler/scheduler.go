@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	weekStart = "38 15 * * 0"
+	weekStart = "20 23 * * 6"
 )
 
 type Scheduler struct {
