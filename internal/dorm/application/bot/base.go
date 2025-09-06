@@ -217,8 +217,19 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		text = message.TaskManagementState
-		s.SendInlineAndGo(context, chatID, text, keyboard.BuildTaskManagementKeyboard(uncompletedTasks), &TaskManagementState{})
+		progress, err := s.ComputeUserProgress(context, chatID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+
+		s.SendInlineAndGo(
+			context,
+			chatID,
+			fmt.Sprintf(message.TaskManagementState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
+			keyboard.BuildTaskManagementKeyboard(uncompletedTasks),
+			&TaskManagementState{},
+		)
 	case message.Payment:
 		text = message.PaymentManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildBackKeyboard(), &PaymentManagementState{})

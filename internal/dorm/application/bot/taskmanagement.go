@@ -23,10 +23,6 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			return err
 		}
 
-		if len(uncompletedTasks) == 0 {
-			s.EditInlineAndGo(context, chatID, message.NoTasksToConfirm, keyboard.BuildTaskManagementKeyboard(uncompletedTasks), &TaskManagementState{})
-			return nil
-		}
 		progress, err := s.ComputeUserProgress(context, chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})

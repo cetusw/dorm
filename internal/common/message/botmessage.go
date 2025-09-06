@@ -16,20 +16,19 @@ const (
 	PaymentManagementState = "💳 Оплата проживания\nПерейдите по ссылке для оплаты:\n\nhttps://clck.ru/3Nq23U\n\nПосле оплаты вернитесь в бот."
 	ProfileHeader          = "👤 Профиль\n"
 
-	TaskManagementState   = "🧹 Управление задачами."
+	TaskManagementState   = "🧹 Управление задачами.\n\n" + PointsSummary
 	NotOnDutyTeam         = "✅ Твоя команда не дежурит на этой неделе, брать задачи ни к чему."
 	AreaSelectionState    = "📍 Выберите зону для уборки.\n\n" + PointsSummary
 	ConfirmExecutionState = "✅ Что подтвердим?\nВыберите задачу, которую уже выполнили.\n\n" + PointsSummary
 	TaskAssignmentState   = "🧩 Выберите задачу, которую готовы выполнить.\n\n" + PointsSummary
 	TaskUnassignmentState = "↩️ Выберите задачу, которую вы не будете выполнять.\n\n" + PointsSummary
 
-	NoTasksToConfirm  = "ℹ️ Пока нет задач для подтверждения. Сначала возьмите задачу в работу."
 	AllTasksConfirmed = "🎉 Все задачи подтверждены — отлично сработано!"
 
 	NoCurrentDuty = "⏳ Сейчас нет активного дежурства. Загляните позже."
 	NoDutyTasks   = "🗒️ Пока нет задач для текущего дежурства. Проверьте позже."
 
-	PointsSummary = "Ваши текущие баллы:\n• Взято: %d\n• Подтверждено: %d\n• Нужно подтвердить: %.1f"
+	PointsSummary = "---\nВаши текущие баллы:\n⏳ В работе: %d\n✅ Выполнено: %d\n⚠️ Необходимо: %.1f"
 )
 
 const (

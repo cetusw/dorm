@@ -24,11 +24,16 @@ func (s *ConfirmExecutionState) HandleCallback(context *Bot, update *tgbotapi.Up
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
+		progress, err := s.ComputeUserProgress(context, chatID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
 
 		s.EditInlineAndGo(
 			context,
 			chatID,
-			message.TaskManagementState,
+			fmt.Sprintf(message.TaskManagementState, progress.UserPoints, progress.UserConfirmedPoints, progress.UserRequiredPoints),
 			keyboard.BuildTaskManagementKeyboard(uncompletedTasks),
 			&TaskManagementState{},
 		)
