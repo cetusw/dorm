@@ -12,7 +12,7 @@ type User struct {
 	MiddleName  *string
 	TeamID      *uuid.UUID
 	RoomNumber  *int
-	DormitoryID *uuid.UUID
+	DormitoryID *int
 	RoleID      int
 	CreatedAt   []uint8
 	DeletedAt   *[]uint8

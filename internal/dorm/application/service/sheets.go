@@ -38,6 +38,20 @@ func (s *SheetsService) CreateDutySheet(sheetData model.SheetData) error {
 		return err
 	}
 
+	userTableData := s.prepareUserTableData(sheetData.Users)
+	if len(userTableData) > 0 {
+		err = s.sheets.WriteRange(sheetData, "G2", userTableData)
+		if err != nil {
+			return fmt.Errorf("failed to write user table to column G: %w", err)
+		}
+
+		requests := s.createUserTableFormattingRequests(sheetID, len(userTableData), teamColor)
+		err = s.sheets.BatchUpdate(sheetData, requests)
+		if err != nil {
+			return fmt.Errorf("failed to format user table: %w", err)
+		}
+	}
+
 	requests := s.prepareFormattingRequests(sheetID, zoneMergeRanges, teamColor, len(sheetData.Tasks), sheetData.Users)
 	return s.sheets.BatchUpdate(sheetData, requests)
 }
@@ -49,7 +63,7 @@ func (s *SheetsService) UpdateDutySheet(sheetData model.SheetData) error {
 		dataToWrite = append(dataToWrite, row)
 	}
 
-	clearRange := fmt.Sprintf("A%d:E", consts.TasksStartRow)
+	clearRange := fmt.Sprintf("A%d:K", consts.TasksStartRow)
 	err := s.sheets.ClearRange(sheetData, clearRange)
 	if err != nil {
 		return fmt.Errorf("failed to clear range in sheet '%s': %w", sheetData.Title, err)
@@ -62,6 +76,100 @@ func (s *SheetsService) UpdateDutySheet(sheetData model.SheetData) error {
 	}
 
 	return nil
+}
+
+func (s *SheetsService) prepareUserTableData(users []model.User) [][]interface{} {
+	var data [][]interface{}
+
+	data = append(data, []interface{}{
+		"Состав команды",
+		"Бронь",
+		"Заработано",
+	})
+
+	for i, user := range users {
+		name := fmt.Sprintf("%s %s.", user.FirstName, string([]rune(user.LastName)[0]))
+		data = append(data, []interface{}{
+			name,
+			fmt.Sprintf("=SUMPRODUCT(($D$3:$D = G%d)*$C$3:$C)", i+3),
+			fmt.Sprintf("=SUMPRODUCT(($D$3:$D = G%d)*$C$3:$C*($E$3:$E = \"Проверено\"))", i+3),
+		})
+	}
+
+	data = append(data, []interface{}{
+		"",
+		"",
+		"",
+	})
+
+	return data
+}
+
+func (s *SheetsService) createUserTableFormattingRequests(sheetID int64, rowCount int, teamColor *sheets.Color) []*sheets.Request {
+	var requests []*sheets.Request
+
+	headerRange := &sheets.GridRange{
+		SheetId:          sheetID,
+		StartRowIndex:    1,
+		EndRowIndex:      2,
+		StartColumnIndex: 6,
+		EndColumnIndex:   9,
+	}
+	requests = append(requests, &sheets.Request{
+		RepeatCell: &sheets.RepeatCellRequest{
+			Range: headerRange,
+			Cell: &sheets.CellData{
+				UserEnteredFormat: &sheets.CellFormat{
+					BackgroundColor:     consts.SubHeaderBgColor,
+					HorizontalAlignment: "CENTER",
+					TextFormat:          &sheets.TextFormat{Bold: true},
+				},
+			},
+			Fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
+		},
+	})
+
+	dataRange := &sheets.GridRange{
+		SheetId:          sheetID,
+		StartRowIndex:    2,
+		EndRowIndex:      int64(rowCount),
+		StartColumnIndex: 6,
+		EndColumnIndex:   9,
+	}
+	requests = append(requests, &sheets.Request{
+		RepeatCell: &sheets.RepeatCellRequest{
+			Range: dataRange,
+			Cell: &sheets.CellData{
+				UserEnteredFormat: &sheets.CellFormat{
+					BackgroundColor:     teamColor,
+					HorizontalAlignment: "LEFT",
+					TextFormat:          &sheets.TextFormat{FontSize: 12},
+				},
+			},
+			Fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
+		},
+	})
+
+	columnWidths := []int{150, 80, 80}
+	for i, width := range columnWidths {
+		colStart := int64(6 + i)
+		requests = append(requests, &sheets.Request{
+			UpdateDimensionProperties: &sheets.UpdateDimensionPropertiesRequest{
+				Range: &sheets.DimensionRange{
+					SheetId:    sheetID,
+					Dimension:  "COLUMNS",
+					StartIndex: colStart,
+					EndIndex:   colStart + 1,
+				},
+				Properties: &sheets.DimensionProperties{
+					PixelSize: int64(width),
+				},
+				Fields: "pixelSize",
+			},
+		})
+	}
+
+	return requests
 }
 
 func (s *SheetsService) prepareSheetData(
@@ -278,8 +386,10 @@ func (s *SheetsService) createConditionalFormattingRequests(sheetID int64) []*sh
 				Rule: &sheets.ConditionalFormatRule{
 					Ranges: []*sheets.GridRange{
 						{
-							SheetId:       sheetID,
-							StartRowIndex: int64(consts.TasksStartRow - 1),
+							SheetId:          sheetID,
+							StartRowIndex:    int64(consts.TasksStartRow - 1),
+							StartColumnIndex: 2,
+							EndColumnIndex:   3,
 						},
 					},
 					GradientRule: &sheets.GradientRule{
