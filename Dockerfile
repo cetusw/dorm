@@ -1,5 +1,3 @@
-# Dockerfile
-
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
@@ -19,7 +17,9 @@ RUN apk add --no-cache tzdata
 WORKDIR /root/
 
 COPY --from=builder /app/main .
+COPY --from=builder /app/config.json .
 COPY credentials.json .
+COPY ./mysql .
 
 EXPOSE 8080
 

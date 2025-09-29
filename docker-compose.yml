@@ -1,5 +1,6 @@
 services:
   app:
+    image: dorm-app:latest
     build: .
     container_name: dorm
     ports:
@@ -31,7 +32,6 @@ services:
       interval: 5s
       timeout: 10s
       retries: 10
-
 
 volumes:
   dorm-db:

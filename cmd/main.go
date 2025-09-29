@@ -1,21 +1,27 @@
 package main
 
 import (
-	"database/sql"
-	"dorm/internal/dorm/application/bot"
-	"dorm/internal/dorm/application/scheduler"
-	"dorm/internal/dorm/application/service"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
+	"database/sql"
+	"dorm/internal/common/config"
+	"dorm/internal/dorm/application/bot"
+	"dorm/internal/dorm/application/scheduler"
+	"dorm/internal/dorm/application/service"
 	"dorm/internal/dorm/infrastructure"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
 )
 
 func main() {
-	log.Printf(".env file loaded successfully.")
+	configPath := filepath.Join(filepath.Dir(os.Args[0]), "config.json")
+	configData, err := config.LoadConfig(configPath)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 	db := connectDatabase()
 	userRepository := repository.NewUserRepository(db)
 	dutyRepository := repository.NewDutyRepository(db)
@@ -71,7 +77,7 @@ func main() {
 	//	log.Println(err)
 	//}
 
-	s := scheduler.NewScheduler(cleaningService)
+	s := scheduler.NewScheduler(cleaningService, *configData)
 	s.RegisterJobs()
 	s.Start()
 
