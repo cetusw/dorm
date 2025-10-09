@@ -1,6 +1,7 @@
 package main
 
 import (
+	"dorm/internal/dorm/application/service/sheets"
 	"fmt"
 	"log"
 	"os"
@@ -36,7 +37,7 @@ func main() {
 		log.Fatalf("Failed to create Telegram client: %v", err)
 	}
 
-	sheets, err := infrastructure.NewSheets(os.Getenv("SHEETS_CREDENTIALS"))
+	newSheets, err := infrastructure.NewSheets(os.Getenv("SHEETS_CREDENTIALS"))
 	if err != nil {
 		log.Fatalf("Failed to create Sheets client: %v", err)
 	}
@@ -46,7 +47,9 @@ func main() {
 	dutyTaskService := service.NewDutyTaskService(dutyTaskRepository)
 	teamService := service.NewTeamService(teamRepository)
 	taskService := service.NewTaskService(taskRepository)
-	sheetsService := service.NewSheetsService(sheets)
+	builder := sheets.NewDutySheetBuilder()
+	styler := sheets.NewDutySheetStyler()
+	sheetsService := sheets.NewSheetsService(newSheets, builder, styler)
 	groupService := service.NewGroupService(groupRepository)
 	areaService := service.NewAreaService(areaRepository)
 	cleaningService := service.NewCleaningService(
@@ -71,11 +74,11 @@ func main() {
 		cleaningService,
 	)
 
-	//// TODO: remove
-	//err = cleaningService.StartNewWeek()
-	//if err != nil {
-	//	log.Println(err)
-	//}
+	// TODO: remove
+	err = cleaningService.StartNewWeek()
+	if err != nil {
+		log.Println(err)
+	}
 
 	s := scheduler.NewScheduler(cleaningService, *configData)
 	s.RegisterJobs()

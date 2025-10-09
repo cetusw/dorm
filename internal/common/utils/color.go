@@ -29,3 +29,21 @@ func HexToSheetsColor(hexString string) (*sheets.Color, error) {
 
 	return color, nil
 }
+
+func DarkenColorRGB(color *sheets.Color, factor float64) *sheets.Color {
+	if color == nil {
+		return nil
+	}
+	if factor < 0 {
+		factor = 0
+	}
+	if factor > 1 {
+		factor = 1
+	}
+	return &sheets.Color{
+		Red:   color.Red * factor,
+		Green: color.Green * factor,
+		Blue:  color.Blue * factor,
+		Alpha: color.Alpha,
+	}
+}

@@ -3,6 +3,7 @@ package service
 import (
 	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
+	"dorm/internal/dorm/application/service/sheets"
 	"fmt"
 	"sort"
 
@@ -10,7 +11,7 @@ import (
 )
 
 type CleaningService struct {
-	sheetsService   *SheetsService
+	sheetsService   sheets.SheetsService
 	userService     *UserService
 	dutyService     *DutyService
 	dutyTaskService *DutyTaskService
@@ -21,7 +22,7 @@ type CleaningService struct {
 }
 
 func NewCleaningService(
-	sheetsService *SheetsService,
+	sheetsService sheets.SheetsService,
 	userService *UserService,
 	dutyService *DutyService,
 	dutyTaskService *DutyTaskService,
