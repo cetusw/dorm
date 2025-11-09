@@ -1,11 +1,13 @@
 package service
 
 import (
+	"fmt"
+	"sort"
+	"time"
+
 	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/application/service/sheets"
-	"fmt"
-	"sort"
 
 	"github.com/google/uuid"
 )
@@ -184,6 +186,9 @@ func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) er
 			return err
 		}
 		for _, task := range privateTasks {
+			if !s.shouldScheduleTask(task, time.Now()) {
+				continue
+			}
 			dutyTask := model.DutyTask{
 				DutyTaskID: uuid.New(),
 				DutyID:     duty.DutyID,
@@ -195,6 +200,17 @@ func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) er
 	}
 
 	return s.dutyTaskService.SetDutyTasksBatch(dutyTasks)
+}
+
+func (s *CleaningService) shouldScheduleTask(task model.Task, date time.Time) bool {
+	switch task.Frequency {
+	case 7:
+		return true
+	case 30:
+		return utils.IsFirstWeekOfMonth(date)
+	default:
+		return true
+	}
 }
 
 func (s *CleaningService) groupPublicTasksByArea() (map[int][]model.Task, error) {

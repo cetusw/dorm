@@ -18,6 +18,7 @@ WORKDIR /root/
 
 COPY --from=builder /app/main .
 COPY --from=builder /app/config.json .
+COPY ./db/migrations ./db/migrations
 COPY credentials.json .
 COPY ./mysql .
 

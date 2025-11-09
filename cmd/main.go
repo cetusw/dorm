@@ -1,7 +1,6 @@
 package main
 
 import (
-	"dorm/internal/dorm/application/service/sheets"
 	"fmt"
 	"log"
 	"os"
@@ -10,9 +9,11 @@ import (
 
 	"database/sql"
 	"dorm/internal/common/config"
+	"dorm/internal/database"
 	"dorm/internal/dorm/application/bot"
 	"dorm/internal/dorm/application/scheduler"
 	"dorm/internal/dorm/application/service"
+	"dorm/internal/dorm/application/service/sheets"
 	"dorm/internal/dorm/infrastructure"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
 )
@@ -24,6 +25,7 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 	db := connectDatabase()
+	database.ApplyMigrations(db)
 	userRepository := repository.NewUserRepository(db)
 	dutyRepository := repository.NewDutyRepository(db)
 	dutyTaskRepository := repository.NewDutyTaskRepository(db)
@@ -98,7 +100,7 @@ func main() {
 
 func connectDatabase() *sql.DB {
 	connStr := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?parseTime=true",
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true",
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_HOST"),
