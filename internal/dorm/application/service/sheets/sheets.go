@@ -1,10 +1,12 @@
 package sheets
 
 import (
+	"fmt"
+
+	"dorm/internal/common/consts"
 	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure"
-	"fmt"
 )
 
 type SheetsService interface {
@@ -38,11 +40,11 @@ func (s *sheetsService) CreateDutySheet(sheetData model.SheetData) error {
 
 	layout := s.builder.Build(sheetData.Order, sheetData.Tasks, sheetData.Users)
 
-	err = s.sheets.WriteRange(sheetData, layout.TaskTableRange, layout.TaskTableData)
+	err = s.sheets.WriteRange(sheetData, consts.TasksTableRange, layout.TaskTableData)
 	if err != nil {
 		return err
 	}
-	err = s.sheets.WriteRange(sheetData, layout.UserTableRange, layout.UserTableData)
+	err = s.sheets.WriteRange(sheetData, consts.UserTableRange, layout.UserTableData)
 	if err != nil {
 		return fmt.Errorf("failed to write user table: %w", err)
 	}
@@ -53,14 +55,18 @@ func (s *sheetsService) CreateDutySheet(sheetData model.SheetData) error {
 }
 
 func (s *sheetsService) UpdateDutySheet(sheetData model.SheetData) error {
-	layout := s.builder.BuildForUpdate(sheetData.Tasks)
+	layout := s.builder.BuildForUpdate(sheetData)
 
-	err := s.sheets.ClearRange(sheetData, layout.TaskTableClearRange)
+	err := s.sheets.ClearRange(sheetData, consts.ClearRange)
 	if err != nil {
 		return fmt.Errorf("failed to clear range in sheet '%s': %w", sheetData.Title, err)
 	}
 
-	err = s.sheets.WriteRange(sheetData, layout.TaskTableWriteRange, layout.TaskTableData)
+	err = s.sheets.WriteRange(sheetData, consts.TasksTableRange, layout.TaskTableData)
+	if err != nil {
+		return fmt.Errorf("failed to write new data to sheet '%s': %w", sheetData.Title, err)
+	}
+	err = s.sheets.WriteRange(sheetData, consts.UserTableRange, layout.UserTableData)
 	if err != nil {
 		return fmt.Errorf("failed to write new data to sheet '%s': %w", sheetData.Title, err)
 	}

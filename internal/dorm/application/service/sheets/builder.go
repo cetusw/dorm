@@ -7,15 +7,12 @@ import (
 )
 
 type SheetLayout struct {
-	TaskTableData       [][]interface{}
-	UserTableData       [][]interface{}
-	TaskTableRange      string
-	UserTableRange      string
-	ZoneMergeRanges     map[string][2]int
-	TaskCount           int
-	UserCount           int
-	TaskTableClearRange string
-	TaskTableWriteRange string
+	TaskCount      int
+	TaskTableData  [][]interface{}
+	UserCount      int
+	UserTableData  [][]interface{}
+	ClearRange     string
+	ZoneMergeRange map[string][2]int
 }
 
 type DutySheetBuilder struct{}
@@ -29,27 +26,21 @@ func (b *DutySheetBuilder) Build(order int, tasks []model.DutyTaskView, users []
 	userData := b.prepareUserTableData(users)
 
 	return &SheetLayout{
-		TaskTableData:   taskData,
-		UserTableData:   userData,
-		TaskTableRange:  "A1",
-		UserTableRange:  "G2",
-		ZoneMergeRanges: zoneRanges,
-		TaskCount:       len(tasks),
-		UserCount:       len(users) + 1,
+		TaskCount:      len(tasks),
+		TaskTableData:  taskData,
+		UserCount:      len(users) + 1,
+		UserTableData:  userData,
+		ZoneMergeRange: zoneRanges,
 	}
 }
 
-func (b *DutySheetBuilder) BuildForUpdate(tasks []model.DutyTaskView) *SheetLayout {
-	var dataToWrite [][]interface{}
-	for _, task := range tasks {
-		row := b.formatTaskRow(task)
-		dataToWrite = append(dataToWrite, row)
-	}
-
+func (b *DutySheetBuilder) BuildForUpdate(sheetData model.SheetData) *SheetLayout {
+	tasksToWrite, zoneMergeRanges := b.prepareTaskTableData(sheetData.Order, sheetData.Tasks)
+	usersToWrite := b.prepareUserTableData(sheetData.Users)
 	return &SheetLayout{
-		TaskTableData:       dataToWrite,
-		TaskTableClearRange: fmt.Sprintf("A%d:K", consts.TasksStartRow),
-		TaskTableWriteRange: fmt.Sprintf("A%d", consts.TasksStartRow),
+		TaskTableData:  tasksToWrite,
+		UserTableData:  usersToWrite,
+		ZoneMergeRange: zoneMergeRanges,
 	}
 }
 
