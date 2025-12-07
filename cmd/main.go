@@ -64,6 +64,13 @@ func main() {
 		groupService,
 		areaService,
 	)
+	syncService := service.NewSyncService(
+		newSheets,
+		groupService,
+		dutyService,
+		dutyTaskService,
+		userService,
+	)
 	botContext := bot.NewBot(
 		telegram,
 		userService,
@@ -76,14 +83,18 @@ func main() {
 		cleaningService,
 	)
 
-	s := scheduler.NewScheduler(cleaningService, *configData)
+	s := scheduler.NewScheduler(cleaningService, syncService, *configData)
 	s.RegisterJobs()
 	s.Start()
+
+	err = syncService.SyncAllActiveDuties()
+	if err != nil {
+		log.Printf("Failed to sync duties: %v", err)
+	}
 
 	updates := telegram.GetUpdates(telegram.Bot)
 
 	for update := range updates {
-		log.Println(botContext.State.GetName())
 		if update.Message != nil {
 			err := botContext.State.Handle(botContext, &update)
 			if err != nil {

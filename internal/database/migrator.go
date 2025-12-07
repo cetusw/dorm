@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
-	_ "github.com/golang-migrate/migrate/v4/source/file" // Требуется для чтения миграций из файлов
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 const (

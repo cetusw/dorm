@@ -91,6 +91,14 @@ func (c *Sheets) ClearRange(sheetData model.SheetData, clearRange string) error 
 	return nil
 }
 
+func (c *Sheets) ReadSheet(spreadsheetID string, readRange string) ([][]interface{}, error) {
+	response, err := c.srv.Spreadsheets.Values.Get(spreadsheetID, readRange).Do()
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve data from sheet: %w", err)
+	}
+	return response.Values, nil
+}
+
 func (c *Sheets) BatchUpdate(sheetData model.SheetData, requests []*sheets.Request) error {
 	if len(requests) == 0 {
 		return nil
