@@ -101,3 +101,11 @@ func (c *Sheets) BatchUpdate(sheetData model.SheetData, requests []*sheets.Reque
 	_, err := c.srv.Spreadsheets.BatchUpdate(sheetData.SpreadsheetID, batchUpdateReq).Do()
 	return err
 }
+
+func (c *Sheets) GetSpreadsheet(spreadsheetID string) (*sheets.Spreadsheet, error) {
+	resp, err := c.srv.Spreadsheets.Get(spreadsheetID).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get spreadsheet: %w", err)
+	}
+	return resp, nil
+}

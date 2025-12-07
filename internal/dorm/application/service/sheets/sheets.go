@@ -7,6 +7,9 @@ import (
 	"dorm/internal/common/utils"
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure"
+	infrasheets "dorm/internal/dorm/infrastructure/sheets"
+
+	"google.golang.org/api/sheets/v4"
 )
 
 type SheetsService interface {
@@ -15,9 +18,10 @@ type SheetsService interface {
 }
 
 type sheetsService struct {
-	sheets  *infrastructure.Sheets
-	builder *DutySheetBuilder
-	styler  *DutySheetStyler
+	sheets         *infrastructure.Sheets
+	builder        *DutySheetBuilder
+	styler         *DutySheetStyler
+	requestFactory *infrasheets.RequestFactory
 }
 
 func NewSheetsService(s *infrastructure.Sheets, builder *DutySheetBuilder, styler *DutySheetStyler) SheetsService {
@@ -37,6 +41,10 @@ func (s *sheetsService) CreateDutySheet(sheetData model.SheetData) error {
 	if err != nil {
 		return err
 	}
+	requests, err := s.hideOtherSheetsRequest(sheetData, sheet.Properties.SheetId)
+	if err != nil {
+		return err
+	}
 
 	layout := s.builder.Build(sheetData.Order, sheetData.Tasks, sheetData.Users)
 
@@ -50,8 +58,9 @@ func (s *sheetsService) CreateDutySheet(sheetData model.SheetData) error {
 	}
 
 	styleRequests := s.styler.GenerateRequests(sheet.Properties.SheetId, layout, teamColor, sheetData.Users)
+	requests = append(requests, styleRequests...)
 
-	return s.sheets.BatchUpdate(sheetData, styleRequests)
+	return s.sheets.BatchUpdate(sheetData, requests)
 }
 
 func (s *sheetsService) UpdateDutySheet(sheetData model.SheetData) error {
@@ -72,4 +81,17 @@ func (s *sheetsService) UpdateDutySheet(sheetData model.SheetData) error {
 	}
 
 	return nil
+}
+
+func (s *sheetsService) hideOtherSheetsRequest(
+	sheetData model.SheetData,
+	currentSheetID int64,
+) ([]*sheets.Request, error) {
+	spreadsheet, err := s.sheets.GetSpreadsheet(sheetData.SpreadsheetID)
+	if err != nil {
+		fmt.Printf("Warning: failed to fetch spreadsheet: %v\n", err)
+		return nil, err
+	}
+	hideRequests := s.requestFactory.BuildHideOtherSheetsRequests(spreadsheet, currentSheetID)
+	return hideRequests, nil
 }
