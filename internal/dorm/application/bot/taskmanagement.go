@@ -37,7 +37,7 @@ func (s *TaskManagementState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			&ConfirmExecutionState{},
 		)
 	case message.AssignTask:
-		unassignedAreas, err := s.GetUnassignedAreas(context)
+		unassignedAreas, err := s.GetUnassignedAreas(context, chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err

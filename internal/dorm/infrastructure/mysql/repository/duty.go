@@ -36,25 +36,6 @@ func (r *DutyRepository) Find(dutyID uuid.UUID) (*model.Duty, error) {
 	return duty, nil
 }
 
-func (r *DutyRepository) FindLastDuty() (*model.Duty, error) {
-	const sqlQuery = `
-		SELECT duty_id, team_id, duty_start_date, duty_end_date 
-		FROM duty 
-		ORDER BY duty_start_date DESC 
-		LIMIT 1`
-
-	duty := &model.Duty{}
-	err := r.db.QueryRow(sqlQuery).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to get duty: %w", err)
-	}
-
-	return duty, nil
-}
-
 func (r *DutyRepository) FindLastDutyByGroupID(groupID uuid.UUID) (*model.Duty, error) {
 	const sqlQuery = `
 		SELECT d.duty_id, d.team_id, d.duty_start_date, d.duty_end_date 
@@ -71,6 +52,28 @@ func (r *DutyRepository) FindLastDutyByGroupID(groupID uuid.UUID) (*model.Duty, 
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get last duty for team group %s: %w", groupID, err)
+	}
+
+	return duty, nil
+}
+
+func (r *DutyRepository) FindLastDutyByUserID(userID uuid.UUID) (*model.Duty, error) {
+	const sqlQuery = `
+		SELECT d.duty_id, d.team_id, d.duty_start_date, d.duty_end_date 
+		FROM duty d
+		    INNER JOIN team t ON d.team_id = t.team_id
+			INNER JOIN user u ON u.team_id = t.team_id
+		WHERE u.user_id = UUID_TO_BIN(?)
+		ORDER BY d.duty_start_date DESC 
+		LIMIT 1`
+
+	duty := &model.Duty{}
+	err := r.db.QueryRow(sqlQuery, userID).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get last duty for team group %s: %w", userID, err)
 	}
 
 	return duty, nil
