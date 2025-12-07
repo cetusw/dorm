@@ -1,15 +1,16 @@
 package bot
 
 import (
-	"dorm/internal/common/keyboard"
-	"dorm/internal/common/message"
-	"dorm/internal/dorm/application/model"
 	"fmt"
 	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
+
+	"dorm/internal/common/keyboard"
+	"dorm/internal/common/message"
+	"dorm/internal/dorm/application/model"
 )
 
 type baseState struct{}
@@ -203,12 +204,17 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 		if err != nil {
 			return err
 		}
-		duty, err := context.DutyService.GetCurrentDuty()
+		team, err := context.TeamService.GetTeam(*user.TeamID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		if duty.TeamID != *user.TeamID {
+		duty, err := context.DutyService.GetGroupLastDuty(team.GroupID)
+		if err != nil {
+			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
+			return err
+		}
+		if duty != nil && duty.TeamID != team.TeamID {
 			s.SendReplyAndGo(context, chatID, message.NotOnDutyTeam, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return nil
 		}

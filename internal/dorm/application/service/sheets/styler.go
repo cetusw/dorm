@@ -81,7 +81,7 @@ func (s *DutySheetStyler) createTaskTableFormattingRequests(layout *SheetLayout,
 
 	requests = append(requests, s.getTaskTableHeaderRequest(teamColor)...)
 	requests = append(requests, s.getTaskTableSubHeaderRequest()...)
-	requests = append(requests, s.getTaskTableRowsRequest(layout.ZoneMergeRanges, layout.TaskCount)...)
+	requests = append(requests, s.getTaskTableRowsRequest(layout.ZoneMergeRange, layout.TaskCount)...)
 	requests = append(requests, s.getValidationRequest(layout.TaskCount, users)...)
 	requests = append(requests, s.getConditionalFormattingRequest()...)
 	requests = append(requests, s.getTaskTableColumnsWidthRequest()...)

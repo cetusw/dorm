@@ -9,6 +9,9 @@ const (
 	TaskTableStartRow       = 0
 	TaskTableHeaderHeight   = 60
 	TasksStartRow           = 3
+	TasksTableRange         = "A1:E"
+	UserTableRange          = "G2:I6"
+	ClearRange              = "A1:K"
 )
 
 const (

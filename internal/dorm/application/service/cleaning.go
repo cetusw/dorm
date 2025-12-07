@@ -90,13 +90,18 @@ func (s *CleaningService) UpdateCurrentSheet(user model.User) error {
 		return fmt.Errorf("failed to get readable duty tasks for sheet update: %w", err)
 	}
 
+	users, err := s.userService.GetUsersByTeamID(*user.TeamID)
+	if err != nil {
+		return fmt.Errorf("failed to get users for sheet update: %w", err)
+	}
+
 	sheetData := model.SheetData{
 		SpreadsheetID: group.SpreadsheetID,
 		Title:         s.createSheetTitle(*duty),
 		Tasks:         dutyTasksView,
-		Order:         0,
+		Order:         team.Order,
 		TeamColor:     "",
-		Users:         nil,
+		Users:         users,
 	}
 
 	err = s.sheetsService.UpdateDutySheet(sheetData)
@@ -335,5 +340,8 @@ func (s *CleaningService) createDutySheets(duties []model.Duty) error {
 }
 
 func (s *CleaningService) createSheetTitle(duty model.Duty) string {
-	return fmt.Sprintf("%s-%s", duty.Start.Format("02.01"), duty.End.Format("02.01"))
+	// TODO: исправить часовые зоны DORM-17
+	start := duty.Start.Add(10800000000000)
+	end := duty.End.Add(10800000000000)
+	return fmt.Sprintf("%s-%s", start.Format("02.01"), end.Format("02.01"))
 }
