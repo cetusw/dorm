@@ -45,7 +45,7 @@ func (s *AreaSelectionState) HandleCallback(context *Bot, update *tgbotapi.Updat
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		tasks, err := s.GetUnassignedTasks(context, areaID)
+		tasks, err := s.GetUnassignedTasks(context, chatID, areaID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err

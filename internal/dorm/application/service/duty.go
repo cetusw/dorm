@@ -3,6 +3,7 @@ package service
 import (
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,10 +34,6 @@ func (s *DutyService) CreateNewDuties(teams []model.Team, start time.Time, end t
 	return duties, s.dutyRepository.StoreBatch(duties)
 }
 
-func (s *DutyService) GetCurrentDuty() (*model.Duty, error) {
-	return s.dutyRepository.FindLastDuty()
-}
-
 func (s *DutyService) GetCurrentWeek() (int, error) {
 	return s.dutyRepository.CountDistinctStartDates()
 }
@@ -47,7 +44,18 @@ func (s *DutyService) GetGroupLastDuty(groupID uuid.UUID) (*model.Duty, error) {
 		return nil, err
 	}
 	if lastDuty == nil {
-		return nil, nil
+		return nil, errors.New("last group duty not found")
+	}
+	return lastDuty, nil
+}
+
+func (s *DutyService) GetUserLastDuty(userID uuid.UUID) (*model.Duty, error) {
+	lastDuty, err := s.dutyRepository.FindLastDutyByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if lastDuty == nil {
+		return nil, errors.New("last user duty not found")
 	}
 	return lastDuty, nil
 }

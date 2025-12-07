@@ -80,7 +80,7 @@ func (s *CleaningService) UpdateCurrentSheet(user model.User) error {
 	if err != nil {
 		return err
 	}
-	duty, err := s.dutyService.GetCurrentDuty()
+	duty, err := s.dutyService.GetUserLastDuty(user.UserID)
 	if err != nil {
 		return err
 	}
@@ -147,9 +147,6 @@ func (s *CleaningService) getNextDutyTeamInGroup(group model.Group) (*model.Team
 	lastDuty, err := s.dutyService.GetGroupLastDuty(group.GroupID)
 	if err != nil {
 		return nil, err
-	}
-	if lastDuty == nil {
-		return &teams[0], nil
 	}
 	lastDutyTeam, err := s.teamService.GetTeam(lastDuty.TeamID)
 	if err != nil {
