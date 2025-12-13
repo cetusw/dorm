@@ -60,7 +60,7 @@ func (s *baseState) GetUnassignedTasks(
 	chatID int64,
 	areaID int,
 ) ([]model.DutyTaskView, error) {
-	user, err := context.UserService.GetUser(chatID)
+	user, err := context.UserService.GetUserByTelegramID(chatID)
 	if err != nil {
 		return []model.DutyTaskView{}, err
 	}
@@ -77,7 +77,7 @@ func (s *baseState) GetUnassignedTasks(
 }
 
 func (s *baseState) AssignTask(context *Bot, chatID int64, taskID uuid.UUID) error {
-	user, err := context.UserService.GetUser(chatID)
+	user, err := context.UserService.GetUserByTelegramID(chatID)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (s *baseState) AssignTask(context *Bot, chatID int64, taskID uuid.UUID) err
 }
 
 func (s *baseState) UnassignTask(context *Bot, chatID int64, taskID uuid.UUID) error {
-	user, err := context.UserService.GetUser(chatID)
+	user, err := context.UserService.GetUserByTelegramID(chatID)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (s *baseState) UnassignTask(context *Bot, chatID int64, taskID uuid.UUID) e
 }
 
 func (s *baseState) GetUncompletedDutyTasksView(context *Bot, userID int64) ([]model.DutyTaskView, error) {
-	user, err := context.UserService.GetUser(userID)
+	user, err := context.UserService.GetUserByTelegramID(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (s *baseState) GetUncompletedDutyTasksView(context *Bot, userID int64) ([]m
 }
 
 func (s *baseState) GetUnassignedAreas(context *Bot, chatID int64) ([]model.Area, error) {
-	user, err := context.UserService.GetUser(chatID)
+	user, err := context.UserService.GetUserByTelegramID(chatID)
 	if err != nil {
 		return []model.Area{}, err
 	}
@@ -134,7 +134,7 @@ func (s *baseState) GetUnassignedAreas(context *Bot, chatID int64) ([]model.Area
 }
 
 func (s *baseState) ConfirmTask(context *Bot, chatID int64, taskID uuid.UUID) error {
-	user, err := context.UserService.GetUser(chatID)
+	user, err := context.UserService.GetUserByTelegramID(chatID)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (s *baseState) ConfirmTask(context *Bot, chatID int64, taskID uuid.UUID) er
 }
 
 func (s *baseState) ComputeUserProgress(context *Bot, chatID int64) (*model.UserProgress, error) {
-	user, err := context.UserService.GetUser(chatID)
+	user, err := context.UserService.GetUserByTelegramID(chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 	case message.StartCommand:
 		s.SendReplyAndGo(context, chatID, message.MainState, keyboard.BuildMainStateKeyboard(), &MainState{})
 	case message.Tasks:
-		user, err := context.UserService.GetUser(chatID)
+		user, err := context.UserService.GetUserByTelegramID(chatID)
 		if err != nil {
 			return err
 		}
@@ -235,7 +235,7 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 		text = message.PaymentManagementState
 		s.SendInlineAndGo(context, chatID, text, keyboard.BuildBackKeyboard(), &PaymentManagementState{})
 	case message.Profile:
-		user, err := context.UserService.GetUser(chatID)
+		user, err := context.UserService.GetUserByTelegramID(chatID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err

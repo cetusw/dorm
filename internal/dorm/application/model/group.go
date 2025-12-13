@@ -4,7 +4,8 @@ import "github.com/google/uuid"
 
 type Group struct {
 	GroupID       uuid.UUID
+	LeaderID      *uuid.UUID
 	Name          string
-	DormitoryID   int
+	DormitoryID   int64
 	SpreadsheetID string
 }

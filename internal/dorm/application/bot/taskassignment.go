@@ -70,7 +70,7 @@ func (s *TaskAssignmentState) HandleCallback(context *Bot, update *tgbotapi.Upda
 			keyboard.BuildTaskAssignmentKeyboard(unassignedTasks),
 			&TaskAssignmentState{AreaID: s.AreaID},
 		)
-		user, err := context.UserService.GetUser(chatID)
+		user, err := context.UserService.GetUserByTelegramID(chatID)
 		if err != nil {
 			return err
 		}

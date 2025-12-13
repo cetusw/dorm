@@ -12,8 +12,14 @@ type User struct {
 	MiddleName  *string
 	TeamID      *uuid.UUID
 	RoomNumber  *int
-	DormitoryID *int
+	DormitoryID *int64
 	RoleID      int
 	CreatedAt   []uint8
 	DeletedAt   *[]uint8
+}
+
+type UsersToNotifyFilter struct {
+	Names       []string
+	RoleIDs     []int
+	DormitoryID *int
 }

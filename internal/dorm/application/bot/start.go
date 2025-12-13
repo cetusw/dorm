@@ -14,7 +14,7 @@ type StartState struct {
 func (s *StartState) Handle(context *Bot, update *tgbotapi.Update) error {
 	chatID := update.Message.Chat.ID
 	context.Telegram.DeleteMessage(chatID, update.Message.MessageID)
-	user, err := context.UserService.GetUser(update.Message.From.ID)
+	user, err := context.UserService.GetUserByTelegramID(update.Message.From.ID)
 	if err != nil {
 		messageID, err := context.Telegram.SendMessage(chatID, message.RegistrationFail)
 		if err != nil || messageID == 0 {

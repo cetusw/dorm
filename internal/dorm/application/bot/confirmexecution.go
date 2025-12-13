@@ -79,7 +79,7 @@ func (s *ConfirmExecutionState) HandleCallback(context *Bot, update *tgbotapi.Up
 				&ConfirmExecutionState{},
 			)
 		}
-		user, err := context.UserService.GetUser(chatID)
+		user, err := context.UserService.GetUserByTelegramID(chatID)
 		if err != nil {
 			return err
 		}

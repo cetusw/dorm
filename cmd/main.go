@@ -33,6 +33,7 @@ func main() {
 	taskRepository := repository.NewTaskRepository(db)
 	areaRepository := repository.NewAreaRepository(db)
 	groupRepository := repository.NewGroupRepository(db)
+	dormRepository := repository.NewDormitoryRepository(db)
 
 	telegram, err := infrastructure.NewTelegram(os.Getenv("BOT_TOKEN"))
 	if err != nil {
@@ -71,6 +72,15 @@ func main() {
 		dutyTaskService,
 		userService,
 	)
+	notificationService := service.NewNotificationService(
+		telegram,
+		dormRepository,
+		groupService,
+		dutyService,
+		dutyTaskService,
+		teamService,
+		userService,
+	)
 	botContext := bot.NewBot(
 		telegram,
 		userService,
@@ -83,13 +93,24 @@ func main() {
 		cleaningService,
 	)
 
-	s := scheduler.NewScheduler(cleaningService, syncService, *configData)
+	s := scheduler.NewScheduler(
+		*configData,
+		cleaningService,
+		syncService,
+		notificationService,
+	)
 	s.RegisterJobs()
 	s.Start()
 
 	err = syncService.SyncAllActiveDuties()
 	if err != nil {
 		log.Printf("Failed to sync duties: %v", err)
+	}
+
+	//TODO: remove
+	err = notificationService.SendWeeklyCleaningReport()
+	if err != nil {
+		log.Printf("Failed to send report: %v", err)
 	}
 
 	updates := telegram.GetUpdates(telegram.Bot)

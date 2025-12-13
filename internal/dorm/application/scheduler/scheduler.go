@@ -10,22 +10,25 @@ import (
 )
 
 type Scheduler struct {
-	cron            *cron.Cron
-	cfg             model.Config
-	cleaningService *service.CleaningService
-	syncService     *service.SyncService
+	cron                *cron.Cron
+	cfg                 model.Config
+	cleaningService     *service.CleaningService
+	syncService         *service.SyncService
+	notificationService *service.NotificationService
 }
 
 func NewScheduler(
+	config model.Config,
 	cleaningService *service.CleaningService,
 	syncService *service.SyncService,
-	config model.Config,
+	notificationService *service.NotificationService,
 ) *Scheduler {
 	return &Scheduler{
-		cron:            cron.New(),
-		cleaningService: cleaningService,
-		syncService:     syncService,
-		cfg:             config,
+		cron:                cron.New(),
+		cfg:                 config,
+		cleaningService:     cleaningService,
+		syncService:         syncService,
+		notificationService: notificationService,
 	}
 }
 
@@ -55,6 +58,12 @@ func (s *Scheduler) startSyncJob() {
 		err := s.syncService.SyncAllActiveDuties()
 		if err != nil {
 			log.Printf("Sync job error: %v", err)
+		}
+
+		log.Println("Starting cleaning report notification...")
+		err = s.notificationService.SendWeeklyCleaningReport()
+		if err != nil {
+			log.Printf("Notification job error: %v", err)
 		}
 	})
 	if err != nil {

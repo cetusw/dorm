@@ -18,11 +18,12 @@ func NewGroupRepository(db *sql.DB) *GroupRepository {
 }
 
 func (r *GroupRepository) Find(groupID uuid.UUID) (*model.Group, error) {
-	const sqlQuery = "SELECT group_id, group_name, dormitory_id, spreadsheet_id FROM `group` WHERE group_id = UUID_TO_BIN(?)"
+	const sqlQuery = "SELECT group_id, leader_id, group_name, dormitory_id, spreadsheet_id FROM `group` WHERE group_id = UUID_TO_BIN(?)"
 
 	group := &model.Group{}
 	err := r.db.QueryRow(sqlQuery, groupID).Scan(
 		&group.GroupID,
+		&group.LeaderID,
 		&group.Name,
 		&group.DormitoryID,
 		&group.SpreadsheetID,
@@ -38,7 +39,7 @@ func (r *GroupRepository) Find(groupID uuid.UUID) (*model.Group, error) {
 }
 
 func (r *GroupRepository) FindAll() ([]model.Group, error) {
-	const sqlQuery = "SELECT group_id, group_name, dormitory_id, spreadsheet_id FROM `group`"
+	const sqlQuery = "SELECT group_id, leader_id, group_name, dormitory_id, spreadsheet_id FROM `group`"
 
 	rows, err := r.db.Query(sqlQuery)
 	if err != nil {
@@ -50,7 +51,13 @@ func (r *GroupRepository) FindAll() ([]model.Group, error) {
 
 	for rows.Next() {
 		var group model.Group
-		if err := rows.Scan(&group.GroupID, &group.Name, &group.DormitoryID, &group.SpreadsheetID); err != nil {
+		if err := rows.Scan(
+			&group.GroupID,
+			&group.LeaderID,
+			&group.Name,
+			&group.DormitoryID,
+			&group.SpreadsheetID,
+		); err != nil {
 			return nil, fmt.Errorf("failed to scan team group row: %w", err)
 		}
 		groups = append(groups, group)

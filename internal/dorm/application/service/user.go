@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dorm/internal/common/consts"
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
 	"errors"
@@ -20,7 +21,7 @@ func NewUserService(repository *repository.UserRepository) *UserService {
 }
 
 func (s *UserService) RegisterUser(fullName string, chatID int64) error {
-	user, err := s.userRepository.Find(chatID)
+	user, err := s.userRepository.FindByTelegramID(chatID)
 	if err != nil {
 		return err
 	}
@@ -47,8 +48,12 @@ func (s *UserService) RegisterUser(fullName string, chatID int64) error {
 	return s.userRepository.Store(user)
 }
 
-func (s *UserService) GetUser(id int64) (*model.User, error) {
-	return s.userRepository.Find(id)
+func (s *UserService) GetUserByTelegramID(telegramID int64) (*model.User, error) {
+	return s.userRepository.FindByTelegramID(telegramID)
+}
+
+func (s *UserService) GetUserByID(id uuid.UUID) (*model.User, error) {
+	return s.userRepository.FindByID(id)
 }
 
 func (s *UserService) GetUsersByTeamID(teamID uuid.UUID) ([]model.User, error) {
@@ -72,4 +77,19 @@ func (s *UserService) GetRequiredUserPoints(userID uuid.UUID, dutyPoints int) (f
 		return 0, nil
 	}
 	return float64(dutyPoints) / float64(teamSize), nil
+}
+
+func (s *UserService) GetDormitoryHeads(dormID int64) ([]model.User, error) {
+	roles := []int{consts.RoleFloorHead, consts.RoleColivingHead}
+	headsRaw, err := s.userRepository.FindUsersByRole(roles)
+	if err != nil {
+		return nil, err
+	}
+	heads := make([]model.User, 0)
+	for _, head := range headsRaw {
+		if head.DormitoryID != nil && *head.DormitoryID == dormID {
+			heads = append(heads, head)
+		}
+	}
+	return heads, nil
 }
