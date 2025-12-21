@@ -22,7 +22,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 func (r *UserRepository) FindByTelegramID(telegramID int64) (*model.User, error) {
 	const sqlQuery = `
 		SELECT 
-		    user_id, 
+		    id, 
 		    telegram_id, 
 		    first_name, 
 		    last_name, 
@@ -63,7 +63,7 @@ func (r *UserRepository) FindByTelegramID(telegramID int64) (*model.User, error)
 func (r *UserRepository) FindByID(id uuid.UUID) (*model.User, error) {
 	const sqlQuery = `
 		SELECT 
-		    user_id, 
+		    id, 
 		    telegram_id, 
 		    first_name, 
 		    last_name, 
@@ -75,7 +75,7 @@ func (r *UserRepository) FindByID(id uuid.UUID) (*model.User, error) {
 		    created_at,
 		    deleted_at 
 		FROM user 
-		WHERE user_id = UUID_TO_BIN(?)`
+		WHERE id = UUID_TO_BIN(?)`
 
 	user := &model.User{}
 	err := r.db.QueryRow(sqlQuery, id).Scan(
@@ -104,7 +104,7 @@ func (r *UserRepository) FindByID(id uuid.UUID) (*model.User, error) {
 func (r *UserRepository) FindAll() ([]model.User, error) {
 	const sqlQuery = `
 		SELECT 
-			user_id, 
+			id, 
 			telegram_id, 
 			first_name, 
 			last_name, 
@@ -154,7 +154,7 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 func (r *UserRepository) FindUsersByTeamID(teamID uuid.UUID) ([]model.User, error) {
 	const sqlQuery = `
 		SELECT 
-			user_id, 
+			id, 
 			telegram_id, 
 			first_name, 
 			last_name, 
@@ -206,7 +206,7 @@ func (r *UserRepository) FindUserTeamID(userID uuid.UUID) (*uuid.UUID, error) {
 	const sqlQuery = `
 		SELECT team_id 
 		FROM user 
-		WHERE user_id = UUID_TO_BIN(?)`
+		WHERE id = UUID_TO_BIN(?)`
 
 	var teamID *uuid.UUID
 	err := r.db.QueryRow(sqlQuery, userID).Scan(&teamID)
@@ -239,7 +239,7 @@ func (r *UserRepository) FindUsersByRole(roleIDs []int) ([]model.User, error) {
 
 	sqlQuery := fmt.Sprintf(`
 		SELECT 
-			user_id, 
+			id, 
 			telegram_id, 
 			first_name, 
 			last_name, 
@@ -291,7 +291,7 @@ func (r *UserRepository) FindUsersByRole(roleIDs []int) ([]model.User, error) {
 
 func (r *UserRepository) Store(user *model.User) error {
 	const sqlQuery = `
-		INSERT INTO user (user_id, telegram_id, first_name, last_name, role_id) 
+		INSERT INTO user (id, telegram_id, first_name, last_name, role_id) 
 		VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)`
 
 	_, err := r.db.Exec(sqlQuery, user.UserID, user.TelegramID, user.FirstName, user.LastName, user.RoleID)

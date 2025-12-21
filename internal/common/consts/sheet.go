@@ -10,7 +10,7 @@ const (
 	TaskTableHeaderHeight   = 60
 	TasksStartRow           = 3
 	TasksTableRange         = "A1:E"
-	UserTableRange          = "G2:I6"
+	UserTableRange          = "G2:I"
 	ClearRange              = "A1:K"
 )
 

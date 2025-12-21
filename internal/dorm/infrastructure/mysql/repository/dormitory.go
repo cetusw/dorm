@@ -17,13 +17,13 @@ func NewDormitoryRepository(db *sql.DB) *DormitoryRepository {
 func (r *DormitoryRepository) FindAll() ([]model.Dormitory, error) {
 	const sqlQuery = `
 		SELECT 
-		    dormitory_id, 
+		    id, 
 		    leader_id,
-		    dormitory_name, 
-		    dormitory_city, 
-		    dormitory_street_type, 
-		    dormitory_street_name, 
-		    dormitory_house_number
+		    name, 
+		    city, 
+		    street_type, 
+		    street_name, 
+		    house_number
 		FROM dormitory
 		`
 	rows, err := r.db.Query(sqlQuery)

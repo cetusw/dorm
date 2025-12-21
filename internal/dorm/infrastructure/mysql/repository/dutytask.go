@@ -22,20 +22,20 @@ func NewDutyTaskRepository(db *sql.DB) *DutyTaskRepository {
 func (r *DutyTaskRepository) FindDutyTaskViewsByDutyID(dutyID uuid.UUID) ([]model.DutyTaskView, error) {
 	const sqlQuery = `
 		SELECT 
-			a.area_floor, 
-			a.area_name, 
-			t.task_id,
-			t.task_title, 
-			t.task_cost, 
-			u.user_id,
+			a.floor, 
+			a.name, 
+			t.id,
+			t.title, 
+			t.cost, 
+			u.id,
 			u.first_name, 
 			u.last_name, 
 			dt.completion_date, 
 			dt.verification_date 
 		FROM duty_task dt 
-			INNER JOIN task t ON dt.task_id = t.task_id 
-			INNER JOIN area a ON a.area_id = t.area_id 
-			LEFT JOIN user u ON u.user_id = dt.assignee_id 
+			INNER JOIN task t ON dt.task_id = t.id 
+			INNER JOIN area a ON a.id = t.area_id 
+			LEFT JOIN user u ON u.id = dt.assignee_id 
 		WHERE dt.duty_id = UUID_TO_BIN(?)`
 
 	rows, err := r.db.Query(sqlQuery, dutyID)
@@ -79,19 +79,19 @@ func (r *DutyTaskRepository) FindUncompletedDutyTasksView(
 ) ([]model.DutyTaskView, error) {
 	const sqlQuery = `
 		SELECT 
-			a.area_floor, 
-			a.area_name, 
-			t.task_id,
-			t.task_title, 
-			t.task_cost, 
+			a.floor, 
+			a.name, 
+			t.id,
+			t.title, 
+			t.cost, 
 			u.first_name, 
 			u.last_name, 
 			dt.completion_date, 
 			dt.verification_date 
 		FROM duty_task dt 
-			INNER JOIN task t ON dt.task_id = t.task_id 
-			INNER JOIN area a ON a.area_id = t.area_id
-			LEFT JOIN user u ON u.user_id = dt.assignee_id
+			INNER JOIN task t ON dt.task_id = t.id 
+			INNER JOIN area a ON a.id = t.area_id
+			LEFT JOIN user u ON u.id = dt.assignee_id
 		WHERE dt.completion_date IS NULL 
 		  AND dt.assignee_id = UUID_TO_BIN(?) 
 		  AND dt.duty_id = UUID_TO_BIN(?)`
@@ -136,16 +136,16 @@ func (r *DutyTaskRepository) FindUnassignedDutyTasksView(
 ) ([]model.DutyTaskView, error) {
 	const sqlQuery = `
 		SELECT 
-			a.area_floor, 
-			a.area_name, 
-			t.task_id,
-			t.task_title, 
-			t.task_cost,
+			a.floor, 
+			a.name, 
+			t.id,
+			t.title, 
+			t.cost,
 			dt.completion_date, 
 			dt.verification_date 
 		FROM duty_task dt 
-			INNER JOIN task t ON dt.task_id = t.task_id 
-			INNER JOIN area a ON a.area_id = t.area_id
+			INNER JOIN task t ON dt.task_id = t.id 
+			INNER JOIN area a ON a.id = t.area_id
 		WHERE dt.assignee_id IS NULL
 		  AND t.area_id = ?
 		  AND dt.duty_id = UUID_TO_BIN(?)`
@@ -236,7 +236,7 @@ func (r *DutyTaskRepository) UpdateDutyTaskCompletionDate(dutyID uuid.UUID, task
 
 func (r *DutyTaskRepository) Store(dutyTask *model.DutyTask) error {
 	const sqlQuery = `
-	INSERT INTO duty_task (duty_task_id, duty_id, task_id, reviewer_id) 
+	INSERT INTO duty_task (id, duty_id, task_id, reviewer_id) 
 	VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?))`
 
 	_, err := r.db.Exec(sqlQuery, dutyTask.DutyTaskID, dutyTask.DutyID, dutyTask.TaskID, dutyTask.ReviewerID)
@@ -253,7 +253,7 @@ func (r *DutyTaskRepository) StoreBatch(dutyTasks []model.DutyTask) error {
 	}
 
 	const sqlQuery = `
-		INSERT INTO duty_task (duty_task_id, duty_id, task_id, reviewer_id) 
+		INSERT INTO duty_task (id, duty_id, task_id, reviewer_id) 
 		VALUES `
 
 	var valueStrings []string

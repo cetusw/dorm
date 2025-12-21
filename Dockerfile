@@ -18,9 +18,9 @@ WORKDIR /root/
 
 COPY --from=builder /app/main .
 COPY --from=builder /app/config.json .
-COPY ./db/migrations ./db/migrations
-COPY credentials.json .
-COPY ./mysql .
+COPY --from=builder /app/credentials.json .
+COPY --from=builder /app/data/mysql/migrations ./data/mysql/migrations
+COPY --from=builder /app/data/mysql/my.cnf /etc/mysql/conf.d/my.cnf
 
 EXPOSE 8080
 

@@ -21,9 +21,9 @@ func NewDutyRepository(db *sql.DB) *DutyRepository {
 
 func (r *DutyRepository) Find(dutyID uuid.UUID) (*model.Duty, error) {
 	const sqlQuery = `
-		SELECT duty_id, team_id, duty_start_date, duty_end_date 
+		SELECT id, team_id, start_date, end_date 
 		FROM duty 
-		WHERE duty_id = UUID_TO_BIN(?)`
+		WHERE id = UUID_TO_BIN(?)`
 
 	duty := &model.Duty{}
 	err := r.db.QueryRow(sqlQuery, dutyID).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
@@ -38,11 +38,11 @@ func (r *DutyRepository) Find(dutyID uuid.UUID) (*model.Duty, error) {
 
 func (r *DutyRepository) FindLastDutyByGroupID(groupID uuid.UUID) (*model.Duty, error) {
 	const sqlQuery = `
-		SELECT d.duty_id, d.team_id, d.duty_start_date, d.duty_end_date 
+		SELECT d.id, d.team_id, d.start_date, d.end_date 
 		FROM duty d
-		    INNER JOIN team t ON d.team_id = t.team_id
+		    INNER JOIN team t ON d.team_id = t.id
 		WHERE t.group_id = UUID_TO_BIN(?)
-		ORDER BY d.duty_start_date DESC 
+		ORDER BY d.start_date DESC 
 		LIMIT 1`
 
 	duty := &model.Duty{}
@@ -59,12 +59,12 @@ func (r *DutyRepository) FindLastDutyByGroupID(groupID uuid.UUID) (*model.Duty, 
 
 func (r *DutyRepository) FindLastDutyByUserID(userID uuid.UUID) (*model.Duty, error) {
 	const sqlQuery = `
-		SELECT d.duty_id, d.team_id, d.duty_start_date, d.duty_end_date 
+		SELECT d.id, d.team_id, d.start_date, d.end_date 
 		FROM duty d
-		    INNER JOIN team t ON d.team_id = t.team_id
-			INNER JOIN user u ON u.team_id = t.team_id
-		WHERE u.user_id = UUID_TO_BIN(?)
-		ORDER BY d.duty_start_date DESC 
+		    INNER JOIN team t ON d.team_id = t.id
+			INNER JOIN user u ON u.team_id = t.id
+		WHERE u.id = UUID_TO_BIN(?)
+		ORDER BY d.start_date DESC 
 		LIMIT 1`
 
 	duty := &model.Duty{}
@@ -81,7 +81,7 @@ func (r *DutyRepository) FindLastDutyByUserID(userID uuid.UUID) (*model.Duty, er
 
 func (r *DutyRepository) Store(duty *model.Duty) error {
 	const sqlQuery = `
-		INSERT INTO duty (duty_id, team_id, duty_start_date, duty_end_date) 
+		INSERT INTO duty (id, team_id, start_date, end_date) 
 		VALUES (UUID_TO_BIN(?), ?, ?, ?)`
 	_, err := r.db.Exec(sqlQuery, duty.DutyID, duty.TeamID, duty.Start, duty.End)
 	if err != nil {
@@ -96,7 +96,7 @@ func (r *DutyRepository) StoreBatch(duties []model.Duty) error {
 	}
 
 	const sqlQuery = `
-		INSERT INTO duty (duty_id, team_id, duty_start_date, duty_end_date) 
+		INSERT INTO duty (id, team_id, start_date, end_date) 
 		VALUES `
 
 	var valueStrings []string
@@ -119,7 +119,7 @@ func (r *DutyRepository) StoreBatch(duties []model.Duty) error {
 
 func (r *DutyRepository) CountDistinctStartDates() (int, error) {
 	const sqlQuery = `
-		SELECT COUNT(DISTINCT duty_start_date)
+		SELECT COUNT(DISTINCT start_date)
 		FROM duty`
 
 	var count int

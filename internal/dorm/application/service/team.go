@@ -39,3 +39,7 @@ func (s *TeamService) GetTeamColor(teamID uuid.UUID) (string, error) {
 func (s *TeamService) GetGroupTeams(groupID uuid.UUID) ([]model.Team, error) {
 	return s.teamRepository.FindTeamsByGroupID(groupID)
 }
+
+func (s *TeamService) GetFirstGroupTeam(groupID uuid.UUID) (*model.Team, error) {
+	return s.teamRepository.FindGroupTeamByOrder(groupID, 1)
+}

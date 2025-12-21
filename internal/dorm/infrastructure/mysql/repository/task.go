@@ -20,8 +20,8 @@ func NewTaskRepository(db *sql.DB) *TaskRepository {
 
 func (r *TaskRepository) Find(taskID uuid.UUID) (*model.Task, error) {
 	const sqlQuery = `
-		SELECT task_id, area_id, task_title, task_cost, task_frequency 
-		FROM task WHERE task_id = UUID_TO_BIN(?)`
+		SELECT id, area_id, title, cost, frequency 
+		FROM task WHERE id = UUID_TO_BIN(?)`
 
 	task := &model.Task{}
 	err := r.db.QueryRow(sqlQuery, taskID).Scan(&task.TaskID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency, &task.Scope)
@@ -36,7 +36,7 @@ func (r *TaskRepository) Find(taskID uuid.UUID) (*model.Task, error) {
 
 func (r *TaskRepository) FindAll() ([]model.Task, error) {
 	const sqlQuery = `
-		SELECT task_id, area_id, task_title, task_cost, task_frequency
+		SELECT id, area_id, title, cost, frequency
 		FROM task`
 
 	rows, err := r.db.Query(sqlQuery)
@@ -64,9 +64,9 @@ func (r *TaskRepository) FindAll() ([]model.Task, error) {
 
 func (r *TaskRepository) FindGroupTasks(groupID uuid.UUID) ([]model.Task, error) {
 	const sqlQuery = `
-		SELECT t.task_id, t.area_id, t.task_title, t.task_cost, t.task_frequency
+		SELECT t.id, t.area_id, t.title, t.cost, t.frequency
 		FROM task t
-			INNER JOIN area a ON a.area_id = t.area_id
+			INNER JOIN area a ON a.id = t.area_id
 		WHERE a.group_id = UUID_TO_BIN(?)`
 
 	rows, err := r.db.Query(sqlQuery, groupID)
@@ -93,9 +93,9 @@ func (r *TaskRepository) FindGroupTasks(groupID uuid.UUID) ([]model.Task, error)
 
 func (r *TaskRepository) FindPublicTasks() ([]model.Task, error) {
 	const sqlQuery = `
-		SELECT t.task_id, t.area_id, t.task_title, t.task_cost, t.task_frequency
+		SELECT t.id, t.area_id, t.title, t.cost, t.frequency
 		FROM task t
-			INNER JOIN area a ON a.area_id = t.area_id
+			INNER JOIN area a ON a.id = t.area_id
 		WHERE a.group_id IS NULL`
 
 	rows, err := r.db.Query(sqlQuery)
@@ -122,7 +122,7 @@ func (r *TaskRepository) FindPublicTasks() ([]model.Task, error) {
 
 func (r *TaskRepository) Store(task *model.Task) error {
 	const sqlQuery = `
-		INSERT INTO task (task_id, area_id, task_title, task_cost, task_frequency) 
+		INSERT INTO task (id, area_id, title, cost, frequency) 
 		VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)`
 
 	_, err := r.db.Exec(sqlQuery, task.TaskID, task.AreaID, task.Title, task.Cost, task.Frequency, task.Scope)

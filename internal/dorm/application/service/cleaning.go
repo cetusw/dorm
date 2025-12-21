@@ -134,6 +134,7 @@ func (s *CleaningService) getNewDutyTeams() ([]model.Team, error) {
 }
 
 func (s *CleaningService) getNextDutyTeamInGroup(group model.Group) (*model.Team, error) {
+	var teamID uuid.UUID
 	teams, err := s.teamService.GetGroupTeams(group.GroupID)
 	if err != nil {
 		return nil, err
@@ -148,7 +149,16 @@ func (s *CleaningService) getNextDutyTeamInGroup(group model.Group) (*model.Team
 	if err != nil {
 		return nil, err
 	}
-	lastDutyTeam, err := s.teamService.GetTeam(lastDuty.TeamID)
+	if lastDuty == nil {
+		firstTeamInGroup, err := s.teamService.GetFirstGroupTeam(group.GroupID)
+		if err != nil {
+			return nil, err
+		}
+		teamID = firstTeamInGroup.TeamID
+	} else {
+		teamID = lastDuty.TeamID
+	}
+	lastDutyTeam, err := s.teamService.GetTeam(teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +348,5 @@ func (s *CleaningService) createDutySheets(duties []model.Duty) error {
 
 func (s *CleaningService) createSheetTitle(duty model.Duty) string {
 	// TODO: исправить часовые зоны DORM-17
-	start := duty.Start.Add(10800000000000)
-	end := duty.End.Add(10800000000000)
-	return fmt.Sprintf("%s-%s", start.Format("02.01"), end.Format("02.01"))
+	return fmt.Sprintf("%s-%s", duty.Start.Format("02.01"), duty.End.Format("02.01"))
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `group` DROP FOREIGN KEY `fk_group_leader`;

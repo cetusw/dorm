@@ -1,0 +1,1 @@
+ALTER TABLE `team` DROP FOREIGN KEY `fk_team_leader`;

@@ -20,9 +20,9 @@ func NewTeamRepository(db *sql.DB) *TeamRepository {
 
 func (r *TeamRepository) Find(teamID uuid.UUID) (*model.Team, error) {
 	const sqlQuery = `
-		SELECT team_id, group_id, team_leader_id, team_color, team_order
+		SELECT id, group_id, leader_id, color, team_order
 		FROM team 
-		WHERE team_id = UUID_TO_BIN(?)`
+		WHERE id = UUID_TO_BIN(?)`
 
 	team := &model.Team{}
 	err := r.db.QueryRow(sqlQuery, teamID).Scan(
@@ -44,7 +44,7 @@ func (r *TeamRepository) Find(teamID uuid.UUID) (*model.Team, error) {
 
 func (r *TeamRepository) FindAll() ([]model.Team, error) {
 	const sqlQuery = `
-		SELECT team_id, group_id, team_leader_id, team_color 
+		SELECT id, group_id, leader_id, color, team_order 
 		FROM team`
 
 	rows, err := r.db.Query(sqlQuery)
@@ -56,7 +56,13 @@ func (r *TeamRepository) FindAll() ([]model.Team, error) {
 	var teams []model.Team
 	for rows.Next() {
 		var team model.Team
-		if err := rows.Scan(&team.TeamID, &team.GroupID, &team.TeamLeaderID, &team.Color); err != nil {
+		if err := rows.Scan(
+			&team.TeamID,
+			&team.GroupID,
+			&team.TeamLeaderID,
+			&team.Color,
+			&team.Order,
+		); err != nil {
 			return nil, fmt.Errorf("failed to scan team row: %w", err)
 		}
 
@@ -72,7 +78,7 @@ func (r *TeamRepository) FindAll() ([]model.Team, error) {
 
 func (r *TeamRepository) FindTeamByGroupIDAndOrder(groupID uuid.UUID, order int) (*model.Team, error) {
 	const sqlQuery = `
-		SELECT team_id, group_id, team_leader_id, team_color, team_order
+		SELECT id, group_id, leader_id, color, team_order
 		FROM team 
 		WHERE group_id = UUID_TO_BIN(?) 
 		  AND team_order = ?`
@@ -97,10 +103,10 @@ func (r *TeamRepository) FindTeamByGroupIDAndOrder(groupID uuid.UUID, order int)
 
 func (r *TeamRepository) FindTeamsByGroupID(groupID uuid.UUID) ([]model.Team, error) {
 	const sqlQuery = `
-		SELECT team_id, group_id, team_leader_id, team_color 
+		SELECT id, group_id, leader_id, color, team_order 
 		FROM team 
 		WHERE group_id = UUID_TO_BIN(?) 
-		ORDER BY team_id`
+		ORDER BY id`
 
 	rows, err := r.db.Query(sqlQuery, groupID)
 	if err != nil {
@@ -111,7 +117,13 @@ func (r *TeamRepository) FindTeamsByGroupID(groupID uuid.UUID) ([]model.Team, er
 	var teams []model.Team
 	for rows.Next() {
 		var team model.Team
-		if err := rows.Scan(&team.TeamID, &team.GroupID, &team.TeamLeaderID, &team.Color); err != nil {
+		if err := rows.Scan(
+			&team.TeamID,
+			&team.GroupID,
+			&team.TeamLeaderID,
+			&team.Color,
+			&team.Order,
+		); err != nil {
 			return nil, fmt.Errorf("failed to scan team row for team group ID %s: %w", groupID, err)
 		}
 		teams = append(teams, team)
@@ -124,11 +136,11 @@ func (r *TeamRepository) FindTeamsByGroupID(groupID uuid.UUID) ([]model.Team, er
 	return teams, nil
 }
 
-func (r *TeamRepository) FindPreviousTeamInGroup(groupID uuid.UUID, order int) (*model.Team, error) {
+func (r *TeamRepository) FindGroupTeamByOrder(groupID uuid.UUID, order int) (*model.Team, error) {
 	const sqlQuery = `
-		SELECT team_id, group_id, team_leader_id, team_color, team_order
+		SELECT id, group_id, leader_id, color, team_order
 		FROM team 
-		WHERE group_id = UUID_TO_BIN(?) AND team_order < ?
+		WHERE group_id = UUID_TO_BIN(?) AND team_order = ?
 		ORDER BY team_order DESC 
 		LIMIT 1`
 
@@ -145,17 +157,22 @@ func (r *TeamRepository) FindPreviousTeamInGroup(groupID uuid.UUID, order int) (
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to get previous team in group: %w", err)
+		return nil, fmt.Errorf("failed to get group team by order: %w", err)
 	}
 	return team, nil
 }
 
 func (r *TeamRepository) Store(team *model.Team) error {
 	const sqlQuery = `
-		INSERT INTO team (team_id, group_id, team_leader_id, team_color) 
-		VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), ?)`
+		INSERT INTO team (id, group_id, leader_id, color, team_order) 
+		VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?)`
 
-	_, err := r.db.Exec(sqlQuery, team.GroupID, team.TeamLeaderID, team.Color)
+	_, err := r.db.Exec(sqlQuery,
+		team.GroupID,
+		team.TeamLeaderID,
+		team.Color,
+		team.Order,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to save team: %w", err)
 	}

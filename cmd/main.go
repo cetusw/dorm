@@ -1,6 +1,7 @@
 package main
 
 import (
+	"dorm/data/mysql"
 	"fmt"
 	"log"
 	"os"
@@ -9,7 +10,6 @@ import (
 
 	"database/sql"
 	"dorm/internal/common/config"
-	"dorm/internal/database"
 	"dorm/internal/dorm/application/bot"
 	"dorm/internal/dorm/application/scheduler"
 	"dorm/internal/dorm/application/service"
@@ -25,7 +25,7 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 	db := connectDatabase()
-	database.ApplyMigrations(db)
+	mysql.ApplyMigrations(db)
 	userRepository := repository.NewUserRepository(db)
 	dutyRepository := repository.NewDutyRepository(db)
 	dutyTaskRepository := repository.NewDutyTaskRepository(db)
@@ -107,12 +107,6 @@ func main() {
 		log.Printf("Failed to sync duties: %v", err)
 	}
 
-	//TODO: remove
-	err = notificationService.SendWeeklyCleaningReport()
-	if err != nil {
-		log.Printf("Failed to send report: %v", err)
-	}
-
 	updates := telegram.GetUpdates(telegram.Bot)
 
 	for update := range updates {
@@ -132,7 +126,7 @@ func main() {
 
 func connectDatabase() *sql.DB {
 	connStr := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true",
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true&allowNativePasswords=true",
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_HOST"),

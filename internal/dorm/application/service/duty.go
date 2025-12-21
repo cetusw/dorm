@@ -44,7 +44,7 @@ func (s *DutyService) GetGroupLastDuty(groupID uuid.UUID) (*model.Duty, error) {
 		return nil, err
 	}
 	if lastDuty == nil {
-		return nil, errors.New("last group duty not found")
+		return nil, nil
 	}
 	return lastDuty, nil
 }

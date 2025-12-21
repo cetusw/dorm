@@ -20,9 +20,9 @@ func NewAreaRepository(db *sql.DB) *AreaRepository {
 
 func (r *AreaRepository) Find(areaFloor int, areaName string) (*model.Area, error) {
 	const sqlQuery = `
-		SELECT area_id, area_floor, area_name 
+		SELECT id, floor, name 
 		FROM area 
-		WHERE area_floor = ? AND area_name = ?`
+		WHERE floor = ? AND name = ?`
 
 	area := &model.Area{}
 	err := r.db.QueryRow(sqlQuery, areaFloor, areaName).Scan(&area.AreaID, &area.Floor, &area.Name)
@@ -38,9 +38,9 @@ func (r *AreaRepository) Find(areaFloor int, areaName string) (*model.Area, erro
 
 func (r *AreaRepository) FindAll() ([]model.Area, error) {
 	const sqlQuery = `
-		SELECT area_id, area_floor, area_name 
+		SELECT id, floor, name 
 		FROM area 
-		ORDER BY area_floor DESC, area_name DESC`
+		ORDER BY floor DESC, name DESC`
 
 	rows, err := r.db.Query(sqlQuery)
 	if err != nil {
@@ -67,13 +67,13 @@ func (r *AreaRepository) FindAll() ([]model.Area, error) {
 
 func (r *AreaRepository) FindUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.Area, error) {
 	const sqlQuery = `
-		SELECT DISTINCT a.area_id, a.area_floor, a.area_name
+		SELECT DISTINCT a.id, a.floor, a.name
 		FROM area a
-			INNER JOIN task t ON t.area_id = a.area_id
-		    INNER JOIN duty_task dt ON dt.task_id = t.task_id
+			INNER JOIN task t ON t.area_id = a.id
+		    INNER JOIN duty_task dt ON dt.task_id = t.id
 		WHERE dt.duty_id = UUID_TO_BIN(?)
 		  AND dt.assignee_id IS NULL
-		ORDER BY a.area_floor DESC, a.area_name DESC`
+		ORDER BY a.floor DESC, a.name DESC`
 
 	rows, err := r.db.Query(sqlQuery, dutyID)
 	if err != nil {
@@ -97,10 +97,10 @@ func (r *AreaRepository) FindUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.
 
 func (r *AreaRepository) FindAreasWithoutGroup() ([]model.Area, error) {
 	const sqlQuery = `
-		SELECT area_id, area_floor, area_name, group_id
+		SELECT id, floor, name, group_id
 		FROM area 
 		WHERE group_id IS NULL
-		ORDER BY area_floor DESC, area_name DESC`
+		ORDER BY floor DESC, name DESC`
 
 	rows, err := r.db.Query(sqlQuery)
 	if err != nil {
@@ -127,7 +127,7 @@ func (r *AreaRepository) FindAreasWithoutGroup() ([]model.Area, error) {
 
 func (r *AreaRepository) Store(area *model.Area) error {
 	const sqlQuery = `
-		INSERT INTO area (area_floor, area_name) 
+		INSERT INTO area (floor, name) 
 		VALUES (?, ?)`
 	_, err := r.db.Exec(sqlQuery, area.Floor, area.Name)
 	if err != nil {

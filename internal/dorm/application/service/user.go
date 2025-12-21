@@ -1,7 +1,6 @@
 package service
 
 import (
-	"dorm/internal/common/consts"
 	"dorm/internal/dorm/application/model"
 	"dorm/internal/dorm/infrastructure/mysql/repository"
 	"errors"
@@ -77,19 +76,4 @@ func (s *UserService) GetRequiredUserPoints(userID uuid.UUID, dutyPoints int) (f
 		return 0, nil
 	}
 	return float64(dutyPoints) / float64(teamSize), nil
-}
-
-func (s *UserService) GetDormitoryHeads(dormID int64) ([]model.User, error) {
-	roles := []int{consts.RoleFloorHead, consts.RoleColivingHead}
-	headsRaw, err := s.userRepository.FindUsersByRole(roles)
-	if err != nil {
-		return nil, err
-	}
-	heads := make([]model.User, 0)
-	for _, head := range headsRaw {
-		if head.DormitoryID != nil && *head.DormitoryID == dormID {
-			heads = append(heads, head)
-		}
-	}
-	return heads, nil
 }

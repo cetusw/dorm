@@ -1,0 +1,1 @@
+ALTER TABLE `dormitory` DROP FOREIGN KEY `fk_dormitory_leader`;

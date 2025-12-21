@@ -1,4 +1,4 @@
-package database
+package mysql
 
 import (
 	"database/sql"
@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	migrationsPath = "file://db/migrations"
+	migrationsPath = "file://data/mysql/migrations"
 )
 
 func ApplyMigrations(db *sql.DB) {
