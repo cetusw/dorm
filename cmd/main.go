@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"database/sql"
-	"dorm/internal/common/config"
-	"dorm/internal/dorm/application/bot"
-	"dorm/internal/dorm/application/scheduler"
-	"dorm/internal/dorm/application/service"
-	"dorm/internal/dorm/application/service/sheets"
-	"dorm/internal/dorm/infrastructure"
-	"dorm/internal/dorm/infrastructure/mysql/repository"
+	"dorm/pkg/common/config"
+	"dorm/pkg/dorm/application/bot"
+	"dorm/pkg/dorm/application/scheduler"
+	"dorm/pkg/dorm/application/service"
+	"dorm/pkg/dorm/application/service/sheets"
+	"dorm/pkg/dorm/infrastructure"
+	"dorm/pkg/dorm/infrastructure/mysql/repository"
 )
 
 func main() {
