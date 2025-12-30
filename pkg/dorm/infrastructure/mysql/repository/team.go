@@ -28,7 +28,7 @@ func (r *TeamRepository) Find(teamID uuid.UUID) (*model.Team, error) {
 	err := r.db.QueryRow(sqlQuery, teamID).Scan(
 		&team.ID,
 		&team.GroupID,
-		&team.TeamLeaderID,
+		&team.LeaderID,
 		&team.Color,
 		&team.Order,
 	)
@@ -59,7 +59,7 @@ func (r *TeamRepository) FindAll() ([]model.Team, error) {
 		if err := rows.Scan(
 			&team.ID,
 			&team.GroupID,
-			&team.TeamLeaderID,
+			&team.LeaderID,
 			&team.Color,
 			&team.Order,
 		); err != nil {
@@ -87,7 +87,7 @@ func (r *TeamRepository) FindTeamByGroupIDAndOrder(groupID uuid.UUID, order int)
 	err := r.db.QueryRow(sqlQuery, groupID, order).Scan(
 		&team.ID,
 		&team.GroupID,
-		&team.TeamLeaderID,
+		&team.LeaderID,
 		&team.Color,
 		&team.Order,
 	)
@@ -120,7 +120,7 @@ func (r *TeamRepository) FindTeamsByGroupID(groupID uuid.UUID) ([]model.Team, er
 		if err := rows.Scan(
 			&team.ID,
 			&team.GroupID,
-			&team.TeamLeaderID,
+			&team.LeaderID,
 			&team.Color,
 			&team.Order,
 		); err != nil {
@@ -148,7 +148,7 @@ func (r *TeamRepository) FindGroupTeamByOrder(groupID uuid.UUID, order int) (*mo
 	err := r.db.QueryRow(sqlQuery, groupID, order).Scan(
 		&team.ID,
 		&team.GroupID,
-		&team.TeamLeaderID,
+		&team.LeaderID,
 		&team.Color,
 		&team.Order,
 	)
@@ -169,7 +169,7 @@ func (r *TeamRepository) Store(team *model.Team) error {
 
 	_, err := r.db.Exec(sqlQuery,
 		team.GroupID,
-		team.TeamLeaderID,
+		team.LeaderID,
 		team.Color,
 		team.Order,
 	)

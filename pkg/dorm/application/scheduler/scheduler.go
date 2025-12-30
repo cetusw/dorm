@@ -3,32 +3,33 @@ package scheduler
 import (
 	"log"
 
-	"github.com/robfig/cron/v3"
-
 	"dorm/pkg/dorm/application/model"
 	"dorm/pkg/dorm/application/service"
+	"dorm/pkg/dorm/application/service/report"
+
+	"github.com/robfig/cron/v3"
 )
 
 type Scheduler struct {
-	cron                *cron.Cron
-	cfg                 model.Config
-	cleaningService     *service.CleaningService
-	syncService         *service.SyncService
-	notificationService *service.NotificationService
+	cron            *cron.Cron
+	cfg             model.Config
+	cleaningService *service.CleaningService
+	syncService     *service.SyncService
+	reportService   *report.CleaningReportService
 }
 
 func NewScheduler(
 	config model.Config,
 	cleaningService *service.CleaningService,
 	syncService *service.SyncService,
-	notificationService *service.NotificationService,
+	reportService *report.CleaningReportService,
 ) *Scheduler {
 	return &Scheduler{
-		cron:                cron.New(),
-		cfg:                 config,
-		cleaningService:     cleaningService,
-		syncService:         syncService,
-		notificationService: notificationService,
+		cron:            cron.New(),
+		cfg:             config,
+		cleaningService: cleaningService,
+		syncService:     syncService,
+		reportService:   reportService,
 	}
 }
 
@@ -61,7 +62,7 @@ func (s *Scheduler) startSyncJob() {
 		}
 
 		log.Println("Starting cleaning report notification...")
-		err = s.notificationService.SendWeeklyCleaningReport()
+		err = s.reportService.ProcessWeeklyReports()
 		if err != nil {
 			log.Printf("Notification job error: %v", err)
 		}

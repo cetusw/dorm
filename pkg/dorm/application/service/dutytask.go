@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dorm/pkg/common/utils"
 	"dorm/pkg/dorm/application/model"
 	"dorm/pkg/dorm/infrastructure/mysql/repository"
 
@@ -111,5 +112,10 @@ func (s *DutyTaskService) SetDutyTaskAssigneeID(
 }
 
 func (s *DutyTaskService) CompleteDutyTaskByDutyIDAndTaskID(dutyID uuid.UUID, taskID uuid.UUID) error {
-	return s.dutyTaskRepository.UpdateDutyTaskCompletionDate(dutyID, taskID)
+	completionDate := utils.NowMoscow()
+	return s.dutyTaskRepository.SetDutyTaskCompletionDate(dutyID, taskID, &completionDate)
+}
+
+func (s *DutyTaskService) IncompleteDutyTaskByDutyIDAndTaskID(dutyID uuid.UUID, taskID uuid.UUID) error {
+	return s.dutyTaskRepository.SetDutyTaskCompletionDate(dutyID, taskID, nil)
 }

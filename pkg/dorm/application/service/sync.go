@@ -133,6 +133,13 @@ func (s *SyncService) applyUpdates(
 				log.Printf("Error completing task %s: %v", dbTask.TaskTitle, err)
 			}
 		}
+
+		if !isDoneInSheet && isDoneInDB {
+			err := s.dutyTaskService.IncompleteDutyTaskByDutyIDAndTaskID(dutyID, dbTask.TaskID)
+			if err != nil {
+				log.Printf("Error incompleting task %s: %v", dbTask.TaskTitle, err)
+			}
+		}
 	}
 
 	return nil

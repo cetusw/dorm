@@ -1,18 +1,20 @@
 package main
 
 import (
-	"dorm/data/mysql"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
 
-	"database/sql"
+	"dorm/data/mysql"
 	"dorm/pkg/common/config"
 	"dorm/pkg/dorm/application/bot"
 	"dorm/pkg/dorm/application/scheduler"
 	"dorm/pkg/dorm/application/service"
+	"dorm/pkg/dorm/application/service/notification"
+	"dorm/pkg/dorm/application/service/report"
 	"dorm/pkg/dorm/application/service/sheets"
 	"dorm/pkg/dorm/infrastructure"
 	"dorm/pkg/dorm/infrastructure/mysql/repository"
@@ -72,15 +74,20 @@ func main() {
 		dutyTaskService,
 		userService,
 	)
-	notificationService := service.NewNotificationService(
+	notificationService := notification.NewNotificationService(
+		userService,
 		telegram,
-		dormRepository,
+	)
+	reportService := report.NewCleaningReportService(
+		cleaningService,
 		groupService,
+		teamService,
+		dormRepository,
 		dutyService,
 		dutyTaskService,
-		teamService,
-		userService,
+		notificationService,
 	)
+
 	botContext := bot.NewBot(
 		telegram,
 		userService,
@@ -97,7 +104,7 @@ func main() {
 		*configData,
 		cleaningService,
 		syncService,
-		notificationService,
+		reportService,
 	)
 	s.RegisterJobs()
 	s.Start()

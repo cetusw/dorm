@@ -2,10 +2,11 @@ package repository
 
 import (
 	"database/sql"
-	"dorm/pkg/common/utils"
-	"dorm/pkg/dorm/application/model"
 	"fmt"
 	"strings"
+	"time"
+
+	"dorm/pkg/dorm/application/model"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
@@ -210,15 +211,14 @@ func (r *DutyTaskRepository) UpdateDutyTaskAssigneeID(
 	return nil
 }
 
-func (r *DutyTaskRepository) UpdateDutyTaskCompletionDate(dutyID uuid.UUID, taskID uuid.UUID) error {
+func (r *DutyTaskRepository) SetDutyTaskCompletionDate(dutyID uuid.UUID, taskID uuid.UUID, completionDate *time.Time) error {
 	const sqlQuery = `
 		UPDATE duty_task
 		SET completion_date = ?
 		WHERE duty_id = UUID_TO_BIN(?)
 		  AND task_id = UUID_TO_BIN(?)`
 
-	now := utils.NowMoscow()
-	result, err := r.db.Exec(sqlQuery, now, dutyID, taskID)
+	result, err := r.db.Exec(sqlQuery, completionDate, dutyID, taskID)
 	if err != nil {
 		return fmt.Errorf("failed to execute update for task_id %d: %w", taskID, err)
 	}

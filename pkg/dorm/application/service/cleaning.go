@@ -205,7 +205,7 @@ func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) er
 				ID:         uuid.New(),
 				DutyID:     duty.ID,
 				TaskID:     task.ID,
-				ReviewerID: team.TeamLeaderID,
+				ReviewerID: team.LeaderID,
 			}
 			dutyTasks = append(dutyTasks, dutyTask)
 		}
@@ -291,7 +291,7 @@ func (s *CleaningService) assignAreasRoundRobin(
 				ID:         uuid.New(),
 				DutyID:     duty.ID,
 				TaskID:     task.ID,
-				ReviewerID: team.TeamLeaderID,
+				ReviewerID: team.LeaderID,
 			})
 		}
 		dutyIndex = (dutyIndex + 1) % len(duties)
