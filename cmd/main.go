@@ -109,14 +109,19 @@ func main() {
 	s.RegisterJobs()
 	s.Start()
 
-	err = cleaningService.StartNewWeek()
-	if err != nil {
-		log.Printf("Failed to start new week: %v", err)
-	}
+	//err = cleaningService.StartNewWeek()
+	//if err != nil {
+	//	log.Printf("Failed to start new week: %v", err)
+	//}
 
 	//err = syncService.SyncAllActiveDuties()
 	//if err != nil {
 	//	log.Printf("Failed to sync duties: %v", err)
+	//}
+
+	//err = reportService.ProcessWeeklyReports()
+	//if err != nil {
+	//	log.Printf("Failed to SendWeeklyCleaningReport: %v", err)
 	//}
 
 	updates := telegram.GetUpdates(telegram.Bot)
