@@ -9,22 +9,3 @@ func NowMoscow() time.Time {
 	}
 	return time.Now().In(loc)
 }
-
-func IsFirstWeekOfMonth(date time.Time) bool {
-	year, week := date.ISOWeek()
-
-	firstDayOfMonth := time.Date(
-		date.Year(),
-		date.Month(),
-		1,
-		0,
-		0,
-		0,
-		0,
-		date.Location(),
-	)
-
-	firstDayYear, firstDayWeek := firstDayOfMonth.ISOWeek()
-
-	return year == firstDayYear && week == firstDayWeek
-}

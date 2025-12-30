@@ -198,7 +198,7 @@ func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) er
 			return err
 		}
 		for _, task := range privateTasks {
-			if !s.shouldScheduleTask(task, time.Now()) {
+			if !s.isTaskDue(task) {
 				continue
 			}
 			dutyTask := model.DutyTask{
@@ -212,17 +212,6 @@ func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) er
 	}
 
 	return s.dutyTaskService.SetDutyTasksBatch(dutyTasks)
-}
-
-func (s *CleaningService) shouldScheduleTask(task model.Task, date time.Time) bool {
-	switch task.Frequency {
-	case 7:
-		return true
-	case 30:
-		return utils.IsFirstWeekOfMonth(date)
-	default:
-		return true
-	}
 }
 
 func (s *CleaningService) groupPublicTasksByArea() (map[int][]model.Task, error) {
@@ -295,6 +284,9 @@ func (s *CleaningService) assignAreasRoundRobin(
 		team := teamForDuty[duty.DutyID]
 
 		for _, task := range tasksByArea[area.AreaID] {
+			if !s.isTaskDue(task) {
+				continue
+			}
 			allDutyTasks = append(allDutyTasks, model.DutyTask{
 				DutyTaskID: uuid.New(),
 				DutyID:     duty.DutyID,
@@ -344,6 +336,17 @@ func (s *CleaningService) createDutySheets(duties []model.Duty) error {
 	}
 
 	return nil
+}
+
+func (s *CleaningService) isTaskDue(task model.Task) bool {
+	lastTaskDuty, err := s.dutyService.GetTaskLastDuty(task.TaskID)
+	if err != nil {
+		return true
+	}
+
+	nextAllowedDate := lastTaskDuty.Start.AddDate(0, 0, task.Frequency)
+
+	return !time.Now().Before(nextAllowedDate)
 }
 
 func (s *CleaningService) createSheetTitle(duty model.Duty) string {

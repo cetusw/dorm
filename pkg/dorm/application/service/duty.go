@@ -59,3 +59,14 @@ func (s *DutyService) GetUserLastDuty(userID uuid.UUID) (*model.Duty, error) {
 	}
 	return lastDuty, nil
 }
+
+func (s *DutyService) GetTaskLastDuty(taskID uuid.UUID) (*model.Duty, error) {
+	lastTaskDuty, err := s.dutyRepository.FindLastDutyByTaskID(taskID)
+	if err != nil {
+		return nil, err
+	}
+	if lastTaskDuty == nil {
+		return nil, errors.New("last user duty not found")
+	}
+	return lastTaskDuty, nil
+}

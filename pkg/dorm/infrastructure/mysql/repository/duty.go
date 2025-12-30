@@ -79,6 +79,27 @@ func (r *DutyRepository) FindLastDutyByUserID(userID uuid.UUID) (*model.Duty, er
 	return duty, nil
 }
 
+func (r *DutyRepository) FindLastDutyByTaskID(taskID uuid.UUID) (*model.Duty, error) {
+	const sqlQuery = `
+		SELECT d.id, d.team_id, d.start_date, d.end_date 
+		FROM duty d
+		    JOIN duty_task dt ON d.id = dt.duty_id
+		WHERE dt.task_id = UUID_TO_BIN(?)
+		ORDER BY d.start_date DESC 
+		LIMIT 1`
+
+	duty := &model.Duty{}
+	err := r.db.QueryRow(sqlQuery, taskID).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get last duty where task %s existed: %w", taskID, err)
+	}
+
+	return duty, nil
+}
+
 func (r *DutyRepository) Store(duty *model.Duty) error {
 	const sqlQuery = `
 		INSERT INTO duty (id, team_id, start_date, end_date) 

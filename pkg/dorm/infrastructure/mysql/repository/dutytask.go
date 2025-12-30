@@ -36,7 +36,8 @@ func (r *DutyTaskRepository) FindDutyTaskViewsByDutyID(dutyID uuid.UUID) ([]mode
 			INNER JOIN task t ON dt.task_id = t.id 
 			INNER JOIN area a ON a.id = t.area_id 
 			LEFT JOIN user u ON u.id = dt.assignee_id 
-		WHERE dt.duty_id = UUID_TO_BIN(?)`
+		WHERE dt.duty_id = UUID_TO_BIN(?)
+		ORDER BY a.floor DESC, a.name DESC, t.cost DESC`
 
 	rows, err := r.db.Query(sqlQuery, dutyID)
 	if err != nil {
