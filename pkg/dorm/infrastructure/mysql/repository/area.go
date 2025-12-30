@@ -25,7 +25,7 @@ func (r *AreaRepository) Find(areaFloor int, areaName string) (*model.Area, erro
 		WHERE floor = ? AND name = ?`
 
 	area := &model.Area{}
-	err := r.db.QueryRow(sqlQuery, areaFloor, areaName).Scan(&area.AreaID, &area.Floor, &area.Name)
+	err := r.db.QueryRow(sqlQuery, areaFloor, areaName).Scan(&area.ID, &area.Floor, &area.Name)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -52,7 +52,7 @@ func (r *AreaRepository) FindAll() ([]model.Area, error) {
 
 	for rows.Next() {
 		var area model.Area
-		if err := rows.Scan(&area.AreaID, &area.Floor, &area.Name); err != nil {
+		if err := rows.Scan(&area.ID, &area.Floor, &area.Name); err != nil {
 			return nil, fmt.Errorf("failed to scan area row: %w", err)
 		}
 		areas = append(areas, area)
@@ -84,7 +84,7 @@ func (r *AreaRepository) FindUnassignedAreasByDutyID(dutyID uuid.UUID) ([]model.
 	var areas []model.Area
 	for rows.Next() {
 		var area model.Area
-		if err := rows.Scan(&area.AreaID, &area.Floor, &area.Name); err != nil {
+		if err := rows.Scan(&area.ID, &area.Floor, &area.Name); err != nil {
 			return nil, fmt.Errorf("failed to scan area row: %w", err)
 		}
 		areas = append(areas, area)
@@ -112,7 +112,7 @@ func (r *AreaRepository) FindAreasWithoutGroup() ([]model.Area, error) {
 
 	for rows.Next() {
 		var area model.Area
-		if err := rows.Scan(&area.AreaID, &area.Floor, &area.Name, &area.GroupID); err != nil {
+		if err := rows.Scan(&area.ID, &area.Floor, &area.Name, &area.GroupID); err != nil {
 			return nil, fmt.Errorf("failed to scan area row: %w", err)
 		}
 		areas = append(areas, area)

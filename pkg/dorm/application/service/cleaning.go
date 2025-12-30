@@ -80,12 +80,12 @@ func (s *CleaningService) UpdateCurrentSheet(user model.User) error {
 	if err != nil {
 		return err
 	}
-	duty, err := s.dutyService.GetUserLastDuty(user.UserID)
+	duty, err := s.dutyService.GetUserLastDuty(user.ID)
 	if err != nil {
 		return err
 	}
 
-	dutyTasksView, err := s.dutyTaskService.GetDutyTasksView(duty.DutyID)
+	dutyTasksView, err := s.dutyTaskService.GetDutyTasksView(duty.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get readable duty tasks for sheet update: %w", err)
 	}
@@ -135,26 +135,26 @@ func (s *CleaningService) getNewDutyTeams() ([]model.Team, error) {
 
 func (s *CleaningService) getNextDutyTeamInGroup(group model.Group) (*model.Team, error) {
 	var teamID uuid.UUID
-	teams, err := s.teamService.GetGroupTeams(group.GroupID)
+	teams, err := s.teamService.GetGroupTeams(group.ID)
 	if err != nil {
 		return nil, err
 	}
 	if len(teams) == 0 {
-		return nil, fmt.Errorf("no teams found in team group %s", group.GroupID)
+		return nil, fmt.Errorf("no teams found in team group %s", group.ID)
 	}
 	sort.Slice(teams, func(i, j int) bool {
 		return teams[i].Order < teams[j].Order
 	})
-	lastDuty, err := s.dutyService.GetGroupLastDuty(group.GroupID)
+	lastDuty, err := s.dutyService.GetGroupLastDuty(group.ID)
 	if err != nil {
 		return nil, err
 	}
 	if lastDuty == nil {
-		firstTeamInGroup, err := s.teamService.GetFirstGroupTeam(group.GroupID)
+		firstTeamInGroup, err := s.teamService.GetFirstGroupTeam(group.ID)
 		if err != nil {
 			return nil, err
 		}
-		teamID = firstTeamInGroup.TeamID
+		teamID = firstTeamInGroup.ID
 	} else {
 		teamID = lastDuty.TeamID
 	}
@@ -167,7 +167,7 @@ func (s *CleaningService) getNextDutyTeamInGroup(group model.Group) (*model.Team
 		return nil, err
 	}
 
-	return s.teamService.GetTeamByGroupIDAndOrder(group.GroupID, nextOrder)
+	return s.teamService.GetTeamByGroupIDAndOrder(group.ID, nextOrder)
 }
 
 func (s *CleaningService) getNextOrder(currentOrder int, totalTeams int) (int, error) {
@@ -202,9 +202,9 @@ func (s *CleaningService) assignPrivateAreaTasksToDuties(duties []model.Duty) er
 				continue
 			}
 			dutyTask := model.DutyTask{
-				DutyTaskID: uuid.New(),
-				DutyID:     duty.DutyID,
-				TaskID:     task.TaskID,
+				ID:         uuid.New(),
+				DutyID:     duty.ID,
+				TaskID:     task.ID,
 				ReviewerID: team.TeamLeaderID,
 			}
 			dutyTasks = append(dutyTasks, dutyTask)
@@ -235,7 +235,7 @@ func (s *CleaningService) buildDutyToTeamMap(duties []model.Duty) (map[uuid.UUID
 		if err != nil {
 			return nil, fmt.Errorf("failed to get team %s: %w", duty.TeamID, err)
 		}
-		dutyToTeamMap[duty.DutyID] = *team
+		dutyToTeamMap[duty.ID] = *team
 	}
 	return dutyToTeamMap, nil
 }
@@ -269,7 +269,7 @@ func (s *CleaningService) assignAreasRoundRobin(
 	tasksByArea map[int][]model.Task,
 ) []model.DutyTask {
 	sort.Slice(publicAreas, func(i, j int) bool {
-		return publicAreas[i].AreaID < publicAreas[j].AreaID
+		return publicAreas[i].ID < publicAreas[j].ID
 	})
 
 	currentWeek, err := s.dutyService.GetCurrentWeek()
@@ -281,16 +281,16 @@ func (s *CleaningService) assignAreasRoundRobin(
 	dutyIndex := currentWeek % len(duties)
 	for _, area := range publicAreas {
 		duty := duties[dutyIndex]
-		team := teamForDuty[duty.DutyID]
+		team := teamForDuty[duty.ID]
 
-		for _, task := range tasksByArea[area.AreaID] {
+		for _, task := range tasksByArea[area.ID] {
 			if !s.isTaskDue(task) {
 				continue
 			}
 			allDutyTasks = append(allDutyTasks, model.DutyTask{
-				DutyTaskID: uuid.New(),
-				DutyID:     duty.DutyID,
-				TaskID:     task.TaskID,
+				ID:         uuid.New(),
+				DutyID:     duty.ID,
+				TaskID:     task.ID,
 				ReviewerID: team.TeamLeaderID,
 			})
 		}
@@ -313,7 +313,7 @@ func (s *CleaningService) createDutySheets(duties []model.Duty) error {
 		if err != nil {
 			return err
 		}
-		dutyTasksView, err := s.dutyTaskService.GetDutyTasksView(duty.DutyID)
+		dutyTasksView, err := s.dutyTaskService.GetDutyTasksView(duty.ID)
 		if err != nil {
 			return err
 		}
@@ -339,7 +339,7 @@ func (s *CleaningService) createDutySheets(duties []model.Duty) error {
 }
 
 func (s *CleaningService) isTaskDue(task model.Task) bool {
-	lastTaskDuty, err := s.dutyService.GetTaskLastDuty(task.TaskID)
+	lastTaskDuty, err := s.dutyService.GetTaskLastDuty(task.ID)
 	if err != nil {
 		return true
 	}

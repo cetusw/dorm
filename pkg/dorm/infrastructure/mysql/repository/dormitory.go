@@ -36,7 +36,7 @@ func (r *DormitoryRepository) FindAll() ([]model.Dormitory, error) {
 	for rows.Next() {
 		var d model.Dormitory
 		if err := rows.Scan(
-			&d.DormitoryID,
+			&d.ID,
 			&d.LeaderID,
 			&d.Name,
 			&d.City,

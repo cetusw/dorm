@@ -61,7 +61,7 @@ func BuildBackKeyboard() tgbotapi.InlineKeyboardMarkup {
 func BuildAreaKeyboard(areas []model.Area) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, area := range areas {
-		callbackData := fmt.Sprintf("%s%d", CallbackPrefixArea, area.AreaID)
+		callbackData := fmt.Sprintf("%s%d", CallbackPrefixArea, area.ID)
 		button := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%d этаж. %s", area.Floor, area.Name), callbackData)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
 	}

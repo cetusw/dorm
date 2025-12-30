@@ -33,7 +33,7 @@ func (s *UserService) RegisterUser(fullName string, chatID int64) error {
 		return errors.New("invalid full name")
 	}
 	user = &model.User{
-		UserID:     uuid.New(),
+		ID:         uuid.New(),
 		TelegramID: chatID,
 		FirstName:  parts[0],
 		LastName:   parts[1],

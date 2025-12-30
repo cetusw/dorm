@@ -22,7 +22,7 @@ func (r *GroupRepository) Find(groupID uuid.UUID) (*model.Group, error) {
 
 	group := &model.Group{}
 	err := r.db.QueryRow(sqlQuery, groupID).Scan(
-		&group.GroupID,
+		&group.ID,
 		&group.LeaderID,
 		&group.Name,
 		&group.DormitoryID,
@@ -52,7 +52,7 @@ func (r *GroupRepository) FindAll() ([]model.Group, error) {
 	for rows.Next() {
 		var group model.Group
 		if err := rows.Scan(
-			&group.GroupID,
+			&group.ID,
 			&group.LeaderID,
 			&group.Name,
 			&group.DormitoryID,

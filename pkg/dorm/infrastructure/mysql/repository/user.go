@@ -38,7 +38,7 @@ func (r *UserRepository) FindByTelegramID(telegramID int64) (*model.User, error)
 		`
 	user := &model.User{}
 	err := r.db.QueryRow(sqlQuery, telegramID).Scan(
-		&user.UserID,
+		&user.ID,
 		&user.TelegramID,
 		&user.FirstName,
 		&user.LastName,
@@ -79,7 +79,7 @@ func (r *UserRepository) FindByID(id uuid.UUID) (*model.User, error) {
 
 	user := &model.User{}
 	err := r.db.QueryRow(sqlQuery, id).Scan(
-		&user.UserID,
+		&user.ID,
 		&user.TelegramID,
 		&user.FirstName,
 		&user.LastName,
@@ -127,7 +127,7 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 	for rows.Next() {
 		var user model.User
 		if err := rows.Scan(
-			&user.UserID,
+			&user.ID,
 			&user.TelegramID,
 			&user.FirstName,
 			&user.LastName,
@@ -178,7 +178,7 @@ func (r *UserRepository) FindUsersByTeamID(teamID uuid.UUID) ([]model.User, erro
 	for rows.Next() {
 		var user model.User
 		if err := rows.Scan(
-			&user.UserID,
+			&user.ID,
 			&user.TelegramID,
 			&user.FirstName,
 			&user.LastName,
@@ -265,7 +265,7 @@ func (r *UserRepository) FindUsersByRole(roleIDs []int) ([]model.User, error) {
 	for rows.Next() {
 		var user model.User
 		if err := rows.Scan(
-			&user.UserID,
+			&user.ID,
 			&user.TelegramID,
 			&user.FirstName,
 			&user.LastName,
@@ -294,7 +294,7 @@ func (r *UserRepository) Store(user *model.User) error {
 		INSERT INTO user (id, telegram_id, first_name, last_name, role_id) 
 		VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)`
 
-	_, err := r.db.Exec(sqlQuery, user.UserID, user.TelegramID, user.FirstName, user.LastName, user.RoleID)
+	_, err := r.db.Exec(sqlQuery, user.ID, user.TelegramID, user.FirstName, user.LastName, user.RoleID)
 	if err != nil {
 		return fmt.Errorf("failed to save user: %w", err)
 	}

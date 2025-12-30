@@ -53,12 +53,12 @@ func (s *SyncService) SyncAllActiveDuties() error {
 }
 
 func (s *SyncService) syncGroupDuty(group model.Group) error {
-	duty, err := s.dutyService.GetGroupLastDuty(group.GroupID)
+	duty, err := s.dutyService.GetGroupLastDuty(group.ID)
 	if err != nil || duty == nil {
 		return nil
 	}
 
-	dbTasks, err := s.dutyTaskService.GetDutyTasksView(duty.DutyID)
+	dbTasks, err := s.dutyTaskService.GetDutyTasksView(duty.ID)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (s *SyncService) syncGroupDuty(group model.Group) error {
 		return fmt.Errorf("parse error: %w", err)
 	}
 
-	return s.applyUpdates(duty.DutyID, dbTasks, parsedRows, teamUsers)
+	return s.applyUpdates(duty.ID, dbTasks, parsedRows, teamUsers)
 }
 
 func (s *SyncService) applyUpdates(
@@ -147,7 +147,7 @@ func (s *SyncService) resolveUser(shortName string, users []model.User) *uuid.UU
 		generatedName := fmt.Sprintf("%s %s.", u.FirstName, string([]rune(u.LastName)[0]))
 
 		if generatedName == shortName {
-			uid := u.UserID
+			uid := u.ID
 			return &uid
 		}
 	}

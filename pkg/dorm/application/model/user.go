@@ -5,7 +5,7 @@ import (
 )
 
 type User struct {
-	UserID      uuid.UUID
+	ID          uuid.UUID
 	TelegramID  int64
 	FirstName   string
 	LastName    string

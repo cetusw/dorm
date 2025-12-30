@@ -26,7 +26,7 @@ func (r *DutyRepository) Find(dutyID uuid.UUID) (*model.Duty, error) {
 		WHERE id = UUID_TO_BIN(?)`
 
 	duty := &model.Duty{}
-	err := r.db.QueryRow(sqlQuery, dutyID).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
+	err := r.db.QueryRow(sqlQuery, dutyID).Scan(&duty.ID, &duty.TeamID, &duty.Start, &duty.End)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -46,7 +46,7 @@ func (r *DutyRepository) FindLastDutyByGroupID(groupID uuid.UUID) (*model.Duty, 
 		LIMIT 1`
 
 	duty := &model.Duty{}
-	err := r.db.QueryRow(sqlQuery, groupID).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
+	err := r.db.QueryRow(sqlQuery, groupID).Scan(&duty.ID, &duty.TeamID, &duty.Start, &duty.End)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -68,7 +68,7 @@ func (r *DutyRepository) FindLastDutyByUserID(userID uuid.UUID) (*model.Duty, er
 		LIMIT 1`
 
 	duty := &model.Duty{}
-	err := r.db.QueryRow(sqlQuery, userID).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
+	err := r.db.QueryRow(sqlQuery, userID).Scan(&duty.ID, &duty.TeamID, &duty.Start, &duty.End)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -89,7 +89,7 @@ func (r *DutyRepository) FindLastDutyByTaskID(taskID uuid.UUID) (*model.Duty, er
 		LIMIT 1`
 
 	duty := &model.Duty{}
-	err := r.db.QueryRow(sqlQuery, taskID).Scan(&duty.DutyID, &duty.TeamID, &duty.Start, &duty.End)
+	err := r.db.QueryRow(sqlQuery, taskID).Scan(&duty.ID, &duty.TeamID, &duty.Start, &duty.End)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -104,7 +104,7 @@ func (r *DutyRepository) Store(duty *model.Duty) error {
 	const sqlQuery = `
 		INSERT INTO duty (id, team_id, start_date, end_date) 
 		VALUES (UUID_TO_BIN(?), ?, ?, ?)`
-	_, err := r.db.Exec(sqlQuery, duty.DutyID, duty.TeamID, duty.Start, duty.End)
+	_, err := r.db.Exec(sqlQuery, duty.ID, duty.TeamID, duty.Start, duty.End)
 	if err != nil {
 		return fmt.Errorf("failed to save duty: %w", err)
 	}
@@ -125,7 +125,7 @@ func (r *DutyRepository) StoreBatch(duties []model.Duty) error {
 
 	for _, duty := range duties {
 		valueStrings = append(valueStrings, "(UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?)")
-		valueArgs = append(valueArgs, duty.DutyID, duty.TeamID, duty.Start, duty.End)
+		valueArgs = append(valueArgs, duty.ID, duty.TeamID, duty.Start, duty.End)
 	}
 
 	stmt := fmt.Sprintf("%s %s", sqlQuery, strings.Join(valueStrings, ","))

@@ -7,7 +7,7 @@ import (
 )
 
 type DutyTask struct {
-	DutyTaskID       uuid.UUID
+	ID               uuid.UUID
 	DutyID           uuid.UUID
 	TaskID           uuid.UUID
 	AssigneeID       *uuid.UUID

@@ -240,7 +240,7 @@ func (r *DutyTaskRepository) Store(dutyTask *model.DutyTask) error {
 	INSERT INTO duty_task (id, duty_id, task_id, reviewer_id) 
 	VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?))`
 
-	_, err := r.db.Exec(sqlQuery, dutyTask.DutyTaskID, dutyTask.DutyID, dutyTask.TaskID, dutyTask.ReviewerID)
+	_, err := r.db.Exec(sqlQuery, dutyTask.ID, dutyTask.DutyID, dutyTask.TaskID, dutyTask.ReviewerID)
 	if err != nil {
 		return fmt.Errorf("failed to save task: %w", err)
 	}
@@ -262,7 +262,7 @@ func (r *DutyTaskRepository) StoreBatch(dutyTasks []model.DutyTask) error {
 
 	for _, dutyTask := range dutyTasks {
 		valueStrings = append(valueStrings, "(UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?))")
-		valueArgs = append(valueArgs, dutyTask.DutyTaskID, dutyTask.DutyID, dutyTask.TaskID, dutyTask.ReviewerID)
+		valueArgs = append(valueArgs, dutyTask.ID, dutyTask.DutyID, dutyTask.TaskID, dutyTask.ReviewerID)
 	}
 
 	stmt := fmt.Sprintf("%s %s", sqlQuery, strings.Join(valueStrings, ","))

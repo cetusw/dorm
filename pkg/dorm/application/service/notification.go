@@ -99,7 +99,7 @@ func (s *NotificationService) notifyDormitoryLeaders(dormIssues map[int64][]mode
 	}
 
 	for _, dorm := range dorms {
-		problematicGroups, exists := dormIssues[dorm.DormitoryID]
+		problematicGroups, exists := dormIssues[dorm.ID]
 		if !exists || len(problematicGroups) == 0 {
 			continue
 		}
@@ -132,7 +132,7 @@ func (s *NotificationService) notifyDormitoryLeaders(dormIssues map[int64][]mode
 }
 
 func (s *NotificationService) groupHasIssues(group model.Group) (bool, error) {
-	duty, err := s.dutyService.GetGroupLastDuty(group.GroupID)
+	duty, err := s.dutyService.GetGroupLastDuty(group.ID)
 	if err != nil {
 		return false, nil
 	}
@@ -140,7 +140,7 @@ func (s *NotificationService) groupHasIssues(group model.Group) (bool, error) {
 		return false, nil
 	}
 
-	tasks, err := s.dutyTaskService.GetDutyTasksView(duty.DutyID)
+	tasks, err := s.dutyTaskService.GetDutyTasksView(duty.ID)
 	if err != nil {
 		return false, err
 	}

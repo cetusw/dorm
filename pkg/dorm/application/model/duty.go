@@ -7,7 +7,7 @@ import (
 )
 
 type Duty struct {
-	DutyID uuid.UUID
+	ID     uuid.UUID
 	TeamID uuid.UUID
 	Start  time.Time
 	End    time.Time

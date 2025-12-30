@@ -21,7 +21,7 @@ func (s *DutyTaskService) SetDutyTasks(dutyID uuid.UUID, taskIDs []uuid.UUID, re
 	var dutyTasksToCreate []model.DutyTask
 	for _, taskID := range taskIDs {
 		dutyTask := model.DutyTask{
-			DutyTaskID: uuid.New(),
+			ID:         uuid.New(),
 			DutyID:     dutyID,
 			TaskID:     taskID,
 			ReviewerID: reviewerID,

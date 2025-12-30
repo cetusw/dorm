@@ -3,7 +3,7 @@ package model
 import "github.com/google/uuid"
 
 type Dormitory struct {
-	DormitoryID int64
+	ID          int64
 	LeaderID    *uuid.UUID
 	Name        string
 	City        string

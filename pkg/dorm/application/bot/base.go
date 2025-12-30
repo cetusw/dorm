@@ -64,11 +64,11 @@ func (s *baseState) GetUnassignedTasks(
 	if err != nil {
 		return []model.DutyTaskView{}, err
 	}
-	duty, err := context.DutyService.GetUserLastDuty(user.UserID)
+	duty, err := context.DutyService.GetUserLastDuty(user.ID)
 	if err != nil {
 		return []model.DutyTaskView{}, err
 	}
-	tasks, err := context.DutyTaskService.GetUnassignedDutyTasksView(areaID, duty.DutyID)
+	tasks, err := context.DutyTaskService.GetUnassignedDutyTasksView(areaID, duty.ID)
 	if err != nil {
 		return []model.DutyTaskView{}, err
 	}
@@ -81,11 +81,11 @@ func (s *baseState) AssignTask(context *Bot, chatID int64, taskID uuid.UUID) err
 	if err != nil {
 		return err
 	}
-	duty, err := context.DutyService.GetUserLastDuty(user.UserID)
+	duty, err := context.DutyService.GetUserLastDuty(user.ID)
 	if err != nil {
 		return err
 	}
-	return context.DutyTaskService.SetDutyTaskAssigneeID(&user.UserID, taskID, duty.DutyID)
+	return context.DutyTaskService.SetDutyTaskAssigneeID(&user.ID, taskID, duty.ID)
 }
 
 func (s *baseState) UnassignTask(context *Bot, chatID int64, taskID uuid.UUID) error {
@@ -93,11 +93,11 @@ func (s *baseState) UnassignTask(context *Bot, chatID int64, taskID uuid.UUID) e
 	if err != nil {
 		return err
 	}
-	duty, err := context.DutyService.GetUserLastDuty(user.UserID)
+	duty, err := context.DutyService.GetUserLastDuty(user.ID)
 	if err != nil {
 		return err
 	}
-	return context.DutyTaskService.SetDutyTaskAssigneeID(nil, taskID, duty.DutyID)
+	return context.DutyTaskService.SetDutyTaskAssigneeID(nil, taskID, duty.ID)
 }
 
 func (s *baseState) GetUncompletedDutyTasksView(context *Bot, userID int64) ([]model.DutyTaskView, error) {
@@ -105,11 +105,11 @@ func (s *baseState) GetUncompletedDutyTasksView(context *Bot, userID int64) ([]m
 	if err != nil {
 		return nil, err
 	}
-	duty, err := context.DutyService.GetUserLastDuty(user.UserID)
+	duty, err := context.DutyService.GetUserLastDuty(user.ID)
 	if err != nil {
 		return nil, err
 	}
-	dutyTasksReadable, err := context.DutyTaskService.GetUncompletedDutyTasksView(user.UserID, duty.DutyID)
+	dutyTasksReadable, err := context.DutyTaskService.GetUncompletedDutyTasksView(user.ID, duty.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -122,11 +122,11 @@ func (s *baseState) GetUnassignedAreas(context *Bot, chatID int64) ([]model.Area
 	if err != nil {
 		return []model.Area{}, err
 	}
-	duty, err := context.DutyService.GetUserLastDuty(user.UserID)
+	duty, err := context.DutyService.GetUserLastDuty(user.ID)
 	if err != nil {
 		return nil, err
 	}
-	areas, err := context.AreaService.GetUnassignedAreasByDutyID(duty.DutyID)
+	areas, err := context.AreaService.GetUnassignedAreasByDutyID(duty.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,11 +138,11 @@ func (s *baseState) ConfirmTask(context *Bot, chatID int64, taskID uuid.UUID) er
 	if err != nil {
 		return err
 	}
-	duty, err := context.DutyService.GetUserLastDuty(user.UserID)
+	duty, err := context.DutyService.GetUserLastDuty(user.ID)
 	if err != nil {
 		return err
 	}
-	err = context.DutyTaskService.CompleteDutyTaskByDutyIDAndTaskID(duty.DutyID, taskID)
+	err = context.DutyTaskService.CompleteDutyTaskByDutyIDAndTaskID(duty.ID, taskID)
 	if err != nil {
 		return err
 	}
@@ -155,26 +155,26 @@ func (s *baseState) ComputeUserProgress(context *Bot, chatID int64) (*model.User
 	if err != nil {
 		return nil, err
 	}
-	duty, err := context.DutyService.GetUserLastDuty(user.UserID)
+	duty, err := context.DutyService.GetUserLastDuty(user.ID)
 	if err != nil {
 		return nil, err
 	}
 	var userPoints int
 	var userConfirmedPoints int
 	var userRequiredPoints float64
-	userPoints, err = context.DutyTaskService.GetUserPoints(user.UserID, duty.DutyID)
+	userPoints, err = context.DutyTaskService.GetUserPoints(user.ID, duty.ID)
 	if err != nil {
 		return nil, err
 	}
-	userConfirmedPoints, err = context.DutyTaskService.GetUserConfirmedPoints(user.UserID, duty.DutyID)
+	userConfirmedPoints, err = context.DutyTaskService.GetUserConfirmedPoints(user.ID, duty.ID)
 	if err != nil {
 		return nil, err
 	}
-	dutyPoints, err := context.DutyTaskService.GetDutyPoints(duty.DutyID)
+	dutyPoints, err := context.DutyTaskService.GetDutyPoints(duty.ID)
 	if err != nil {
 		return nil, err
 	}
-	userRequiredPoints, err = context.UserService.GetRequiredUserPoints(user.UserID, dutyPoints)
+	userRequiredPoints, err = context.UserService.GetRequiredUserPoints(user.ID, dutyPoints)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +240,7 @@ func (s *baseState) Handle(context *Bot, update *tgbotapi.Update) error {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err
 		}
-		duty, err := context.DutyService.GetUserLastDuty(user.UserID)
+		duty, err := context.DutyService.GetUserLastDuty(user.ID)
 		if err != nil {
 			s.SendReplyAndGo(context, chatID, message.Error, keyboard.BuildMainStateKeyboard(), &MainState{})
 			return err

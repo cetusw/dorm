@@ -23,8 +23,8 @@ func (s *DutyService) CreateNewDuties(teams []model.Team, start time.Time, end t
 	var duties []model.Duty
 	for _, team := range teams {
 		duty := &model.Duty{
-			DutyID: uuid.New(),
-			TeamID: team.TeamID,
+			ID:     uuid.New(),
+			TeamID: team.ID,
 			Start:  start,
 			End:    end,
 		}

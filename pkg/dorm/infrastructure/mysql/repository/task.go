@@ -24,7 +24,7 @@ func (r *TaskRepository) Find(taskID uuid.UUID) (*model.Task, error) {
 		FROM task WHERE id = UUID_TO_BIN(?)`
 
 	task := &model.Task{}
-	err := r.db.QueryRow(sqlQuery, taskID).Scan(&task.TaskID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency, &task.Scope)
+	err := r.db.QueryRow(sqlQuery, taskID).Scan(&task.ID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency, &task.Scope)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -48,7 +48,7 @@ func (r *TaskRepository) FindAll() ([]model.Task, error) {
 	var tasks []model.Task
 	for rows.Next() {
 		var task model.Task
-		if err := rows.Scan(&task.TaskID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency, &task.Scope); err != nil {
+		if err := rows.Scan(&task.ID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency, &task.Scope); err != nil {
 			return nil, fmt.Errorf("failed to scan task row: %w", err)
 		}
 
@@ -78,7 +78,7 @@ func (r *TaskRepository) FindGroupTasks(groupID uuid.UUID) ([]model.Task, error)
 	var tasks []model.Task
 	for rows.Next() {
 		var task model.Task
-		if err := rows.Scan(&task.TaskID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency); err != nil {
+		if err := rows.Scan(&task.ID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency); err != nil {
 			return nil, fmt.Errorf("failed to scan task ID row: %w", err)
 		}
 		tasks = append(tasks, task)
@@ -107,7 +107,7 @@ func (r *TaskRepository) FindPublicTasks() ([]model.Task, error) {
 	var tasks []model.Task
 	for rows.Next() {
 		var task model.Task
-		if err := rows.Scan(&task.TaskID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency); err != nil {
+		if err := rows.Scan(&task.ID, &task.AreaID, &task.Title, &task.Cost, &task.Frequency); err != nil {
 			return nil, fmt.Errorf("failed to scan task ID row: %w", err)
 		}
 		tasks = append(tasks, task)
@@ -125,7 +125,7 @@ func (r *TaskRepository) Store(task *model.Task) error {
 		INSERT INTO task (id, area_id, title, cost, frequency) 
 		VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)`
 
-	_, err := r.db.Exec(sqlQuery, task.TaskID, task.AreaID, task.Title, task.Cost, task.Frequency, task.Scope)
+	_, err := r.db.Exec(sqlQuery, task.ID, task.AreaID, task.Title, task.Cost, task.Frequency, task.Scope)
 	if err != nil {
 		return fmt.Errorf("failed to save task: %w", err)
 	}
