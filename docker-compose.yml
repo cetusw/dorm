@@ -34,5 +34,14 @@ services:
       timeout: 10s
       retries: 10
 
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+
+
 volumes:
   dorm-db:
