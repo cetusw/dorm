@@ -1,10 +1,11 @@
 package sheets
 
 import (
+	"fmt"
+
 	"dorm/pkg/common/consts"
 	"dorm/pkg/common/utils"
 	"dorm/pkg/dorm/application/model"
-	"fmt"
 
 	"google.golang.org/api/sheets/v4"
 )
@@ -53,18 +54,23 @@ func (s *DutySheetStyler) getUserTableRowsRequest(rowCount int64, teamColor *she
 	if rowCount <= 2 {
 		return []*sheets.Request{}
 	}
+	const dataRowsAmount = 2
 
 	return []*sheets.Request{
 		s.formatter.SetOuterBorders(1, 2, 6, 9),
 		s.formatter.SetOuterBorders(2, rowCount, 6, 9),
 		s.formatter.SetOuterBorders(1, rowCount, 7, 9),
 		s.formatter.SetOuterBorders(rowCount, rowCount+1, 6, 9),
+		s.formatter.SetOuterBorders(rowCount+1, rowCount+dataRowsAmount, 6, 9),
 		s.formatter.MergeCells(rowCount, rowCount+1, 7, 9, "MERGE_ALL"),
-		s.formatter.SetTextAlignment(rowCount, rowCount+1, 7, 9, "LEFT", "MIDDLE"),
-		s.formatter.SetTextFormat(rowCount, rowCount+1, 6, 9, true, consts.DefaultFontSize, consts.DefaultFontFamily, nil),
+		s.formatter.MergeCells(rowCount+1, rowCount+dataRowsAmount, 7, 9, "MERGE_ALL"),
+		s.formatter.SetTextAlignment(rowCount, rowCount+dataRowsAmount, 7, 9, "LEFT", "MIDDLE"),
+		s.formatter.SetTextFormat(rowCount, rowCount+dataRowsAmount, 6, 9, true, consts.DefaultFontSize, consts.DefaultFontFamily, nil),
 		s.formatter.SetBackgroundColor(2, rowCount, 6, 7, teamColor),
 		s.formatter.SetTextAlignment(2, rowCount, 6, 9, "LEFT", "MIDDLE"),
 		s.formatter.SetTextFormat(2, rowCount, 6, 9, false, consts.DefaultFontSize, consts.DefaultFontFamily, nil),
+		s.getTooManyUnassignedTasksFormattingRequest(rowCount+1, rowCount+dataRowsAmount, 6, 9, fmt.Sprintf("$H$%d", rowCount+2)),
+		s.getNoUnassignedTasksFormattingRequest(rowCount+1, rowCount+dataRowsAmount, 6, 9, fmt.Sprintf("$H$%d", rowCount+2)),
 	}
 }
 
@@ -83,7 +89,7 @@ func (s *DutySheetStyler) createTaskTableFormattingRequests(layout *SheetLayout,
 	requests = append(requests, s.getTaskTableSubHeaderRequest()...)
 	requests = append(requests, s.getTaskTableRowsRequest(layout.ZoneMergeRange, layout.TaskCount)...)
 	requests = append(requests, s.getValidationRequest(layout.TaskCount, users)...)
-	requests = append(requests, s.getConditionalFormattingRequest()...)
+	requests = append(requests, s.getPointsConditionalFormattingRequest(layout.TaskCount))
 	requests = append(requests, s.getTaskTableColumnsWidthRequest()...)
 
 	return requests
@@ -185,38 +191,86 @@ func (s *DutySheetStyler) getValidationRequest(rows int, users []model.User) []*
 	}
 }
 
-func (s *DutySheetStyler) getConditionalFormattingRequest() []*sheets.Request {
-	return []*sheets.Request{
-		{
-			AddConditionalFormatRule: &sheets.AddConditionalFormatRuleRequest{
-				Rule: &sheets.ConditionalFormatRule{
-					Ranges: []*sheets.GridRange{
-						{
-							SheetId:          s.formatter.GetID(),
-							StartRowIndex:    int64(consts.TasksStartRow - 1),
-							StartColumnIndex: 2,
-							EndColumnIndex:   3,
-						},
-					},
-					GradientRule: &sheets.GradientRule{
-						Minpoint: &sheets.InterpolationPoint{
-							ColorStyle: &sheets.ColorStyle{RgbColor: consts.CostMinColor},
-							Type:       "NUMBER", Value: "1",
-						},
-						Midpoint: &sheets.InterpolationPoint{
-							ColorStyle: &sheets.ColorStyle{RgbColor: consts.CostMidColor},
-							Type:       "NUMBER", Value: "5",
-						},
-						Maxpoint: &sheets.InterpolationPoint{
-							ColorStyle: &sheets.ColorStyle{RgbColor: consts.CostMaxColor},
-							Type:       "NUMBER", Value: "9",
-						},
-					},
-				},
-				Index: 0,
+func (s *DutySheetStyler) getPointsConditionalFormattingRequest(taskCount int) *sheets.Request {
+	gradientRule := &sheets.ConditionalFormatRule{
+		GradientRule: &sheets.GradientRule{
+			Minpoint: &sheets.InterpolationPoint{
+				ColorStyle: &sheets.ColorStyle{RgbColor: consts.CostMinColor},
+				Type:       "NUMBER", Value: "1",
+			},
+			Midpoint: &sheets.InterpolationPoint{
+				ColorStyle: &sheets.ColorStyle{RgbColor: consts.CostMidColor},
+				Type:       "NUMBER", Value: "5",
+			},
+			Maxpoint: &sheets.InterpolationPoint{
+				ColorStyle: &sheets.ColorStyle{RgbColor: consts.CostMaxColor},
+				Type:       "NUMBER", Value: "9",
 			},
 		},
 	}
+
+	return s.formatter.AddConditionalFormatRule(
+		int64(consts.TasksStartRow-1),
+		int64(consts.TasksStartRow-1+taskCount),
+		2, 3,
+		gradientRule,
+	)
+}
+
+func (s *DutySheetStyler) getTooManyUnassignedTasksFormattingRequest(
+	startRow int64,
+	endRow int64,
+	startCol int64,
+	endCol int64,
+	valueCellAddress string,
+) *sheets.Request {
+	redRule := &sheets.ConditionalFormatRule{
+		BooleanRule: &sheets.BooleanRule{
+			Condition: &sheets.BooleanCondition{
+				Type: "CUSTOM_FORMULA",
+				Values: []*sheets.ConditionValue{
+					{UserEnteredValue: fmt.Sprintf("=%s>0", valueCellAddress)},
+				},
+			},
+			Format: &sheets.CellFormat{
+				BackgroundColor: &sheets.Color{Red: 1, Green: 0.8, Blue: 0.8},
+			},
+		},
+	}
+
+	return s.formatter.AddConditionalFormatRule(
+		startRow, endRow,
+		startCol, endCol,
+		redRule,
+	)
+}
+
+func (s *DutySheetStyler) getNoUnassignedTasksFormattingRequest(
+	startRow int64,
+	endRow int64,
+	startCol int64,
+	endCol int64,
+	valueCellAddress string,
+) *sheets.Request {
+	greenRule := &sheets.ConditionalFormatRule{
+		BooleanRule: &sheets.BooleanRule{
+			Condition: &sheets.BooleanCondition{
+				Type: "CUSTOM_FORMULA",
+				Values: []*sheets.ConditionValue{
+					{UserEnteredValue: fmt.Sprintf("=%s=0", valueCellAddress)},
+				},
+			},
+			Format: &sheets.CellFormat{
+				BackgroundColor: &sheets.Color{Red: 0.8, Green: 1, Blue: 0.8},
+			},
+		},
+	}
+
+	return s.formatter.AddConditionalFormatRule(
+		startRow, endRow,
+		startCol, endCol,
+		greenRule,
+	)
 }
 
 func (s *DutySheetStyler) getTaskTableColumnsWidthRequest() []*sheets.Request {

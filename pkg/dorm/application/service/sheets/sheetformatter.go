@@ -2,6 +2,7 @@ package sheets
 
 import (
 	"fmt"
+	"strings"
 
 	"google.golang.org/api/sheets/v4"
 )
@@ -207,6 +208,25 @@ func (f *SheetFormatter) SetDataValidation(startRow, endRow, startCol, endCol in
 	}
 }
 
+func (f *SheetFormatter) AddConditionalFormatRule(startRow, endRow, startCol, endCol int64, rule *sheets.ConditionalFormatRule) *sheets.Request {
+	rule.Ranges = []*sheets.GridRange{
+		{
+			SheetId:          f.sheetID,
+			StartRowIndex:    startRow,
+			EndRowIndex:      endRow,
+			StartColumnIndex: startCol,
+			EndColumnIndex:   endCol,
+		},
+	}
+
+	return &sheets.Request{
+		AddConditionalFormatRule: &sheets.AddConditionalFormatRuleRequest{
+			Rule:  rule,
+			Index: 0,
+		},
+	}
+}
+
 func (f *SheetFormatter) SetOuterBorders(startRow, endRow, startCol, endCol int64) *sheets.Request {
 	border := &sheets.Border{
 		Style: "SOLID",
@@ -301,6 +321,30 @@ func (f *SheetFormatter) SetValue(row, col int64, value interface{}) *sheets.Req
 			Fields: "userEnteredValue",
 		},
 	}
+}
+
+func (f *SheetFormatter) IndexToLetter(index int64) string {
+	if index < 0 {
+		return ""
+	}
+	var result string
+	for index >= 0 {
+		result = string(rune('A'+index%26)) + result
+		index = index/26 - 1
+	}
+	return result
+}
+
+func (f *SheetFormatter) LetterToIndex(letter string) (int64, error) {
+	letter = strings.ToUpper(letter)
+	var index int64 = 0
+	for _, char := range letter {
+		if char < 'A' || char > 'Z' {
+			return 0, fmt.Errorf("invalid column letter: %s", letter)
+		}
+		index = index*26 + int64(char-'A'+1)
+	}
+	return index - 1, nil
 }
 
 func (f *SheetFormatter) GetID() int64 {
