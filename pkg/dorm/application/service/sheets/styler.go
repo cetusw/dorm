@@ -15,7 +15,6 @@ type DutySheetStyler struct {
 }
 
 func NewDutySheetStyler() *DutySheetStyler {
-
 	return &DutySheetStyler{}
 }
 

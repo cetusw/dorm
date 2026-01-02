@@ -1,9 +1,7 @@
 run:
-  timeout: 5m
-  tests: true
+  issues-exit-code: 1
 
 linters:
-  disable-all: true
   enable:
     - errcheck
     - gosimple
@@ -12,50 +10,37 @@ linters:
     - staticcheck
     - typecheck
     - unused
-
-    - revive
+    - bodyclose
+    - dogsled
+    - dupl
+    - gochecknoinits
+    - gocognit
+    - gocritic
+    - gocyclo
     - gofmt
     - goimports
+    - gosec
     - misspell
+    - nakedret
+    - prealloc
+    - stylecheck
     - unconvert
-
-    - gocyclo
-    - funlen
-
-    - depguard
+    - whitespace
+    - rowserrcheck
+    - goconst
+    - asciicheck
+    - nestif
+    - copyloopvar
+    - sqlclosecheck
+    - revive
 
 linters-settings:
-  funlen:
-    lines: 100
-    statements: 50
-
-  gocyclo:
-    min-complexity: 15
-
-  depguard:
-    rules:
-      domain_isolation:
-        files:
-          - "**/pkg/core/domain/**/*.go"
-        deny:
-          - pkg: "dorm/pkg/infrastructure"
-            desc: "Нарушение DDD: Доменный слой не может зависеть от Инфраструктуры"
-          - pkg: "dorm/pkg/adapters"
-            desc: "Нарушение DDD: Доменный слой не может зависеть от Адаптеров"
-          - pkg: "database/sql"
-            desc: "Нарушение DDD: Домен не должен зависеть от SQL (используйте абстракции)"
-
-      usecase_isolation:
-        files:
-          - "**/pkg/core/usecase/**/*.go"
-        deny:
-          - pkg: "dorm/pkg/adapters"
-            desc: "Нарушение Clean Architecture: UseCase не должен знать о внешних адаптерах"
-
-  revive:
-    rules:
-      - name: exported
-        severity: warning
-        arguments:
-          - "checkPrivateReceivers"
-          - "sayRepetitive"
+  goimports:
+    local-prefixes: gostore
+  gocritic:
+    disabled-checks:
+      - sloppyReassign
+      - whyNoLint
+    enabled-tags:
+      - experimental
+      - opinionated

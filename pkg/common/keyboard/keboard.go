@@ -42,7 +42,6 @@ func BuildTaskManagementKeyboard(uncompletedTasks []model.DutyTaskView) tgbotapi
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
-
 }
 
 func BuildTeamManagementKeyboard() tgbotapi.InlineKeyboardMarkup {

@@ -111,6 +111,6 @@ func (b *DutySheetBuilder) prepareUserTableData(users []model.User) [][]interfac
 		fmt.Sprintf("=ROUND(SUM(C:C) / %d, 0)", len(users))})
 	data = append(data, []interface{}{
 		"Задач не взято:",
-		fmt.Sprintf("=COUNTIF(D:D, \"Никто\")")})
+		"=COUNTIF(D:D, \"Никто\")"})
 	return data
 }
