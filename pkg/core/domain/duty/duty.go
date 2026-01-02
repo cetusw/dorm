@@ -58,6 +58,9 @@ func (d *Duty) AssignTask(taskID uuid.UUID, userID uuid.UUID) error {
 	if !exists {
 		return ErrTaskNotFound
 	}
+	if task.assigneeID != nil {
+		return ErrTaskAssigned
+	}
 	task.assigneeID = &userID
 	return nil
 }
