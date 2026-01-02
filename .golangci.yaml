@@ -1,0 +1,61 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+
+    - revive
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+
+    - gocyclo
+    - funlen
+
+    - depguard
+
+linters-settings:
+  funlen:
+    lines: 100
+    statements: 50
+
+  gocyclo:
+    min-complexity: 15
+
+  depguard:
+    rules:
+      domain_isolation:
+        files:
+          - "**/pkg/core/domain/**/*.go"
+        deny:
+          - pkg: "dorm/pkg/infrastructure"
+            desc: "Нарушение DDD: Доменный слой не может зависеть от Инфраструктуры"
+          - pkg: "dorm/pkg/adapters"
+            desc: "Нарушение DDD: Доменный слой не может зависеть от Адаптеров"
+          - pkg: "database/sql"
+            desc: "Нарушение DDD: Домен не должен зависеть от SQL (используйте абстракции)"
+
+      usecase_isolation:
+        files:
+          - "**/pkg/core/usecase/**/*.go"
+        deny:
+          - pkg: "dorm/pkg/adapters"
+            desc: "Нарушение Clean Architecture: UseCase не должен знать о внешних адаптерах"
+
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+        arguments:
+          - "checkPrivateReceivers"
+          - "sayRepetitive"
