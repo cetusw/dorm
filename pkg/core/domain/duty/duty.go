@@ -97,6 +97,8 @@ func (d *Duty) Tasks() []*DutyTask {
 	}
 	return list
 }
+func (d *Duty) Start() time.Time { return d.start }
+func (d *Duty) End() time.Time   { return d.end }
 
 type Repository interface {
 	Save(ctx context.Context, duty *Duty) error
