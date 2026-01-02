@@ -11,8 +11,9 @@ func TestRestoreArea(t *testing.T) {
 	id := 1
 	name := "Kitchen"
 	floor := 2
+	groupID := uuid.New()
 
-	area := RestoreArea(id, name, floor)
+	area := RestoreArea(id, name, floor, &groupID)
 
 	assert.Equal(t, id, area.ID())
 	assert.Equal(t, name, area.Name())

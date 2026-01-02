@@ -13,18 +13,17 @@ const (
 )
 
 type TaskCompletedEvent struct {
-	TaskID   uuid.UUID
-	UserID   uuid.UUID
-	Time     time.Time
-	TaskCost int
+	TaskID uuid.UUID
+	UserID uuid.UUID
+	Time   time.Time
 }
 
 type TaskAssignedEvent struct {
 	TaskID     uuid.UUID
-	AssigneeID uuid.UUID
+	AssigneeID *uuid.UUID
 }
 
 type WeekStartedEvent struct {
-	WeekNumber int
-	StartDate  time.Time
+	StartDate time.Time
+	EndDate   time.Time
 }

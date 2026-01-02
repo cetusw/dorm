@@ -27,8 +27,7 @@ func TestInMemoryEventBus_PublishSubscribe(t *testing.T) {
 
 	testTaskID := uuid.New()
 	eventToSend := events.TaskCompletedEvent{
-		TaskID:   testTaskID,
-		TaskCost: 5,
+		TaskID: testTaskID,
 	}
 
 	err := bus.Publish(ctx, events.TopicTaskCompleted, eventToSend)
@@ -36,7 +35,6 @@ func TestInMemoryEventBus_PublishSubscribe(t *testing.T) {
 
 	assert.Equal(t, 1, receivedCount)
 	assert.Equal(t, testTaskID, receivedEvent.TaskID)
-	assert.Equal(t, 5, receivedEvent.TaskCost)
 }
 
 func TestInMemoryEventBus_NoSubscribers(t *testing.T) {

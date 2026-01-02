@@ -104,4 +104,6 @@ type Repository interface {
 	Save(ctx context.Context, duty *Duty) error
 	FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Duty, error)
+	CountDistinctStartDates(ctx context.Context) (int, error)
+	FindLastByTaskDefID(ctx context.Context, taskDefID uuid.UUID) (*Duty, error)
 }

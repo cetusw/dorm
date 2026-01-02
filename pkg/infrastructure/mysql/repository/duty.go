@@ -134,6 +134,53 @@ func (r *DutyRepository) FindByID(ctx context.Context, id uuid.UUID) (*duty.Duty
 	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
 }
 
+func (r *DutyRepository) CountDistinctStartDates(ctx context.Context) (int, error) {
+	const query = `SELECT COUNT(DISTINCT start_date) FROM duty`
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count distinct start dates: %w", err)
+	}
+
+	return count, nil
+}
+
+func (r *DutyRepository) FindLastByTaskDefID(ctx context.Context, taskDefID uuid.UUID) (*duty.Duty, error) {
+	const query = `
+		SELECT d.id, d.team_id, d.start_date, d.end_date
+		FROM duty d
+		JOIN duty_task dt ON d.id = dt.duty_id
+		WHERE dt.task_id = ?
+		ORDER BY d.start_date DESC
+		LIMIT 1
+	`
+
+	defIDBytes, _ := taskDefID.MarshalBinary()
+	row := r.db.QueryRowContext(ctx, query, defIDBytes)
+
+	var dID, tID []byte
+	var start, end time.Time
+
+	err := row.Scan(&dID, &tID, &start, &end)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find last by task def: %w", err)
+	}
+
+	dutyID, _ := uuid.FromBytes(dID)
+	teamID, _ := uuid.FromBytes(tID)
+
+	tasks, err := r.findTasksByDutyID(ctx, dutyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
+}
+
 func (r *DutyRepository) findTasksByDutyID(ctx context.Context, dutyID uuid.UUID) ([]*duty.DutyTask, error) {
 	const query = `
 		SELECT id, task_id, assignee_id, completion_date

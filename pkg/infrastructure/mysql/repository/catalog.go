@@ -18,7 +18,7 @@ func NewCatalogRepository(db *sql.DB) *CatalogRepository {
 }
 
 func (r *CatalogRepository) GetAllAreas(ctx context.Context) ([]*catalog.Area, error) {
-	const query = `SELECT id, name, floor FROM area ORDER BY floor DESC, name`
+	const query = `SELECT id, name, floor, group_id FROM area ORDER BY floor DESC, name`
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -30,10 +30,12 @@ func (r *CatalogRepository) GetAllAreas(ctx context.Context) ([]*catalog.Area, e
 	for rows.Next() {
 		var id, floor int
 		var name string
+		var groupIDBytes []byte
 		if err := rows.Scan(&id, &name, &floor); err != nil {
 			return nil, err
 		}
-		areas = append(areas, catalog.RestoreArea(id, name, floor))
+		groupID, _ := uuid.FromBytes(groupIDBytes)
+		areas = append(areas, catalog.RestoreArea(id, name, floor, &groupID))
 	}
 	return areas, nil
 }
