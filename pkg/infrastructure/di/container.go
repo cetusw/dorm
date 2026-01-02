@@ -2,6 +2,8 @@ package di
 
 import (
 	"database/sql"
+	"dorm/pkg/core/usecase/cleaning"
+	"dorm/pkg/infrastructure/mysql/repository"
 	"fmt"
 	"log"
 
@@ -12,20 +14,10 @@ import (
 )
 
 type Container struct {
-	Config *config.AppConfig
-	DB     *sql.DB
-
-	EventBus ports.EventBus
-
-	// 3. Domain Repositories (появятся на Этапе 2)
-	// UserRepository user.Repository
-	// TaskRepository task.Repository
-
-	// 4. UseCases / Services (появятся на Этапе 2)
-	// CleaningService ports.CleaningUseCase
-
-	// 5. Adapters (появятся на Этапе 3)
-	// TelegramBot *telegram.Adapter
+	Config          *config.AppConfig
+	DB              *sql.DB
+	EventBus        ports.EventBus
+	CleaningService ports.CleaningUseCase
 }
 
 func NewContainer(configPath string) (*Container, error) {
@@ -41,10 +33,28 @@ func NewContainer(configPath string) (*Container, error) {
 
 	bus := eventbus.NewInMemoryEventBus()
 
+	userRepo := repository.NewUserRepository(db)
+	teamRepo := repository.NewTeamRepository(db)
+	groupRepo := repository.NewGroupRepository(db)
+	dutyRepo := repository.NewDutyRepository(db)
+	areaRepo := repository.NewAreaRepository(db)
+	taskRepo := repository.NewTaskRepository(db)
+
+	cleaningService := cleaning.NewCleaningService(
+		userRepo,
+		teamRepo,
+		groupRepo,
+		dutyRepo,
+		taskRepo,
+		areaRepo,
+		bus,
+	)
+
 	return &Container{
-		Config:   cfg,
-		DB:       db,
-		EventBus: bus,
+		Config:          cfg,
+		DB:              db,
+		EventBus:        bus,
+		CleaningService: cleaningService,
 	}, nil
 }
 

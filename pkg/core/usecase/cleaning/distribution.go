@@ -49,7 +49,7 @@ func (s *Service) loadSchedulingData(ctx context.Context) (*distributingContext,
 	if err != nil {
 		return nil, fmt.Errorf("load groups: %w", err)
 	}
-	taskDefs, err := s.catalogRepo.GetAllTaskDefinitions(ctx)
+	taskDefs, err := s.taskRepo.GetAllTaskDefinitions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load tasks: %w", err)
 	}

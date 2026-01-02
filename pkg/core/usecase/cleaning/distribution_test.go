@@ -15,12 +15,12 @@ import (
 )
 
 type testFixtures struct {
-	teamID1, teamID2       uuid.UUID
+	teamID1, teamID2        uuid.UUID
 	taskPrivate, taskPublic *catalog.TaskDefinition
-	groups                 []*structure.Group
-	teams1, teams2         []*structure.Team
-	areas                  []*catalog.Area
-	tasks                  []*catalog.TaskDefinition
+	groups                  []*structure.Group
+	teams1, teams2          []*structure.Team
+	areas                   []*catalog.Area
+	tasks                   []*catalog.TaskDefinition
 }
 
 type testEnv struct {
@@ -116,7 +116,7 @@ func newTestEnv() *testEnv {
 		areaRepo:  new(MockAreaRepo),
 		eventBus:  new(MockEventBus),
 	}
-	e.service = NewService(nil, e.teamRepo, e.groupRepo, e.dutyRepo, e.catRepo, e.areaRepo, e.eventBus)
+	e.service = NewCleaningService(nil, e.teamRepo, e.groupRepo, e.dutyRepo, e.catRepo, e.areaRepo, e.eventBus)
 	return e
 }
 
@@ -132,7 +132,6 @@ func setupCommonExpectations(ctx context.Context, e *testEnv, f *testFixtures) {
 
 	e.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
 }
-
 
 func findDutyByTeam(duties []*duty.Duty, teamID uuid.UUID) *duty.Duty {
 	for _, d := range duties {
