@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -35,29 +36,30 @@ func (s *TaskMenuState) HandleCallback(ctx context.Context, cb *tgbotapi.Callbac
 	}
 
 	if !onDuty {
-		r.Display("⛔️ Сейчас дежурит не ваша команда. Вы не можете брать или выполнять задачи.", nil)
+		r.Display("⛔️ Сейчас дежурит не ваша команда.", nil)
 		return NewMainMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 
 	switch cb.Data {
 	case cbAssign:
-		progressText := getSimplifiedProgress(ctx, s.cleaningUseCase, user.ID())
+		progressText := getCoveredProgress(ctx, s.cleaningUseCase, user.ID())
 		tasks, _ := s.cleaningUseCase.GetTaskCandidates(ctx, user.ID())
 		if len(tasks) == 0 {
-			r.Display("🎉 Свободных задач нет!", taskMenuKeyboard())
+			r.Display("🛠 Управление дежурством\n\n🎉 Свободных задач нет!", taskMenuKeyboard())
 			return s, nil
 		}
 		r.Display(progressText+"📍 Выберите зону:", areaSelectKeyboard(tasks))
 		return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 
 	case cbConfirm:
+		progressText := getMetProgress(ctx, s.cleaningUseCase, user.ID())
 		tasks, _ := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
 		if len(tasks) == 0 {
-			r.Display("🤷‍♂️ У вас нет активных задач.", taskMenuKeyboard())
+			r.Display("🛠 Управление дежурством\n\n🤷‍♂️ У вас нет активных задач.", taskMenuKeyboard())
 			return s, nil
 		}
 		kb := confirmAreaSelectKeyboard(tasks)
-		r.Display("✅ В какой зоне вы завершили уборку?", kb)
+		r.Display(progressText+"Выберите зону, в которой вы выполнили задачу:", kb)
 		return NewConfirmSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 	}
 	return nil, nil
@@ -87,7 +89,7 @@ func (s *SelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.Callb
 
 	if strings.HasPrefix(cb.Data, "area:") {
 		user, _ := s.userUseCase.GetUserByTelegramID(ctx, cb.From.ID)
-		progressText := getSimplifiedProgress(ctx, s.cleaningUseCase, user.ID())
+		progressText := getCoveredProgress(ctx, s.cleaningUseCase, user.ID())
 		areaID, _ := strconv.Atoi(strings.TrimPrefix(cb.Data, "area:"))
 
 		var filtered []ports.TaskViewModel
@@ -98,12 +100,15 @@ func (s *SelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.Callb
 		}
 
 		if len(filtered) == 0 {
-			r.Display(progressText+"⚠️ В этой зоне задач не осталось. Выберите другую:", areaSelectKeyboard(s.tasks))
+			r.Display(progressText+"🎉 В этой зоне задач не осталось. Выберите другую зону:", areaSelectKeyboard(s.tasks))
 			return s, nil
 		}
 
-		r.Display(progressText+"👇 Выберите задачу:", taskSelectKeyboard(filtered))
-		return NewSelectTaskState(s.userUseCase, s.cleaningUseCase, areaID), nil
+		r.Display(
+			fmt.Sprintf("*%s*\n%sВыберите задачу:", filtered[0].AreaName, progressText),
+			taskSelectKeyboard(filtered),
+		)
+		return NewSelectTaskState(s.userUseCase, s.cleaningUseCase, filtered), nil
 	}
 
 	return nil, nil
@@ -112,18 +117,18 @@ func (s *SelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.Callb
 type SelectTaskState struct {
 	userUseCase     ports.UserUseCase
 	cleaningUseCase ports.CleaningUseCase
-	areaID          int
+	tasks           []ports.TaskViewModel
 }
 
 func NewSelectTaskState(
 	u ports.UserUseCase,
 	c ports.CleaningUseCase,
-	areaID int,
+	tasks []ports.TaskViewModel,
 ) *SelectTaskState {
 	return &SelectTaskState{
 		userUseCase:     u,
 		cleaningUseCase: c,
-		areaID:          areaID,
+		tasks:           tasks,
 	}
 }
 
@@ -140,8 +145,9 @@ func (s *SelectTaskState) HandleMessage(
 func (s *SelectTaskState) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder) (State, error) {
 	user, _ := s.userUseCase.GetUserByTelegramID(ctx, cb.From.ID)
 	if cb.Data == cbBack {
+		progressText := getCoveredProgress(ctx, s.cleaningUseCase, user.ID())
 		tasks, _ := s.cleaningUseCase.GetTaskCandidates(ctx, user.ID())
-		r.Display("📍 Выберите зону:", areaSelectKeyboard(tasks))
+		r.Display(progressText+"📍 Выберите зону:", areaSelectKeyboard(tasks))
 		return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 	}
 
@@ -153,28 +159,32 @@ func (s *SelectTaskState) HandleCallback(ctx context.Context, cb *tgbotapi.Callb
 			return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 		}
 
-		progressText := getSimplifiedProgress(ctx, s.cleaningUseCase, user.ID())
+		progressText := getCoveredProgress(ctx, s.cleaningUseCase, user.ID())
+		areaID := s.tasks[0].AreaID
 
 		allTasks, _ := s.cleaningUseCase.GetTaskCandidates(ctx, user.ID())
 
 		var tasksInSameArea []ports.TaskViewModel
 		for _, t := range allTasks {
-			if t.AreaID == s.areaID {
+			if t.AreaID == areaID {
 				tasksInSameArea = append(tasksInSameArea, t)
 			}
 		}
 
 		if len(tasksInSameArea) > 0 {
-			r.Display(progressText+"✅ Задача взята! Возьмите следующую:", taskSelectKeyboard(tasksInSameArea))
+			r.Display(
+				fmt.Sprintf("*%s*\n%s%s", tasksInSameArea[0].AreaName, progressText, "✅ Задача взята! Возьмите следующую:"),
+				taskSelectKeyboard(tasksInSameArea),
+			)
 			return s, nil
 		}
 
 		if len(allTasks) > 0 {
-			r.Display(progressText+"✅ В этой зоне задач не осталось. Выберите другую:", areaSelectKeyboard(allTasks))
+			r.Display(progressText+"✅ Задача взята!\n🎉 В этой зоне задач не осталось.\nВыберите другую зону:", areaSelectKeyboard(allTasks))
 			return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, allTasks), nil
 		}
 
-		r.Display(progressText+"✅ Задача взята! Больше свободных задач нет.", taskMenuKeyboard())
+		r.Display(progressText+"🎉 Больше свободных задач нет.", taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 
@@ -207,11 +217,13 @@ func (s *ConfirmSelectAreaState) HandleMessage(
 
 func (s *ConfirmSelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder) (State, error) {
 	if cb.Data == cbBack {
-		r.Display("Управление дежурством:", taskMenuKeyboard())
+		r.Display("🛠 Управление дежурством\n\nВыберите действие ниже:", taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 
 	if strings.HasPrefix(cb.Data, "conf_area:") {
+		user, _ := s.userUseCase.GetUserByTelegramID(ctx, cb.From.ID)
+		progressText := getMetProgress(ctx, s.cleaningUseCase, user.ID())
 		areaID, _ := strconv.Atoi(strings.TrimPrefix(cb.Data, "conf_area:"))
 
 		var filtered []ports.TaskViewModel
@@ -221,8 +233,11 @@ func (s *ConfirmSelectAreaState) HandleCallback(ctx context.Context, cb *tgbotap
 			}
 		}
 
-		r.Display("✅ Выберите выполненную задачу:", taskConfirmKeyboard(filtered))
-		return NewConfirmTaskState(s.userUseCase, s.cleaningUseCase, areaID), nil
+		r.Display(
+			fmt.Sprintf("*%s*\n%s%s", filtered[0].AreaName, progressText, "Выберите выполненную задачу:"),
+			taskConfirmKeyboard(filtered),
+		)
+		return NewConfirmTaskState(s.userUseCase, s.cleaningUseCase, filtered), nil
 	}
 	return nil, nil
 }
@@ -230,11 +245,11 @@ func (s *ConfirmSelectAreaState) HandleCallback(ctx context.Context, cb *tgbotap
 type ConfirmTaskState struct {
 	userUseCase     ports.UserUseCase
 	cleaningUseCase ports.CleaningUseCase
-	areaID          int
+	tasks           []ports.TaskViewModel
 }
 
-func NewConfirmTaskState(u ports.UserUseCase, c ports.CleaningUseCase, areaID int) *ConfirmTaskState {
-	return &ConfirmTaskState{userUseCase: u, cleaningUseCase: c, areaID: areaID}
+func NewConfirmTaskState(u ports.UserUseCase, c ports.CleaningUseCase, tasks []ports.TaskViewModel) *ConfirmTaskState {
+	return &ConfirmTaskState{userUseCase: u, cleaningUseCase: c, tasks: tasks}
 }
 
 func (s *ConfirmTaskState) Name() string { return "ConfirmTask" }
@@ -255,8 +270,9 @@ func (s *ConfirmTaskState) HandleCallback(
 	user, _ := s.userUseCase.GetUserByTelegramID(ctx, cb.From.ID)
 
 	if cb.Data == cbBack {
+		progressText := getMetProgress(ctx, s.cleaningUseCase, user.ID())
 		allAssigned, _ := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
-		r.Display("✅ Выберите зону:", confirmAreaSelectKeyboard(allAssigned))
+		r.Display(progressText+"Выберите зону:", confirmAreaSelectKeyboard(allAssigned))
 		return NewConfirmSelectAreaState(s.userUseCase, s.cleaningUseCase, allAssigned), nil
 	}
 
@@ -268,26 +284,33 @@ func (s *ConfirmTaskState) HandleCallback(
 			return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 		}
 
+		areaID := s.tasks[0].AreaID
 		allAssigned, _ := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
 
 		var tasksInSameArea []ports.TaskViewModel
 		for _, t := range allAssigned {
-			if t.AreaID == s.areaID {
+			if t.AreaID == areaID {
 				tasksInSameArea = append(tasksInSameArea, t)
 			}
 		}
 
+		progressText := getMetProgress(ctx, s.cleaningUseCase, user.ID())
 		if len(tasksInSameArea) > 0 {
-			r.Display("🎉 Отлично! Еще что-то в этой зоне?", taskConfirmKeyboard(tasksInSameArea))
+			r.Display(
+				fmt.Sprintf("*%s*\n%s%s", s.tasks[0].AreaName, progressText, "✅ Задача выполнена! Выберити следующую задачу:"),
+				taskConfirmKeyboard(tasksInSameArea),
+			)
 			return s, nil
 		}
 
 		if len(allAssigned) > 0 {
-			r.Display("👏 В этой зоне всё готово! Выберите следующую:", confirmAreaSelectKeyboard(allAssigned))
+			r.Display(
+				fmt.Sprintf("%s%s%s%s", progressText, "🎉 В зоне \"", s.tasks[0].AreaName, "\" всё готово! Выберити следующую зону:"),
+				confirmAreaSelectKeyboard(allAssigned))
 			return NewConfirmSelectAreaState(s.userUseCase, s.cleaningUseCase, allAssigned), nil
 		}
 
-		r.Display("🥳 Поздравляю! Вы выполнили все свои задачи.", taskMenuKeyboard())
+		r.Display("🎉 Поздравляю! Вы выполнили все свои задачи.", taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 	return nil, nil

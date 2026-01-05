@@ -39,7 +39,7 @@ func areaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMark
 	for _, a := range areas {
 		data := fmt.Sprintf("area:%d", a.id)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📍 "+a.name, data),
+			tgbotapi.NewInlineKeyboardButtonData(a.name, data),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnBack, cbBack)))
@@ -66,7 +66,7 @@ func taskConfirmKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMar
 	for _, t := range tasks {
 		data := fmt.Sprintf("complete:%s", t.ID.String())
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("✅ "+t.Title, data),
+			tgbotapi.NewInlineKeyboardButtonData(t.Title, data),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnBack, cbBack)))
@@ -80,7 +80,7 @@ func confirmAreaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeybo
 	for _, a := range areas {
 		data := fmt.Sprintf("conf_area:%d", a.id)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("✅ "+a.name, data),
+			tgbotapi.NewInlineKeyboardButtonData(a.name, data),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnBack, cbBack)))

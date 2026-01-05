@@ -15,6 +15,7 @@ type Responder struct {
 func (r *Responder) Display(text string, kb interface{}) {
 	if r.callbackMsgID != 0 {
 		edit := tgbotapi.NewEditMessageTextAndMarkup(r.chatID, r.callbackMsgID, text, tgbotapi.InlineKeyboardMarkup{})
+		edit.ParseMode = "Markdown"
 		if kb != nil {
 			if inline, ok := kb.(tgbotapi.InlineKeyboardMarkup); ok {
 				edit.ReplyMarkup = &inline
