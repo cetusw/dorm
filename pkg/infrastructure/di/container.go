@@ -2,7 +2,9 @@ package di
 
 import (
 	"database/sql"
+	"dorm/pkg/adapters/telegram"
 	"dorm/pkg/core/usecase/cleaning"
+	"dorm/pkg/core/usecase/user"
 	"dorm/pkg/infrastructure/mysql/repository"
 	"fmt"
 	"log"
@@ -18,6 +20,7 @@ type Container struct {
 	DB              *sql.DB
 	EventBus        ports.EventBus
 	CleaningService ports.CleaningUseCase
+	Bot             *telegram.BotAdapter
 }
 
 func NewContainer(configPath string) (*Container, error) {
@@ -50,11 +53,19 @@ func NewContainer(configPath string) (*Container, error) {
 		bus,
 	)
 
+	userService := user.NewUserService(userRepo)
+
+	botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
+	if err != nil {
+		return nil, fmt.Errorf("bot init failed: %w", err)
+	}
+
 	return &Container{
 		Config:          cfg,
 		DB:              db,
 		EventBus:        bus,
 		CleaningService: cleaningService,
+		Bot:             botAdapter,
 	}, nil
 }
 

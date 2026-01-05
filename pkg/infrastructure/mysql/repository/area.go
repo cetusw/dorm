@@ -38,8 +38,9 @@ func (r *AreaRepository) GetAllAreas(ctx context.Context) ([]*catalog.Area, erro
 
 		var groupID *uuid.UUID
 		if len(groupIDBytes) > 0 {
-			uid, _ := uuid.FromBytes(groupIDBytes)
-			groupID = &uid
+			parsedID, _ := uuid.FromBytes(groupIDBytes)
+			tempID := parsedID
+			groupID = &tempID
 		}
 
 		areas = append(areas, catalog.RestoreArea(id, name, floor, groupID))

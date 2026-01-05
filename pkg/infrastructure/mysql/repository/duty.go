@@ -55,12 +55,12 @@ func (r *DutyRepository) Save(ctx context.Context, d *duty.Duty) error {
 		dtIDBytes, _ := task.ID().MarshalBinary()
 		defIDBytes, _ := task.TaskDefID().MarshalBinary()
 
-		var assignee interface{}
+		var assignee interface{} = nil
 		if task.AssigneeID() != nil {
 			assignee, _ = task.AssigneeID().MarshalBinary()
 		}
 
-		var completion interface{}
+		var completion interface{} = nil
 		if task.CompletionDate() != nil {
 			completion = *task.CompletionDate()
 		}

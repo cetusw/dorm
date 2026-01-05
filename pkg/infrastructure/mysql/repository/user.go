@@ -58,8 +58,8 @@ func (dto *userDTO) toDomain() *user.User {
 
 func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 	const query = `
-		INSERT INTO user (id, telegram_id, first_name, last_name, team_id, dormitory_id, created_at, role_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user (id, telegram_id, first_name, last_name, team_id, dormitory_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 			first_name = VALUES(first_name),
 			last_name = VALUES(last_name),

@@ -2,26 +2,46 @@ package main
 
 import (
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"dorm/pkg/infrastructure/di"
 )
 
-const configPath = "../config.json"
-
 func main() {
-	dependencyContainer, err := di.NewContainer(configPath)
+	configPath := "config.json"
+
+	ctn, err := di.NewContainer(configPath)
 	if err != nil {
-		log.Fatalf("Failed to initialize application: %v", err)
+		log.Fatalf("❌ Failed to initialize container: %v", err)
 	}
-	defer dependencyContainer.Close()
+	defer ctn.Close()
 
-	log.Println("Application initialized successfully")
-	log.Println("Connected to DB...")
+	log.Println("✅ Application initialized successfully")
 
-	// 2. В будущем запуск бота будет выглядеть так:
-	// log.Println("Starting Bot...")
-	// dependencyContainer.TelegramBot.Start()
+	go func() {
+		log.Println("🚀 Starting Telegram Bot...")
+		ctn.Bot.Start()
+	}()
 
-	// А пока просто чтобы процесс не падал сразу, можно поставить ожидание (или убрать для теста)
-	select {}
+	//ctx := context.Background()
+	//if err := ctn.CleaningService.StartNewWeek(ctx); err != nil {
+	//	log.Printf("⚠️ Failed to start weekly duty: %v", err)
+	//} else {
+	//	log.Println("✅ Weekly duty started successfully!")
+	//}
+
+	// 4. (Опционально) Запускаем слушателя событий (для обновления таблиц)
+	// Пока у нас нет SheetsAdapter, можно просто логировать события в консоль
+	// ctn.EventBus.Subscribe("task.completed", func(ctx context.Context, e interface{}) error {
+	//     log.Printf("EVENT: Task completed! %+v", e)
+	//     return nil
+	// })
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("🛑 Shutting down...")
 }
