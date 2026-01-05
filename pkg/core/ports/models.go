@@ -3,12 +3,13 @@ package ports
 import "github.com/google/uuid"
 
 type TaskViewModel struct {
-	ID       uuid.UUID
-	Title    string
-	AreaName string
-	AreaID   int
-	Cost     int
-	IsDone   bool
+	ID        uuid.UUID
+	Title     string
+	AreaName  string
+	AreaID    int
+	AreaFloor int
+	Cost      int
+	IsDone    bool
 }
 
 type ProfileViewModel struct {

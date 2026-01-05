@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	btnBack   = "« Назад"
 	cbBack    = "back"
 	cbAssign  = "cmd_assign"
 	cbConfirm = "cmd_complete"
@@ -97,8 +96,9 @@ func SortTasks(tasks []ports.TaskViewModel) {
 }
 
 type area struct {
-	id   int
-	name string
+	id    int
+	name  string
+	floor int
 }
 
 type areaList []area
@@ -108,14 +108,20 @@ func (a areaList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a areaList) Less(i, j int) bool { return a[i].name < a[j].name }
 
 func getSortedAreas(tasks []ports.TaskViewModel) areaList {
-	areaMap := make(map[int]string)
+	areaMap := make(map[int]area)
 	for _, t := range tasks {
-		areaMap[t.AreaID] = t.AreaName
+		if _, ok := areaMap[t.AreaID]; !ok {
+			areaMap[t.AreaID] = area{
+				id:    t.AreaID,
+				name:  fmt.Sprintf("%d этаж. %s", t.AreaFloor, t.AreaName),
+				floor: t.AreaFloor,
+			}
+		}
 	}
 
 	areas := make(areaList, 0, len(areaMap))
-	for id, name := range areaMap {
-		areas = append(areas, area{id: id, name: name})
+	for _, a := range areaMap {
+		areas = append(areas, a)
 	}
 	sort.Sort(areas)
 	return areas

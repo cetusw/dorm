@@ -119,9 +119,9 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]po
 			Cost   int
 		}{t.Title(), t.AreaID(), t.Cost()}
 	}
-	areaMap := make(map[int]string)
+	areaMap := make(map[int]*catalog.Area)
 	for _, a := range areas {
-		areaMap[a.ID()] = a.Name()
+		areaMap[a.ID()] = a
 	}
 
 	var result []ports.TaskViewModel
@@ -135,13 +135,19 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]po
 			continue
 		}
 
+		area, ok := areaMap[def.AreaID]
+		if !ok {
+			continue
+		}
+
 		result = append(result, ports.TaskViewModel{
-			ID:       task.ID(),
-			Title:    def.Title,
-			AreaID:   def.AreaID,
-			AreaName: areaMap[def.AreaID],
-			Cost:     def.Cost,
-			IsDone:   false,
+			ID:        task.ID(),
+			Title:     def.Title,
+			AreaID:    def.AreaID,
+			AreaName:  area.Name(),
+			AreaFloor: area.Floor(),
+			Cost:      def.Cost,
+			IsDone:    false,
 		})
 	}
 
@@ -172,9 +178,9 @@ func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.U
 		defMap[t.ID()] = t
 	}
 
-	areaMap := make(map[int]string)
+	areaMap := make(map[int]*catalog.Area)
 	for _, a := range areas {
-		areaMap[a.ID()] = a.Name()
+		areaMap[a.ID()] = a
 	}
 
 	var result []ports.TaskViewModel
@@ -188,13 +194,19 @@ func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.U
 			continue
 		}
 
+		area, ok := areaMap[def.AreaID()]
+		if !ok {
+			continue
+		}
+
 		result = append(result, ports.TaskViewModel{
-			ID:       task.ID(),
-			Title:    def.Title(),
-			Cost:     def.Cost(),
-			AreaID:   def.AreaID(),
-			AreaName: areaMap[def.AreaID()],
-			IsDone:   task.IsCompleted(),
+			ID:        task.ID(),
+			Title:     def.Title(),
+			Cost:      def.Cost(),
+			AreaID:    def.AreaID(),
+			AreaName:  area.Name(),
+			AreaFloor: area.Floor(),
+			IsDone:    task.IsCompleted(),
 		})
 	}
 	return result, nil
@@ -224,9 +236,9 @@ func (s *Service) GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]
 		defMap[t.ID()] = t
 	}
 
-	areaMap := make(map[int]string)
+	areaMap := make(map[int]*catalog.Area)
 	for _, a := range areas {
-		areaMap[a.ID()] = a.Name()
+		areaMap[a.ID()] = a
 	}
 
 	var result []ports.TaskViewModel
@@ -240,13 +252,19 @@ func (s *Service) GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]
 			continue
 		}
 
+		area, ok := areaMap[def.AreaID()]
+		if !ok {
+			continue
+		}
+
 		result = append(result, ports.TaskViewModel{
-			ID:       task.ID(),
-			Title:    def.Title(),
-			Cost:     def.Cost(),
-			AreaID:   def.AreaID(),
-			AreaName: areaMap[def.AreaID()],
-			IsDone:   task.IsCompleted(),
+			ID:        task.ID(),
+			Title:     def.Title(),
+			Cost:      def.Cost(),
+			AreaID:    def.AreaID(),
+			AreaName:  area.Name(),
+			AreaFloor: area.Floor(),
+			IsDone:    task.IsCompleted(),
 		})
 	}
 	return result, nil

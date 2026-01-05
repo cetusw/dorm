@@ -101,7 +101,7 @@ func (b *BotAdapter) processUpdate(update tgbotapi.Update) {
 
 	if err != nil {
 		log.Printf("Bot Error: %v", err)
-		r.Display("⚠️ Произошла ошибка. Пожалуйста, начните заново: /start", nil)
+		r.Display(msgErrDefault, nil)
 		b.setState(userID, nil)
 		return
 	}

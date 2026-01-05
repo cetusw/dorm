@@ -34,18 +34,18 @@ func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message
 		statsText := getFullProgress(ctx, s.cleaningUseCase, user)
 
 		var b strings.Builder
-		b.WriteString(statsText + "\n\n")
-		b.WriteString("*Мои задачи:*\n\n")
+		b.WriteString(statsText + "\n\n" + msgMyTasksTitle)
 
 		if len(tasks) == 0 {
-			b.WriteString("У вас пока нет назначенных задач")
+			b.WriteString(msgNoAssignedTasks)
 			r.Display(b.String(), mainKeyboard())
 			return nil, nil
 		}
 
 		tasksByArea := make(map[string][]ports.TaskViewModel)
 		for _, task := range tasks {
-			tasksByArea[task.AreaName] = append(tasksByArea[task.AreaName], task)
+			key := fmt.Sprintf("%d этаж. %s", task.AreaFloor, task.AreaName)
+			tasksByArea[key] = append(tasksByArea[key], task)
 		}
 
 		var sortedAreaNames []string
@@ -74,23 +74,19 @@ func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message
 		user, _ := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
 		profile, _ := s.userUseCase.GetUserProfile(ctx, user.ID())
 		if profile == nil {
-			r.Display("⚠️ Не удалось загрузить профиль. Возможно, вы еще не присоединены к команде.", mainKeyboard())
+			r.Display(msgProfileLoadError, mainKeyboard())
 			return nil, nil
 		}
 
 		onDuty, _ := s.cleaningUseCase.IsUserOnDuty(ctx, user.ID())
 
-		dutyStatus := "не на дежурстве"
+		dutyStatus := msgNotOnDutyTeam
 		if onDuty {
-			dutyStatus = "на дежурстве"
+			dutyStatus = msgOnDutyTeam
 		}
 
 		text := fmt.Sprintf(
-			"👤 %s %s\n\n"+
-				"🚪 Комната: %s\n"+
-				"🏢 Коливинг: %s\n"+
-				"👥 Группа: %s\n"+
-				"🛠 Команда: %s (%s)",
+			msgProfileFormat,
 			profile.FirstName,
 			profile.LastName,
 			profile.RoomNumber,

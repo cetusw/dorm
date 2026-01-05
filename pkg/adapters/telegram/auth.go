@@ -25,11 +25,11 @@ func (s *AuthState) HandleMessage(ctx context.Context, msg *tgbotapi.Message, r 
 	}
 
 	if user != nil {
-		r.SendMenu("👋 С возвращением!", mainKeyboard())
+		r.SendMenu(msgReturnWelcome, mainKeyboard())
 		return NewMainMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 
-	r.Display("👋 Добро пожаловать! Введите Имя и Фамилию для регистрации:", nil)
+	r.Display(msgWelcome+"\n"+msgAskForName, nil)
 	return NewRegistrationState(s.userUseCase, s.cleaningUseCase), nil
 }
 func (s *AuthState) HandleCallback(_ context.Context, _ *tgbotapi.CallbackQuery, _ *Responder) (State, error) {
@@ -48,10 +48,10 @@ func (s *RegistrationState) Name() string { return "Registration" }
 
 func (s *RegistrationState) HandleMessage(ctx context.Context, msg *tgbotapi.Message, r *Responder) (State, error) {
 	if err := s.userUseCase.RegisterUser(ctx, msg.From.ID, msg.Text); err != nil {
-		r.Display("⚠️ Ошибка регистрации. Попробуйте еще раз.", nil)
+		r.Display(msgRegisterErr, nil)
 		return nil, err
 	}
-	r.SendMenu("✅ Регистрация успешна!", mainKeyboard())
+	r.SendMenu(msgRegisterSuccess, mainKeyboard())
 	return NewMainMenuState(s.userUseCase, s.cleaningUseCase), nil
 }
 func (s *RegistrationState) HandleCallback(_ context.Context, _ *tgbotapi.CallbackQuery, _ *Responder) (State, error) {
