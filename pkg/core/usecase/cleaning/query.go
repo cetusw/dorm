@@ -148,7 +148,7 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]po
 	return result, nil
 }
 
-func (s *Service) GetAssignedTasks(ctx context.Context, userID uuid.UUID) ([]ports.TaskViewModel, error) {
+func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.UUID) ([]ports.TaskViewModel, error) {
 	u, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil || u.TeamID() == nil {
 		return nil, fmt.Errorf("user or team not found")
@@ -200,4 +200,56 @@ func (s *Service) GetAssignedTasks(ctx context.Context, userID uuid.UUID) ([]por
 	return result, nil
 }
 
-// TODO: отрефакторить и подумать о расположении query
+func (s *Service) GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]ports.TaskViewModel, error) {
+	u, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil || u.TeamID() == nil {
+		return nil, fmt.Errorf("user or team not found")
+	}
+	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
+	if err != nil || d == nil {
+		return []ports.TaskViewModel{}, nil
+	}
+
+	taskDefs, err := s.taskRepo.GetAllTaskDefinitions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	areas, err := s.areaRepo.GetAllAreas(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defMap := make(map[uuid.UUID]*catalog.TaskDefinition)
+	for _, t := range taskDefs {
+		defMap[t.ID()] = t
+	}
+
+	areaMap := make(map[int]string)
+	for _, a := range areas {
+		areaMap[a.ID()] = a.Name()
+	}
+
+	var result []ports.TaskViewModel
+	for _, task := range d.Tasks() {
+		if task.AssigneeID() == nil || *task.AssigneeID() != userID {
+			continue
+		}
+
+		def, ok := defMap[task.TaskDefID()]
+		if !ok {
+			continue
+		}
+
+		result = append(result, ports.TaskViewModel{
+			ID:       task.ID(),
+			Title:    def.Title(),
+			Cost:     def.Cost(),
+			AreaID:   def.AreaID(),
+			AreaName: areaMap[def.AreaID()],
+			IsDone:   task.IsCompleted(),
+		})
+	}
+	return result, nil
+}
+
+// TODO: Логика повторяется, нужно вынести в отдельный метод получение задач и фильтровать. отрефакторить и подумать о расположении query

@@ -19,6 +19,7 @@ func mainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	return tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("🧹 Задачи"),
+			tgbotapi.NewKeyboardButton("📝 Мои задачи"),
 			tgbotapi.NewKeyboardButton("👤 Профиль"),
 		),
 	)
@@ -32,23 +33,13 @@ func taskMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 }
 
 func areaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
-	sortTaskList(tasks)
-	areaNames := make(map[int]string)
-	for _, t := range tasks {
-		areaNames[t.AreaID] = t.AreaName
-	}
-
-	ids := make([]int, 0, len(areaNames))
-	for id := range areaNames {
-		ids = append(ids, id)
-	}
-	sort.Ints(ids)
+	areas := getSortedAreas(tasks)
 
 	var rows [][]tgbotapi.InlineKeyboardButton
-	for _, id := range ids {
-		data := fmt.Sprintf("area:%d", id)
+	for _, a := range areas {
+		data := fmt.Sprintf("area:%d", a.id)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📍 "+areaNames[id], data),
+			tgbotapi.NewInlineKeyboardButtonData("📍 "+a.name, data),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnBack, cbBack)))
@@ -56,7 +47,7 @@ func areaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMark
 }
 
 func taskSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
-	sortTaskList(tasks)
+	SortTasks(tasks)
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, t := range tasks {
 		data := fmt.Sprintf("assign:%s", t.ID.String())
@@ -70,7 +61,7 @@ func taskSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMark
 }
 
 func taskConfirmKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
-	sortTaskList(tasks)
+	SortTasks(tasks)
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, t := range tasks {
 		data := fmt.Sprintf("complete:%s", t.ID.String())
@@ -83,33 +74,49 @@ func taskConfirmKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMar
 }
 
 func confirmAreaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
-	areaNames := make(map[int]string)
-	for _, t := range tasks {
-		areaNames[t.AreaID] = t.AreaName
-	}
-
-	ids := make([]int, 0, len(areaNames))
-	for id := range areaNames {
-		ids = append(ids, id)
-	}
-	sort.Ints(ids)
+	areas := getSortedAreas(tasks)
 
 	var rows [][]tgbotapi.InlineKeyboardButton
-	for _, id := range ids {
-		data := fmt.Sprintf("conf_area:%d", id)
+	for _, a := range areas {
+		data := fmt.Sprintf("conf_area:%d", a.id)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("✅ "+areaNames[id], data),
+			tgbotapi.NewInlineKeyboardButtonData("✅ "+a.name, data),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnBack, cbBack)))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-func sortTaskList(tasks []ports.TaskViewModel) {
+func SortTasks(tasks []ports.TaskViewModel) {
 	sort.Slice(tasks, func(i, j int) bool {
 		if tasks[i].Cost != tasks[j].Cost {
 			return tasks[i].Cost > tasks[j].Cost
 		}
 		return tasks[i].Title < tasks[j].Title
 	})
+}
+
+type area struct {
+	id   int
+	name string
+}
+
+type areaList []area
+
+func (a areaList) Len() int           { return len(a) }
+func (a areaList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a areaList) Less(i, j int) bool { return a[i].name < a[j].name }
+
+func getSortedAreas(tasks []ports.TaskViewModel) areaList {
+	areaMap := make(map[int]string)
+	for _, t := range tasks {
+		areaMap[t.AreaID] = t.AreaName
+	}
+
+	areas := make(areaList, 0, len(areaMap))
+	for id, name := range areaMap {
+		areas = append(areas, area{id: id, name: name})
+	}
+	sort.Sort(areas)
+	return areas
 }

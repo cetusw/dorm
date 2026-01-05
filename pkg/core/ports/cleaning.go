@@ -18,5 +18,6 @@ type CleaningUseCase interface {
 	GetTeamActiveDuty(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error)
 	GetUserStats(ctx context.Context, userID uuid.UUID) (*duty.UserStats, error)
 	GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]TaskViewModel, error)
-	GetAssignedTasks(ctx context.Context, userID uuid.UUID) ([]TaskViewModel, error)
+	GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]TaskViewModel, error)
+	GetUncompletedAssignedTasks(ctx context.Context, userID uuid.UUID) ([]TaskViewModel, error)
 }

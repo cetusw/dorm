@@ -50,7 +50,7 @@ func (s *TaskMenuState) HandleCallback(ctx context.Context, cb *tgbotapi.Callbac
 		return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 
 	case cbConfirm:
-		tasks, _ := s.cleaningUseCase.GetAssignedTasks(ctx, user.ID())
+		tasks, _ := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
 		if len(tasks) == 0 {
 			r.Display("🤷‍♂️ У вас нет активных задач.", taskMenuKeyboard())
 			return s, nil
@@ -250,7 +250,7 @@ func (s *ConfirmTaskState) HandleCallback(
 	user, _ := s.userUseCase.GetUserByTelegramID(ctx, cb.From.ID)
 
 	if cb.Data == cbBack {
-		allAssigned, _ := s.cleaningUseCase.GetAssignedTasks(ctx, user.ID())
+		allAssigned, _ := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
 		r.Display("✅ Выберите зону:", confirmAreaSelectKeyboard(allAssigned))
 		return NewConfirmSelectAreaState(s.userUseCase, s.cleaningUseCase, allAssigned), nil
 	}
@@ -263,7 +263,7 @@ func (s *ConfirmTaskState) HandleCallback(
 			return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 		}
 
-		allAssigned, _ := s.cleaningUseCase.GetAssignedTasks(ctx, user.ID())
+		allAssigned, _ := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
 
 		var tasksInSameArea []ports.TaskViewModel
 		for _, t := range allAssigned {
