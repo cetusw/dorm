@@ -41,12 +41,13 @@ func (s *TaskMenuState) HandleCallback(ctx context.Context, cb *tgbotapi.Callbac
 
 	switch cb.Data {
 	case cbAssign:
+		progressText := getSimplifiedProgress(ctx, s.cleaningUseCase, user.ID())
 		tasks, _ := s.cleaningUseCase.GetTaskCandidates(ctx, user.ID())
 		if len(tasks) == 0 {
 			r.Display("🎉 Свободных задач нет!", taskMenuKeyboard())
 			return s, nil
 		}
-		r.Display("📍 Выберите зону:", areaSelectKeyboard(tasks))
+		r.Display(progressText+"📍 Выберите зону:", areaSelectKeyboard(tasks))
 		return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 
 	case cbConfirm:
@@ -80,11 +81,13 @@ func (s *SelectAreaState) HandleMessage(ctx context.Context, msg *tgbotapi.Messa
 
 func (s *SelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder) (State, error) {
 	if cb.Data == cbBack {
-		r.Display("Управление дежурством:", taskMenuKeyboard())
+		r.Display("🛠 Управление дежурством\n\nВыберите действие ниже:", taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 
 	if strings.HasPrefix(cb.Data, "area:") {
+		user, _ := s.userUseCase.GetUserByTelegramID(ctx, cb.From.ID)
+		progressText := getSimplifiedProgress(ctx, s.cleaningUseCase, user.ID())
 		areaID, _ := strconv.Atoi(strings.TrimPrefix(cb.Data, "area:"))
 
 		var filtered []ports.TaskViewModel
@@ -95,11 +98,11 @@ func (s *SelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.Callb
 		}
 
 		if len(filtered) == 0 {
-			r.Display("⚠️ В этой зоне задач не осталось. Выберите другую:", areaSelectKeyboard(s.tasks))
+			r.Display(progressText+"⚠️ В этой зоне задач не осталось. Выберите другую:", areaSelectKeyboard(s.tasks))
 			return s, nil
 		}
 
-		r.Display("👇 Выберите задачу:", taskSelectKeyboard(filtered))
+		r.Display(progressText+"👇 Выберите задачу:", taskSelectKeyboard(filtered))
 		return NewSelectTaskState(s.userUseCase, s.cleaningUseCase, areaID), nil
 	}
 
@@ -150,6 +153,8 @@ func (s *SelectTaskState) HandleCallback(ctx context.Context, cb *tgbotapi.Callb
 			return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 		}
 
+		progressText := getSimplifiedProgress(ctx, s.cleaningUseCase, user.ID())
+
 		allTasks, _ := s.cleaningUseCase.GetTaskCandidates(ctx, user.ID())
 
 		var tasksInSameArea []ports.TaskViewModel
@@ -160,16 +165,16 @@ func (s *SelectTaskState) HandleCallback(ctx context.Context, cb *tgbotapi.Callb
 		}
 
 		if len(tasksInSameArea) > 0 {
-			r.Display("✅ Задача взята! Возьмите следующую:", taskSelectKeyboard(tasksInSameArea))
+			r.Display(progressText+"✅ Задача взята! Возьмите следующую:", taskSelectKeyboard(tasksInSameArea))
 			return s, nil
 		}
 
 		if len(allTasks) > 0 {
-			r.Display("✅ В этой зоне задач не осталось. Выберите другую:", areaSelectKeyboard(allTasks))
+			r.Display(progressText+"✅ В этой зоне задач не осталось. Выберите другую:", areaSelectKeyboard(allTasks))
 			return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, allTasks), nil
 		}
 
-		r.Display("✅ Задача взята! Больше свободных задач нет.", taskMenuKeyboard())
+		r.Display(progressText+"✅ Задача взята! Больше свободных задач нет.", taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 

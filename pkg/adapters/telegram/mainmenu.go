@@ -28,21 +28,12 @@ func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	case "📝 Мои задачи":
 		user, _ := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
-		stats, _ := s.cleaningUseCase.GetUserStats(ctx, user.ID())
 		tasks, _ := s.cleaningUseCase.GetAllAssignedTasks(ctx, user.ID())
 
-		status := "🟢 Норма выполнена"
-		if !stats.IsQuotaMet() {
-			status = "🔴 Норма не выполнена"
-		}
-		statsText := fmt.Sprintf(
-			"*Текущий прогресс*\n\n📊 Баллы: %d\n🎯 Цель: %.1f\n%s\n\n",
-			stats.ConfirmedPoints, stats.RequiredPoints,
-			status,
-		)
+		statsText := getFullProgress(ctx, s.cleaningUseCase, user)
 
 		var b strings.Builder
-		b.WriteString(statsText)
+		b.WriteString(statsText + "\n\n")
 		b.WriteString("*Мои задачи:*\n\n")
 
 		if len(tasks) == 0 {
@@ -80,19 +71,7 @@ func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message
 		return nil, nil
 	case "👤 Профиль":
 		user, _ := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
-		stats, _ := s.cleaningUseCase.GetUserStats(ctx, user.ID())
-
-		status := "🟢 Норма выполнена"
-		if !stats.IsQuotaMet() {
-			status = "🔴 Норма не выполнена"
-		}
-
-		text := fmt.Sprintf(
-			"👤 %s %s\n\n📊 Баллы: %d\n🎯 Цель: %.1f\n%s",
-			user.FirstName(), user.LastName(),
-			stats.ConfirmedPoints, stats.RequiredPoints,
-			status,
-		)
+		text := getFullProgress(ctx, s.cleaningUseCase, user)
 		r.Display(text, mainKeyboard())
 		return nil, nil
 	}
