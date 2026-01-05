@@ -1,8 +1,14 @@
 package telegram
 
 const (
+	btnProfile = "👤 Профиль"
+	btnDuty    = "💼 Дежурство"
+	btnMyTasks = "📝 Мои задачи"
+	btnBack    = "« Назад"
+)
+
+const (
 	msgErrDefault         = "⚠️ Произошла ошибка. Пожалуйста, начните заново: /start"
-	btnBack               = "« Назад"
 	msgDutyManagement     = "🛠 Управление дежурством\n\n"
 	msgSelectAction       = "Выберите действие ниже:"
 	msgOnDutyTeam         = "на дежурстве"

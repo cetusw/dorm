@@ -17,9 +17,11 @@ const (
 func mainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	return tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("🧹 Задачи"),
-			tgbotapi.NewKeyboardButton("📝 Мои задачи"),
-			tgbotapi.NewKeyboardButton("👤 Профиль"),
+			tgbotapi.NewKeyboardButton(btnProfile),
+			tgbotapi.NewKeyboardButton(btnDuty),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(btnMyTasks),
 		),
 	)
 }

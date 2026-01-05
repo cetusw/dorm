@@ -21,83 +21,93 @@ func NewMainMenuState(u ports.UserUseCase, c ports.CleaningUseCase) *MainMenuSta
 }
 func (s *MainMenuState) Name() string { return "MainMenu" }
 
-// TODO: refactor
 func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message, r *Responder) (State, error) {
 	switch msg.Text {
-	case "🧹 Задачи":
-		r.SendInline("🛠 Управление дежурством\n\nВыберите действие ниже:", taskMenuKeyboard())
+	case btnDuty:
+		r.SendInline(msgDutyManagement+msgSelectAction, taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
-	case "📝 Мои задачи":
-		user, _ := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
-		tasks, _ := s.cleaningUseCase.GetAllAssignedTasks(ctx, user.ID())
+	case btnMyTasks:
+		return s.handleMyTasks(ctx, msg, r)
+	case btnProfile:
+		return s.handleProfile(ctx, msg, r)
+	}
+	return nil, nil
+}
 
-		statsText := getFullProgress(ctx, s.cleaningUseCase, user)
+func (s *MainMenuState) handleMyTasks(ctx context.Context, msg *tgbotapi.Message, r *Responder) (State, error) {
+	user, _ := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
+	tasks, _ := s.cleaningUseCase.GetAllAssignedTasks(ctx, user.ID())
 
-		var b strings.Builder
-		b.WriteString(statsText + "\n\n" + msgMyTasksTitle)
+	statsText := getFullProgress(ctx, s.cleaningUseCase, user)
 
-		if len(tasks) == 0 {
-			b.WriteString(msgNoAssignedTasks)
-			r.Display(b.String(), mainKeyboard())
-			return nil, nil
-		}
+	var b strings.Builder
+	b.WriteString(statsText + "\n\n" + msgMyTasksTitle)
 
-		tasksByArea := make(map[string][]ports.TaskViewModel)
-		for _, task := range tasks {
-			key := fmt.Sprintf("%d этаж. %s", task.AreaFloor, task.AreaName)
-			tasksByArea[key] = append(tasksByArea[key], task)
-		}
-
-		var sortedAreaNames []string
-		for areaName := range tasksByArea {
-			sortedAreaNames = append(sortedAreaNames, areaName)
-		}
-		sort.Strings(sortedAreaNames)
-
-		for _, areaName := range sortedAreaNames {
-			areaTasks := tasksByArea[areaName]
-			SortTasks(areaTasks)
-			b.WriteString(fmt.Sprintf("*%s*\n", areaName))
-			for _, task := range areaTasks {
-				statusEmoji := "📝"
-				if task.IsDone {
-					statusEmoji = "✅"
-				}
-				b.WriteString(fmt.Sprintf("%s %s\n", statusEmoji, task.Title))
-			}
-			b.WriteString("\n")
-		}
-
+	if len(tasks) == 0 {
+		b.WriteString(msgNoAssignedTasks)
 		r.Display(b.String(), mainKeyboard())
 		return nil, nil
-	case "👤 Профиль":
-		user, _ := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
-		profile, _ := s.userUseCase.GetUserProfile(ctx, user.ID())
-		if profile == nil {
-			r.Display(msgProfileLoadError, mainKeyboard())
-			return nil, nil
+	}
+
+	s.buildTasksList(&b, tasks)
+	r.Display(b.String(), mainKeyboard())
+	return nil, nil
+}
+
+func (s *MainMenuState) buildTasksList(b *strings.Builder, tasks []ports.TaskViewModel) {
+	tasksByArea := make(map[string][]ports.TaskViewModel)
+	for _, task := range tasks {
+		key := fmt.Sprintf("%d этаж. %s", task.AreaFloor, task.AreaName)
+		tasksByArea[key] = append(tasksByArea[key], task)
+	}
+
+	var sortedAreaNames []string
+	for areaName := range tasksByArea {
+		sortedAreaNames = append(sortedAreaNames, areaName)
+	}
+	sort.Strings(sortedAreaNames)
+
+	for _, areaName := range sortedAreaNames {
+		areaTasks := tasksByArea[areaName]
+		SortTasks(areaTasks)
+		b.WriteString(fmt.Sprintf("*%s*\n", areaName))
+		for _, task := range areaTasks {
+			statusEmoji := "📝"
+			if task.IsDone {
+				statusEmoji = "✅"
+			}
+			b.WriteString(fmt.Sprintf("%s %s\n", statusEmoji, task.Title))
 		}
+		b.WriteString("\n")
+	}
+}
 
-		onDuty, _ := s.cleaningUseCase.IsUserOnDuty(ctx, user.ID())
-
-		dutyStatus := msgNotOnDutyTeam
-		if onDuty {
-			dutyStatus = msgOnDutyTeam
-		}
-
-		text := fmt.Sprintf(
-			msgProfileFormat,
-			profile.FirstName,
-			profile.LastName,
-			profile.RoomNumber,
-			profile.DormitoryName,
-			profile.GroupName,
-			profile.TeamName,
-			dutyStatus,
-		)
-		r.Display(text, mainKeyboard())
+func (s *MainMenuState) handleProfile(ctx context.Context, msg *tgbotapi.Message, r *Responder) (State, error) {
+	user, _ := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
+	profile, _ := s.userUseCase.GetUserProfile(ctx, user.ID())
+	if profile == nil {
+		r.Display(msgProfileLoadError, mainKeyboard())
 		return nil, nil
 	}
+
+	onDuty, _ := s.cleaningUseCase.IsUserOnDuty(ctx, user.ID())
+
+	dutyStatus := msgNotOnDutyTeam
+	if onDuty {
+		dutyStatus = msgOnDutyTeam
+	}
+
+	text := fmt.Sprintf(
+		msgProfileFormat,
+		profile.FirstName,
+		profile.LastName,
+		profile.RoomNumber,
+		profile.DormitoryName,
+		profile.GroupName,
+		profile.TeamName,
+		dutyStatus,
+	)
+	r.Display(text, mainKeyboard())
 	return nil, nil
 }
 
