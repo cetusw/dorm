@@ -12,4 +12,5 @@ type UserUseCase interface {
 	RegisterUser(ctx context.Context, telegramID int64, fullName string) error
 	GetUserByTelegramID(ctx context.Context, telegramID int64) (*user.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*user.User, error)
+	GetUserProfile(ctx context.Context, userID uuid.UUID) (*ProfileViewModel, error)
 }

@@ -2,17 +2,17 @@ package di
 
 import (
 	"database/sql"
-	"dorm/pkg/adapters/telegram"
-	"dorm/pkg/core/usecase/cleaning"
-	"dorm/pkg/core/usecase/user"
-	"dorm/pkg/infrastructure/mysql/repository"
 	"fmt"
 	"log"
 
+	"dorm/pkg/adapters/telegram"
 	"dorm/pkg/core/ports"
+	"dorm/pkg/core/usecase/cleaning"
+	"dorm/pkg/core/usecase/user"
 	"dorm/pkg/infrastructure/config"
 	"dorm/pkg/infrastructure/eventbus"
 	"dorm/pkg/infrastructure/mysql"
+	"dorm/pkg/infrastructure/mysql/repository"
 )
 
 type Container struct {
@@ -42,6 +42,7 @@ func NewContainer(configPath string) (*Container, error) {
 	dutyRepo := repository.NewDutyRepository(db)
 	areaRepo := repository.NewAreaRepository(db)
 	taskRepo := repository.NewTaskRepository(db)
+	dormitoryRepo := repository.NewDormitoryRepository(db)
 
 	cleaningService := cleaning.NewCleaningService(
 		userRepo,
@@ -53,7 +54,7 @@ func NewContainer(configPath string) (*Container, error) {
 		bus,
 	)
 
-	userService := user.NewUserService(userRepo)
+	userService := user.NewUserService(userRepo, teamRepo, groupRepo, dormitoryRepo)
 
 	botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
 	if err != nil {

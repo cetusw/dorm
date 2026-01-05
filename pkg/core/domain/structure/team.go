@@ -8,15 +8,24 @@ import (
 
 type Team struct {
 	id       uuid.UUID
+	name     string
 	groupID  uuid.UUID
 	leaderID *uuid.UUID
 	color    string
 	order    int
 }
 
-func RestoreTeam(id, groupID uuid.UUID, leaderID *uuid.UUID, color string, order int) *Team {
+func RestoreTeam(
+	id uuid.UUID,
+	name string,
+	groupID uuid.UUID,
+	leaderID *uuid.UUID,
+	color string,
+	order int,
+) *Team {
 	return &Team{
 		id:       id,
+		name:     name,
 		groupID:  groupID,
 		leaderID: leaderID,
 		color:    color,
@@ -25,6 +34,7 @@ func RestoreTeam(id, groupID uuid.UUID, leaderID *uuid.UUID, color string, order
 }
 
 func (t *Team) ID() uuid.UUID        { return t.id }
+func (t *Team) Name() string         { return t.name }
 func (t *Team) GroupID() uuid.UUID   { return t.groupID }
 func (t *Team) LeaderID() *uuid.UUID { return t.leaderID }
 func (t *Team) Color() string        { return t.color }

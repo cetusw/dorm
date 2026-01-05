@@ -41,6 +41,7 @@ func TestNewUser_Validation(t *testing.T) {
 func TestRestoreUser(t *testing.T) {
 	id := uuid.New()
 	teamID := uuid.New()
+	roomNumber := "10"
 	dormID := int64(1)
 	now := time.Now()
 
@@ -50,6 +51,7 @@ func TestRestoreUser(t *testing.T) {
 		"Jane",
 		"Smith",
 		&teamID,
+		&roomNumber,
 		&dormID,
 		now,
 	)
@@ -76,9 +78,10 @@ func TestUser_TeamManagement(t *testing.T) {
 
 func TestUser_DormitoryAssignment(t *testing.T) {
 	u, _ := NewUser(123, "Test", "User")
+	roomNumber := "11A"
 	dormID := int64(5)
 
-	u.MoveInto(dormID)
+	u.MoveInto(dormID, roomNumber)
 	assert.NotNil(t, u.DormitoryID())
 	assert.Equal(t, dormID, *u.DormitoryID())
 }

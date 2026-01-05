@@ -20,16 +20,17 @@ func NewTeamRepository(db *sql.DB) *TeamRepository {
 }
 
 func (r *TeamRepository) FindByID(ctx context.Context, id uuid.UUID) (*structure.Team, error) {
-	const query = `SELECT id, group_id, leader_id, color, team_order FROM team WHERE id = ?`
+	const query = `SELECT id, name, group_id, leader_id, color, team_order FROM team WHERE id = ?`
 
 	idBytes, _ := id.MarshalBinary()
 	row := r.db.QueryRowContext(ctx, query, idBytes)
 
 	var tID, gID, lID []byte
+	var name string
 	var color string
 	var order int
 
-	if err := row.Scan(&tID, &gID, &lID, &color, &order); err != nil {
+	if err := row.Scan(&tID, &name, &gID, &lID, &color, &order); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -44,11 +45,12 @@ func (r *TeamRepository) FindByID(ctx context.Context, id uuid.UUID) (*structure
 		leaderID = &uid
 	}
 
-	return structure.RestoreTeam(teamID, groupID, leaderID, color, order), nil
+	return structure.RestoreTeam(teamID, name, groupID, leaderID, color, order), nil
 }
 
+// TODO: вынести в DTO, как в user
 func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*structure.Team, error) {
-	const query = `SELECT id, group_id, leader_id, color, team_order FROM team WHERE group_id = ?`
+	const query = `SELECT id, name, group_id, leader_id, color, team_order FROM team WHERE group_id = ?`
 
 	gIDBytes, _ := groupID.MarshalBinary()
 	rows, err := r.db.QueryContext(ctx, query, gIDBytes)
@@ -60,10 +62,11 @@ func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 	var teams []*structure.Team
 	for rows.Next() {
 		var tID, gID, lID []byte
+		var name string
 		var color string
 		var order int
 
-		if err := rows.Scan(&tID, &gID, &lID, &color, &order); err != nil {
+		if err := rows.Scan(&tID, &name, &gID, &lID, &color, &order); err != nil {
 			return nil, fmt.Errorf("FindByGroupID scan error: %w", err)
 		}
 
@@ -74,7 +77,7 @@ func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 			uid, _ := uuid.FromBytes(lID)
 			leaderID = &uid
 		}
-		teams = append(teams, structure.RestoreTeam(teamID, grpID, leaderID, color, order))
+		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color, order))
 	}
 	return teams, nil
 }

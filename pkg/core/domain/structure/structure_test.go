@@ -11,14 +11,16 @@ func TestRestoreTeam(t *testing.T) {
 	id := uuid.New()
 	groupID := uuid.New()
 	leaderID := uuid.New()
+	name := "Test Team"
 	color := "#FF0000"
 	order := 1
 
-	team := RestoreTeam(id, groupID, &leaderID, color, order)
+	team := RestoreTeam(id, name, groupID, &leaderID, color, order)
 
 	assert.Equal(t, id, team.ID())
 	assert.Equal(t, groupID, team.GroupID())
 	assert.Equal(t, &leaderID, team.LeaderID())
+	assert.Equal(t, name, team.Name())
 	assert.Equal(t, color, team.Color())
 	assert.Equal(t, order, team.Order())
 }

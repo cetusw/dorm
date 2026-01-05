@@ -21,6 +21,7 @@ func NewMainMenuState(u ports.UserUseCase, c ports.CleaningUseCase) *MainMenuSta
 }
 func (s *MainMenuState) Name() string { return "MainMenu" }
 
+// TODO: refactor
 func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message, r *Responder) (State, error) {
 	switch msg.Text {
 	case "🧹 Задачи":
@@ -71,12 +72,39 @@ func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message
 		return nil, nil
 	case "👤 Профиль":
 		user, _ := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
-		text := getFullProgress(ctx, s.cleaningUseCase, user)
+		profile, _ := s.userUseCase.GetUserProfile(ctx, user.ID())
+		if profile == nil {
+			r.Display("⚠️ Не удалось загрузить профиль. Возможно, вы еще не присоединены к команде.", mainKeyboard())
+			return nil, nil
+		}
+
+		onDuty, _ := s.cleaningUseCase.IsUserOnDuty(ctx, user.ID())
+
+		dutyStatus := "не на дежурстве"
+		if onDuty {
+			dutyStatus = "на дежурстве"
+		}
+
+		text := fmt.Sprintf(
+			"👤 %s %s\n\n"+
+				"🚪 Комната: %s\n"+
+				"🏢 Коливинг: %s\n"+
+				"👥 Группа: %s\n"+
+				"🛠 Команда: %s (%s)",
+			profile.FirstName,
+			profile.LastName,
+			profile.RoomNumber,
+			profile.DormitoryName,
+			profile.GroupName,
+			profile.TeamName,
+			dutyStatus,
+		)
 		r.Display(text, mainKeyboard())
 		return nil, nil
 	}
 	return nil, nil
 }
+
 func (s *MainMenuState) HandleCallback(_ context.Context, _ *tgbotapi.CallbackQuery, _ *Responder) (State, error) {
 	return nil, nil
 }

@@ -38,7 +38,7 @@ func TestNewContainer(t *testing.T) {
 	}
 
 	t.Setenv("DB_DRIVER", "test-driver")
-	t.Setenv("BOT_TOKEN", "dummy")
+	t.Setenv("BOT_TOKEN", "7528543633:AAEIVLeGoadblN9KRr8h6R1L5ZiChzFrACk")
 	t.Setenv("SHEETS_CREDENTIALS", "dummy.json")
 	t.Setenv("DB_USER", "user")
 	t.Setenv("DB_PASSWORD", "pass")

@@ -11,4 +11,12 @@ type TaskViewModel struct {
 	IsDone   bool
 }
 
-// TODO: подумать о расположении этой модели
+type ProfileViewModel struct {
+	FirstName     string
+	LastName      string
+	RoomNumber    string
+	DormitoryName string
+	GroupName     string
+	TeamID        uuid.UUID
+	TeamName      string
+}

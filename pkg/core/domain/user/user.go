@@ -19,6 +19,7 @@ type User struct {
 	firstName   string
 	lastName    string
 	teamID      *uuid.UUID
+	roomNumber  *string
 	dormitoryID *int64
 	createdAt   time.Time
 }
@@ -45,6 +46,7 @@ func RestoreUser(
 	telegramID int64,
 	firstName, lastName string,
 	teamID *uuid.UUID,
+	roomNumber *string,
 	dormitoryID *int64,
 	createdAt time.Time,
 ) *User {
@@ -54,6 +56,7 @@ func RestoreUser(
 		firstName:   firstName,
 		lastName:    lastName,
 		teamID:      teamID,
+		roomNumber:  roomNumber,
 		dormitoryID: dormitoryID,
 		createdAt:   createdAt,
 	}
@@ -67,8 +70,9 @@ func (u *User) LeaveTeam() {
 	u.teamID = nil
 }
 
-func (u *User) MoveInto(dormID int64) {
+func (u *User) MoveInto(dormID int64, roomNumber string) {
 	u.dormitoryID = &dormID
+	u.roomNumber = &roomNumber
 }
 
 func (u *User) ID() uuid.UUID        { return u.id }
@@ -76,6 +80,7 @@ func (u *User) TelegramID() int64    { return u.telegramID }
 func (u *User) FirstName() string    { return u.firstName }
 func (u *User) LastName() string     { return u.lastName }
 func (u *User) TeamID() *uuid.UUID   { return u.teamID }
+func (u *User) RoomNumber() *string  { return u.roomNumber }
 func (u *User) DormitoryID() *int64  { return u.dormitoryID }
 func (u *User) CreatedAt() time.Time { return u.createdAt }
 
