@@ -55,14 +55,15 @@ func (r *DutyRepository) Save(ctx context.Context, d *duty.Duty) error {
 		dtIDBytes, _ := task.ID().MarshalBinary()
 		defIDBytes, _ := task.TaskDefID().MarshalBinary()
 
-		var assignee interface{} = nil
+		var assignee interface{}
 		if task.AssigneeID() != nil {
 			assignee, _ = task.AssigneeID().MarshalBinary()
 		}
 
-		var completion interface{} = nil
+		var completion sql.NullTime
 		if task.CompletionDate() != nil {
-			completion = *task.CompletionDate()
+			completion.Valid = true
+			completion.Time = *task.CompletionDate()
 		}
 
 		_, err = tx.ExecContext(ctx, taskQuery, dtIDBytes, dIDBytes, defIDBytes, assignee, completion)
@@ -75,6 +76,38 @@ func (r *DutyRepository) Save(ctx context.Context, d *duty.Duty) error {
 }
 
 func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
+	const dutyQuery = `
+		SELECT id, team_id, start_date, end_date
+		FROM duty
+		WHERE team_id = ? AND start_date = (
+			SELECT MAX(start_date) FROM duty
+		)
+	`
+	tIDBytes, _ := teamID.MarshalBinary()
+	row := r.db.QueryRowContext(ctx, dutyQuery, tIDBytes)
+
+	var dID, teamIDBytes []byte
+	var start, end time.Time
+
+	err := row.Scan(&dID, &teamIDBytes, &start, &end)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find duty root: %w", err)
+	}
+
+	dutyID, _ := uuid.FromBytes(dID)
+
+	tasks, err := r.findTasksByDutyID(ctx, dutyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
+}
+
+func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
 	const dutyQuery = `
 		SELECT id, team_id, start_date, end_date
 		FROM duty

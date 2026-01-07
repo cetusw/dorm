@@ -24,6 +24,15 @@ func (s *MainMenuState) Name() string { return "MainMenu" }
 func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message, r *Responder) (State, error) {
 	switch msg.Text {
 	case btnDuty:
+		user, err := s.userUseCase.GetUserByTelegramID(ctx, msg.From.ID)
+		if err != nil {
+			return nil, err
+		}
+		if onDuty, err := s.cleaningUseCase.IsUserOnDuty(ctx, user.ID()); err != nil || !onDuty {
+			r.Display(msgTeamNotOnDutyError, nil)
+			return nil, err
+		}
+
 		r.SendInline(msgDutyManagement+msgDutyManagementDescription+msgSelectAction, taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	case btnMyTasks:

@@ -29,10 +29,6 @@ func (s *TaskMenuState) HandleCallback(ctx context.Context, cb *tgbotapi.Callbac
 	if err != nil {
 		return nil, err
 	}
-	if onDuty, err := s.cleaningUseCase.IsUserOnDuty(ctx, u.ID()); err != nil || !onDuty {
-		r.Display(msgTeamNotOnDutyError, nil)
-		return NewMainMenuState(s.userUseCase, s.cleaningUseCase), err
-	}
 
 	switch cb.Data {
 	case cbAssign:
