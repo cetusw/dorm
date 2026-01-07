@@ -4,13 +4,17 @@ const (
 	btnProfile = "👤 Профиль"
 	btnDuty    = "🛠 Дежурство"
 	btnMyTasks = "📝 Мои задачи"
-	btnBack    = "« Назад"
+
+	btnAssign   = "➕ Взять задачу"
+	btnUnassign = "➖ Отдать задачу"
+	btnConfirm  = "✅ Подтвердить выполнение"
+	btnBack     = "« Назад"
 )
 
 const (
 	msgErrDefault                = "⚠️ Произошла ошибка. Пожалуйста, начните заново: /start"
 	msgDutyManagement            = "🛠 Управление дежурством\n\n"
-	msgDutyManagementDescription = "Здесь вы можете взять задачу и подтвердить её выполнение.\n"
+	msgDutyManagementDescription = "Здесь вы можете управлять своими задачами: брать, возвращать и подтверждать выполнение.\n"
 	msgSelectAction              = "Выберите действие ниже:"
 	msgOnDutyTeam                = "на дежурстве"
 	msgNotOnDutyTeam             = "не на дежурстве"
@@ -22,23 +26,25 @@ const (
 	msgProfileFormat    = "👤 %s %s\n\n🚪 Комната: %s\n🏢 Коливинг: %s\n👥 Группа: %s\n🛠 Команда: %s (%s)"
 
 	msgNoFreeTasks         = "🎉 Свободных задач нет!"
-	msgSelectArea          = "📍 Выберите зону:"
-	msgNoTasksInArea       = "🎉 В этой зоне задач не осталось. Выберите другую зону:"
+	msgSelectArea          = "Выберите зону:"
 	msgSelectTask          = "Выберите задачу:"
 	msgTaskAssigned        = "✅ Задача взята!"
-	msgTakeNextTask        = " Возьмите следующую:"
-	msgNoMoreTasksInArea   = "\n🎉 В этой зоне задач не осталось.\nВыберите другую зону:"
-	msgNoMoreFreeTasks     = "🎉 Больше свободных задач нет."
+	msgTakeNextTask        = "Возьмите следующую:"
 	msgAssignTaskErrPrefix = "❌ Ошибка: "
 
 	msgNoActiveTasks         = "🤷‍♂️ У вас нет активных задач."
 	msgSelectConfirmArea     = "Выберите зону, в которой вы выполнили задачу:"
 	msgSelectConfirmTask     = "Выберите выполненную задачу:"
 	msgTaskCompleted         = "✅ Задача выполнена!"
-	msgTakeNextConfirmTask   = " Выберити следующую задачу:"
-	msgConfirmAreaFinished   = "🎉 В зоне \"%s\" всё готово! Выберити следующую зону:"
+	msgTakeNextConfirmTask   = "Выберите следующую задачу:"
+	msgNoTasksInArea         = "🎉 В зоне не осталось задач! Выберите следующую зону:"
 	msgConfirmAllFinished    = "🎉 Поздравляю! Вы выполнили все свои задачи."
 	msgCompleteTaskErrPrefix = "❌ Ошибка: "
+
+	msgTaskUnassigned           = "✅ Задача отдана!"
+	msgSelectNextTaskToUnassign = " Выберите следующую задачу:"
+	msgAllTasksUnassigned       = "🎉 Вы отдали все свои задачи."
+	msgUnassignTaskErrPrefix    = "❌ Ошибка: "
 
 	msgWelcome         = "👋 Добро пожаловать!"
 	msgReturnWelcome   = "👋 С возвращением!"

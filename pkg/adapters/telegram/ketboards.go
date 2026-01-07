@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	cbBack    = "back"
-	cbAssign  = "cmd_assign"
-	cbConfirm = "cmd_complete"
+	cbBack     = "back"
+	cbAssign   = "cmd_assign"
+	cbUnassign = "cmd_unassign"
+	cbConfirm  = "cmd_complete"
 )
 
 func mainKeyboard() tgbotapi.ReplyKeyboardMarkup {
@@ -28,17 +29,25 @@ func mainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 
 func taskMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("➕ Взять задачу", cbAssign)),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnAssign, cbAssign)),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnUnassign, cbUnassign)),
 		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("✅ Подтвердить выполнение", cbConfirm)),
 	)
 }
 
 func areaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
-	areas := getSortedAreas(tasks)
+	return areaKeyboardBuilder(tasks, "area")
+}
 
+func unassignAreaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
+	return areaKeyboardBuilder(tasks, "unassign_area")
+}
+
+func areaKeyboardBuilder(tasks []ports.TaskViewModel, prefix string) tgbotapi.InlineKeyboardMarkup {
+	areas := getSortedAreas(tasks)
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, a := range areas {
-		data := fmt.Sprintf("area:%d", a.id)
+		data := fmt.Sprintf("%s:%d", prefix, a.id)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(a.name, data),
 		))
@@ -48,11 +57,24 @@ func areaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMark
 }
 
 func taskSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
+	return taskKeyboardBuilder(tasks, "assign")
+}
+
+func unassignTaskSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
+	return taskKeyboardBuilder(tasks, "unassign")
+}
+
+func taskKeyboardBuilder(tasks []ports.TaskViewModel, prefix string) tgbotapi.InlineKeyboardMarkup {
 	SortTasks(tasks)
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, t := range tasks {
-		data := fmt.Sprintf("assign:%s", t.ID.String())
-		text := fmt.Sprintf("%s (%d б.)", t.Title, t.Cost)
+		data := fmt.Sprintf("%s:%s", prefix, t.ID.String())
+		var text string
+		if prefix == "assign" {
+			text = fmt.Sprintf("%s (%d б.)", t.Title, t.Cost)
+		} else {
+			text = t.Title
+		}
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(text, data),
 		))

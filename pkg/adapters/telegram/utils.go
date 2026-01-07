@@ -55,3 +55,13 @@ func getFullProgress(ctx context.Context, useCase ports.CleaningUseCase, user *u
 		getUserProgress(ctx, useCase, user.ID()),
 	)
 }
+
+func filterTasksByArea(tasks []ports.TaskViewModel, areaID int) []ports.TaskViewModel {
+	var filtered []ports.TaskViewModel
+	for _, t := range tasks {
+		if t.AreaID == areaID {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}
