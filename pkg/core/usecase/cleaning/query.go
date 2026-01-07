@@ -126,7 +126,11 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]po
 
 	var result []ports.TaskViewModel
 	for _, task := range d.Tasks() {
-		if task.AssigneeID() != nil {
+		isAssignedToMe := task.AssigneeID() != nil && *task.AssigneeID() == userID
+		if task.AssigneeID() != nil && !isAssignedToMe {
+			continue
+		}
+		if task.IsCompleted() {
 			continue
 		}
 
@@ -141,13 +145,14 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]po
 		}
 
 		result = append(result, ports.TaskViewModel{
-			ID:        task.ID(),
-			Title:     def.Title,
-			AreaID:    def.AreaID,
-			AreaName:  area.Name(),
-			AreaFloor: area.Floor(),
-			Cost:      def.Cost,
-			IsDone:    false,
+			ID:               task.ID(),
+			Title:            def.Title,
+			AreaID:           def.AreaID,
+			AreaName:         area.Name(),
+			AreaFloor:        area.Floor(),
+			Cost:             def.Cost,
+			IsDone:           false,
+			IsAssignedToUser: isAssignedToMe,
 		})
 	}
 

@@ -5,10 +5,9 @@ const (
 	btnDuty    = "🛠 Дежурство"
 	btnMyTasks = "📝 Мои задачи"
 
-	btnAssign   = "➕ Взять задачу"
-	btnUnassign = "➖ Отдать задачу"
-	btnConfirm  = "✅ Подтвердить выполнение"
-	btnBack     = "« Назад"
+	btnAssign  = "🧹 Задачи"
+	btnConfirm = "✅ Подтвердить выполнение"
+	btnBack    = "« Назад"
 )
 
 const (
@@ -29,7 +28,7 @@ const (
 	msgSelectArea          = "Выберите зону:"
 	msgSelectTask          = "Выберите задачу:"
 	msgTaskAssigned        = "✅ Задача взята!"
-	msgTakeNextTask        = "Возьмите следующую:"
+	msgTaskReturned        = "✅ Задача возвращена!"
 	msgAssignTaskErrPrefix = "❌ Ошибка: "
 
 	msgNoActiveTasks         = "🤷‍♂️ У вас нет активных задач."
@@ -40,11 +39,6 @@ const (
 	msgNoTasksInArea         = "🎉 В зоне не осталось задач! Выберите следующую зону:"
 	msgConfirmAllFinished    = "🎉 Поздравляю! Вы выполнили все свои задачи."
 	msgCompleteTaskErrPrefix = "❌ Ошибка: "
-
-	msgTaskUnassigned           = "✅ Задача отдана!"
-	msgSelectNextTaskToUnassign = " Выберите следующую задачу:"
-	msgAllTasksUnassigned       = "🎉 Вы отдали все свои задачи."
-	msgUnassignTaskErrPrefix    = "❌ Ошибка: "
 
 	msgWelcome         = "👋 Добро пожаловать!"
 	msgReturnWelcome   = "👋 С возвращением!"

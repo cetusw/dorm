@@ -37,8 +37,6 @@ func (s *TaskMenuState) HandleCallback(ctx context.Context, cb *tgbotapi.Callbac
 	switch cb.Data {
 	case cbAssign:
 		return s.handleAssign(ctx, u, r)
-	case cbUnassign:
-		return s.handleUnassign(ctx, u, r)
 	case cbConfirm:
 		return s.handleConfirm(ctx, u, r)
 	}
@@ -60,26 +58,6 @@ func (s *TaskMenuState) handleAssign(ctx context.Context, user *user.User, r *Re
 		areaSelectKeyboard(tasks),
 	)
 	return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
-}
-
-func (s *TaskMenuState) handleUnassign(ctx context.Context, user *user.User, r *Responder) (State, error) {
-	progressText := getCoveredProgress(ctx, s.cleaningUseCase, user.ID())
-	tasks, err := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
-	if err != nil {
-		return nil, err
-	}
-	if len(tasks) == 0 {
-		r.Display(
-			fmt.Sprintf("%s%s", msgDutyManagement, msgNoActiveTasks),
-			taskMenuKeyboard(),
-		)
-		return s, nil
-	}
-	r.Display(
-		fmt.Sprintf("*Отдать задачу*\n%s\n%s", progressText, msgSelectArea),
-		unassignAreaSelectKeyboard(tasks),
-	)
-	return NewUnassignSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 }
 
 func (s *TaskMenuState) handleConfirm(ctx context.Context, user *user.User, r *Responder) (State, error) {
