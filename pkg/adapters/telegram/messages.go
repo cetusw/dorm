@@ -2,18 +2,19 @@ package telegram
 
 const (
 	btnProfile = "👤 Профиль"
-	btnDuty    = "💼 Дежурство"
+	btnDuty    = "🛠 Дежурство"
 	btnMyTasks = "📝 Мои задачи"
 	btnBack    = "« Назад"
 )
 
 const (
-	msgErrDefault         = "⚠️ Произошла ошибка. Пожалуйста, начните заново: /start"
-	msgDutyManagement     = "🛠 Управление дежурством\n\n"
-	msgSelectAction       = "Выберите действие ниже:"
-	msgOnDutyTeam         = "на дежурстве"
-	msgNotOnDutyTeam      = "не на дежурстве"
-	msgTeamNotOnDutyError = "⛔️ Сейчас дежурит не ваша команда."
+	msgErrDefault                = "⚠️ Произошла ошибка. Пожалуйста, начните заново: /start"
+	msgDutyManagement            = "🛠 Управление дежурством\n\n"
+	msgDutyManagementDescription = "Здесь вы можете взять задачу и подтвердить её выполнение.\n"
+	msgSelectAction              = "Выберите действие ниже:"
+	msgOnDutyTeam                = "на дежурстве"
+	msgNotOnDutyTeam             = "не на дежурстве"
+	msgTeamNotOnDutyError        = "⛔️ Сейчас дежурит не ваша команда."
 
 	msgProfileLoadError = "⚠️ Не удалось загрузить профиль. Возможно, вы еще не присоединены к команде."
 	msgMyTasksTitle     = "*Мои задачи:*\n\n"

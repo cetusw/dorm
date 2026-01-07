@@ -24,7 +24,7 @@ func (s *MainMenuState) Name() string { return "MainMenu" }
 func (s *MainMenuState) HandleMessage(ctx context.Context, msg *tgbotapi.Message, r *Responder) (State, error) {
 	switch msg.Text {
 	case btnDuty:
-		r.SendInline(msgDutyManagement+msgSelectAction, taskMenuKeyboard())
+		r.SendInline(msgDutyManagement+msgDutyManagementDescription+msgSelectAction, taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	case btnMyTasks:
 		return s.handleMyTasks(ctx, msg, r)
@@ -41,7 +41,7 @@ func (s *MainMenuState) handleMyTasks(ctx context.Context, msg *tgbotapi.Message
 	statsText := getFullProgress(ctx, s.cleaningUseCase, user)
 
 	var b strings.Builder
-	b.WriteString(statsText + "\n\n" + msgMyTasksTitle)
+	b.WriteString(statsText + msgMyTasksTitle)
 
 	if len(tasks) == 0 {
 		b.WriteString(msgNoAssignedTasks)

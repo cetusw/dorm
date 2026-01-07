@@ -56,7 +56,7 @@ func (s *TaskMenuState) handleAssign(ctx context.Context, user *user.User, r *Re
 		r.Display(msgDutyManagement+msgNoFreeTasks, taskMenuKeyboard())
 		return s, nil
 	}
-	r.Display(progressText+msgSelectArea, areaSelectKeyboard(tasks))
+	r.Display(progressText+"\n"+msgSelectArea, areaSelectKeyboard(tasks))
 	return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 }
 
@@ -70,7 +70,7 @@ func (s *TaskMenuState) handleConfirm(ctx context.Context, user *user.User, r *R
 		r.Display(msgDutyManagement+msgNoActiveTasks, taskMenuKeyboard())
 		return s, nil
 	}
-	r.Display(progressText+msgSelectConfirmArea, confirmAreaSelectKeyboard(tasks))
+	r.Display(progressText+"\n"+msgSelectConfirmArea, confirmAreaSelectKeyboard(tasks))
 	return NewConfirmSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 }
 
@@ -91,7 +91,7 @@ func (s *SelectAreaState) HandleMessage(ctx context.Context, msg *tgbotapi.Messa
 
 func (s *SelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder) (State, error) {
 	if cb.Data == cbBack {
-		r.Display(msgDutyManagement+msgSelectAction, taskMenuKeyboard())
+		r.Display(msgDutyManagement+msgDutyManagementDescription+msgSelectAction, taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 	if strings.HasPrefix(cb.Data, "area:") {
@@ -113,7 +113,7 @@ func (s *SelectAreaState) handleAreaSelection(ctx context.Context, cb *tgbotapi.
 	}
 
 	if len(filtered) == 0 {
-		r.Display(progressText+msgNoTasksInArea, areaSelectKeyboard(s.tasks))
+		r.Display(progressText+"\n"+msgNoTasksInArea, areaSelectKeyboard(s.tasks))
 		return s, nil
 	}
 	r.Display(fmt.Sprintf("*%s*\n%s%s", filtered[0].AreaName, progressText, msgSelectTask), taskSelectKeyboard(filtered))
@@ -152,7 +152,7 @@ func (s *SelectTaskState) handleBack(ctx context.Context, user *user.User, r *Re
 	if err != nil {
 		return nil, err
 	}
-	r.Display(progressText+msgSelectArea, areaSelectKeyboard(tasks))
+	r.Display(progressText+"\n"+msgSelectArea, areaSelectKeyboard(tasks))
 	return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, tasks), nil
 }
 
@@ -174,7 +174,7 @@ func (s *SelectTaskState) handleAssignment(ctx context.Context, cb *tgbotapi.Cal
 	}
 
 	if len(tasksInSameArea) > 0 {
-		msg := fmt.Sprintf("*%s*\n%s%s%s", tasksInSameArea[0].AreaName, progressText, msgTaskAssigned, msgTakeNextTask)
+		msg := fmt.Sprintf("*%s*\n%s\n%s%s", tasksInSameArea[0].AreaName, progressText, msgTaskAssigned, msgTakeNextTask)
 		r.Display(msg, taskSelectKeyboard(tasksInSameArea))
 		return s, nil
 	}
@@ -204,7 +204,7 @@ func (s *ConfirmSelectAreaState) HandleMessage(ctx context.Context, msg *tgbotap
 
 func (s *ConfirmSelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder) (State, error) {
 	if cb.Data == cbBack {
-		r.Display(msgDutyManagement+msgSelectAction, taskMenuKeyboard())
+		r.Display(msgDutyManagement+msgDutyManagementDescription+msgSelectAction, taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 	if strings.HasPrefix(cb.Data, "conf_area:") {
@@ -223,7 +223,7 @@ func (s *ConfirmSelectAreaState) handleAreaSelection(ctx context.Context, cb *tg
 			filtered = append(filtered, t)
 		}
 	}
-	r.Display(fmt.Sprintf("*%s*\n%s%s", filtered[0].AreaName, progressText, msgSelectConfirmTask), taskConfirmKeyboard(filtered))
+	r.Display(fmt.Sprintf("*%s*\n%s\n%s", filtered[0].AreaName, progressText, msgSelectConfirmTask), taskConfirmKeyboard(filtered))
 	return NewConfirmTaskState(s.userUseCase, s.cleaningUseCase, filtered), nil
 }
 
@@ -259,7 +259,7 @@ func (s *ConfirmTaskState) handleBack(ctx context.Context, user *user.User, r *R
 	if err != nil {
 		return nil, err
 	}
-	r.Display(progressText+msgSelectArea, confirmAreaSelectKeyboard(allAssigned))
+	r.Display(progressText+"\n"+msgSelectArea, confirmAreaSelectKeyboard(allAssigned))
 	return NewConfirmSelectAreaState(s.userUseCase, s.cleaningUseCase, allAssigned), nil
 }
 
@@ -282,7 +282,7 @@ func (s *ConfirmTaskState) handleCompletion(ctx context.Context, cb *tgbotapi.Ca
 
 	progressText := getMetProgress(ctx, s.cleaningUseCase, user.ID())
 	if len(tasksInSameArea) > 0 {
-		msg := fmt.Sprintf("*%s*\n%s%s", areaName, progressText, msgTaskCompleted+msgTakeNextConfirmTask)
+		msg := fmt.Sprintf("*%s*\n%s\n%s", areaName, progressText, msgTaskCompleted+msgTakeNextConfirmTask)
 		r.Display(msg, taskConfirmKeyboard(tasksInSameArea))
 		return s, nil
 	}

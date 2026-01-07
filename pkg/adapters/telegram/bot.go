@@ -50,65 +50,88 @@ func (b *BotAdapter) Start() {
 	}
 }
 
-// TODO: refactor
-func (b *BotAdapter) processUpdate(update tgbotapi.Update) {
-	var chatID, userID int64
-	var callbackMsgID int
+type updateInfo struct {
+	ChatID        int64
+	UserID        int64
+	CallbackMsgID int
+}
 
-	if update.Message != nil {
-		chatID = update.Message.Chat.ID
-		userID = update.Message.From.ID
-		b.api.Send(tgbotapi.NewDeleteMessage(chatID, update.Message.MessageID))
-	} else if update.CallbackQuery != nil {
-		chatID = update.CallbackQuery.Message.Chat.ID
-		userID = update.CallbackQuery.From.ID
-		callbackMsgID = update.CallbackQuery.Message.MessageID
-		b.api.Request(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
-	} else {
+func (b *BotAdapter) processUpdate(update tgbotapi.Update) {
+	info, ok := b.extractUpdateInfo(update)
+	if !ok {
 		return
 	}
+	b.handleRequest(context.Background(), update, info)
+}
 
-	state := b.getState(userID)
-	if state == nil {
-		state = NewAuthState(b.userUseCase, b.cleaningUseCase)
-	}
+func (b *BotAdapter) handleRequest(ctx context.Context, update tgbotapi.Update, info *updateInfo) {
+	state := b.getOrCreateState(info.UserID)
+	responder := b.createResponder(info)
 
-	b.muMsg.Lock()
-	lastID := b.lastBotMsg[userID]
-	b.muMsg.Unlock()
-
-	r := &Responder{
-		api:           b.api,
-		chatID:        chatID,
-		lastBotMsgID:  lastID,
-		callbackMsgID: callbackMsgID,
-		onSent: func(id int) {
-			b.muMsg.Lock()
-			b.lastBotMsg[userID] = id
-			b.muMsg.Unlock()
-		},
-	}
-	ctx := context.Background()
-	var nextState State
-	var err error
-
-	if update.Message != nil {
-		nextState, err = state.HandleMessage(ctx, update.Message, r)
-	} else if update.CallbackQuery != nil {
-		b.api.Request(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
-		nextState, err = state.HandleCallback(ctx, update.CallbackQuery, r)
-	}
-
+	nextState, err := b.executeStateHandler(ctx, state, update, responder)
 	if err != nil {
 		log.Printf("Bot Error: %v", err)
-		r.Display(msgErrDefault, nil)
-		b.setState(userID, nil)
+		responder.Display(msgErrDefault, nil)
+		b.setState(info.UserID, nil)
 		return
 	}
 
 	if nextState != nil {
-		b.setState(userID, nextState)
+		b.setState(info.UserID, nextState)
 	}
+}
+
+func (b *BotAdapter) extractUpdateInfo(update tgbotapi.Update) (*updateInfo, bool) {
+	if update.Message != nil {
+		b.api.Send(tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID))
+		return &updateInfo{
+			ChatID: update.Message.Chat.ID,
+			UserID: update.Message.From.ID,
+		}, true
+	}
+
+	if update.CallbackQuery != nil {
+		b.api.Request(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+		return &updateInfo{
+			ChatID:        update.CallbackQuery.Message.Chat.ID,
+			UserID:        update.CallbackQuery.From.ID,
+			CallbackMsgID: update.CallbackQuery.Message.MessageID,
+		}, true
+	}
+
+	return nil, false
+}
+
+func (b *BotAdapter) getOrCreateState(userID int64) State {
+	if state := b.getState(userID); state != nil {
+		return state
+	}
+	return NewAuthState(b.userUseCase, b.cleaningUseCase)
+}
+
+func (b *BotAdapter) createResponder(info *updateInfo) *Responder {
+	b.muMsg.Lock()
+	lastID := b.lastBotMsg[info.UserID]
+	b.muMsg.Unlock()
+
+	return &Responder{
+		api:           b.api,
+		chatID:        info.ChatID,
+		lastBotMsgID:  lastID,
+		callbackMsgID: info.CallbackMsgID,
+		onSent: func(id int) {
+			b.muMsg.Lock()
+			b.lastBotMsg[info.UserID] = id
+			b.muMsg.Unlock()
+		},
+	}
+}
+
+func (b *BotAdapter) executeStateHandler(ctx context.Context, state State, update tgbotapi.Update, r *Responder) (State, error) {
+	if update.Message != nil {
+		return state.HandleMessage(ctx, update.Message, r)
+	}
+	return state.HandleCallback(ctx, update.CallbackQuery, r)
 }
 
 func (b *BotAdapter) getState(userID int64) State {

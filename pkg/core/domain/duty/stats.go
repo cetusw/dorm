@@ -13,3 +13,7 @@ func (s UserStats) IsQuotaMet() bool {
 func (s UserStats) IsQuotaCovered() bool {
 	return float64(s.TotalPoints) >= s.RequiredPoints
 }
+
+func (s UserStats) IsUserProgressMet() bool {
+	return s.ConfirmedPoints >= s.TotalPoints
+}
