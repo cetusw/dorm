@@ -58,7 +58,7 @@ func (s *TaskMenuState) handleAssign(ctx context.Context, user *user.User, r *Re
 
 func (s *TaskMenuState) handleConfirm(ctx context.Context, user *user.User, r *Responder) (State, error) {
 	progressText := getUserProgress(ctx, s.cleaningUseCase, user.ID())
-	tasks, err := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
+	tasks, err := s.cleaningUseCase.GetAllAssignedTasks(ctx, user.ID())
 	if err != nil {
 		return nil, err
 	}

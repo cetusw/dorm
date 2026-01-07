@@ -73,8 +73,13 @@ func taskConfirmKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMar
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, t := range tasks {
 		data := fmt.Sprintf("complete:%s", t.ID.String())
+		var text string
+		if t.IsDone {
+			text += "✅ "
+		}
+		text += fmt.Sprintf("%s (%d б.)", t.Title, t.Cost)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(t.Title, data),
+			tgbotapi.NewInlineKeyboardButtonData(text, data),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnBack, cbBack)))
@@ -83,12 +88,29 @@ func taskConfirmKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMar
 
 func confirmAreaSelectKeyboard(tasks []ports.TaskViewModel) tgbotapi.InlineKeyboardMarkup {
 	areas := getSortedAreas(tasks)
+	areaTasks := make(map[int][]ports.TaskViewModel)
+	for _, t := range tasks {
+		areaTasks[t.AreaID] = append(areaTasks[t.AreaID], t)
+	}
 
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, a := range areas {
+		allDone := true
+		for _, t := range areaTasks[a.id] {
+			if !t.IsDone {
+				allDone = false
+				break
+			}
+		}
+
+		text := a.name
+		if allDone {
+			text = "✅ " + text
+		}
+
 		data := fmt.Sprintf("conf_area:%d", a.id)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(a.name, data),
+			tgbotapi.NewInlineKeyboardButtonData(text, data),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(btnBack, cbBack)))

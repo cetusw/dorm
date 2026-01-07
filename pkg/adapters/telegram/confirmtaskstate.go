@@ -39,48 +39,52 @@ func (s *ConfirmTaskState) HandleCallback(ctx context.Context, cb *tgbotapi.Call
 }
 
 func (s *ConfirmTaskState) handleBack(ctx context.Context, user *user.User, r *Responder) (State, error) {
-	progressText := getMetProgress(ctx, s.cleaningUseCase, user.ID())
+	progressText := getUserProgress(ctx, s.cleaningUseCase, user.ID())
 	r.Display(progressText+"\n"+msgSelectConfirmArea, confirmAreaSelectKeyboard(s.allTasks))
 	return NewConfirmSelectAreaState(s.userUseCase, s.cleaningUseCase, s.allTasks), nil
 }
 
 func (s *ConfirmTaskState) handleCompletion(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder, user *user.User) (State, error) {
 	taskID, _ := uuid.Parse(strings.TrimPrefix(cb.Data, "complete:"))
-	if err := s.cleaningUseCase.CompleteTask(ctx, taskID, user.ID()); err != nil {
+
+	var taskToToggle *ports.TaskViewModel
+	for _, t := range s.allTasks {
+		if t.ID == taskID {
+			taskToToggle = &t
+			break
+		}
+	}
+
+	if taskToToggle == nil {
+		return s, nil
+	}
+
+	var err error
+	var notification string
+	if taskToToggle.IsDone {
+		err = s.cleaningUseCase.OpenTask(ctx, taskID, user.ID())
+		notification = msgTaskUncompleted
+	} else {
+		err = s.cleaningUseCase.CompleteTask(ctx, taskID, user.ID())
+		notification = msgTaskCompleted
+	}
+
+	if err != nil {
 		r.Display(msgCompleteTaskErrPrefix+err.Error(), taskMenuKeyboard())
 		return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
 	}
 
-	progressText := getUserProgress(ctx, s.cleaningUseCase, user.ID())
-
-	allAssigned, _ := s.cleaningUseCase.GetUncompletedAssignedTasks(ctx, user.ID())
+	allAssigned, _ := s.cleaningUseCase.GetAllAssignedTasks(ctx, user.ID())
 	s.allTasks = allAssigned
 
 	tasksInSameArea := filterTasksByArea(s.allTasks, s.areaID)
 	var areaName string
-	if len(s.allTasks) > 0 {
-		for _, task := range s.allTasks {
-			if task.AreaID == s.areaID {
-				areaName = task.AreaName
-				break
-			}
-		}
+	if len(tasksInSameArea) > 0 {
+		areaName = tasksInSameArea[0].AreaName
 	}
 
-	if len(tasksInSameArea) > 0 {
-		r.Display(
-			fmt.Sprintf("*%s*\n%s\n%s %s", areaName, progressText, msgTaskCompleted, msgTakeNextConfirmTask),
-			taskConfirmKeyboard(tasksInSameArea),
-		)
-		return s, nil
-	}
-	if len(allAssigned) > 0 {
-		r.Display(
-			fmt.Sprintf("*Подтвердить выполнение*\n%s\n%s", progressText, msgNoTasksInArea),
-			confirmAreaSelectKeyboard(allAssigned),
-		)
-		return NewConfirmSelectAreaState(s.userUseCase, s.cleaningUseCase, allAssigned), nil
-	}
-	r.Display(msgConfirmAllFinished, taskMenuKeyboard())
-	return NewTaskMenuState(s.userUseCase, s.cleaningUseCase), nil
+	progressText := getUserProgress(ctx, s.cleaningUseCase, user.ID())
+	msg := fmt.Sprintf("*%s*\n%s\n%s %s", areaName, progressText, notification, msgSelectConfirmTask)
+	r.Display(msg, taskConfirmKeyboard(tasksInSameArea))
+	return s, nil
 }

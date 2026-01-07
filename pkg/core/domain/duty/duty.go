@@ -88,6 +88,18 @@ func (d *Duty) CompleteTask(taskID uuid.UUID) error {
 	return nil
 }
 
+func (d *Duty) OpenTask(taskID uuid.UUID) error {
+	task, exists := d.tasks[taskID]
+	if !exists {
+		return ErrTaskNotFound
+	}
+	if task.assigneeID == nil {
+		return ErrTaskNotAssigned
+	}
+	task.completionDate = nil
+	return nil
+}
+
 func (d *Duty) ID() uuid.UUID     { return d.id }
 func (d *Duty) TeamID() uuid.UUID { return d.teamID }
 func (d *Duty) Tasks() []*DutyTask {

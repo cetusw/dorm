@@ -140,6 +140,37 @@ func (s *Service) UnassignTask(ctx context.Context, taskID uuid.UUID, userID uui
 	return nil
 }
 
+func (s *Service) OpenTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
+	u, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if u.TeamID() == nil {
+		return fmt.Errorf("user not in team")
+	}
+
+	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
+	if err != nil || d == nil {
+		return fmt.Errorf("duty not found")
+	}
+
+	if err := d.OpenTask(taskID); err != nil {
+		return err
+	}
+
+	if err := s.dutyRepo.Save(ctx, d); err != nil {
+		return err
+	}
+
+	_ = s.eventBus.Publish(ctx, events.TopicTaskUncompleted, events.TaskUncompletedEvent{
+		TaskID: taskID,
+		UserID: userID,
+		Time:   time.Now(),
+	})
+
+	return nil
+}
+
 func (s *Service) GetTeamActiveDuty(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
 	return s.dutyRepo.FindCurrentByTeamID(ctx, teamID)
 }

@@ -35,6 +35,7 @@ const (
 	msgSelectConfirmArea     = "Выберите зону, в которой вы выполнили задачу:"
 	msgSelectConfirmTask     = "Выберите выполненную задачу:"
 	msgTaskCompleted         = "✅ Задача выполнена!"
+	msgTaskUncompleted       = "✅ Выполнение отменено!"
 	msgTakeNextConfirmTask   = "Выберите следующую задачу:"
 	msgNoTasksInArea         = "🎉 В зоне не осталось задач! Выберите следующую зону:"
 	msgConfirmAllFinished    = "🎉 Поздравляю! Вы выполнили все свои задачи."
