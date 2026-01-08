@@ -31,7 +31,7 @@ func NewContainer(configPath string) (*Container, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	gsheetsClient, err := gsheets.NewClient(cfg.GoogleCredentials)
+	gsheetsClient, err := gsheets.NewGoogleSheetsClient(cfg.GoogleCredentials)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gsheets client: %w", err)
 	}
