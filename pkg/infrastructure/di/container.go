@@ -11,6 +11,7 @@ import (
 	"dorm/pkg/core/usecase/user"
 	"dorm/pkg/infrastructure/config"
 	"dorm/pkg/infrastructure/eventbus"
+	"dorm/pkg/infrastructure/gsheets"
 	"dorm/pkg/infrastructure/mysql"
 	"dorm/pkg/infrastructure/mysql/repository"
 )
@@ -21,12 +22,18 @@ type Container struct {
 	EventBus        ports.EventBus
 	CleaningService ports.CleaningUseCase
 	Bot             *telegram.BotAdapter
+	GSheetsClient   gsheets.SpreadsheetClient
 }
 
 func NewContainer(configPath string) (*Container, error) {
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	gsheetsClient, err := gsheets.NewClient(cfg.GoogleCredentials)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gsheets client: %w", err)
 	}
 
 	db, err := mysql.NewConnection(cfg)
@@ -67,6 +74,7 @@ func NewContainer(configPath string) (*Container, error) {
 		EventBus:        bus,
 		CleaningService: cleaningService,
 		Bot:             botAdapter,
+		GSheetsClient:   gsheetsClient,
 	}, nil
 }
 
@@ -79,3 +87,5 @@ func (c *Container) Close() {
 		}
 	}
 }
+
+// TODO: поменять названия gsheets на нормальное googlesheets

@@ -14,12 +14,6 @@ type CronConfig struct {
 }
 
 type AppConfig struct {
-	Cron CronConfig
-
-	BotToken string
-
-	SheetsCredentials string
-
 	DBUser     string
 	DBPassword string
 	DBHost     string
@@ -27,6 +21,10 @@ type AppConfig struct {
 	DBName     string
 	TZ         string
 	DBDriver   string
+
+	Cron              CronConfig
+	BotToken          string
+	GoogleCredentials string
 }
 
 func LoadConfig(configPath string) (*AppConfig, error) {
@@ -38,7 +36,10 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 	}
 
 	cfg.getBotToken()
-	cfg.getSheetsCredentials()
+	err = cfg.getGoogleConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	err = cfg.getDBConfig()
 	if err != nil {
@@ -58,10 +59,6 @@ func (cfg *AppConfig) GetDBConnectionString() string {
 		cfg.DBName,
 		url.QueryEscape(cfg.TZ),
 	)
-}
-
-func (cfg *AppConfig) GetSheetsCredentialsPath() string {
-	return cfg.SheetsCredentials
 }
 
 func (cfg *AppConfig) getCronConfig(configPath string) error {
@@ -86,11 +83,18 @@ func (cfg *AppConfig) getBotToken() {
 	}
 }
 
-func (cfg *AppConfig) getSheetsCredentials() {
-	cfg.SheetsCredentials = os.Getenv("SHEETS_CREDENTIALS")
-	if cfg.SheetsCredentials == "" {
-		log.Println("Warning: SHEETS_CREDENTIALS not set in environment variables.")
+func (cfg *AppConfig) getGoogleConfig() error {
+	googleCredentialsPath := os.Getenv("GOOGLE_CREDENTIALS")
+	if googleCredentialsPath == "" {
+		return fmt.Errorf("GOOGLE_CREDENTIALS environment variable not set")
 	}
+	b, err := os.ReadFile(googleCredentialsPath)
+	if err != nil {
+		return fmt.Errorf("failed to read GOOGLE_CREDENTIALS file: %w", err)
+	}
+	cfg.GoogleCredentials = string(b)
+
+	return nil
 }
 
 func (cfg *AppConfig) getDBConfig() error {
