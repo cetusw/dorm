@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"dorm/pkg/core/ports"
+	"dorm/pkg/core/ports/dto"
 	"fmt"
 	"strconv"
 	"strings"
@@ -13,10 +14,10 @@ import (
 type ConfirmSelectAreaState struct {
 	userUseCase     ports.UserUseCase
 	cleaningUseCase ports.CleaningUseCase
-	tasks           []ports.TaskViewModel
+	tasks           []dto.TaskViewModel
 }
 
-func NewConfirmSelectAreaState(u ports.UserUseCase, c ports.CleaningUseCase, t []ports.TaskViewModel) *ConfirmSelectAreaState {
+func NewConfirmSelectAreaState(u ports.UserUseCase, c ports.CleaningUseCase, t []dto.TaskViewModel) *ConfirmSelectAreaState {
 	return &ConfirmSelectAreaState{userUseCase: u, cleaningUseCase: c, tasks: t}
 }
 func (s *ConfirmSelectAreaState) Name() string { return "ConfirmSelectArea" }

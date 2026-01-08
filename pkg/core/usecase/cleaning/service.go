@@ -170,7 +170,3 @@ func (s *Service) OpenTask(ctx context.Context, taskID uuid.UUID, userID uuid.UU
 
 	return nil
 }
-
-func (s *Service) GetTeamActiveDuty(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
-	return s.dutyRepo.FindCurrentByTeamID(ctx, teamID)
-}

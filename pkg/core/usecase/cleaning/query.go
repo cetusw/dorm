@@ -3,13 +3,14 @@ package cleaning
 import (
 	"context"
 	"dorm/pkg/core/domain/catalog"
+	"dorm/pkg/core/domain/user"
+	"dorm/pkg/core/ports/dto"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 
 	"dorm/pkg/core/domain/duty"
-	"dorm/pkg/core/ports"
 )
 
 func (s *Service) IsUserOnDuty(ctx context.Context, userID uuid.UUID) (bool, error) {
@@ -88,14 +89,96 @@ func (s *Service) GetUserStats(ctx context.Context, userID uuid.UUID) (*duty.Use
 	}, nil
 }
 
-func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]ports.TaskViewModel, error) {
+func (s *Service) GetTeamTasks(ctx context.Context, teamID uuid.UUID) ([]dto.TaskViewModel, error) {
+	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, teamID)
+	if err != nil || d == nil {
+		return nil, nil
+	}
+
+	defs, _ := s.taskRepo.GetAllTaskDefinitions(ctx)
+	areas, _ := s.areaRepo.GetAllAreas(ctx)
+	users, _ := s.userRepo.FindByTeamID(ctx, teamID)
+
+	defMap := make(map[uuid.UUID]*catalog.TaskDefinition)
+	for _, df := range defs {
+		defMap[df.ID()] = df
+	}
+
+	areaMap := make(map[int]*catalog.Area)
+	for _, ar := range areas {
+		areaMap[ar.ID()] = ar
+	}
+
+	userMap := make(map[uuid.UUID]*user.User)
+	for _, u := range users {
+		userMap[u.ID()] = u
+	}
+
+	var table []dto.TaskViewModel
+	for _, dt := range d.Tasks() {
+		def := defMap[dt.TaskDefID()]
+		area := areaMap[def.AreaID()]
+
+		var assignee *user.User
+		if dt.AssigneeID() != nil {
+			assignee = userMap[*dt.AssigneeID()]
+		}
+
+		table = append(table, dto.NewTaskViewModel(dt, def, area, assignee, uuid.Nil))
+	}
+
+	return table, nil
+}
+
+func (s *Service) GetLatestDuties(ctx context.Context) ([]dto.DutyViewModel, error) {
+	latestDuties, err := s.dutyRepo.FindAllLatest(ctx)
+	if err != nil || len(latestDuties) == 0 {
+		return nil, err
+	}
+
+	var result []dto.DutyViewModel
+	for _, d := range latestDuties {
+		team, _ := s.teamRepo.FindByID(ctx, d.TeamID())
+		group, _ := s.groupRepo.FindByID(ctx, team.GroupID())
+		tasks, err := s.GetTeamTasks(ctx, d.TeamID())
+		if err != nil {
+			return nil, err
+		}
+		var userStats []dto.UserStats
+		members, err := s.userRepo.FindByTeamID(ctx, d.TeamID())
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO: этот кринж надо привести к получению одним запросом к бд
+		for _, member := range members {
+			stats, err := s.GetUserStats(ctx, member.ID())
+			if err != nil {
+				return nil, err
+			}
+			userStats = append(userStats, dto.UserStats{
+				FirstName:       member.FirstName(),
+				LastName:        member.LastName(),
+				TotalPoints:     stats.TotalPoints,
+				ConfirmedPoints: stats.ConfirmedPoints,
+			})
+		}
+
+		vm := dto.NewDutyViewModel(d, team, group, tasks, userStats)
+		result = append(result, vm)
+	}
+
+	return result, nil
+}
+
+func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]dto.TaskViewModel, error) {
 	u, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil || u.TeamID() == nil {
 		return nil, fmt.Errorf("user or team not found")
 	}
 	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
 	if err != nil || d == nil {
-		return []ports.TaskViewModel{}, nil
+		return []dto.TaskViewModel{}, nil
 	}
 
 	taskDefs, err := s.taskRepo.GetAllTaskDefinitions(ctx)
@@ -124,7 +207,7 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]po
 		areaMap[a.ID()] = a
 	}
 
-	var result []ports.TaskViewModel
+	var result []dto.TaskViewModel
 	for _, task := range d.Tasks() {
 		isAssignedToMe := task.AssigneeID() != nil && *task.AssigneeID() == userID
 		if task.AssigneeID() != nil && !isAssignedToMe {
@@ -144,7 +227,7 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]po
 			continue
 		}
 
-		result = append(result, ports.TaskViewModel{
+		result = append(result, dto.TaskViewModel{
 			ID:               task.ID(),
 			Title:            def.Title,
 			AreaID:           def.AreaID,
@@ -159,14 +242,14 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]po
 	return result, nil
 }
 
-func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.UUID) ([]ports.TaskViewModel, error) {
+func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.UUID) ([]dto.TaskViewModel, error) {
 	u, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil || u.TeamID() == nil {
 		return nil, fmt.Errorf("user or team not found")
 	}
 	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
 	if err != nil || d == nil {
-		return []ports.TaskViewModel{}, nil
+		return []dto.TaskViewModel{}, nil
 	}
 
 	taskDefs, err := s.taskRepo.GetAllTaskDefinitions(ctx)
@@ -188,7 +271,7 @@ func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.U
 		areaMap[a.ID()] = a
 	}
 
-	var result []ports.TaskViewModel
+	var result []dto.TaskViewModel
 	for _, task := range d.Tasks() {
 		if task.AssigneeID() == nil || *task.AssigneeID() != userID || task.IsCompleted() {
 			continue
@@ -204,7 +287,7 @@ func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.U
 			continue
 		}
 
-		result = append(result, ports.TaskViewModel{
+		result = append(result, dto.TaskViewModel{
 			ID:        task.ID(),
 			Title:     def.Title(),
 			Cost:      def.Cost(),
@@ -217,14 +300,14 @@ func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.U
 	return result, nil
 }
 
-func (s *Service) GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]ports.TaskViewModel, error) {
+func (s *Service) GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]dto.TaskViewModel, error) {
 	u, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil || u.TeamID() == nil {
 		return nil, fmt.Errorf("user or team not found")
 	}
 	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
 	if err != nil || d == nil {
-		return []ports.TaskViewModel{}, nil
+		return []dto.TaskViewModel{}, nil
 	}
 
 	taskDefs, err := s.taskRepo.GetAllTaskDefinitions(ctx)
@@ -246,7 +329,7 @@ func (s *Service) GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]
 		areaMap[a.ID()] = a
 	}
 
-	var result []ports.TaskViewModel
+	var result []dto.TaskViewModel
 	for _, task := range d.Tasks() {
 		if task.AssigneeID() == nil || *task.AssigneeID() != userID {
 			continue
@@ -262,7 +345,7 @@ func (s *Service) GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]
 			continue
 		}
 
-		result = append(result, ports.TaskViewModel{
+		result = append(result, dto.TaskViewModel{
 			ID:        task.ID(),
 			Title:     def.Title(),
 			Cost:      def.Cost(),

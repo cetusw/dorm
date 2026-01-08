@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"dorm/pkg/core/ports/dto"
 
 	"github.com/google/uuid"
 
@@ -12,5 +13,5 @@ type UserUseCase interface {
 	RegisterUser(ctx context.Context, telegramID int64, fullName string) error
 	GetUserByTelegramID(ctx context.Context, telegramID int64) (*user.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*user.User, error)
-	GetUserProfile(ctx context.Context, userID uuid.UUID) (*ProfileViewModel, error)
+	GetUserProfile(ctx context.Context, userID uuid.UUID) (*dto.ProfileViewModel, error)
 }

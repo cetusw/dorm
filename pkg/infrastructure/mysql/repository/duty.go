@@ -214,6 +214,38 @@ func (r *DutyRepository) FindLastByTaskDefID(ctx context.Context, taskDefID uuid
 	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
 }
 
+func (r *DutyRepository) FindAllLatest(ctx context.Context) ([]*duty.Duty, error) {
+	const query = `
+		SELECT id, team_id, start_date, end_date 
+		FROM duty 
+		WHERE start_date = (SELECT MAX(start_date) FROM duty)`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("find all latest duties: %w", err)
+	}
+	defer rows.Close()
+
+	var result []*duty.Duty
+	for rows.Next() {
+		var dID, tID []byte
+		var start, end time.Time
+		if err := rows.Scan(&dID, &tID, &start, &end); err != nil {
+			return nil, err
+		}
+		id, _ := uuid.FromBytes(dID)
+		teamID, _ := uuid.FromBytes(tID)
+
+		tasks, err := r.findTasksByDutyID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, duty.RestoreDuty(id, teamID, start, end, tasks))
+	}
+	return result, rows.Err()
+}
+
 func (r *DutyRepository) findTasksByDutyID(ctx context.Context, dutyID uuid.UUID) ([]*duty.DutyTask, error) {
 	const query = `
 		SELECT id, task_id, assignee_id, completion_date

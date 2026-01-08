@@ -3,6 +3,7 @@ package ports
 import (
 	"context"
 	"dorm/pkg/core/domain/duty"
+	"dorm/pkg/core/ports/dto"
 
 	"github.com/google/uuid"
 )
@@ -16,9 +17,11 @@ type CleaningUseCase interface {
 
 	IsUserOnDuty(ctx context.Context, userID uuid.UUID) (bool, error)
 
-	GetTeamActiveDuty(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error)
+	// TODO: возможно, стоит переписать telegram на использование одного метода GetTeamTasks и внутри фильтровать так, как ему нужно
+	GetTeamTasks(ctx context.Context, teamID uuid.UUID) ([]dto.TaskViewModel, error)
+	GetLatestDuties(ctx context.Context) ([]dto.DutyViewModel, error)
 	GetUserStats(ctx context.Context, userID uuid.UUID) (*duty.UserStats, error)
-	GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]TaskViewModel, error)
-	GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]TaskViewModel, error)
-	GetUncompletedAssignedTasks(ctx context.Context, userID uuid.UUID) ([]TaskViewModel, error)
+	GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]dto.TaskViewModel, error)
+	GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]dto.TaskViewModel, error)
+	GetUncompletedAssignedTasks(ctx context.Context, userID uuid.UUID) ([]dto.TaskViewModel, error)
 }

@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"dorm/pkg/core/ports/dto"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -56,8 +57,8 @@ func getFullProgress(ctx context.Context, useCase ports.CleaningUseCase, user *u
 	)
 }
 
-func filterTasksByArea(tasks []ports.TaskViewModel, areaID int) []ports.TaskViewModel {
-	var filtered []ports.TaskViewModel
+func filterTasksByArea(tasks []dto.TaskViewModel, areaID int) []dto.TaskViewModel {
+	var filtered []dto.TaskViewModel
 	for _, t := range tasks {
 		if t.AreaID == areaID {
 			filtered = append(filtered, t)

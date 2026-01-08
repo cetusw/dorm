@@ -118,4 +118,5 @@ type Repository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Duty, error)
 	CountDistinctStartDates(ctx context.Context) (int, error)
 	FindLastByTaskDefID(ctx context.Context, taskDefID uuid.UUID) (*Duty, error)
+	FindAllLatest(ctx context.Context) ([]*Duty, error)
 }

@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"dorm/pkg/core/ports/dto"
 	"fmt"
 	"sort"
 	"strings"
@@ -63,8 +64,8 @@ func (s *MainMenuState) handleMyTasks(ctx context.Context, msg *tgbotapi.Message
 	return nil, nil
 }
 
-func (s *MainMenuState) buildTasksList(b *strings.Builder, tasks []ports.TaskViewModel) {
-	tasksByArea := make(map[string][]ports.TaskViewModel)
+func (s *MainMenuState) buildTasksList(b *strings.Builder, tasks []dto.TaskViewModel) {
+	tasksByArea := make(map[string][]dto.TaskViewModel)
 	for _, task := range tasks {
 		key := fmt.Sprintf("%d этаж. %s", task.AreaFloor, task.AreaName)
 		tasksByArea[key] = append(tasksByArea[key], task)

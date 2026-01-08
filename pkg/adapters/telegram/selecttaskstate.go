@@ -4,6 +4,7 @@ import (
 	"context"
 	"dorm/pkg/core/domain/user"
 	"dorm/pkg/core/ports"
+	"dorm/pkg/core/ports/dto"
 	"fmt"
 	"strings"
 
@@ -14,11 +15,11 @@ import (
 type SelectTaskState struct {
 	userUseCase     ports.UserUseCase
 	cleaningUseCase ports.CleaningUseCase
-	allTasks        []ports.TaskViewModel
+	allTasks        []dto.TaskViewModel
 	areaID          int
 }
 
-func NewSelectTaskState(u ports.UserUseCase, c ports.CleaningUseCase, allTasks []ports.TaskViewModel, areaID int) *SelectTaskState {
+func NewSelectTaskState(u ports.UserUseCase, c ports.CleaningUseCase, allTasks []dto.TaskViewModel, areaID int) *SelectTaskState {
 	return &SelectTaskState{userUseCase: u, cleaningUseCase: c, allTasks: allTasks, areaID: areaID}
 }
 func (s *SelectTaskState) Name() string { return "SelectTask" }
@@ -50,7 +51,7 @@ func (s *SelectTaskState) handleBack(ctx context.Context, user *user.User, r *Re
 func (s *SelectTaskState) handleAssignment(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder, user *user.User) (State, error) {
 	taskID, _ := uuid.Parse(strings.TrimPrefix(cb.Data, "assign:"))
 
-	var taskToToggle *ports.TaskViewModel
+	var taskToToggle *dto.TaskViewModel
 	for _, t := range s.allTasks {
 		if t.ID == taskID {
 			taskToToggle = &t

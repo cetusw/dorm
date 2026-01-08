@@ -2,13 +2,13 @@ package user
 
 import (
 	"context"
+	"dorm/pkg/core/ports/dto"
 	"strings"
 
 	"github.com/google/uuid"
 
 	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/domain/user"
-	"dorm/pkg/core/ports"
 )
 
 type Service struct {
@@ -49,7 +49,7 @@ func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*user.User, er
 	return s.userRepo.FindByID(ctx, id)
 }
 
-func (s *Service) GetUserProfile(ctx context.Context, userID uuid.UUID) (*ports.ProfileViewModel, error) {
+func (s *Service) GetUserProfile(ctx context.Context, userID uuid.UUID) (*dto.ProfileViewModel, error) {
 	u, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (s *Service) GetUserProfile(ctx context.Context, userID uuid.UUID) (*ports.
 		room = *u.RoomNumber()
 	}
 
-	profile := &ports.ProfileViewModel{
+	profile := &dto.ProfileViewModel{
 		FirstName:     u.FirstName(),
 		LastName:      u.LastName(),
 		RoomNumber:    room,
@@ -89,7 +89,7 @@ func (s *Service) GetUserProfile(ctx context.Context, userID uuid.UUID) (*ports.
 	return profile, nil
 }
 
-func (s *Service) fillTeamData(ctx context.Context, p *ports.ProfileViewModel, u *user.User) (*structure.Team, error) {
+func (s *Service) fillTeamData(ctx context.Context, p *dto.ProfileViewModel, u *user.User) (*structure.Team, error) {
 	if u.TeamID() == nil {
 		return nil, nil
 	}
@@ -102,7 +102,7 @@ func (s *Service) fillTeamData(ctx context.Context, p *ports.ProfileViewModel, u
 	return team, nil
 }
 
-func (s *Service) fillGroupData(ctx context.Context, p *ports.ProfileViewModel, t *structure.Team) (*structure.Group, error) {
+func (s *Service) fillGroupData(ctx context.Context, p *dto.ProfileViewModel, t *structure.Team) (*structure.Group, error) {
 	group, err := s.groupRepo.FindByID(ctx, t.GroupID())
 	if err != nil || group == nil {
 		return nil, err
@@ -111,7 +111,7 @@ func (s *Service) fillGroupData(ctx context.Context, p *ports.ProfileViewModel, 
 	return group, nil
 }
 
-func (s *Service) fillDormData(ctx context.Context, p *ports.ProfileViewModel, g *structure.Group) error {
+func (s *Service) fillDormData(ctx context.Context, p *dto.ProfileViewModel, g *structure.Group) error {
 	dorm, err := s.dormitoryRepo.FindByID(ctx, g.DormitoryID())
 	if err != nil || dorm == nil {
 		return err

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"dorm/pkg/adapters/sheets"
 	"dorm/pkg/adapters/telegram"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/usecase/cleaning"
@@ -23,6 +24,7 @@ type Container struct {
 	CleaningService ports.CleaningUseCase
 	Bot             *telegram.BotAdapter
 	GSheetsClient   gsheets.SpreadsheetClient
+	SheetsAdapter   *sheets.Adapter
 }
 
 func NewContainer(configPath string) (*Container, error) {
@@ -68,6 +70,11 @@ func NewContainer(configPath string) (*Container, error) {
 		return nil, fmt.Errorf("bot init failed: %w", err)
 	}
 
+	sheetsAdapter, err := sheets.NewAdapter(cleaningService, userService, gsheetsClient, bus, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("sheets adapter init failed: %w", err)
+	}
+
 	return &Container{
 		Config:          cfg,
 		DB:              db,
@@ -75,6 +82,7 @@ func NewContainer(configPath string) (*Container, error) {
 		CleaningService: cleaningService,
 		Bot:             botAdapter,
 		GSheetsClient:   gsheetsClient,
+		SheetsAdapter:   sheetsAdapter,
 	}, nil
 }
 

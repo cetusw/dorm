@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -25,12 +26,12 @@ func main() {
 		ctn.Bot.Start()
 	}()
 
-	//ctx := context.Background()
-	//if err := ctn.CleaningService.StartNewWeek(ctx); err != nil {
-	//	log.Printf("⚠️ Failed to start weekly duty: %v", err)
-	//} else {
-	//	log.Println("✅ Weekly duty started successfully!")
-	//}
+	ctx := context.Background()
+	if err := ctn.CleaningService.StartNewWeek(ctx); err != nil {
+		log.Printf("⚠️ Failed to start weekly duty: %v", err)
+	} else {
+		log.Println("✅ Weekly duty started successfully!")
+	}
 
 	// 4. (Опционально) Запускаем слушателя событий (для обновления таблиц)
 	// Пока у нас нет SheetsAdapter, можно просто логировать события в консоль

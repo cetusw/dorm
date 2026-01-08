@@ -4,6 +4,7 @@ import (
 	"context"
 	"dorm/pkg/core/domain/user"
 	"dorm/pkg/core/ports"
+	"dorm/pkg/core/ports/dto"
 	"fmt"
 	"strings"
 
@@ -14,11 +15,11 @@ import (
 type ConfirmTaskState struct {
 	userUseCase     ports.UserUseCase
 	cleaningUseCase ports.CleaningUseCase
-	allTasks        []ports.TaskViewModel
+	allTasks        []dto.TaskViewModel
 	areaID          int
 }
 
-func NewConfirmTaskState(u ports.UserUseCase, c ports.CleaningUseCase, allTasks []ports.TaskViewModel, areaID int) *ConfirmTaskState {
+func NewConfirmTaskState(u ports.UserUseCase, c ports.CleaningUseCase, allTasks []dto.TaskViewModel, areaID int) *ConfirmTaskState {
 	return &ConfirmTaskState{userUseCase: u, cleaningUseCase: c, allTasks: allTasks, areaID: areaID}
 }
 func (s *ConfirmTaskState) Name() string { return "ConfirmTask" }
@@ -47,7 +48,7 @@ func (s *ConfirmTaskState) handleBack(ctx context.Context, user *user.User, r *R
 func (s *ConfirmTaskState) handleCompletion(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder, user *user.User) (State, error) {
 	taskID, _ := uuid.Parse(strings.TrimPrefix(cb.Data, "complete:"))
 
-	var taskToToggle *ports.TaskViewModel
+	var taskToToggle *dto.TaskViewModel
 	for _, t := range s.allTasks {
 		if t.ID == taskID {
 			taskToToggle = &t
