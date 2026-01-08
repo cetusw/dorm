@@ -20,6 +20,7 @@ type SpreadsheetClient interface {
 	UpdateValues(spreadsheetID, range_ string, values [][]interface{}) error
 	BatchUpdateValues(spreadsheetID string, data []*sheets.ValueRange) error
 	HideSheetsExcept(spreadsheetID string, sheetIDs []int64) error
+	BatchUpdate(spreadsheetID string, reqs []*sheets.Request) error
 }
 
 type GoogleSheetsClient struct {
@@ -142,6 +143,19 @@ func (c *GoogleSheetsClient) HideSheetsExcept(spreadsheetID string, sheetIDs []i
 		if err != nil {
 			return fmt.Errorf("failed to hide sheets: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func (c *GoogleSheetsClient) BatchUpdate(spreadsheetID string, reqs []*sheets.Request) error {
+	batchUpdateReq := &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: reqs,
+	}
+
+	_, err := c.service.Spreadsheets.BatchUpdate(spreadsheetID, batchUpdateReq).Do()
+	if err != nil {
+		return fmt.Errorf("failed to batch update: %w", err)
 	}
 
 	return nil

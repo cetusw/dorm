@@ -10,6 +10,7 @@ import (
 	"dorm/pkg/core/ports"
 	"dorm/pkg/infrastructure/config"
 	"dorm/pkg/infrastructure/gsheets"
+	"google.golang.org/api/sheets/v4"
 )
 
 type Adapter struct {
@@ -54,7 +55,7 @@ func (a *Adapter) onWeekStarted(ctx context.Context, event interface{}) error {
 	for _, concreteDuty := range duties {
 		sheetData := layout.BuildSheetData(concreteDuty)
 
-		_, err := a.gsheetsClient.CreateSheet(concreteDuty.SpreadsheetID, concreteDuty.DutyName)
+		sheetID, err := a.gsheetsClient.CreateSheet(concreteDuty.SpreadsheetID, concreteDuty.DutyName)
 		if err != nil {
 			log.Printf("Failed to create sheet for team %s: %v", concreteDuty.TeamName, err)
 			continue
@@ -67,6 +68,18 @@ func (a *Adapter) onWeekStarted(ctx context.Context, event interface{}) error {
 		)
 		if err != nil {
 			log.Printf("Failed to update values for team %s: %v", concreteDuty.TeamName, err)
+			continue
+		}
+
+		var styleReqs []*sheets.Request
+		styleReqs = append(styleReqs, ApplyHeaderStyle(sheetID))
+		styleReqs = append(styleReqs, ApplyTaskBorders(sheetID, len(concreteDuty.Tasks), 5))
+		styleReqs = append(styleReqs, MergeAreaCells(sheetID, concreteDuty.Tasks)...)
+		styleReqs = append(styleReqs, AddStatusValidation(sheetID, len(concreteDuty.Tasks)))
+
+		err = a.gsheetsClient.BatchUpdate(concreteDuty.SpreadsheetID, styleReqs)
+		if err != nil {
+			log.Printf("Failed to apply styles for team %s: %v", concreteDuty.TeamName, err)
 		}
 	}
 
