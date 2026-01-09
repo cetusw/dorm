@@ -37,7 +37,11 @@ func (s *SelectAreaState) HandleCallback(ctx context.Context, cb *tgbotapi.Callb
 	return nil, nil
 }
 
-func (s *SelectAreaState) handleAreaSelection(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder) (State, error) {
+func (s *SelectAreaState) handleAreaSelection(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	r *Responder,
+) (State, error) {
 	u, _ := s.userUseCase.GetUserByTelegramID(ctx, cb.From.ID)
 	progressText := getCoveredProgress(ctx, s.cleaningUseCase, u.ID())
 	areaID, _ := strconv.Atoi(strings.TrimPrefix(cb.Data, "area:"))
@@ -62,6 +66,9 @@ func (s *SelectAreaState) handleAreaSelection(ctx context.Context, cb *tgbotapi.
 		)
 		return s, nil
 	}
-	r.Display(fmt.Sprintf("*%s*\n%s\n%s", areaName, progressText, msgSelectTask), taskSelectKeyboard(filtered))
+	r.Display(
+		fmt.Sprintf("*%s*\n%s\n%s", areaName, progressText, msgSelectTask),
+		taskSelectKeyboard(filtered),
+	)
 	return NewSelectTaskState(s.userUseCase, s.cleaningUseCase, s.tasks, areaID), nil
 }

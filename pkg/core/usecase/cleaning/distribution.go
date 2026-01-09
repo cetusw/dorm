@@ -3,6 +3,7 @@ package cleaning
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
@@ -244,12 +245,12 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 		}
 	}
 
-	go func() {
-		bgCtx := context.WithoutCancel(ctx)
-		_ = s.eventBus.Publish(bgCtx, events.TopicWeekStarted, events.WeekStartedEvent{
-			StartDate: c.start,
-		})
-	}()
+	err := s.eventBus.Publish(ctx, events.TopicWeekStarted, events.WeekStartedEvent{
+		StartDate: c.start,
+	})
+	if err != nil {
+		log.Printf("Failed to publish week started event: %v", err)
+	}
 
 	return nil
 }

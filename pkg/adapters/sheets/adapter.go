@@ -2,14 +2,12 @@ package sheets
 
 import (
 	"context"
-	"fmt"
-	"log"
-
 	"dorm/pkg/adapters/sheets/internal/layout"
 	"dorm/pkg/core/domain/events"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/infrastructure/config"
 	"dorm/pkg/infrastructure/gsheets"
+
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -41,47 +39,40 @@ func NewAdapter(
 	return a, nil
 }
 
-func (a *Adapter) onWeekStarted(ctx context.Context, event interface{}) error {
-	duties, err := a.cleaningUseCase.GetLatestDuties(ctx)
-	if err != nil {
-		return fmt.Errorf("duties not found: %w", err)
-	}
+func (a *Adapter) onWeekStarted(ctx context.Context, _ interface{}) error {
+	duties, _ := a.cleaningUseCase.GetLatestDuties(ctx)
 
-	if len(duties) == 0 {
-		log.Println("No duties for the new week, skipping sheet creation.")
-		return nil
-	}
+	for _, d := range duties {
+		sheetID, _ := a.gsheetsClient.CreateSheet(d.SpreadsheetID, d.DutyName)
 
-	for _, concreteDuty := range duties {
-		sheetData := layout.BuildSheetData(concreteDuty)
+		mainData := layout.BuildSheetData(d)
+		statsData := layout.PrepareStatsTable(d)
 
-		sheetID, err := a.gsheetsClient.CreateSheet(concreteDuty.SpreadsheetID, concreteDuty.DutyName)
+		err := a.gsheetsClient.UpdateValues(d.SpreadsheetID, d.DutyName+"!A1", mainData)
 		if err != nil {
-			log.Printf("Failed to create sheet for team %s: %v", concreteDuty.TeamName, err)
-			continue
+			return err
+		}
+		err = a.gsheetsClient.UpdateValues(d.SpreadsheetID, d.DutyName+"!G3", statsData)
+		if err != nil {
+			return err
 		}
 
-		err = a.gsheetsClient.UpdateValues(
-			concreteDuty.SpreadsheetID,
-			fmt.Sprintf("'%s'!A1", concreteDuty.DutyName),
-			sheetData,
-		)
-		if err != nil {
-			log.Printf("Failed to update values for team %s: %v", concreteDuty.TeamName, err)
-			continue
+		requests := []*sheets.Request{
+			ApplyHeaderStyle(sheetID, d.TeamColor),
+			AddCostGradient(sheetID, len(d.Tasks)),
+			AddExecutorValidation(sheetID, d.UsersStats, len(d.Tasks)),
+			AddStatusValidation(sheetID, len(d.Tasks)),
 		}
+		requests = append(requests, MergeAreaCells(sheetID, d.Tasks)...)
 
-		var styleReqs []*sheets.Request
-		styleReqs = append(styleReqs, ApplyHeaderStyle(sheetID))
-		styleReqs = append(styleReqs, ApplyTaskBorders(sheetID, len(concreteDuty.Tasks), 5))
-		styleReqs = append(styleReqs, MergeAreaCells(sheetID, concreteDuty.Tasks)...)
-		styleReqs = append(styleReqs, AddStatusValidation(sheetID, len(concreteDuty.Tasks)))
-
-		err = a.gsheetsClient.BatchUpdate(concreteDuty.SpreadsheetID, styleReqs)
+		err = a.gsheetsClient.BatchUpdate(d.SpreadsheetID, requests)
 		if err != nil {
-			log.Printf("Failed to apply styles for team %s: %v", concreteDuty.TeamName, err)
+			return err
+		}
+		err = a.gsheetsClient.HideSheetsExcept(d.SpreadsheetID, []int64{sheetID})
+		if err != nil {
+			return err
 		}
 	}
-
 	return nil
 }

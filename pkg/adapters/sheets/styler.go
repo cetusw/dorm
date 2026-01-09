@@ -1,39 +1,39 @@
 package sheets
 
 import (
+	"dorm/pkg/adapters/sheets/utils"
+	"log"
+
 	"google.golang.org/api/sheets/v4"
 
 	"dorm/pkg/core/ports/dto"
 )
 
-const (
-	headerColor = "E0E0E0"
-	borderColor = "000000"
-)
-
-func ApplyHeaderStyle(sheetID int64) *sheets.Request {
+func ApplyHeaderStyle(sheetID int64, teamColor string) *sheets.Request {
+	backgroundColor, err := utils.HexToRGB(teamColor)
+	if err != nil {
+		log.Printf("WARNING: invalid team color value: %s", err)
+	}
 	return &sheets.Request{
 		RepeatCell: &sheets.RepeatCellRequest{
 			Range: &sheets.GridRange{
 				SheetId:          sheetID,
-				StartRowIndex:    2,
-				EndRowIndex:      3,
+				StartRowIndex:    0,
+				EndRowIndex:      1,
 				StartColumnIndex: 0,
 				EndColumnIndex:   5,
 			},
 			Cell: &sheets.CellData{
 				UserEnteredFormat: &sheets.CellFormat{
-					BackgroundColor: &sheets.Color{
-						Red:   0.878,
-						Green: 0.878,
-						Blue:  0.878,
-					},
+					BackgroundColor:     backgroundColor,
+					HorizontalAlignment: "CENTER",
 					TextFormat: &sheets.TextFormat{
-						Bold: true,
+						Bold:     true,
+						FontSize: 14,
 					},
 				},
 			},
-			Fields: "userEnteredFormat(backgroundColor,textFormat)",
+			Fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
 		},
 	}
 }
@@ -141,6 +141,61 @@ func AddStatusValidation(sheetID int64, rowCount int) *sheets.Request {
 				},
 			},
 			Fields: "dataValidation",
+		},
+	}
+}
+
+func AddCostGradient(sheetID int64, rowCount int) *sheets.Request {
+	minPointColor, _ := utils.HexToRGB("b6d7a8")
+	maxPointColor, _ := utils.HexToRGB("ea9999")
+	return &sheets.Request{
+		AddConditionalFormatRule: &sheets.AddConditionalFormatRuleRequest{
+			Rule: &sheets.ConditionalFormatRule{
+				Ranges: []*sheets.GridRange{{
+					SheetId: sheetID, StartColumnIndex: 2, EndColumnIndex: 3,
+					StartRowIndex: 2, EndRowIndex: int64(2 + rowCount),
+				}},
+				GradientRule: &sheets.GradientRule{
+					Minpoint: &sheets.InterpolationPoint{
+						Color: minPointColor,
+						Type:  "NUMBER", Value: "1",
+					},
+					Maxpoint: &sheets.InterpolationPoint{
+						Color: maxPointColor,
+						Type:  "NUMBER",
+						Value: "9",
+					},
+				},
+			},
+		},
+	}
+}
+
+func AddExecutorValidation(sheetID int64, users []*dto.UserStats, rowCount int) *sheets.Request {
+	var values []*sheets.ConditionValue
+	for _, m := range users {
+		values = append(values, &sheets.ConditionValue{
+			UserEnteredValue: utils.FormatMemberName(m, users),
+		})
+	}
+	values = append(values, &sheets.ConditionValue{UserEnteredValue: "Никто"})
+
+	return &sheets.Request{
+		SetDataValidation: &sheets.SetDataValidationRequest{
+			Range: &sheets.GridRange{
+				SheetId:          sheetID,
+				StartColumnIndex: 3,
+				EndColumnIndex:   4,
+				StartRowIndex:    2,
+				EndRowIndex:      int64(2 + rowCount),
+			},
+			Rule: &sheets.DataValidationRule{
+				Condition: &sheets.BooleanCondition{
+					Type:   "ONE_OF_LIST",
+					Values: values,
+				},
+				ShowCustomUi: true,
+			},
 		},
 	}
 }

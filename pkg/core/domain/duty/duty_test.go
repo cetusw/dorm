@@ -35,7 +35,7 @@ func TestDuty_TaskLifecycle(t *testing.T) {
 	assert.Equal(t, taskID, tasks[0].ID())
 	assert.Equal(t, taskDefID, tasks[0].TaskDefID())
 	assert.Nil(t, tasks[0].AssigneeID())
-	assert.False(t, tasks[0].IsCompleted())
+	assert.Nil(t, tasks[0].CompletionDate())
 
 	err := d.AssignTask(otherTaskID, userID)
 	assert.ErrorIs(t, err, ErrTaskNotFound)
@@ -53,7 +53,6 @@ func TestDuty_TaskLifecycle(t *testing.T) {
 	assert.NoError(t, err)
 
 	tasks = d.Tasks()
-	assert.True(t, tasks[0].IsCompleted())
 	assert.NotNil(t, tasks[0].CompletionDate())
 	assert.WithinDuration(t, time.Now(), *tasks[0].CompletionDate(), time.Second)
 }
@@ -81,7 +80,6 @@ func TestDuty_UnassignTask(t *testing.T) {
 
 	tasks := d.Tasks()
 	assert.Nil(t, tasks[0].AssigneeID())
-	assert.False(t, tasks[0].IsCompleted())
 	assert.Nil(t, tasks[0].CompletionDate())
 }
 
@@ -91,7 +89,7 @@ func TestRestoreDuty(t *testing.T) {
 	taskID := uuid.New()
 
 	tasks := []*DutyTask{
-		RestoreDutyTask(taskID, uuid.New(), nil, nil),
+		RestoreDutyTask(taskID, uuid.New(), nil, nil, nil),
 	}
 
 	d := RestoreDuty(id, teamID, time.Now(), time.Now(), tasks)

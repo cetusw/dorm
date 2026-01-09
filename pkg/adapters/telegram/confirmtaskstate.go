@@ -62,7 +62,7 @@ func (s *ConfirmTaskState) handleCompletion(ctx context.Context, cb *tgbotapi.Ca
 
 	var err error
 	var notification string
-	if taskToToggle.IsDone {
+	if taskToToggle.IsCompleted {
 		err = s.cleaningUseCase.OpenTask(ctx, taskID, user.ID())
 		notification = msgTaskUncompleted
 	} else {

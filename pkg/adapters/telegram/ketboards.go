@@ -56,7 +56,7 @@ func taskSelectKeyboard(tasks []dto.TaskViewModel) tgbotapi.InlineKeyboardMarkup
 	for _, t := range tasks {
 		data := fmt.Sprintf("assign:%s", t.ID.String())
 		var text string
-		if t.IsAssignedToUser {
+		if t.Assignee != nil {
 			text += "✅ "
 		}
 		text += fmt.Sprintf("%s (%d б.)", t.Title, t.Cost)
@@ -74,7 +74,7 @@ func taskConfirmKeyboard(tasks []dto.TaskViewModel) tgbotapi.InlineKeyboardMarku
 	for _, t := range tasks {
 		data := fmt.Sprintf("complete:%s", t.ID.String())
 		var text string
-		if t.IsDone {
+		if t.IsCompleted {
 			text += "✅ "
 		}
 		text += fmt.Sprintf("%s (%d б.)", t.Title, t.Cost)
@@ -97,7 +97,7 @@ func confirmAreaSelectKeyboard(tasks []dto.TaskViewModel) tgbotapi.InlineKeyboar
 	for _, a := range areas {
 		allDone := true
 		for _, t := range areaTasks[a.id] {
-			if !t.IsDone {
+			if !t.IsCompleted {
 				allDone = false
 				break
 			}

@@ -83,7 +83,7 @@ func (s *MainMenuState) buildTasksList(b *strings.Builder, tasks []dto.TaskViewM
 		b.WriteString(fmt.Sprintf("*%s*\n", areaName))
 		for _, task := range areaTasks {
 			statusEmoji := "📝"
-			if task.IsDone {
+			if task.IsCompleted {
 				statusEmoji = "✅"
 			}
 			b.WriteString(fmt.Sprintf("%s %s\n", statusEmoji, task.Title))

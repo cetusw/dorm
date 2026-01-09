@@ -10,29 +10,39 @@ import (
 type DutyViewModel struct {
 	TeamName      string
 	TeamOrder     int
+	TeamColor     string
 	SpreadsheetID string
 	DutyName      string
 	Start         time.Time
 	End           time.Time
-	UsersStats    []UserStats
+	UsersStats    []*UserStats
 	Tasks         []TaskViewModel
 }
 
 func NewDutyViewModel(
-	d *duty.Duty,
+	duty *duty.Duty,
 	team *structure.Team,
 	group *structure.Group,
+	usersStats []*UserStats,
 	tasks []TaskViewModel,
-	usersStats []UserStats,
 ) DutyViewModel {
 	return DutyViewModel{
 		TeamName:      team.Name(),
 		TeamOrder:     team.Order(),
+		TeamColor:     team.Color(),
 		SpreadsheetID: group.SpreadsheetID(),
-		DutyName:      fmt.Sprintf("%s-%s", d.Start().Format("02.01"), d.End().Format("02.01")),
-		Start:         d.Start(),
-		End:           d.End(),
+		DutyName:      formatDutyName(duty),
+		Start:         duty.Start(),
+		End:           duty.End(),
 		UsersStats:    usersStats,
 		Tasks:         tasks,
 	}
+}
+
+func formatDutyName(duty *duty.Duty) string {
+	return fmt.Sprintf(
+		"%s-%s",
+		duty.Start().Format("02.01"),
+		duty.End().Format("02.01"),
+	)
 }

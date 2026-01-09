@@ -48,7 +48,12 @@ func (s *SelectTaskState) handleBack(ctx context.Context, user *user.User, r *Re
 	return NewSelectAreaState(s.userUseCase, s.cleaningUseCase, s.allTasks), nil
 }
 
-func (s *SelectTaskState) handleAssignment(ctx context.Context, cb *tgbotapi.CallbackQuery, r *Responder, user *user.User) (State, error) {
+func (s *SelectTaskState) handleAssignment(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	r *Responder,
+	user *user.User,
+) (State, error) {
 	taskID, _ := uuid.Parse(strings.TrimPrefix(cb.Data, "assign:"))
 
 	var taskToToggle *dto.TaskViewModel
@@ -65,7 +70,7 @@ func (s *SelectTaskState) handleAssignment(ctx context.Context, cb *tgbotapi.Cal
 
 	var err error
 	var notification string
-	if taskToToggle.IsAssignedToUser {
+	if taskToToggle.Assignee == nil {
 		err = s.cleaningUseCase.UnassignTask(ctx, taskID, user.ID())
 		notification = msgTaskReturned
 	} else {

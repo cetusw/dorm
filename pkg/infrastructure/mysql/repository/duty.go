@@ -248,7 +248,7 @@ func (r *DutyRepository) FindAllLatest(ctx context.Context) ([]*duty.Duty, error
 
 func (r *DutyRepository) findTasksByDutyID(ctx context.Context, dutyID uuid.UUID) ([]*duty.DutyTask, error) {
 	const query = `
-		SELECT id, task_id, assignee_id, completion_date
+		SELECT id, task_id, assignee_id, completion_date, verification_date
 		FROM duty_task
 		WHERE duty_id = ?
 	`
@@ -262,9 +262,9 @@ func (r *DutyRepository) findTasksByDutyID(ctx context.Context, dutyID uuid.UUID
 	var tasks []*duty.DutyTask
 	for rows.Next() {
 		var dtID, defID, assignID []byte
-		var compDate sql.NullTime
+		var compDate, verDate sql.NullTime
 
-		if err := rows.Scan(&dtID, &defID, &assignID, &compDate); err != nil {
+		if err := rows.Scan(&dtID, &defID, &assignID, &compDate, &verDate); err != nil {
 			return nil, err
 		}
 
@@ -282,7 +282,12 @@ func (r *DutyRepository) findTasksByDutyID(ctx context.Context, dutyID uuid.UUID
 			completion = &compDate.Time
 		}
 
-		tasks = append(tasks, duty.RestoreDutyTask(id, taskDefID, assigneeUUID, completion))
+		var verification *time.Time
+		if verDate.Valid {
+			verification = &verDate.Time
+		}
+
+		tasks = append(tasks, duty.RestoreDutyTask(id, taskDefID, assigneeUUID, completion, verification))
 	}
 	return tasks, nil
 }

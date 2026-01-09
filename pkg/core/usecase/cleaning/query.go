@@ -71,7 +71,7 @@ func (s *Service) GetUserStats(ctx context.Context, userID uuid.UUID) (*duty.Use
 
 		if task.AssigneeID() != nil && *task.AssigneeID() == userID {
 			userAssigned += cost
-			if task.IsCompleted() {
+			if task.CompletionDate() != nil {
 				userConfirmed += cost
 			}
 		}
@@ -92,7 +92,7 @@ func (s *Service) GetUserStats(ctx context.Context, userID uuid.UUID) (*duty.Use
 func (s *Service) GetTeamTasks(ctx context.Context, teamID uuid.UUID) ([]dto.TaskViewModel, error) {
 	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, teamID)
 	if err != nil || d == nil {
-		return nil, nil
+		return nil, err
 	}
 
 	defs, _ := s.taskRepo.GetAllTaskDefinitions(ctx)
@@ -120,11 +120,16 @@ func (s *Service) GetTeamTasks(ctx context.Context, teamID uuid.UUID) ([]dto.Tas
 		area := areaMap[def.AreaID()]
 
 		var assignee *user.User
+		var stats *duty.UserStats
 		if dt.AssigneeID() != nil {
 			assignee = userMap[*dt.AssigneeID()]
+			stats, err = s.GetUserStats(ctx, assignee.ID())
+			if err != nil {
+				return nil, err
+			}
 		}
 
-		table = append(table, dto.NewTaskViewModel(dt, def, area, assignee, uuid.Nil))
+		table = append(table, dto.NewTaskViewModel(dt, def, area, dto.NewUserStats(assignee, stats)))
 	}
 
 	return table, nil
@@ -144,7 +149,7 @@ func (s *Service) GetLatestDuties(ctx context.Context) ([]dto.DutyViewModel, err
 		if err != nil {
 			return nil, err
 		}
-		var userStats []dto.UserStats
+		var usersStats []*dto.UserStats
 		members, err := s.userRepo.FindByTeamID(ctx, d.TeamID())
 		if err != nil {
 			return nil, err
@@ -156,15 +161,10 @@ func (s *Service) GetLatestDuties(ctx context.Context) ([]dto.DutyViewModel, err
 			if err != nil {
 				return nil, err
 			}
-			userStats = append(userStats, dto.UserStats{
-				FirstName:       member.FirstName(),
-				LastName:        member.LastName(),
-				TotalPoints:     stats.TotalPoints,
-				ConfirmedPoints: stats.ConfirmedPoints,
-			})
+			usersStats = append(usersStats, dto.NewUserStats(member, stats))
 		}
 
-		vm := dto.NewDutyViewModel(d, team, group, tasks, userStats)
+		vm := dto.NewDutyViewModel(d, team, group, usersStats, tasks)
 		result = append(result, vm)
 	}
 
@@ -213,7 +213,7 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]dt
 		if task.AssigneeID() != nil && !isAssignedToMe {
 			continue
 		}
-		if task.IsCompleted() {
+		if task.CompletionDate() != nil {
 			continue
 		}
 
@@ -228,14 +228,13 @@ func (s *Service) GetTaskCandidates(ctx context.Context, userID uuid.UUID) ([]dt
 		}
 
 		result = append(result, dto.TaskViewModel{
-			ID:               task.ID(),
-			Title:            def.Title,
-			AreaID:           def.AreaID,
-			AreaName:         area.Name(),
-			AreaFloor:        area.Floor(),
-			Cost:             def.Cost,
-			IsDone:           false,
-			IsAssignedToUser: isAssignedToMe,
+			ID:          task.ID(),
+			Title:       def.Title,
+			AreaID:      def.AreaID,
+			AreaName:    area.Name(),
+			AreaFloor:   area.Floor(),
+			Cost:        def.Cost,
+			IsCompleted: false,
 		})
 	}
 
@@ -273,7 +272,7 @@ func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.U
 
 	var result []dto.TaskViewModel
 	for _, task := range d.Tasks() {
-		if task.AssigneeID() == nil || *task.AssigneeID() != userID || task.IsCompleted() {
+		if task.AssigneeID() == nil || *task.AssigneeID() != userID || task.CompletionDate() != nil {
 			continue
 		}
 
@@ -288,13 +287,13 @@ func (s *Service) GetUncompletedAssignedTasks(ctx context.Context, userID uuid.U
 		}
 
 		result = append(result, dto.TaskViewModel{
-			ID:        task.ID(),
-			Title:     def.Title(),
-			Cost:      def.Cost(),
-			AreaID:    def.AreaID(),
-			AreaName:  area.Name(),
-			AreaFloor: area.Floor(),
-			IsDone:    task.IsCompleted(),
+			ID:          task.ID(),
+			Title:       def.Title(),
+			Cost:        def.Cost(),
+			AreaID:      def.AreaID(),
+			AreaName:    area.Name(),
+			AreaFloor:   area.Floor(),
+			IsCompleted: task.CompletionDate() != nil,
 		})
 	}
 	return result, nil
@@ -346,13 +345,13 @@ func (s *Service) GetAllAssignedTasks(ctx context.Context, userID uuid.UUID) ([]
 		}
 
 		result = append(result, dto.TaskViewModel{
-			ID:        task.ID(),
-			Title:     def.Title(),
-			Cost:      def.Cost(),
-			AreaID:    def.AreaID(),
-			AreaName:  area.Name(),
-			AreaFloor: area.Floor(),
-			IsDone:    task.IsCompleted(),
+			ID:          task.ID(),
+			Title:       def.Title(),
+			Cost:        def.Cost(),
+			AreaID:      def.AreaID(),
+			AreaName:    area.Name(),
+			AreaFloor:   area.Floor(),
+			IsCompleted: task.CompletionDate() != nil,
 		})
 	}
 	return result, nil
