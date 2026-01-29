@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"dorm/pkg/core/ports/dto"
 )
 
 const (
@@ -33,4 +35,5 @@ type TaskAssignedEvent struct {
 type WeekStartedEvent struct {
 	StartDate time.Time
 	EndDate   time.Time
+	Duties    []dto.DutyViewModel
 }

@@ -245,8 +245,13 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 		}
 	}
 
+	// TODO: обработать ошибку
+	duties, _ := s.GetLatestDuties(ctx)
+
 	err := s.eventBus.Publish(ctx, events.TopicWeekStarted, events.WeekStartedEvent{
 		StartDate: c.start,
+		EndDate:   c.end,
+		Duties:    duties,
 	})
 	if err != nil {
 		log.Printf("Failed to publish week started event: %v", err)

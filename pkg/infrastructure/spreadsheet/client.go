@@ -1,4 +1,4 @@
-package gsheets
+package spreadsheet
 
 import (
 	"context"
@@ -14,20 +14,20 @@ const (
 	scope = "https://www.googleapis.com/auth/spreadsheets"
 )
 
-type SpreadsheetClient interface {
-	CreateSheet(spreadsheetID, title string) (int64, error)
+type Client interface {
+	CreateSheet(spreadsheetID string, title string) (int64, error)
 	HideSheet(spreadsheetID string, sheetID int64) error
-	UpdateValues(spreadsheetID, range_ string, values [][]interface{}) error
+	UpdateValues(spreadsheetID string, rangeName string, values [][]interface{}) error
 	BatchUpdateValues(spreadsheetID string, data []*sheets.ValueRange) error
 	HideSheetsExcept(spreadsheetID string, sheetIDs []int64) error
-	BatchUpdate(spreadsheetID string, reqs []*sheets.Request) error
+	BatchUpdate(spreadsheetID string, requests []*sheets.Request) error
 }
 
-type GoogleSheetsClient struct {
+type SpreadsheetClient struct {
 	service *sheets.Service
 }
 
-func NewGoogleSheetsClient(credentialsJSON string) (*GoogleSheetsClient, error) {
+func NewSpreadsheetClient(credentialsJSON string) (*SpreadsheetClient, error) {
 	ctx := context.Background()
 	credentials, err := google.CredentialsFromJSON(ctx, []byte(credentialsJSON), scope)
 	if err != nil {
@@ -38,10 +38,10 @@ func NewGoogleSheetsClient(credentialsJSON string) (*GoogleSheetsClient, error) 
 		return nil, fmt.Errorf("unable to retrieve Sheets client: %w", err)
 	}
 
-	return &GoogleSheetsClient{service: service}, nil
+	return &SpreadsheetClient{service: service}, nil
 }
 
-func (c *GoogleSheetsClient) CreateSheet(spreadsheetID string, title string) (int64, error) {
+func (c *SpreadsheetClient) CreateSheet(spreadsheetID, title string) (int64, error) {
 	request := &sheets.Request{
 		AddSheet: &sheets.AddSheetRequest{
 			Properties: &sheets.SheetProperties{
@@ -62,7 +62,7 @@ func (c *GoogleSheetsClient) CreateSheet(spreadsheetID string, title string) (in
 	return response.Replies[0].AddSheet.Properties.SheetId, nil
 }
 
-func (c *GoogleSheetsClient) HideSheet(spreadsheetID string, sheetID int64) error {
+func (c *SpreadsheetClient) HideSheet(spreadsheetID string, sheetID int64) error {
 	request := &sheets.Request{
 		UpdateSheetProperties: &sheets.UpdateSheetPropertiesRequest{
 			Properties: &sheets.SheetProperties{
@@ -85,7 +85,7 @@ func (c *GoogleSheetsClient) HideSheet(spreadsheetID string, sheetID int64) erro
 	return nil
 }
 
-func (c *GoogleSheetsClient) UpdateValues(
+func (c *SpreadsheetClient) UpdateValues(
 	spreadsheetID string,
 	updateRange string,
 	values [][]interface{},
@@ -99,7 +99,7 @@ func (c *GoogleSheetsClient) UpdateValues(
 	return nil
 }
 
-func (c *GoogleSheetsClient) BatchUpdateValues(spreadsheetID string, data []*sheets.ValueRange) error {
+func (c *SpreadsheetClient) BatchUpdateValues(spreadsheetID string, data []*sheets.ValueRange) error {
 	batchUpdateRequest := &sheets.BatchUpdateValuesRequest{
 		ValueInputOption: "USER_ENTERED",
 		Data:             data,
@@ -113,7 +113,7 @@ func (c *GoogleSheetsClient) BatchUpdateValues(spreadsheetID string, data []*she
 	return nil
 }
 
-func (c *GoogleSheetsClient) HideSheetsExcept(spreadsheetID string, sheetIDs []int64) error {
+func (c *SpreadsheetClient) HideSheetsExcept(spreadsheetID string, sheetIDs []int64) error {
 	spreadsheet, err := c.service.Spreadsheets.Get(spreadsheetID).Do()
 	if err != nil {
 		return fmt.Errorf("failed to get spreadsheet: %w", err)
@@ -148,7 +148,7 @@ func (c *GoogleSheetsClient) HideSheetsExcept(spreadsheetID string, sheetIDs []i
 	return nil
 }
 
-func (c *GoogleSheetsClient) BatchUpdate(spreadsheetID string, reqs []*sheets.Request) error {
+func (c *SpreadsheetClient) BatchUpdate(spreadsheetID string, reqs []*sheets.Request) error {
 	batchUpdateReq := &sheets.BatchUpdateSpreadsheetRequest{
 		Requests: reqs,
 	}
