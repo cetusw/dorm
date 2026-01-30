@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"dorm/pkg/adapters/sheets/app"
@@ -49,11 +50,14 @@ func (a *SpreadsheetAdapter) onWeekStarted(_ context.Context, event interface{})
 	composer := app.NewReportComposer(a.spreadsheetClient)
 
 	for _, duty := range e.Duties {
-		sheetID, _ := a.spreadsheetClient.CreateSheet(duty.SpreadsheetID, duty.DutyName)
+		sheetID, err := a.spreadsheetClient.CreateSheet(duty.SpreadsheetID, duty.DutyName)
+		if err != nil {
+			return fmt.Errorf("failed to create sheet: %w", err)
+		}
 
 		report := reports.NewWeeklyReportBlueprint(duty)
 
-		err := composer.Compose(sheetID, report)
+		err = composer.Compose(sheetID, report)
 		if err != nil {
 			log.Printf("Compose error: %v", err)
 		}

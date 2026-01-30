@@ -98,6 +98,7 @@ func (s *Service) GetTeamTasks(ctx context.Context, teamID uuid.UUID) ([]dto.Tas
 	defs, _ := s.taskRepo.GetAllTaskDefinitions(ctx)
 	areas, _ := s.areaRepo.GetAllAreas(ctx)
 	users, _ := s.userRepo.FindByTeamID(ctx, teamID)
+	team, _ := s.teamRepo.FindByID(ctx, teamID)
 
 	defMap := make(map[uuid.UUID]*catalog.TaskDefinition)
 	for _, df := range defs {
@@ -120,6 +121,7 @@ func (s *Service) GetTeamTasks(ctx context.Context, teamID uuid.UUID) ([]dto.Tas
 		area := areaMap[def.AreaID()]
 
 		var assignee *user.User
+		isTeamLeader := false
 		var stats *duty.UserStats
 		if dt.AssigneeID() != nil {
 			assignee = userMap[*dt.AssigneeID()]
@@ -127,9 +129,10 @@ func (s *Service) GetTeamTasks(ctx context.Context, teamID uuid.UUID) ([]dto.Tas
 			if err != nil {
 				return nil, err
 			}
+			isTeamLeader = team.LeaderID() != nil && *team.LeaderID() == assignee.ID()
 		}
 
-		table = append(table, dto.NewTaskViewModel(dt, def, area, dto.NewUserStats(assignee, stats)))
+		table = append(table, dto.NewTaskViewModel(dt, def, area, dto.NewUserStats(assignee, stats, isTeamLeader)))
 	}
 
 	return table, nil
@@ -161,7 +164,8 @@ func (s *Service) GetLatestDuties(ctx context.Context) ([]dto.DutyViewModel, err
 			if err != nil {
 				return nil, err
 			}
-			usersStats = append(usersStats, dto.NewUserStats(member, stats))
+			isTeamLeader := team.LeaderID() != nil && *team.LeaderID() == member.ID()
+			usersStats = append(usersStats, dto.NewUserStats(member, stats, isTeamLeader))
 		}
 
 		vm := dto.NewDutyViewModel(d, team, group, usersStats, tasks)

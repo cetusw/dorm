@@ -23,11 +23,13 @@ type UserStats struct {
 	LastName        string
 	TotalPoints     int
 	ConfirmedPoints int
+	IsTeamLeader    bool
 }
 
 func NewUserStats(
 	user *user.User,
 	stats *duty.UserStats,
+	isTeamLeader bool,
 ) *UserStats {
 	if user == nil || stats == nil {
 		return nil
@@ -38,5 +40,6 @@ func NewUserStats(
 		LastName:        user.LastName(),
 		TotalPoints:     stats.TotalPoints,
 		ConfirmedPoints: stats.ConfirmedPoints,
+		IsTeamLeader:    isTeamLeader,
 	}
 }

@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"fmt"
+	"sort"
 
 	"google.golang.org/api/sheets/v4"
 
@@ -30,7 +31,7 @@ func (w *UserStatsWidget) GetWidth() int64 { return userStatsWidth }
 
 func (w *UserStatsWidget) Render(sheetID int64, anchor types.Anchor) types.RenderResult {
 	w.formatter = domain.NewSheetFormatter(sheetID)
-
+	w.sortMembers()
 	values := w.buildValues(anchor)
 
 	var requests []*sheets.Request
@@ -40,6 +41,12 @@ func (w *UserStatsWidget) Render(sheetID int64, anchor types.Anchor) types.Rende
 	requests = append(requests, w.applyColumnWidths(anchor)...)
 
 	return types.RenderResult{Values: values, Requests: requests}
+}
+
+func (w *UserStatsWidget) sortMembers() {
+	sort.SliceStable(w.duty.UsersStats, func(i, j int) bool {
+		return w.duty.UsersStats[i].IsTeamLeader && !w.duty.UsersStats[j].IsTeamLeader
+	})
 }
 
 func (w *UserStatsWidget) buildValues(anchor types.Anchor) [][]interface{} {
@@ -104,7 +111,7 @@ func (w *UserStatsWidget) styleBody(anchor types.Anchor) []*sheets.Request {
 	endRow := startRow + int64(userCount)
 	teamColor, _ := adapter.HexToRGB(w.duty.TeamColor)
 
-	return []*sheets.Request{
+	requests := []*sheets.Request{
 		w.formatter.RepeatCell(w.formatter.NewRange(startRow, endRow, anchor.Col, anchor.Col+1), &sheets.CellFormat{
 			BackgroundColor: teamColor, VerticalAlignment: "MIDDLE",
 			TextFormat: &sheets.TextFormat{FontSize: 10, FontFamily: "Montserrat"},
@@ -115,6 +122,18 @@ func (w *UserStatsWidget) styleBody(anchor types.Anchor) []*sheets.Request {
 		}, "userEnteredFormat(horizontalAlignment,verticalAlignment,textFormat)"),
 		w.formatter.UpdateBorders(w.formatter.NewRange(startRow, endRow, anchor.Col, anchor.Col+3), true, true, true, true, false, true),
 	}
+
+	if userCount > 0 {
+		requests = append(requests, w.styleCaptainRow(startRow, anchor.Col))
+	}
+
+	return requests
+}
+
+func (w *UserStatsWidget) styleCaptainRow(row, col int64) *sheets.Request {
+	return w.formatter.RepeatCell(w.formatter.NewRange(row, row+1, col, col+3), &sheets.CellFormat{
+		TextFormat: &sheets.TextFormat{Bold: true, FontSize: 10, FontFamily: "Montserrat"},
+	}, "userEnteredFormat.textFormat")
 }
 
 func (w *UserStatsWidget) styleFooter(anchor types.Anchor) []*sheets.Request {
