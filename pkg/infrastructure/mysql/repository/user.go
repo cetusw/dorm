@@ -83,7 +83,7 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 
 	var roomNumber interface{} = nil
 	if u.RoomNumber() != nil {
-		roomNumber = *u.DormitoryID()
+		roomNumber = *u.RoomNumber()
 	}
 
 	var dormID interface{} = nil
