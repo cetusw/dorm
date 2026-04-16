@@ -16,6 +16,7 @@ const (
 
 type Client interface {
 	CreateSheet(spreadsheetID string, title string) (int64, error)
+	RecreateSheet(spreadsheetID string, title string) (int64, error)
 	HideSheet(spreadsheetID string, sheetID int64) error
 	UpdateValues(spreadsheetID string, rangeName string, values [][]interface{}) error
 	BatchUpdateValues(spreadsheetID string, data []*sheets.ValueRange) error
@@ -60,6 +61,34 @@ func (c *SpreadsheetClient) CreateSheet(spreadsheetID, title string) (int64, err
 	}
 
 	return response.Replies[0].AddSheet.Properties.SheetId, nil
+}
+
+func (c *SpreadsheetClient) RecreateSheet(spreadsheetID string, title string) (int64, error) {
+	book, err := c.service.Spreadsheets.Get(spreadsheetID).Do()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get spreadsheet: %w", err)
+	}
+
+	for _, sh := range book.Sheets {
+		if sh.Properties != nil && sh.Properties.Title == title {
+			_, err = c.service.Spreadsheets.BatchUpdate(
+				spreadsheetID,
+				&sheets.BatchUpdateSpreadsheetRequest{
+					Requests: []*sheets.Request{{
+						DeleteSheet: &sheets.DeleteSheetRequest{
+							SheetId: sh.Properties.SheetId,
+						},
+					}},
+				},
+			).Do()
+			if err != nil {
+				return 0, fmt.Errorf("failed to delete existing sheet: %w", err)
+			}
+			break
+		}
+	}
+
+	return c.CreateSheet(spreadsheetID, title)
 }
 
 func (c *SpreadsheetClient) HideSheet(spreadsheetID string, sheetID int64) error {

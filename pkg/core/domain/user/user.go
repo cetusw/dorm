@@ -72,6 +72,15 @@ func (u *User) MoveInto(dormID int64, roomNumber string) {
 	u.roomNumber = &roomNumber
 }
 
+func (u *User) Rename(firstName, lastName string) error {
+	if firstName == "" {
+		return ErrEmptyName
+	}
+	u.firstName = firstName
+	u.lastName = lastName
+	return nil
+}
+
 func (u *User) ID() uuid.UUID        { return u.id }
 func (u *User) TelegramID() int64    { return u.telegramID }
 func (u *User) FirstName() string    { return u.firstName }
@@ -86,4 +95,7 @@ type Repository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
 	FindByTelegramID(ctx context.Context, telegramID int64) (*User, error)
 	FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]*User, error)
+	FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*User, error)
+	MoveUserToTeam(ctx context.Context, userID uuid.UUID, teamID *uuid.UUID) error
+	SoftDelete(ctx context.Context, id uuid.UUID) error
 }

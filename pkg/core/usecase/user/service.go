@@ -4,6 +4,7 @@ import (
 	"context"
 	"dorm/pkg/core/ports/dto"
 	ports "dorm/pkg/core/ports/query"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -37,6 +38,9 @@ func NewUserService(
 }
 
 func (s *Service) CreateUser(ctx context.Context, request dto.CreateUserRequest) error {
+	if request.DormitoryID == 0 {
+		return fmt.Errorf("dormitory is required")
+	}
 	u, err := user.NewUser(0, request.FirstName, request.LastName) // TODO: сделать tg_id необязательным
 	if err != nil {
 		return err
@@ -49,6 +53,40 @@ func (s *Service) CreateUser(ctx context.Context, request dto.CreateUserRequest)
 	}
 
 	return s.userRepo.Save(ctx, u)
+}
+
+func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, request dto.UpdateUserRequest) error {
+	if request.DormitoryID == 0 {
+		return fmt.Errorf("dormitory is required")
+	}
+	u, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return fmt.Errorf("user not found")
+	}
+
+	if err := u.Rename(request.FirstName, request.LastName); err != nil {
+		return err
+	}
+	u.MoveInto(request.DormitoryID, request.RoomNumber)
+
+	if request.TeamID == "" {
+		u.LeaveTeam()
+	} else {
+		teamID, err := uuid.Parse(request.TeamID)
+		if err != nil {
+			return fmt.Errorf("invalid team_id")
+		}
+		u.JoinTeam(teamID)
+	}
+
+	return s.userRepo.Save(ctx, u)
+}
+
+func (s *Service) SoftDeleteUser(ctx context.Context, id uuid.UUID) error {
+	return s.userRepo.SoftDelete(ctx, id)
 }
 
 func (s *Service) RegisterUser(ctx context.Context, telegramID int64, fullName string) error {

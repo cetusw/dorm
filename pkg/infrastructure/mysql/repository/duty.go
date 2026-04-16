@@ -80,11 +80,11 @@ func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UU
 		SELECT id, team_id, start_date, end_date
 		FROM duty
 		WHERE team_id = ? AND start_date = (
-			SELECT MAX(start_date) FROM duty
+			SELECT MAX(start_date) FROM duty WHERE team_id = ?
 		)
 	`
 	tIDBytes, _ := teamID.MarshalBinary()
-	row := r.db.QueryRowContext(ctx, dutyQuery, tIDBytes)
+	row := r.db.QueryRowContext(ctx, dutyQuery, tIDBytes, tIDBytes)
 
 	var dID, teamIDBytes []byte
 	var start, end time.Time

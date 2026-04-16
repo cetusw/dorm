@@ -43,4 +43,6 @@ func (t *Team) Order() int           { return t.order }
 type TeamRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Team, error)
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*Team, error)
+	Save(ctx context.Context, team *Team) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }

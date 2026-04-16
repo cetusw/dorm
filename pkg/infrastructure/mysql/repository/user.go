@@ -113,7 +113,7 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	const query = `
 		SELECT id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at
-		FROM user WHERE id = ?
+		FROM user WHERE id = ? AND deleted_at IS NULL
 	`
 	idBytes, _ := id.MarshalBinary()
 	row := r.db.QueryRowContext(ctx, query, idBytes)
@@ -124,7 +124,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User
 func (r *UserRepository) FindByTelegramID(ctx context.Context, telegramID int64) (*user.User, error) {
 	const query = `
 		SELECT id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at
-		FROM user WHERE telegram_id = ?
+		FROM user WHERE telegram_id = ? AND deleted_at IS NULL
 	`
 	row := r.db.QueryRowContext(ctx, query, telegramID)
 	return r.scanUser(row)
@@ -133,10 +133,44 @@ func (r *UserRepository) FindByTelegramID(ctx context.Context, telegramID int64)
 func (r *UserRepository) FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]*user.User, error) {
 	const query = `
 		SELECT id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at
-		FROM user WHERE team_id = ?
+		FROM user WHERE team_id = ? AND deleted_at IS NULL
 	`
 	idBytes, _ := teamID.MarshalBinary()
 	rows, err := r.db.QueryContext(ctx, query, idBytes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*user.User
+	for rows.Next() {
+		var dto userDTO
+		err := rows.Scan(
+			&dto.ID,
+			&dto.TelegramID,
+			&dto.FirstName,
+			&dto.LastName,
+			&dto.TeamID,
+			&dto.RoomNumber,
+			&dto.DormitoryID,
+			&dto.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, dto.toDomain())
+	}
+	return users, nil
+}
+
+func (r *UserRepository) FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*user.User, error) {
+	const query = `
+		SELECT id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at
+		FROM user
+		WHERE dormitory_id = ? AND deleted_at IS NULL
+		ORDER BY last_name, first_name
+	`
+	rows, err := r.db.QueryContext(ctx, query, dormitoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -182,4 +216,55 @@ func (r *UserRepository) scanUser(row *sql.Row) (*user.User, error) {
 		return nil, err
 	}
 	return dto.toDomain(), nil
+}
+
+func (r *UserRepository) MoveUserToTeam(ctx context.Context, userID uuid.UUID, teamID *uuid.UUID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("userRepo.MoveUserToTeam begin tx: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	var userIDBytes []byte
+	userIDBytes, _ = userID.MarshalBinary()
+
+	var teamIDArg interface{} = nil
+	if teamID != nil {
+		var teamIDBytes []byte
+		teamIDBytes, _ = teamID.MarshalBinary()
+		teamIDArg = teamIDBytes
+	}
+
+	_, err = tx.ExecContext(
+		ctx,
+		"UPDATE user SET team_id = ? WHERE id = ? AND deleted_at IS NULL",
+		teamIDArg,
+		userIDBytes,
+	)
+	if err != nil {
+		return fmt.Errorf("userRepo.MoveUserToTeam update: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("userRepo.MoveUserToTeam commit: %w", err)
+	}
+	return nil
+}
+
+func (r *UserRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	const query = `
+		UPDATE user
+		SET deleted_at = NOW()
+		WHERE id = ? AND deleted_at IS NULL
+	`
+	idBytes, _ := id.MarshalBinary()
+	_, err := r.db.ExecContext(ctx, query, idBytes)
+	if err != nil {
+		return fmt.Errorf("userRepo.SoftDelete: %w", err)
+	}
+	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"dorm/pkg/adapters/sheets/infrastructure"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/usecase/cleaning"
+	cataloguc "dorm/pkg/core/usecase/catalog"
 	"dorm/pkg/core/usecase/user"
 	"dorm/pkg/infrastructure/config"
 	"dorm/pkg/infrastructure/eventbus"
@@ -84,7 +85,8 @@ func NewContainer(configPath string) (*Container, error) {
 	)
 
 	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo)
-	teamService := team.NewTeamService(teamQueryService)
+	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
+	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
 	//if err != nil {
@@ -103,7 +105,7 @@ func NewContainer(configPath string) (*Container, error) {
 		Views: engine,
 	})
 
-	adminHandler := http.NewAdminHandler(userService, cleaningService, dormitoryService, teamService)
+	adminHandler := http.NewAdminHandler(userService, cleaningService, dormitoryService, teamService, taskCatalogService, sheetsAdapter)
 	adminHandler.RegisterRoutes(app)
 
 	return &Container{

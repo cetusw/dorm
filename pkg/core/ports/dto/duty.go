@@ -5,9 +5,12 @@ import (
 	"dorm/pkg/core/domain/structure"
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type DutyViewModel struct {
+	TeamID        uuid.UUID
 	TeamName      string
 	TeamOrder     int
 	TeamColor     string
@@ -27,6 +30,7 @@ func NewDutyViewModel(
 	tasks []TaskViewModel,
 ) DutyViewModel {
 	return DutyViewModel{
+		TeamID:        team.ID(),
 		TeamName:      team.Name(),
 		TeamOrder:     team.Order(),
 		TeamColor:     team.Color(),

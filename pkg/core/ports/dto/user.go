@@ -27,6 +27,14 @@ type CreateUserRequest struct {
 	TeamID      string `form:"team_id"`
 }
 
+type UpdateUserRequest struct {
+	FirstName   string `form:"first_name"`
+	LastName    string `form:"last_name"`
+	DormitoryID int64  `form:"dormitory_id"`
+	RoomNumber  string `form:"room_number"`
+	TeamID      string `form:"team_id"`
+}
+
 type ProfileViewModel struct {
 	FirstName     string
 	LastName      string

@@ -82,3 +82,49 @@ func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 	return teams, nil
 }
 
+func (r *TeamRepository) Save(ctx context.Context, team *structure.Team) error {
+	const query = `
+		INSERT INTO team (id, name, group_id, leader_id, color, team_order)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE
+			name = VALUES(name),
+			group_id = VALUES(group_id),
+			leader_id = VALUES(leader_id),
+			color = VALUES(color),
+			team_order = VALUES(team_order)
+	`
+
+	teamIDBytes, _ := team.ID().MarshalBinary()
+	groupIDBytes, _ := team.GroupID().MarshalBinary()
+	var leaderID interface{} = nil
+	if team.LeaderID() != nil {
+		leaderIDBytes, _ := team.LeaderID().MarshalBinary()
+		leaderID = leaderIDBytes
+	}
+
+	_, err := r.db.ExecContext(
+		ctx,
+		query,
+		teamIDBytes,
+		team.Name(),
+		groupIDBytes,
+		leaderID,
+		team.Color(),
+		team.Order(),
+	)
+	if err != nil {
+		return fmt.Errorf("TeamRepository.Save: %w", err)
+	}
+	return nil
+}
+
+func (r *TeamRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	const query = `DELETE FROM team WHERE id = ?`
+	idBytes, _ := id.MarshalBinary()
+	_, err := r.db.ExecContext(ctx, query, idBytes)
+	if err != nil {
+		return fmt.Errorf("TeamRepository.Delete: %w", err)
+	}
+	return nil
+}
+

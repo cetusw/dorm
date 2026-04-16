@@ -94,3 +94,10 @@ func (m *MockUserRepo) FindByTelegramID(ctx context.Context, id int64) (*user.Us
 func (m *MockUserRepo) FindByTeamID(ctx context.Context, id uuid.UUID) ([]*user.User, error) {
 	return nil, nil
 }
+func (m *MockUserRepo) FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*user.User, error) {
+	return nil, nil
+}
+func (m *MockUserRepo) MoveUserToTeam(ctx context.Context, userID uuid.UUID, teamID *uuid.UUID) error {
+	return nil
+}
+func (m *MockUserRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return nil }

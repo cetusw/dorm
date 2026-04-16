@@ -13,6 +13,7 @@ import (
 	"dorm/pkg/core/domain/duty"
 	"dorm/pkg/core/domain/events"
 	"dorm/pkg/core/domain/structure"
+	"dorm/pkg/core/ports/dto"
 )
 
 type distributingContext struct {
@@ -59,7 +60,10 @@ func (s *Service) loadSchedulingData(ctx context.Context) (*distributingContext,
 		return nil, fmt.Errorf("load areas: %w", err)
 	}
 
-	weekNum, _ := s.dutyRepo.CountDistinctStartDates(ctx)
+	weekNum, err := s.dutyRepo.CountDistinctStartDates(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load week number: %w", err)
+	}
 
 	distributingCtx := &distributingContext{
 		groups:        groups,
@@ -88,10 +92,16 @@ func (s *Service) indexData(c *distributingContext) {
 }
 
 func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) error {
+	if len(c.groups) == 0 {
+		return fmt.Errorf("cannot start new week: no groups found")
+	}
+
+	skippedGroups := 0
 	for _, group := range c.groups {
 		nextTeam, err := s.determineNextTeam(ctx, group.ID())
 		if err != nil {
-			fmt.Printf("Skipping group %s: %v\n", group.Name(), err)
+			log.Printf("Skipping group %s: %v", group.Name(), err)
+			skippedGroups++
 			continue
 		}
 
@@ -103,6 +113,10 @@ func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) 
 	sort.Slice(c.dutiesList, func(i, j int) bool {
 		return c.dutiesList[i].TeamID().String() < c.dutiesList[j].TeamID().String()
 	})
+
+	if len(c.dutiesList) == 0 {
+		return fmt.Errorf("cannot start new week: no duties generated (%d groups skipped)", skippedGroups)
+	}
 
 	return nil
 }
@@ -200,24 +214,21 @@ func (s *Service) determineNextTeam(ctx context.Context, groupID uuid.UUID) (*st
 		return teams[0], nil
 	}
 
-	var lastTeamOrder int
-	for _, t := range teams {
+	lastIdx := -1
+	for i, t := range teams {
 		if t.ID() == lastDuty.TeamID() {
-			lastTeamOrder = t.Order()
+			lastIdx = i
 			break
 		}
 	}
 
-	totalTeams := len(teams)
-	nextOrder := (lastTeamOrder % totalTeams) + 1
-
-	for _, t := range teams {
-		if t.Order() == nextOrder {
-			return t, nil
-		}
+	// If previous team is missing (data drift), start from first deterministic item.
+	if lastIdx < 0 {
+		return teams[0], nil
 	}
 
-	return nil, fmt.Errorf("logical error: could not find team with order %d", nextOrder)
+	nextIdx := (lastIdx + 1) % len(teams)
+	return teams[nextIdx], nil
 }
 
 func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition) (bool, error) {
@@ -239,23 +250,35 @@ func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition) (b
 }
 
 func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) error {
+	if len(c.dutiesList) == 0 {
+		return fmt.Errorf("cannot finalize week: no duties to persist")
+	}
+
 	for _, d := range c.dutiesList {
 		if err := s.dutyRepo.Save(ctx, d); err != nil {
 			return fmt.Errorf("save duty %s: %w", d.ID(), err)
 		}
 	}
 
-	// TODO: обработать ошибку
-	duties, _ := s.GetLatestDuties(ctx)
-
-	err := s.eventBus.Publish(ctx, events.TopicWeekStarted, events.WeekStartedEvent{
-		StartDate: c.start,
-		EndDate:   c.end,
-		Duties:    duties,
-	})
+	// Publishing sheets/report events must not block duty creation.
+	duties, err := s.GetLatestDuties(ctx)
 	if err != nil {
-		log.Printf("Failed to publish week started event: %v", err)
+		log.Printf("Failed to load duties for week started event: %v", err)
+		return nil
 	}
+
+	go func(dutiesSnapshot []dto.DutyViewModel, start, end time.Time) {
+		pubCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		if err := s.eventBus.Publish(pubCtx, events.TopicWeekStarted, events.WeekStartedEvent{
+			StartDate: start,
+			EndDate:   end,
+			Duties:    dutiesSnapshot,
+		}); err != nil {
+			log.Printf("Failed to publish week started event: %v", err)
+		}
+	}(duties, c.start, c.end)
 
 	return nil
 }

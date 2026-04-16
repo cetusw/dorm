@@ -1,0 +1,34 @@
+<div id="modal" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="this.closest('#modal').remove()"></div>
+    <div class="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+        <form hx-put="/admin/tasks/{{ .Task.ID }}" hx-swap="none">
+            <div class="p-8 space-y-4">
+                <h3 class="text-xl font-bold text-slate-900">Редактировать задачу</h3>
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-500 uppercase">Зона</label>
+                    <select name="area_id" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        {{ range .Areas }}<option value="{{ .ID }}" {{ if eq .ID $.Task.AreaID }}selected{{ end }}>{{ .Name }}</option>{{ end }}
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-500 uppercase">Название</label>
+                    <input type="text" name="title" required value="{{ .Task.Title }}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500 uppercase">Стоимость</label>
+                        <input type="number" name="cost" required value="{{ .Task.Cost }}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500 uppercase">Частота (дни)</label>
+                        <input type="number" name="frequency" required value="{{ .Task.Frequency }}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-8 py-6 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('modal').remove()" class="px-6 py-2.5 rounded-xl font-semibold text-slate-500 hover:bg-slate-200 transition-colors">Отменить</button>
+                <button type="submit" class="bg-blue-600 text-white px-8 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>

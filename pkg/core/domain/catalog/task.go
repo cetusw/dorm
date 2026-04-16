@@ -32,4 +32,7 @@ func (t *TaskDefinition) Frequency() int { return t.frequency }
 
 type TaskDefinitionRepository interface {
 	GetAllTaskDefinitions(ctx context.Context) ([]*TaskDefinition, error)
+	FindByID(ctx context.Context, id uuid.UUID) (*TaskDefinition, error)
+	Save(ctx context.Context, task *TaskDefinition) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }

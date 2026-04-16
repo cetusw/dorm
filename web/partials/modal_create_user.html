@@ -1,8 +1,7 @@
 <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center">
     <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="this.closest('#modal').remove()"></div>
     <div class="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
-        <form hx-post="/admin/users" hx-target="#user-table-body" hx-swap="innerHTML"
-              hx-on::after-request="if(event.detail.successful) document.getElementById('modal').remove()">
+        <form hx-post="/admin/users" hx-swap="none">
 
             <div class="p-8">
                 <h3 class="text-xl font-bold text-slate-900 mb-6">Новый житель</h3>
