@@ -1,0 +1,71 @@
+<div id="modal" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="this.closest('#modal').remove()"></div>
+    <div class="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+        <form hx-post="/admin/users" hx-target="#user-table-body" hx-swap="innerHTML"
+              hx-on::after-request="if(event.detail.successful) document.getElementById('modal').remove()">
+
+            <div class="p-8">
+                <h3 class="text-xl font-bold text-slate-900 mb-6">Новый житель</h3>
+
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-500 uppercase">Имя</label>
+                            <input type="text" name="first_name" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-500 uppercase">Фамилия</label>
+                            <input type="text" name="last_name" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500 uppercase">Отчество (опционально)</label>
+                        <input type="text" name="middle_name" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500 uppercase">Общежитие</label>
+                        <select name="dormitory_id" required
+                                hx-get="/admin/users/teams-select"
+                                hx-target="#team-select"
+                                hx-trigger="change"
+                                class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="">Выберите общежитие</option>
+                            {{ range .Dormitories }}
+                            <option value="{{ .ID }}">{{ .Name }}</option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-500 uppercase">Этаж</label>
+                            <input type="number" name="floor" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-500 uppercase">Номер комнаты</label>
+                            <input type="text" name="room_number" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500 uppercase">Команда</label>
+                        <select id="team-select" name="team_id" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 outline-none" disabled>
+                            <option value="">Сначала выберите общежитие</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 px-8 py-6 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('modal').remove()" class="px-6 py-2.5 rounded-xl font-semibold text-slate-500 hover:bg-slate-200 transition-colors">
+                    Отменить
+                </button>
+                <button type="submit" class="bg-blue-600 text-white px-8 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
+                    Добавить
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

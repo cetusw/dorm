@@ -2,11 +2,14 @@ package di
 
 import (
 	"database/sql"
+	"dorm/pkg/adapters/http"
+	"dorm/pkg/core/usecase/dormitory"
+	"dorm/pkg/core/usecase/team"
+	"dorm/pkg/infrastructure/mysql/query"
 	"fmt"
 	"log"
 
 	"dorm/pkg/adapters/sheets/infrastructure"
-	"dorm/pkg/adapters/telegram"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/usecase/cleaning"
 	"dorm/pkg/core/usecase/user"
@@ -16,17 +19,21 @@ import (
 	"dorm/pkg/infrastructure/mysql/repository"
 	"dorm/pkg/infrastructure/scheduler"
 	"dorm/pkg/infrastructure/spreadsheet"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/template/html/v2"
 )
 
 type Container struct {
-	Config             *config.AppConfig
-	DB                 *sql.DB
-	EventBus           ports.EventBus
-	CleaningService    ports.CleaningUseCase
-	Bot                *telegram.BotAdapter
+	Config          *config.AppConfig
+	DB              *sql.DB
+	EventBus        ports.EventBus
+	CleaningService ports.CleaningUseCase
+	//Bot                *telegram.BotAdapter
 	SpreadsheetClient  spreadsheet.Client
 	SpreadsheetAdapter *infrastructure.SpreadsheetAdapter
 	Scheduler          *scheduler.Scheduler
+	HTTPServer         *fiber.App
 }
 
 func NewContainer(configPath string) (*Container, error) {
@@ -65,12 +72,24 @@ func NewContainer(configPath string) (*Container, error) {
 		bus,
 	)
 
-	userService := user.NewUserService(userRepo, teamRepo, groupRepo, dormitoryRepo)
+	userQueryService := query.NewUserQueryService(db)
+	teamQueryService := query.NewTeamQueryService(db)
 
-	botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
-	if err != nil {
-		return nil, fmt.Errorf("bot init failed: %w", err)
-	}
+	userService := user.NewUserService(
+		userRepo,
+		teamRepo,
+		groupRepo,
+		dormitoryRepo,
+		userQueryService,
+	)
+
+	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo)
+	teamService := team.NewTeamService(teamQueryService)
+
+	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
+	//if err != nil {
+	//	return nil, fmt.Errorf("bot init failed: %w", err)
+	//}
 
 	sheetsAdapter, err := infrastructure.NewSpreadsheetAdapter(cleaningService, userService, spreadsheetClient, bus, cfg)
 	if err != nil {
@@ -79,15 +98,24 @@ func NewContainer(configPath string) (*Container, error) {
 
 	cronScheduler := scheduler.NewScheduler(cleaningService, cfg)
 
+	engine := html.New("./web", ".html")
+	app := fiber.New(fiber.Config{
+		Views: engine,
+	})
+
+	adminHandler := http.NewAdminHandler(userService, cleaningService, dormitoryService, teamService)
+	adminHandler.RegisterRoutes(app)
+
 	return &Container{
-		Config:             cfg,
-		DB:                 db,
-		EventBus:           bus,
-		CleaningService:    cleaningService,
-		Bot:                botAdapter,
+		Config:          cfg,
+		DB:              db,
+		EventBus:        bus,
+		CleaningService: cleaningService,
+		//Bot:                botAdapter,
 		SpreadsheetClient:  spreadsheetClient,
 		SpreadsheetAdapter: sheetsAdapter,
 		Scheduler:          cronScheduler,
+		HTTPServer:         app,
 	}, nil
 }
 

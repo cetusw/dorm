@@ -81,3 +81,4 @@ func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 	}
 	return teams, nil
 }
+

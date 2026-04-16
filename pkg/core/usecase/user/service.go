@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"dorm/pkg/core/ports/dto"
+	ports "dorm/pkg/core/ports/query"
 	"strings"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ type Service struct {
 	teamRepo      structure.TeamRepository
 	groupRepo     structure.GroupRepository
 	dormitoryRepo structure.DormitoryRepository
+	queryService  ports.UserQueryService
 }
 
 func NewUserService(
@@ -23,13 +25,30 @@ func NewUserService(
 	teamRepo structure.TeamRepository,
 	groupRepo structure.GroupRepository,
 	dormitoryRepo structure.DormitoryRepository,
+	queryService ports.UserQueryService,
 ) *Service {
 	return &Service{
 		userRepo:      userRepo,
 		teamRepo:      teamRepo,
 		groupRepo:     groupRepo,
 		dormitoryRepo: dormitoryRepo,
+		queryService:  queryService,
 	}
+}
+
+func (s *Service) CreateUser(ctx context.Context, request dto.CreateUserRequest) error {
+	u, err := user.NewUser(0, request.FirstName, request.LastName) // TODO: сделать tg_id необязательным
+	if err != nil {
+		return err
+	}
+
+	u.MoveInto(request.DormitoryID, request.RoomNumber)
+	if request.TeamID != "" {
+		teamID, _ := uuid.Parse(request.TeamID)
+		u.JoinTeam(teamID)
+	}
+
+	return s.userRepo.Save(ctx, u)
 }
 
 func (s *Service) RegisterUser(ctx context.Context, telegramID int64, fullName string) error {
@@ -87,6 +106,10 @@ func (s *Service) GetUserProfile(ctx context.Context, userID uuid.UUID) (*dto.Pr
 	}
 
 	return profile, nil
+}
+
+func (s *Service) GetUsersList(ctx context.Context) ([]dto.UserListItem, error) {
+	return s.queryService.GetUsersDetailedList(ctx)
 }
 
 func (s *Service) fillTeamData(ctx context.Context, p *dto.ProfileViewModel, u *user.User) (*structure.Team, error) {

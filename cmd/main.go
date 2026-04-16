@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -22,17 +21,24 @@ func main() {
 	log.Println("Starting Scheduler...")
 	ctn.Scheduler.Start()
 
+	//go func() {
+	//	log.Println("Starting Telegram Bot...")
+	//	ctn.Bot.Start()
+	//}()
+
 	go func() {
-		log.Println("Starting Telegram Bot...")
-		ctn.Bot.Start()
+		log.Println("Starting Admin Panel on :8080...")
+		if err := ctn.HTTPServer.Listen(":8080"); err != nil {
+			log.Printf("Fiber error: %v", err)
+		}
 	}()
 
-	ctx := context.Background()
-	if err := ctn.CleaningService.StartNewWeek(ctx); err != nil {
-		log.Printf("Failed to start weekly duty: %v", err)
-	} else {
-		log.Println("Weekly duty started successfully!")
-	}
+	//ctx := context.Background()
+	//if err := ctn.CleaningService.StartNewWeek(ctx); err != nil {
+	//	log.Printf("Failed to start weekly duty: %v", err)
+	//} else {
+	//	log.Println("Weekly duty started successfully!")
+	//}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

@@ -25,9 +25,6 @@ type User struct {
 }
 
 func NewUser(telegramID int64, firstName, lastName string) (*User, error) {
-	if telegramID == 0 {
-		return nil, ErrInvalidTelegramID
-	}
 	if firstName == "" {
 		return nil, ErrEmptyName
 	}
