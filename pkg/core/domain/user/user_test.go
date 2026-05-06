@@ -27,9 +27,10 @@ func TestNewUser_Success(t *testing.T) {
 }
 
 func TestNewUser_Validation(t *testing.T) {
-	t.Run("Invalid TelegramID", func(t *testing.T) {
-		_, err := NewUser(0, "John", "Doe")
-		assert.ErrorIs(t, err, ErrInvalidTelegramID)
+	t.Run("Optional TelegramID", func(t *testing.T) {
+		u, err := NewUser(0, "John", "Doe")
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), u.TelegramID())
 	})
 
 	t.Run("Empty Name", func(t *testing.T) {

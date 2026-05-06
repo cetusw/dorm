@@ -44,11 +44,12 @@ func (r *DutyRepository) Save(ctx context.Context, d *duty.Duty) error {
 	}
 
 	const taskQuery = `
-		INSERT INTO duty_task (id, duty_id, task_id, assignee_id, completion_date)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO duty_task (id, duty_id, task_id, assignee_id, completion_date, verification_date)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 			assignee_id = VALUES(assignee_id),
-			completion_date = VALUES(completion_date)
+			completion_date = VALUES(completion_date),
+			verification_date = VALUES(verification_date)
 	`
 
 	for _, task := range d.Tasks() {
@@ -66,7 +67,13 @@ func (r *DutyRepository) Save(ctx context.Context, d *duty.Duty) error {
 			completion.Time = *task.CompletionDate()
 		}
 
-		_, err = tx.ExecContext(ctx, taskQuery, dtIDBytes, dIDBytes, defIDBytes, assignee, completion)
+		var verification sql.NullTime
+		if task.VerificationDate() != nil {
+			verification.Valid = true
+			verification.Time = *task.VerificationDate()
+		}
+
+		_, err = tx.ExecContext(ctx, taskQuery, dtIDBytes, dIDBytes, defIDBytes, assignee, completion, verification)
 		if err != nil {
 			return fmt.Errorf("failed to save duty task %s: %w", task.ID(), err)
 		}

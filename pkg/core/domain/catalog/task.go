@@ -2,9 +2,12 @@ package catalog
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 )
+
+var ErrInvalidTaskDefinition = errors.New("area and title are required")
 
 type TaskDefinition struct {
 	id        uuid.UUID
@@ -12,6 +15,13 @@ type TaskDefinition struct {
 	title     string
 	cost      int
 	frequency int
+}
+
+func NewTaskDefinition(areaID int, title string, cost, frequency int) (*TaskDefinition, error) {
+	if areaID == 0 || title == "" {
+		return nil, ErrInvalidTaskDefinition
+	}
+	return RestoreTaskDefinition(uuid.New(), areaID, title, cost, frequency), nil
 }
 
 func RestoreTaskDefinition(id uuid.UUID, areaID int, title string, cost, frequency int) *TaskDefinition {

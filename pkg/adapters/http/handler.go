@@ -84,6 +84,13 @@ func (h *AdminHandler) HandleDashboard(c *fiber.Ctx) error {
 		return c.Status(500).SendString("Ошибка при получении текущих дежурств")
 	}
 
+	cards := buildDashboardDutyCards(duties)
+	return c.Render("dashboard", fiber.Map{
+		"Cards": cards,
+	}, "layouts/main")
+}
+
+func buildDashboardDutyCards(duties []dto.DutyViewModel) []dashboardDutyCard {
 	cards := make([]dashboardDutyCard, 0, len(duties))
 	for _, d := range duties {
 		sort.SliceStable(d.UsersStats, func(i, j int) bool {
@@ -138,9 +145,7 @@ func (h *AdminHandler) HandleDashboard(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Render("dashboard", fiber.Map{
-		"Cards": cards,
-	}, "layouts/main")
+	return cards
 }
 
 func (h *AdminHandler) HandleGetUsers(c *fiber.Ctx) error {
@@ -155,7 +160,10 @@ func (h *AdminHandler) HandleGetUsers(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) HandleCreateUserModal(c *fiber.Ctx) error {
-	dorms, _ := h.dormitoryUC.GetDormitories(c.Context())
+	dorms, err := h.dormitoryUC.GetDormitories(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении общежитий")
+	}
 	return c.Render("partials/modal_create_user", fiber.Map{
 		"Dormitories": dorms,
 	})
@@ -163,7 +171,10 @@ func (h *AdminHandler) HandleCreateUserModal(c *fiber.Ctx) error {
 
 func (h *AdminHandler) HandleTeamsDropdown(c *fiber.Ctx) error {
 	dormID := c.QueryInt("dormitory_id")
-	teams, _ := h.teamUC.GetTeamsByDormitory(c.Context(), int64(dormID))
+	teams, err := h.teamUC.GetTeamsByDormitory(c.Context(), int64(dormID))
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении команд")
+	}
 	return c.Render("partials/team_options", fiber.Map{
 		"Teams": teams,
 	})
@@ -209,8 +220,14 @@ func (h *AdminHandler) HandleEditUserModal(c *fiber.Ctx) error {
 		teamID = u.TeamID().String()
 	}
 
-	dorms, _ := h.dormitoryUC.GetDormitories(c.Context())
-	teams, _ := h.teamUC.GetTeamsByDormitory(c.Context(), dormID)
+	dorms, err := h.dormitoryUC.GetDormitories(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении общежитий")
+	}
+	teams, err := h.teamUC.GetTeamsByDormitory(c.Context(), dormID)
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении команд")
+	}
 
 	return c.Render("partials/modal_edit_user", fiber.Map{
 		"User": fiber.Map{
@@ -241,7 +258,6 @@ func (h *AdminHandler) HandleUpdateUser(c *fiber.Ctx) error {
 		return c.Status(400).SendString(err.Error())
 	}
 
-	// Simplest reliable way to reflect updated joins (team/group/dorm names).
 	c.Response().Header.Set("HX-Redirect", "/admin/users")
 	return c.SendString("")
 }
@@ -278,7 +294,10 @@ func (h *AdminHandler) HandleGetTeams(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) HandleCreateTeamModal(c *fiber.Ctx) error {
-	groups, _ := h.teamUC.GetGroups(c.Context())
+	groups, err := h.teamUC.GetGroups(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении групп")
+	}
 	return c.Render("partials/modal_create_team", fiber.Map{
 		"Groups": groups,
 	})
@@ -310,8 +329,14 @@ func (h *AdminHandler) HandleEditTeamModal(c *fiber.Ctx) error {
 		return c.Status(404).SendString("Team not found")
 	}
 
-	groups, _ := h.teamUC.GetGroups(c.Context())
-	members, _ := h.teamUC.GetTeamMembersForEdit(c.Context(), teamID)
+	groups, err := h.teamUC.GetGroups(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении групп")
+	}
+	members, err := h.teamUC.GetTeamMembersForEdit(c.Context(), teamID)
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении участников команды")
+	}
 	return c.Render("partials/modal_edit_team", fiber.Map{
 		"Team":    teamItem,
 		"Groups":  groups,
@@ -385,7 +410,10 @@ func (h *AdminHandler) HandleGetTasks(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) HandleCreateTaskModal(c *fiber.Ctx) error {
-	areas, _ := h.taskUC.ListAreas(c.Context())
+	areas, err := h.taskUC.ListAreas(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении зон")
+	}
 	return c.Render("partials/modal_create_task", fiber.Map{"Areas": areas})
 }
 
@@ -413,7 +441,10 @@ func (h *AdminHandler) HandleEditTaskModal(c *fiber.Ctx) error {
 	if task == nil {
 		return c.Status(404).SendString("Task not found")
 	}
-	areas, _ := h.taskUC.ListAreas(c.Context())
+	areas, err := h.taskUC.ListAreas(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении зон")
+	}
 	return c.Render("partials/modal_edit_task", fiber.Map{"Task": task, "Areas": areas})
 }
 

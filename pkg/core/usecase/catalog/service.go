@@ -82,10 +82,11 @@ func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (*dto.TaskCatalogIt
 }
 
 func (s *Service) CreateTask(ctx context.Context, req dto.UpsertTaskCatalogRequest) error {
-	if req.AreaID == 0 || req.Title == "" {
-		return fmt.Errorf("area and title are required")
+	task, err := catalog.NewTaskDefinition(req.AreaID, req.Title, req.Cost, req.Frequency)
+	if err != nil {
+		return err
 	}
-	return s.taskRepo.Save(ctx, catalog.RestoreTaskDefinition(uuid.New(), req.AreaID, req.Title, req.Cost, req.Frequency))
+	return s.taskRepo.Save(ctx, task)
 }
 
 func (s *Service) UpdateTask(ctx context.Context, id uuid.UUID, req dto.UpsertTaskCatalogRequest) error {
@@ -98,4 +99,3 @@ func (s *Service) UpdateTask(ctx context.Context, id uuid.UUID, req dto.UpsertTa
 func (s *Service) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	return s.taskRepo.Delete(ctx, id)
 }
-

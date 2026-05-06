@@ -15,6 +15,16 @@ type Team struct {
 	order    int
 }
 
+func NewTeam(name string, groupID uuid.UUID, color string, order int) *Team {
+	return &Team{
+		id:      uuid.New(),
+		name:    name,
+		groupID: groupID,
+		color:   color,
+		order:   order,
+	}
+}
+
 func RestoreTeam(
 	id uuid.UUID,
 	name string,

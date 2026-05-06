@@ -11,8 +11,8 @@ import (
 
 	"dorm/pkg/adapters/sheets/infrastructure"
 	"dorm/pkg/core/ports"
-	"dorm/pkg/core/usecase/cleaning"
 	cataloguc "dorm/pkg/core/usecase/catalog"
+	"dorm/pkg/core/usecase/cleaning"
 	"dorm/pkg/core/usecase/user"
 	"dorm/pkg/infrastructure/config"
 	"dorm/pkg/infrastructure/eventbus"
@@ -37,7 +37,17 @@ type Container struct {
 	HTTPServer         *fiber.App
 }
 
+type SpreadsheetClientFactory func(credentialsJSON string) (spreadsheet.Client, error)
+
+type ContainerOptions struct {
+	NewSpreadsheetClient SpreadsheetClientFactory
+}
+
 func NewContainer(configPath string) (*Container, error) {
+	return NewContainerWithOptions(configPath, ContainerOptions{})
+}
+
+func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Container, error) {
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
@@ -48,7 +58,14 @@ func NewContainer(configPath string) (*Container, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	spreadsheetClient, err := spreadsheet.NewSpreadsheetClient(cfg.GoogleCredentials)
+	newSpreadsheetClient := opts.NewSpreadsheetClient
+	if newSpreadsheetClient == nil {
+		newSpreadsheetClient = func(credentialsJSON string) (spreadsheet.Client, error) {
+			return spreadsheet.NewSpreadsheetClient(credentialsJSON)
+		}
+	}
+
+	spreadsheetClient, err := newSpreadsheetClient(cfg.GoogleCredentials)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create spreadsheet client: %w", err)
 	}

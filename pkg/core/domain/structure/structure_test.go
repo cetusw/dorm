@@ -25,6 +25,19 @@ func TestRestoreTeam(t *testing.T) {
 	assert.Equal(t, order, team.Order())
 }
 
+func TestNewTeam(t *testing.T) {
+	groupID := uuid.New()
+
+	team := NewTeam("Test Team", groupID, "#FF0000", 1)
+
+	assert.NotEqual(t, uuid.Nil, team.ID())
+	assert.Equal(t, groupID, team.GroupID())
+	assert.Nil(t, team.LeaderID())
+	assert.Equal(t, "Test Team", team.Name())
+	assert.Equal(t, "#FF0000", team.Color())
+	assert.Equal(t, 1, team.Order())
+}
+
 func TestRestoreGroup(t *testing.T) {
 	id := uuid.New()
 	name := "Cleaning Group A"

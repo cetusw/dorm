@@ -2,6 +2,7 @@ package cleaning
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -129,6 +130,7 @@ func setupCommonExpectations(ctx context.Context, e *testEnv, f *testFixtures) {
 
 	e.dutyRepo.On("FindCurrentByTeamID", ctx, mock.Anything).Return(nil, nil)
 	e.dutyRepo.On("FindLastByTaskDefID", ctx, mock.Anything).Return(nil, nil)
+	e.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))
 
 	e.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
 }

@@ -40,6 +40,13 @@ func (m *MockDutyRepo) FindLastByTaskDefID(ctx context.Context, id uuid.UUID) (*
 	}
 	return args.Get(0).(*duty.Duty), args.Error(1)
 }
+func (m *MockDutyRepo) FindAllLatest(ctx context.Context) ([]*duty.Duty, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*duty.Duty), args.Error(1)
+}
 
 type MockGroupRepo struct{ mock.Mock }
 
@@ -60,6 +67,8 @@ func (m *MockTeamRepo) FindByGroupID(ctx context.Context, id uuid.UUID) ([]*stru
 func (m *MockTeamRepo) FindByID(ctx context.Context, id uuid.UUID) (*structure.Team, error) {
 	return nil, nil
 }
+func (m *MockTeamRepo) Save(ctx context.Context, team *structure.Team) error { return nil }
+func (m *MockTeamRepo) Delete(ctx context.Context, id uuid.UUID) error       { return nil }
 
 type MockCatalogRepo struct{ mock.Mock }
 
@@ -67,6 +76,13 @@ func (m *MockCatalogRepo) GetAllTaskDefinitions(ctx context.Context) ([]*catalog
 	args := m.Called(ctx)
 	return args.Get(0).([]*catalog.TaskDefinition), args.Error(1)
 }
+func (m *MockCatalogRepo) FindByID(ctx context.Context, id uuid.UUID) (*catalog.TaskDefinition, error) {
+	return nil, nil
+}
+func (m *MockCatalogRepo) Save(ctx context.Context, task *catalog.TaskDefinition) error {
+	return nil
+}
+func (m *MockCatalogRepo) Delete(ctx context.Context, id uuid.UUID) error { return nil }
 
 type MockAreaRepo struct{ mock.Mock }
 

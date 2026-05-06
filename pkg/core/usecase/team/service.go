@@ -2,12 +2,13 @@ package team
 
 import (
 	"context"
-	"dorm/pkg/core/ports/dto"
-	ports "dorm/pkg/core/ports/query"
 	"fmt"
 
 	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/domain/user"
+	"dorm/pkg/core/ports/dto"
+	ports "dorm/pkg/core/ports/query"
+
 	"github.com/google/uuid"
 )
 
@@ -16,7 +17,7 @@ type Service struct {
 	groupRepo     structure.GroupRepository
 	dormitoryRepo structure.DormitoryRepository
 	userRepo      user.Repository
-	queryService ports.TeamQueryService
+	queryService  ports.TeamQueryService
 }
 
 func NewTeamService(
@@ -31,7 +32,7 @@ func NewTeamService(
 		groupRepo:     groupRepo,
 		dormitoryRepo: dormitoryRepo,
 		userRepo:      userRepo,
-		queryService: queryService,
+		queryService:  queryService,
 	}
 }
 
@@ -44,46 +45,7 @@ func (s *Service) GetGroups(ctx context.Context) ([]*structure.Group, error) {
 }
 
 func (s *Service) GetTeamsList(ctx context.Context, dormID int64) ([]dto.TeamListItem, error) {
-	teams, err := s.GetTeamsByDormitory(ctx, dormID)
-	if err != nil {
-		return nil, err
-	}
-
-	groupMap, dormMap, err := s.loadGroupDormitoryMaps(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	out := make([]dto.TeamListItem, 0, len(teams))
-	for _, t := range teams {
-		group := groupMap[t.GroupID()]
-		var groupName string
-		var dormID int64
-		var dormName string
-		if group != nil {
-			groupName = group.Name()
-			dormID = group.DormitoryID()
-			if dorm := dormMap[dormID]; dorm != nil {
-				dormName = dorm.Name()
-			}
-		}
-		members, err := s.userRepo.FindByTeamID(ctx, t.ID())
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, dto.TeamListItem{
-			ID:            t.ID(),
-			Name:          t.Name(),
-			Color:         t.Color(),
-			Order:         t.Order(),
-			GroupID:       t.GroupID(),
-			GroupName:     groupName,
-			DormitoryID:   dormID,
-			DormitoryName: dormName,
-			MembersCount:  len(members),
-		})
-	}
-	return out, nil
+	return s.queryService.GetTeamsDetailedList(ctx, dormID)
 }
 
 func (s *Service) GetTeamByID(ctx context.Context, id uuid.UUID) (*dto.TeamListItem, error) {
@@ -126,7 +88,7 @@ func (s *Service) CreateTeam(ctx context.Context, req dto.CreateTeamRequest) err
 	if err != nil {
 		return fmt.Errorf("invalid group id")
 	}
-	team := structure.RestoreTeam(uuid.New(), req.Name, groupID, nil, req.Color, req.Order)
+	team := structure.NewTeam(req.Name, groupID, req.Color, req.Order)
 	return s.teamRepo.Save(ctx, team)
 }
 

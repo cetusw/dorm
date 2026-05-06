@@ -35,3 +35,22 @@ func TestRestoreTaskDefinition(t *testing.T) {
 	assert.Equal(t, cost, task.Cost())
 	assert.Equal(t, freq, task.Frequency())
 }
+
+func TestNewTaskDefinition(t *testing.T) {
+	task, err := NewTaskDefinition(1, "Clean Floor", 5, 7)
+
+	assert.NoError(t, err)
+	assert.NotEqual(t, uuid.Nil, task.ID())
+	assert.Equal(t, 1, task.AreaID())
+	assert.Equal(t, "Clean Floor", task.Title())
+	assert.Equal(t, 5, task.Cost())
+	assert.Equal(t, 7, task.Frequency())
+}
+
+func TestNewTaskDefinition_Validation(t *testing.T) {
+	_, err := NewTaskDefinition(0, "Clean Floor", 5, 7)
+	assert.ErrorIs(t, err, ErrInvalidTaskDefinition)
+
+	_, err = NewTaskDefinition(1, "", 5, 7)
+	assert.ErrorIs(t, err, ErrInvalidTaskDefinition)
+}
