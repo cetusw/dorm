@@ -21,7 +21,7 @@ COPY --from=builder /app/config.json .
 COPY --from=builder /app/credentials.json .
 COPY --from=builder /app/data/mysql/migrations ./data/mysql/migrations
 COPY --from=builder /app/data/mysql/my.cnf /etc/mysql/conf.d/my.cnf
+COPY --from=builder /app/web ./web
 
 EXPOSE 8080
-
 CMD ["./main"]

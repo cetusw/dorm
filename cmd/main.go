@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
+	"dorm/pkg/infrastructure/di"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	"dorm/pkg/infrastructure/di"
 )
 
 func main() {
@@ -35,14 +32,14 @@ func main() {
 		}
 	}()
 
-	log.Println("Boot: triggering StartNewWeek...")
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	if err := ctn.CleaningService.StartNewWeek(ctx); err != nil {
-		log.Printf("Failed to start weekly duty: %v", err)
-	} else {
-		log.Println("Weekly duty started successfully!")
-	}
+	//log.Println("Boot: triggering StartNewWeek...")
+	//ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	//defer cancel()
+	//if err := ctn.CleaningService.StartNewWeek(ctx); err != nil {
+	//	log.Printf("Failed to start weekly duty: %v", err)
+	//} else {
+	//	log.Println("Weekly duty started successfully!")
+	//}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

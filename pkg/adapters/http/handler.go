@@ -3,9 +3,11 @@ package http
 import (
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
+	"sort"
+	"strings"
 
-	"github.com/google/uuid"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type AdminHandler struct {
@@ -18,10 +20,14 @@ type AdminHandler struct {
 }
 
 type dashboardDutyCard struct {
-	Duty    dto.DutyViewModel
-	Total   int
-	Done    int
-	Percent int
+	Duty            dto.DutyViewModel
+	Total           int
+	Assigned        int
+	Done            int
+	Verified        int
+	AssignedPercent int
+	DonePercent     int
+	VerifiedPercent int
 }
 
 func NewAdminHandler(
@@ -80,23 +86,55 @@ func (h *AdminHandler) HandleDashboard(c *fiber.Ctx) error {
 
 	cards := make([]dashboardDutyCard, 0, len(duties))
 	for _, d := range duties {
+		sort.SliceStable(d.UsersStats, func(i, j int) bool {
+			left := d.UsersStats[i]
+			right := d.UsersStats[j]
+			if left.IsTeamLeader != right.IsTeamLeader {
+				return left.IsTeamLeader
+			}
+			leftLast := strings.ToLower(strings.TrimSpace(left.LastName))
+			rightLast := strings.ToLower(strings.TrimSpace(right.LastName))
+			if leftLast != rightLast {
+				return leftLast < rightLast
+			}
+			leftFirst := strings.ToLower(strings.TrimSpace(left.FirstName))
+			rightFirst := strings.ToLower(strings.TrimSpace(right.FirstName))
+			return leftFirst < rightFirst
+		})
+
 		total := len(d.Tasks)
+		assigned := 0
 		done := 0
+		verified := 0
 		for _, t := range d.Tasks {
+			if t.Assignee != nil {
+				assigned++
+			}
 			if t.IsCompleted {
 				done++
 			}
+			if t.IsVerified {
+				verified++
+			}
 		}
-		pct := 0
+		assignedPct := 0
+		donePct := 0
+		verifiedPct := 0
 		if total > 0 {
-			pct = (done * 100) / total
+			assignedPct = (assigned * 100) / total
+			donePct = (done * 100) / total
+			verifiedPct = (verified * 100) / total
 		}
 
 		cards = append(cards, dashboardDutyCard{
-			Duty:    d,
-			Total:   total,
-			Done:    done,
-			Percent: pct,
+			Duty:            d,
+			Total:           total,
+			Assigned:        assigned,
+			Done:            done,
+			Verified:        verified,
+			AssignedPercent: assignedPct,
+			DonePercent:     donePct,
+			VerifiedPercent: verifiedPct,
 		})
 	}
 
