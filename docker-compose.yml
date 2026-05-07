@@ -12,6 +12,18 @@ services:
       db:
         condition: service_healthy
 
+  migrate:
+    image: dorm-app:latest
+    build: .
+    profiles:
+      - tools
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["./dorm-migrate", "up"]
+
   db:
     build: ./mysql
     container_name: dorm-db

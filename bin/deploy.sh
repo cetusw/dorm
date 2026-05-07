@@ -45,8 +45,10 @@ rm dorm-app.tar
 # Stop and remove old containers (optional)
 docker compose down
 
-# Start new containers
-docker compose up -d
+# Start database, apply migrations, then start the application
+docker compose up -d db
+docker compose run --rm migrate
+docker compose up -d app adminer
 
 echo "Deployment done!"
 EOF

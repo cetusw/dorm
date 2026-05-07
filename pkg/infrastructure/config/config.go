@@ -49,6 +49,14 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 	return cfg, nil
 }
 
+func LoadDatabaseConfig() (*AppConfig, error) {
+	cfg := &AppConfig{}
+	if err := cfg.getDBConfig(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
 func (cfg *AppConfig) GetDBConnectionString() string {
 	return fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true&allowNativePasswords=true&loc=%s",
