@@ -17,9 +17,11 @@ type User struct {
 	id          uuid.UUID
 	telegramID  *int64
 	firstName   string
+	middleName  *string
 	lastName    string
 	teamID      *uuid.UUID
 	roomNumber  *string
+	floorNumber *int
 	dormitoryID *int64
 	createdAt   time.Time
 }
@@ -52,9 +54,12 @@ func newUserWithTelegramID(telegramID *int64, firstName, lastName string) (*User
 func RestoreUser(
 	id uuid.UUID,
 	telegramID *int64,
-	firstName, lastName string,
+	firstName string,
+	middleName *string,
+	lastName string,
 	teamID *uuid.UUID,
 	roomNumber *string,
+	floorNumber *int,
 	dormitoryID *int64,
 	createdAt time.Time,
 ) *User {
@@ -62,9 +67,11 @@ func RestoreUser(
 		id:          id,
 		telegramID:  telegramID,
 		firstName:   firstName,
+		middleName:  middleName,
 		lastName:    lastName,
 		teamID:      teamID,
 		roomNumber:  roomNumber,
+		floorNumber: floorNumber,
 		dormitoryID: dormitoryID,
 		createdAt:   createdAt,
 	}
@@ -81,6 +88,22 @@ func (u *User) LeaveTeam() {
 func (u *User) MoveInto(dormID int64, roomNumber string) {
 	u.dormitoryID = &dormID
 	u.roomNumber = &roomNumber
+}
+
+func (u *User) SetMiddleName(middleName string) {
+	if middleName == "" {
+		u.middleName = nil
+		return
+	}
+	u.middleName = &middleName
+}
+
+func (u *User) SetFloorNumber(floorNumber int) {
+	if floorNumber == 0 {
+		u.floorNumber = nil
+		return
+	}
+	u.floorNumber = &floorNumber
 }
 
 func (u *User) Rename(firstName, lastName string) error {
@@ -101,9 +124,11 @@ func (u *User) TelegramID() int64 {
 }
 func (u *User) TelegramIDValue() *int64 { return u.telegramID }
 func (u *User) FirstName() string       { return u.firstName }
+func (u *User) MiddleName() *string     { return u.middleName }
 func (u *User) LastName() string        { return u.lastName }
 func (u *User) TeamID() *uuid.UUID      { return u.teamID }
 func (u *User) RoomNumber() *string     { return u.roomNumber }
+func (u *User) FloorNumber() *int       { return u.floorNumber }
 func (u *User) DormitoryID() *int64     { return u.dormitoryID }
 func (u *User) CreatedAt() time.Time    { return u.createdAt }
 

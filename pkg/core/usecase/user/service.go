@@ -46,7 +46,9 @@ func (s *Service) CreateUser(ctx context.Context, request dto.CreateUserRequest)
 		return err
 	}
 
+	u.SetMiddleName(request.MiddleName)
 	u.MoveInto(request.DormitoryID, request.RoomNumber)
+	u.SetFloorNumber(request.Floor)
 	if request.TeamID != "" {
 		teamID, err := uuid.Parse(request.TeamID)
 		if err != nil {
@@ -73,17 +75,9 @@ func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, request dto.Upda
 	if err := u.Rename(request.FirstName, request.LastName); err != nil {
 		return err
 	}
+	u.SetMiddleName(request.MiddleName)
 	u.MoveInto(request.DormitoryID, request.RoomNumber)
-
-	if request.TeamID == "" {
-		u.LeaveTeam()
-	} else {
-		teamID, err := uuid.Parse(request.TeamID)
-		if err != nil {
-			return fmt.Errorf("invalid team_id")
-		}
-		u.JoinTeam(teamID)
-	}
+	u.SetFloorNumber(request.Floor)
 
 	return s.userRepo.Save(ctx, u)
 }

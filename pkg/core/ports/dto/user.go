@@ -29,10 +29,11 @@ type CreateUserRequest struct {
 
 type UpdateUserRequest struct {
 	FirstName   string `form:"first_name"`
+	MiddleName  string `form:"middle_name"`
 	LastName    string `form:"last_name"`
 	DormitoryID int64  `form:"dormitory_id"`
+	Floor       int    `form:"floor"`
 	RoomNumber  string `form:"room_number"`
-	TeamID      string `form:"team_id"`
 }
 
 type ProfileViewModel struct {

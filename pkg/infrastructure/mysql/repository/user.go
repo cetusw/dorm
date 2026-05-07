@@ -24,9 +24,11 @@ type userDTO struct {
 	ID          []byte
 	TelegramID  sql.NullInt64
 	FirstName   string
+	MiddleName  sql.NullString
 	LastName    string
 	TeamID      []byte
 	RoomNumber  sql.NullString
+	FloorNumber sql.NullInt64
 	DormitoryID sql.NullInt64
 	CreatedAt   time.Time
 }
@@ -56,9 +58,11 @@ func (dto *userDTO) toDomain() *user.User {
 		id,
 		nullInt64Ptr(dto.TelegramID),
 		dto.FirstName,
+		nullStringPtr(dto.MiddleName),
 		dto.LastName,
 		teamID,
 		roomNumber,
+		nullIntPtr(dto.FloorNumber),
 		dormID,
 		dto.CreatedAt,
 	)
@@ -72,15 +76,33 @@ func nullInt64Ptr(value sql.NullInt64) *int64 {
 	return &v
 }
 
+func nullStringPtr(value sql.NullString) *string {
+	if !value.Valid {
+		return nil
+	}
+	v := value.String
+	return &v
+}
+
+func nullIntPtr(value sql.NullInt64) *int {
+	if !value.Valid {
+		return nil
+	}
+	v := int(value.Int64)
+	return &v
+}
+
 func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 	const query = `
-		INSERT INTO user (id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user (id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 			first_name = VALUES(first_name),
+			middle_name = VALUES(middle_name),
 			last_name = VALUES(last_name),
 			team_id = VALUES(team_id),
 			room_number = VALUES(room_number),
+			floor_number = VALUES(floor_number),
 			dormitory_id = VALUES(dormitory_id)
 	`
 
@@ -89,9 +111,19 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 		teamID, _ = u.TeamID().MarshalBinary()
 	}
 
+	var middleName interface{} = nil
+	if u.MiddleName() != nil {
+		middleName = *u.MiddleName()
+	}
+
 	var roomNumber interface{} = nil
 	if u.RoomNumber() != nil {
 		roomNumber = *u.RoomNumber()
+	}
+
+	var floorNumber interface{} = nil
+	if u.FloorNumber() != nil {
+		floorNumber = *u.FloorNumber()
 	}
 
 	var dormID interface{} = nil
@@ -105,9 +137,11 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 		idBytes,
 		u.TelegramIDValue(),
 		u.FirstName(),
+		middleName,
 		u.LastName(),
 		teamID,
 		roomNumber,
+		floorNumber,
 		dormID,
 		u.CreatedAt(),
 	)
@@ -120,7 +154,7 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	const query = `
-		SELECT id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
 		FROM user WHERE id = ? AND deleted_at IS NULL
 	`
 	idBytes, _ := id.MarshalBinary()
@@ -131,7 +165,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User
 
 func (r *UserRepository) FindByTelegramID(ctx context.Context, telegramID int64) (*user.User, error) {
 	const query = `
-		SELECT id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
 		FROM user WHERE telegram_id = ? AND deleted_at IS NULL
 	`
 	row := r.db.QueryRowContext(ctx, query, telegramID)
@@ -140,7 +174,7 @@ func (r *UserRepository) FindByTelegramID(ctx context.Context, telegramID int64)
 
 func (r *UserRepository) FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]*user.User, error) {
 	const query = `
-		SELECT id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
 		FROM user WHERE team_id = ? AND deleted_at IS NULL
 	`
 	idBytes, _ := teamID.MarshalBinary()
@@ -157,9 +191,11 @@ func (r *UserRepository) FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]
 			&dto.ID,
 			&dto.TelegramID,
 			&dto.FirstName,
+			&dto.MiddleName,
 			&dto.LastName,
 			&dto.TeamID,
 			&dto.RoomNumber,
+			&dto.FloorNumber,
 			&dto.DormitoryID,
 			&dto.CreatedAt,
 		)
@@ -173,7 +209,7 @@ func (r *UserRepository) FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]
 
 func (r *UserRepository) FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*user.User, error) {
 	const query = `
-		SELECT id, telegram_id, first_name, last_name, team_id, room_number, dormitory_id, created_at
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
 		FROM user
 		WHERE dormitory_id = ? AND deleted_at IS NULL
 		ORDER BY last_name, first_name
@@ -191,9 +227,11 @@ func (r *UserRepository) FindByDormitoryID(ctx context.Context, dormitoryID int6
 			&dto.ID,
 			&dto.TelegramID,
 			&dto.FirstName,
+			&dto.MiddleName,
 			&dto.LastName,
 			&dto.TeamID,
 			&dto.RoomNumber,
+			&dto.FloorNumber,
 			&dto.DormitoryID,
 			&dto.CreatedAt,
 		)
@@ -211,9 +249,11 @@ func (r *UserRepository) scanUser(row *sql.Row) (*user.User, error) {
 		&dto.ID,
 		&dto.TelegramID,
 		&dto.FirstName,
+		&dto.MiddleName,
 		&dto.LastName,
 		&dto.TeamID,
 		&dto.RoomNumber,
+		&dto.FloorNumber,
 		&dto.DormitoryID,
 		&dto.CreatedAt,
 	)

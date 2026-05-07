@@ -51,6 +51,7 @@ func TestRestoreUser(t *testing.T) {
 	id := uuid.New()
 	telegramID := int64(12345)
 	teamID := uuid.New()
+	middleName := "Middle"
 	roomNumber := "10"
 	dormID := int64(1)
 	now := time.Now()
@@ -59,9 +60,11 @@ func TestRestoreUser(t *testing.T) {
 		id,
 		&telegramID,
 		"Jane",
+		&middleName,
 		"Smith",
 		&teamID,
 		&roomNumber,
+		nil,
 		&dormID,
 		now,
 	)
@@ -69,6 +72,7 @@ func TestRestoreUser(t *testing.T) {
 	assert.Equal(t, id, u.ID())
 	assert.Equal(t, int64(12345), u.TelegramID())
 	assert.Equal(t, "Jane", u.FirstName())
+	assert.Equal(t, &middleName, u.MiddleName())
 	assert.Equal(t, &teamID, u.TeamID())
 	assert.Equal(t, &dormID, u.DormitoryID())
 	assert.Equal(t, now, u.CreatedAt())
@@ -92,6 +96,23 @@ func TestUser_DormitoryAssignment(t *testing.T) {
 	dormID := int64(5)
 
 	u.MoveInto(dormID, roomNumber)
+	u.SetFloorNumber(3)
 	assert.NotNil(t, u.DormitoryID())
 	assert.Equal(t, dormID, *u.DormitoryID())
+	assert.NotNil(t, u.FloorNumber())
+	assert.Equal(t, 3, *u.FloorNumber())
+
+	u.SetFloorNumber(0)
+	assert.Nil(t, u.FloorNumber())
+}
+
+func TestUser_MiddleName(t *testing.T) {
+	u, _ := NewUser(123, "Test", "User")
+
+	u.SetMiddleName("Middle")
+	assert.NotNil(t, u.MiddleName())
+	assert.Equal(t, "Middle", *u.MiddleName())
+
+	u.SetMiddleName("")
+	assert.Nil(t, u.MiddleName())
 }

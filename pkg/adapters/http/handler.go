@@ -133,31 +133,31 @@ func (h *AdminHandler) HandleEditUserModal(c *fiber.Ctx) error {
 	if u.RoomNumber() != nil {
 		room = *u.RoomNumber()
 	}
-	teamID := ""
-	if u.TeamID() != nil {
-		teamID = u.TeamID().String()
+	middleName := ""
+	if u.MiddleName() != nil {
+		middleName = *u.MiddleName()
+	}
+	floor := 0
+	if u.FloorNumber() != nil {
+		floor = *u.FloorNumber()
 	}
 
 	dorms, err := h.dormitoryUC.GetDormitories(c.Context())
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении общежитий")
 	}
-	teams, err := h.teamUC.GetTeamsByDormitory(c.Context(), dormID)
-	if err != nil {
-		return c.Status(500).SendString("Ошибка при получении команд")
-	}
 
 	return c.Render("partials/modal_edit_user", fiber.Map{
 		"User": fiber.Map{
 			"ID":          u.ID(),
 			"FirstName":   u.FirstName(),
+			"MiddleName":  middleName,
 			"LastName":    u.LastName(),
 			"RoomNumber":  room,
+			"Floor":       floor,
 			"DormitoryID": dormID,
-			"TeamID":      teamID,
 		},
 		"Dormitories": dorms,
-		"Teams":       teams,
 	})
 }
 
