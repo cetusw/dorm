@@ -3,8 +3,6 @@ package http
 import (
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
-	"sort"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -12,27 +10,14 @@ import (
 
 type AdminHandler struct {
 	userUC      ports.UserUseCase
-	cleanUC     ports.CleaningUseCase
 	dormitoryUC ports.DormitoryUseCase
 	teamUC      ports.TeamUseCase
 	taskUC      ports.TaskCatalogUseCase
 	sheetsUC    ports.SheetsUseCase
 }
 
-type dashboardDutyCard struct {
-	Duty            dto.DutyViewModel
-	Total           int
-	Assigned        int
-	Done            int
-	Verified        int
-	AssignedPercent int
-	DonePercent     int
-	VerifiedPercent int
-}
-
 func NewAdminHandler(
 	userUC ports.UserUseCase,
-	cleanUC ports.CleaningUseCase,
 	dormitoryUC ports.DormitoryUseCase,
 	teamUC ports.TeamUseCase,
 	taskUC ports.TaskCatalogUseCase,
@@ -40,7 +25,6 @@ func NewAdminHandler(
 ) *AdminHandler {
 	return &AdminHandler{
 		userUC:      userUC,
-		cleanUC:     cleanUC,
 		dormitoryUC: dormitoryUC,
 		teamUC:      teamUC,
 		taskUC:      taskUC,
@@ -51,7 +35,7 @@ func NewAdminHandler(
 func (h *AdminHandler) RegisterRoutes(app *fiber.App) {
 	admin := app.Group("/admin")
 
-	admin.Get("/", h.HandleDashboard)
+	admin.Get("/", h.HandleIndex)
 	admin.Get("/users", h.HandleGetUsers)
 	admin.Get("/users/create", h.HandleCreateUserModal)
 	admin.Get("/users/teams-select", h.HandleTeamsDropdown)
@@ -78,74 +62,8 @@ func (h *AdminHandler) RegisterRoutes(app *fiber.App) {
 	admin.Post("/sheets/regenerate", h.HandleRegenerateSheet)
 }
 
-func (h *AdminHandler) HandleDashboard(c *fiber.Ctx) error {
-	duties, err := h.cleanUC.GetLatestDuties(c.Context())
-	if err != nil {
-		return c.Status(500).SendString("Ошибка при получении текущих дежурств")
-	}
-
-	cards := buildDashboardDutyCards(duties)
-	return c.Render("dashboard", fiber.Map{
-		"Cards": cards,
-	}, "layouts/main")
-}
-
-func buildDashboardDutyCards(duties []dto.DutyViewModel) []dashboardDutyCard {
-	cards := make([]dashboardDutyCard, 0, len(duties))
-	for _, d := range duties {
-		sort.SliceStable(d.UsersStats, func(i, j int) bool {
-			left := d.UsersStats[i]
-			right := d.UsersStats[j]
-			if left.IsTeamLeader != right.IsTeamLeader {
-				return left.IsTeamLeader
-			}
-			leftLast := strings.ToLower(strings.TrimSpace(left.LastName))
-			rightLast := strings.ToLower(strings.TrimSpace(right.LastName))
-			if leftLast != rightLast {
-				return leftLast < rightLast
-			}
-			leftFirst := strings.ToLower(strings.TrimSpace(left.FirstName))
-			rightFirst := strings.ToLower(strings.TrimSpace(right.FirstName))
-			return leftFirst < rightFirst
-		})
-
-		total := len(d.Tasks)
-		assigned := 0
-		done := 0
-		verified := 0
-		for _, t := range d.Tasks {
-			if t.Assignee != nil {
-				assigned++
-			}
-			if t.IsCompleted {
-				done++
-			}
-			if t.IsVerified {
-				verified++
-			}
-		}
-		assignedPct := 0
-		donePct := 0
-		verifiedPct := 0
-		if total > 0 {
-			assignedPct = (assigned * 100) / total
-			donePct = (done * 100) / total
-			verifiedPct = (verified * 100) / total
-		}
-
-		cards = append(cards, dashboardDutyCard{
-			Duty:            d,
-			Total:           total,
-			Assigned:        assigned,
-			Done:            done,
-			Verified:        verified,
-			AssignedPercent: assignedPct,
-			DonePercent:     donePct,
-			VerifiedPercent: verifiedPct,
-		})
-	}
-
-	return cards
+func (h *AdminHandler) HandleIndex(c *fiber.Ctx) error {
+	return c.Redirect("/admin/users", fiber.StatusFound)
 }
 
 func (h *AdminHandler) HandleGetUsers(c *fiber.Ctx) error {
@@ -484,6 +402,6 @@ func (h *AdminHandler) HandleRegenerateSheet(c *fiber.Ctx) error {
 	if err := h.sheetsUC.RegenerateCurrentDutySheet(c.Context(), teamID); err != nil {
 		return c.Status(500).SendString("Ошибка при пересоздании Google Sheet")
 	}
-	c.Response().Header.Set("HX-Redirect", "/admin")
+	c.Response().Header.Set("HX-Redirect", "/admin/users")
 	return c.SendString("")
 }

@@ -41,14 +41,17 @@ func (s *Service) CreateUser(ctx context.Context, request dto.CreateUserRequest)
 	if request.DormitoryID == 0 {
 		return fmt.Errorf("dormitory is required")
 	}
-	u, err := user.NewUser(0, request.FirstName, request.LastName) // TODO: сделать tg_id необязательным
+	u, err := user.NewManualUser(request.FirstName, request.LastName)
 	if err != nil {
 		return err
 	}
 
 	u.MoveInto(request.DormitoryID, request.RoomNumber)
 	if request.TeamID != "" {
-		teamID, _ := uuid.Parse(request.TeamID)
+		teamID, err := uuid.Parse(request.TeamID)
+		if err != nil {
+			return fmt.Errorf("invalid team_id")
+		}
 		u.JoinTeam(teamID)
 	}
 

@@ -15,7 +15,7 @@ var (
 
 type User struct {
 	id          uuid.UUID
-	telegramID  int64
+	telegramID  *int64
 	firstName   string
 	lastName    string
 	teamID      *uuid.UUID
@@ -25,6 +25,17 @@ type User struct {
 }
 
 func NewUser(telegramID int64, firstName, lastName string) (*User, error) {
+	if telegramID <= 0 {
+		return nil, ErrInvalidTelegramID
+	}
+	return newUserWithTelegramID(&telegramID, firstName, lastName)
+}
+
+func NewManualUser(firstName, lastName string) (*User, error) {
+	return newUserWithTelegramID(nil, firstName, lastName)
+}
+
+func newUserWithTelegramID(telegramID *int64, firstName, lastName string) (*User, error) {
 	if firstName == "" {
 		return nil, ErrEmptyName
 	}
@@ -40,7 +51,7 @@ func NewUser(telegramID int64, firstName, lastName string) (*User, error) {
 
 func RestoreUser(
 	id uuid.UUID,
-	telegramID int64,
+	telegramID *int64,
 	firstName, lastName string,
 	teamID *uuid.UUID,
 	roomNumber *string,
@@ -81,14 +92,20 @@ func (u *User) Rename(firstName, lastName string) error {
 	return nil
 }
 
-func (u *User) ID() uuid.UUID        { return u.id }
-func (u *User) TelegramID() int64    { return u.telegramID }
-func (u *User) FirstName() string    { return u.firstName }
-func (u *User) LastName() string     { return u.lastName }
-func (u *User) TeamID() *uuid.UUID   { return u.teamID }
-func (u *User) RoomNumber() *string  { return u.roomNumber }
-func (u *User) DormitoryID() *int64  { return u.dormitoryID }
-func (u *User) CreatedAt() time.Time { return u.createdAt }
+func (u *User) ID() uuid.UUID { return u.id }
+func (u *User) TelegramID() int64 {
+	if u.telegramID == nil {
+		return 0
+	}
+	return *u.telegramID
+}
+func (u *User) TelegramIDValue() *int64 { return u.telegramID }
+func (u *User) FirstName() string       { return u.firstName }
+func (u *User) LastName() string        { return u.lastName }
+func (u *User) TeamID() *uuid.UUID      { return u.teamID }
+func (u *User) RoomNumber() *string     { return u.roomNumber }
+func (u *User) DormitoryID() *int64     { return u.dormitoryID }
+func (u *User) CreatedAt() time.Time    { return u.createdAt }
 
 type Repository interface {
 	Save(ctx context.Context, user *User) error

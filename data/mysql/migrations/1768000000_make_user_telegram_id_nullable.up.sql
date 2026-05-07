@@ -1,0 +1,1 @@
+ALTER TABLE `user` MODIFY COLUMN `telegram_id` BIGINT NULL;

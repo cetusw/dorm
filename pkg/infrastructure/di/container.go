@@ -122,7 +122,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		Views: engine,
 	})
 
-	adminHandler := http.NewAdminHandler(userService, cleaningService, dormitoryService, teamService, taskCatalogService, sheetsAdapter)
+	adminHandler := http.NewAdminHandler(userService, dormitoryService, teamService, taskCatalogService, sheetsAdapter)
 	adminHandler.RegisterRoutes(app)
 
 	return &Container{

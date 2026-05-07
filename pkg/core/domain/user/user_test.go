@@ -27,10 +27,9 @@ func TestNewUser_Success(t *testing.T) {
 }
 
 func TestNewUser_Validation(t *testing.T) {
-	t.Run("Optional TelegramID", func(t *testing.T) {
-		u, err := NewUser(0, "John", "Doe")
-		assert.NoError(t, err)
-		assert.Equal(t, int64(0), u.TelegramID())
+	t.Run("Invalid TelegramID", func(t *testing.T) {
+		_, err := NewUser(0, "John", "Doe")
+		assert.ErrorIs(t, err, ErrInvalidTelegramID)
 	})
 
 	t.Run("Empty Name", func(t *testing.T) {
@@ -39,8 +38,18 @@ func TestNewUser_Validation(t *testing.T) {
 	})
 }
 
+func TestNewManualUser(t *testing.T) {
+	u, err := NewManualUser("John", "Doe")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, u)
+	assert.Equal(t, int64(0), u.TelegramID())
+	assert.Nil(t, u.TelegramIDValue())
+}
+
 func TestRestoreUser(t *testing.T) {
 	id := uuid.New()
+	telegramID := int64(12345)
 	teamID := uuid.New()
 	roomNumber := "10"
 	dormID := int64(1)
@@ -48,7 +57,7 @@ func TestRestoreUser(t *testing.T) {
 
 	u := RestoreUser(
 		id,
-		12345,
+		&telegramID,
 		"Jane",
 		"Smith",
 		&teamID,

@@ -22,7 +22,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 type userDTO struct {
 	ID          []byte
-	TelegramID  int64
+	TelegramID  sql.NullInt64
 	FirstName   string
 	LastName    string
 	TeamID      []byte
@@ -54,7 +54,7 @@ func (dto *userDTO) toDomain() *user.User {
 
 	return user.RestoreUser(
 		id,
-		dto.TelegramID,
+		nullInt64Ptr(dto.TelegramID),
 		dto.FirstName,
 		dto.LastName,
 		teamID,
@@ -62,6 +62,14 @@ func (dto *userDTO) toDomain() *user.User {
 		dormID,
 		dto.CreatedAt,
 	)
+}
+
+func nullInt64Ptr(value sql.NullInt64) *int64 {
+	if !value.Valid {
+		return nil
+	}
+	v := value.Int64
+	return &v
 }
 
 func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
@@ -95,7 +103,7 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 
 	_, err := r.db.ExecContext(ctx, query,
 		idBytes,
-		u.TelegramID(),
+		u.TelegramIDValue(),
 		u.FirstName(),
 		u.LastName(),
 		teamID,
