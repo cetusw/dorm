@@ -12,6 +12,7 @@ type TeamListItem struct {
 	DormitoryID   int64
 	DormitoryName string
 	MembersCount  int
+	LeaderID      *uuid.UUID
 }
 
 type TeamMemberItem struct {
@@ -23,16 +24,19 @@ type TeamMemberItem struct {
 }
 
 type CreateTeamRequest struct {
-	Name    string `form:"name"`
-	Color   string `form:"color"`
-	Order   int    `form:"order"`
-	GroupID string `form:"group_id"`
+	Name      string   `form:"name"`
+	Color     string   `form:"color"`
+	Order     int      `form:"order"`
+	GroupID   string   `form:"group_id"`
+	LeaderID  string   `form:"leader_id"`
+	MemberIDs []string `form:"member_ids"`
 }
 
 type UpdateTeamRequest struct {
-	Name    string `form:"name"`
-	Color   string `form:"color"`
-	Order   int    `form:"order"`
-	GroupID string `form:"group_id"`
+	Name      string   `form:"name"`
+	Color     string   `form:"color"`
+	Order     int      `form:"order"`
+	GroupID   string   `form:"group_id"`
+	LeaderID  string   `form:"leader_id"`
+	MemberIDs []string `form:"member_ids"`
 }
-

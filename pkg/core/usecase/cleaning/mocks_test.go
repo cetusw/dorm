@@ -57,6 +57,11 @@ func (m *MockGroupRepo) FindAll(ctx context.Context) ([]*structure.Group, error)
 func (m *MockGroupRepo) FindByID(ctx context.Context, id uuid.UUID) (*structure.Group, error) {
 	return nil, nil
 }
+func (m *MockGroupRepo) FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*structure.Group, error) {
+	return nil, nil
+}
+func (m *MockGroupRepo) Save(ctx context.Context, group *structure.Group) error { return nil }
+func (m *MockGroupRepo) Delete(ctx context.Context, id uuid.UUID) error         { return nil }
 
 type MockTeamRepo struct{ mock.Mock }
 
@@ -101,6 +106,9 @@ func (m *MockEventBus) Subscribe(topic string, handler ports.EventHandler) {}
 type MockUserRepo struct{ mock.Mock }
 
 func (m *MockUserRepo) Save(ctx context.Context, u *user.User) error { return nil }
+func (m *MockUserRepo) FindAll(ctx context.Context) ([]*user.User, error) {
+	return nil, nil
+}
 func (m *MockUserRepo) FindByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	return nil, nil
 }

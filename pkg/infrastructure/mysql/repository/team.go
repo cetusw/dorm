@@ -27,8 +27,8 @@ func (r *TeamRepository) FindByID(ctx context.Context, id uuid.UUID) (*structure
 
 	var tID, gID, lID []byte
 	var name string
-	var color string
-	var order int
+	var color sql.NullString
+	var order sql.NullInt64
 
 	if err := row.Scan(&tID, &name, &gID, &lID, &color, &order); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -45,12 +45,12 @@ func (r *TeamRepository) FindByID(ctx context.Context, id uuid.UUID) (*structure
 		leaderID = &uid
 	}
 
-	return structure.RestoreTeam(teamID, name, groupID, leaderID, color, order), nil
+	return structure.RestoreTeam(teamID, name, groupID, leaderID, color.String, int(order.Int64)), nil
 }
 
 // TODO: вынести в DTO, как в user
 func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*structure.Team, error) {
-	const query = `SELECT id, name, group_id, leader_id, color, team_order FROM team WHERE group_id = ?`
+	const query = `SELECT id, name, group_id, leader_id, color, team_order FROM team WHERE group_id = ? ORDER BY team_order, name`
 
 	gIDBytes, _ := groupID.MarshalBinary()
 	rows, err := r.db.QueryContext(ctx, query, gIDBytes)
@@ -63,8 +63,8 @@ func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 	for rows.Next() {
 		var tID, gID, lID []byte
 		var name string
-		var color string
-		var order int
+		var color sql.NullString
+		var order sql.NullInt64
 
 		if err := rows.Scan(&tID, &name, &gID, &lID, &color, &order); err != nil {
 			return nil, fmt.Errorf("FindByGroupID scan error: %w", err)
@@ -77,7 +77,7 @@ func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 			uid, _ := uuid.FromBytes(lID)
 			leaderID = &uid
 		}
-		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color, order))
+		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color.String, int(order.Int64)))
 	}
 	return teams, nil
 }
@@ -127,4 +127,3 @@ func (r *TeamRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
-

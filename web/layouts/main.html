@@ -112,7 +112,6 @@
             left: 0;
             margin-top: 0.35rem;
             max-height: 14rem;
-            overflow-y: auto;
             padding: 0.25rem;
             position: absolute;
             right: 0;
@@ -122,6 +121,28 @@
 
         .admin-select-shell[data-open="true"] .admin-select-menu {
             display: block;
+        }
+
+        .admin-select-search {
+            border: 1px solid rgb(226 232 240);
+            border-radius: 0.65rem;
+            color: rgb(15 23 42);
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            margin-bottom: 0.25rem;
+            outline: none;
+            padding: 0.5rem 0.65rem;
+            width: 100%;
+        }
+
+        .admin-select-search:focus {
+            border-color: rgb(37 99 235);
+            box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
+        }
+
+        .admin-select-options {
+            max-height: 10.5rem;
+            overflow-y: auto;
         }
 
         .admin-select-option {
@@ -150,6 +171,14 @@
             color: rgb(29 78 216);
             font-weight: 700;
         }
+
+        .admin-select-empty {
+            color: rgb(100 116 139);
+            display: none;
+            font-size: 0.875rem;
+            padding: 0.75rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -166,20 +195,20 @@
 
         <nav class="flex-1 p-4 space-y-2 mt-4">
             <a href="/admin/users"
-               class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800 group">
-                <i data-lucide="users" class="w-5 h-5 text-slate-400 group-hover:text-blue-400"></i>
+               class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800 group {{ if eq .ActiveSection "users" }}bg-slate-800 text-white{{ end }}">
+                <i data-lucide="users" class="w-5 h-5 {{ if eq .ActiveSection "users" }}text-blue-400{{ else }}text-slate-400{{ end }} group-hover:text-blue-400"></i>
                 <span class="font-medium">Жители</span>
             </a>
 
-            <a href="/admin/teams"
-               class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800 group border-transparent">
-                <i data-lucide="shield" class="w-5 h-5 text-slate-400 group-hover:text-blue-400"></i>
-                <span class="font-medium">Команды</span>
+            <a href="/admin/dormitories"
+               class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800 group {{ if eq .ActiveSection "dormitories" }}bg-slate-800 text-white{{ end }}">
+                <i data-lucide="building-2" class="w-5 h-5 {{ if eq .ActiveSection "dormitories" }}text-blue-400{{ else }}text-slate-400{{ end }} group-hover:text-blue-400"></i>
+                <span class="font-medium">Общежития</span>
             </a>
 
             <a href="/admin/tasks"
-               class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800 group">
-                <i data-lucide="check-square" class="w-5 h-5 text-slate-400 group-hover:text-blue-400"></i>
+               class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800 group {{ if eq .ActiveSection "tasks" }}bg-slate-800 text-white{{ end }}">
+                <i data-lucide="check-square" class="w-5 h-5 {{ if eq .ActiveSection "tasks" }}text-blue-400{{ else }}text-slate-400{{ end }} group-hover:text-blue-400"></i>
                 <span class="font-medium">Задачи</span>
             </a>
 
@@ -241,6 +270,9 @@
         const trigger = shell.querySelector('[data-admin-select-trigger]');
         const label = shell.querySelector('[data-admin-select-label]');
         const menu = shell.querySelector('[data-admin-select-menu]');
+        const searchInput = shell.querySelector('[data-admin-select-search]');
+        const optionsContainer = shell.querySelector('[data-admin-select-options]');
+        const emptyState = shell.querySelector('[data-admin-select-empty]');
         const selectedOption = select.selectedOptions[0] || select.options[0];
 
         label.textContent = selectedOption ? selectedOption.textContent : '';
@@ -249,13 +281,14 @@
         shell.classList.toggle('admin-select-disabled', select.disabled);
         shell.dataset.open = select.disabled ? 'false' : shell.dataset.open;
 
-        menu.innerHTML = '';
+        optionsContainer.innerHTML = '';
         Array.from(select.options).forEach((option) => {
             const item = document.createElement('button');
             item.type = 'button';
             item.className = 'admin-select-option';
             item.textContent = option.textContent;
             item.dataset.value = option.value;
+            item.dataset.search = option.textContent;
             item.setAttribute('role', 'option');
             item.setAttribute('aria-selected', option.selected ? 'true' : 'false');
             item.addEventListener('click', () => {
@@ -264,8 +297,15 @@
                 closeAdminSelects();
                 syncAdminSelect(select);
             });
-            menu.appendChild(item);
+            optionsContainer.appendChild(item);
         });
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        if (emptyState) {
+            emptyState.style.display = 'none';
+        }
+        menu.dataset.optionsCount = String(select.options.length);
     }
 
     function enhanceAdminSelects(root = document) {
@@ -299,9 +339,37 @@
                 const shouldOpen = shell.dataset.open !== 'true';
                 closeAdminSelects(shell);
                 shell.dataset.open = shouldOpen ? 'true' : 'false';
+                if (shouldOpen) {
+                    const searchInput = shell.querySelector('[data-admin-select-search]');
+                    if (searchInput) {
+                        searchInput.focus();
+                    }
+                }
             });
 
             select.addEventListener('change', () => syncAdminSelect(select));
+
+            const searchInput = document.createElement('input');
+            searchInput.type = 'search';
+            searchInput.className = 'admin-select-search';
+            searchInput.placeholder = 'Поиск';
+            searchInput.dataset.adminSelectSearch = 'true';
+            searchInput.setAttribute('aria-label', 'Поиск по списку');
+            searchInput.addEventListener('click', (event) => event.stopPropagation());
+            searchInput.addEventListener('input', () => filterAdminSelect(shell, searchInput.value));
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'admin-select-options';
+            optionsContainer.dataset.adminSelectOptions = 'true';
+
+            const emptyState = document.createElement('div');
+            emptyState.className = 'admin-select-empty';
+            emptyState.dataset.adminSelectEmpty = 'true';
+            emptyState.textContent = 'Ничего не найдено';
+
+            menu.appendChild(searchInput);
+            menu.appendChild(optionsContainer);
+            menu.appendChild(emptyState);
 
             shell.appendChild(trigger);
             shell.appendChild(menu);
@@ -310,24 +378,43 @@
         });
     }
 
+    function filterAdminSelect(shell, query) {
+        const options = Array.from(shell.querySelectorAll('.admin-select-option'));
+        const emptyState = shell.querySelector('[data-admin-select-empty]');
+        const normalizedQuery = normalizeSearchValue(query);
+        let visibleCount = 0;
+
+        options.forEach((option) => {
+            const isVisible = normalizedQuery === '' || normalizeSearchValue(option.dataset.search).includes(normalizedQuery);
+            option.classList.toggle('hidden', !isVisible);
+            if (isVisible) visibleCount++;
+        });
+
+        if (emptyState) {
+            emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+        }
+    }
+
+    function normalizeSearchValue(value) {
+        return (value || '').toString().trim().toLowerCase();
+    }
+
     function setupUserSearch() {
-        const table = document.querySelector('[data-user-table]');
+        const table = document.querySelector('[data-user-table], [data-structure-table]');
         if (!table) return;
         if (table.dataset.searchReady === 'true') return;
         table.dataset.searchReady = 'true';
 
-        const searchInput = document.querySelector('[data-user-search]');
-        const rows = Array.from(table.querySelectorAll('[data-user-row]'));
+        const searchInput = document.querySelector('[data-user-search], [data-structure-search]');
+        const rows = Array.from(table.querySelectorAll('[data-user-row], [data-structure-row]'));
         const emptyState = table.querySelector('[data-filter-empty]');
 
-        const normalize = (value) => (value || '').toString().trim().toLowerCase();
-
         const applySearch = () => {
-            const query = normalize(searchInput ? searchInput.value : '');
+            const query = normalizeSearchValue(searchInput ? searchInput.value : '');
 
             let visibleCount = 0;
             rows.forEach((row) => {
-                const isVisible = query === '' || normalize(row.dataset.search).includes(query);
+                const isVisible = query === '' || normalizeSearchValue(row.dataset.search).includes(query);
                 row.classList.toggle('hidden', !isVisible);
                 if (isVisible) visibleCount++;
             });
@@ -341,6 +428,37 @@
             searchInput.addEventListener('input', applySearch);
         }
         applySearch();
+    }
+
+    function setupMemberSearch(root = document) {
+        root.querySelectorAll('[data-member-search]').forEach((searchInput) => {
+            if (searchInput.dataset.searchReady === 'true') return;
+            searchInput.dataset.searchReady = 'true';
+
+            const scope = searchInput.closest('[data-member-search-scope]');
+            if (!scope) return;
+
+            const rows = Array.from(scope.querySelectorAll('[data-member-row]'));
+            const emptyState = scope.querySelector('[data-member-search-empty]');
+
+            const applySearch = () => {
+                const query = normalizeSearchValue(searchInput.value);
+                let visibleCount = 0;
+
+                rows.forEach((row) => {
+                    const isVisible = query === '' || normalizeSearchValue(row.dataset.memberSearch).includes(query);
+                    row.classList.toggle('hidden', !isVisible);
+                    if (isVisible) visibleCount++;
+                });
+
+                if (emptyState) {
+                    emptyState.classList.toggle('hidden', visibleCount !== 0 || rows.length === 0);
+                }
+            };
+
+            searchInput.addEventListener('input', applySearch);
+            applySearch();
+        });
     }
 
     document.addEventListener('keydown', (event) => {
@@ -363,12 +481,24 @@
         }
     });
 
+    document.addEventListener('submit', (event) => {
+        const form = event.target.closest('[data-team-form]');
+        if (!form) return;
+
+        const selectedTransferMember = form.querySelector('[data-transfer-member="true"]:checked');
+        if (selectedTransferMember && !confirm('Один или несколько жителей уже находятся в другой команде. Переместить выбранных жителей?')) {
+            event.preventDefault();
+        }
+    }, true);
+
     enhanceAdminSelects();
     lucide.createIcons();
     setupUserSearch();
+    setupMemberSearch();
     document.body.addEventListener('htmx:afterSettle', () => {
         enhanceAdminSelects();
         setupUserSearch();
+        setupMemberSearch();
         lucide.createIcons();
     });
 </script>

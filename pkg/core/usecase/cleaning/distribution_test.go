@@ -98,8 +98,8 @@ func createFixtures() *testFixtures {
 		taskPrivate: taskPrivate,
 		taskPublic:  taskPublic,
 		groups: []*structure.Group{
-			structure.RestoreGroup(groupID1, "Boys", "s1", 1),
-			structure.RestoreGroup(groupID2, "Girls", "s2", 1),
+			structure.RestoreGroup(groupID1, nil, "Boys", "s1", 1),
+			structure.RestoreGroup(groupID2, nil, "Girls", "s2", 1),
 		},
 		teams1: []*structure.Team{structure.RestoreTeam(teamID1, "Boys Team", groupID1, nil, "blue", 1)},
 		teams2: []*structure.Team{structure.RestoreTeam(teamID2, "Girls Team", groupID2, nil, "pink", 2)},

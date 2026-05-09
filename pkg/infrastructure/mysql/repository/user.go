@@ -152,6 +152,42 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 	return nil
 }
 
+func (r *UserRepository) FindAll(ctx context.Context) ([]*user.User, error) {
+	const query = `
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
+		FROM user
+		WHERE deleted_at IS NULL
+		ORDER BY last_name, first_name
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*user.User
+	for rows.Next() {
+		var dto userDTO
+		err := rows.Scan(
+			&dto.ID,
+			&dto.TelegramID,
+			&dto.FirstName,
+			&dto.MiddleName,
+			&dto.LastName,
+			&dto.TeamID,
+			&dto.RoomNumber,
+			&dto.FloorNumber,
+			&dto.DormitoryID,
+			&dto.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, dto.toDomain())
+	}
+	return users, rows.Err()
+}
+
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	const query = `
 		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at

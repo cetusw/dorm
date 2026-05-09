@@ -36,8 +36,8 @@ func (q *TeamQueryService) FindTeamsByDormitoryID(ctx context.Context, dormID in
 	for rows.Next() {
 		var tID, gID, lID []byte
 		var name string
-		var color string
-		var order int
+		var color sql.NullString
+		var order sql.NullInt64
 
 		if err := rows.Scan(&tID, &name, &gID, &lID, &color, &order); err != nil {
 			return nil, fmt.Errorf("FindByGroupID scan error: %w", err)
@@ -50,7 +50,7 @@ func (q *TeamQueryService) FindTeamsByDormitoryID(ctx context.Context, dormID in
 			uid, _ := uuid.FromBytes(lID)
 			leaderID = &uid
 		}
-		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color, order))
+		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color.String, int(order.Int64)))
 	}
 	return teams, nil
 }
@@ -85,11 +85,13 @@ func (q *TeamQueryService) GetTeamsDetailedList(ctx context.Context, dormID int6
 	for rows.Next() {
 		var item dto.TeamListItem
 		var teamIDBytes, groupIDBytes []byte
+		var color sql.NullString
+		var order sql.NullInt64
 		if err := rows.Scan(
 			&teamIDBytes,
 			&item.Name,
-			&item.Color,
-			&item.Order,
+			&color,
+			&order,
 			&groupIDBytes,
 			&item.GroupName,
 			&item.DormitoryID,
@@ -103,6 +105,8 @@ func (q *TeamQueryService) GetTeamsDetailedList(ctx context.Context, dormID int6
 		groupID, _ := uuid.FromBytes(groupIDBytes)
 		item.ID = teamID
 		item.GroupID = groupID
+		item.Color = color.String
+		item.Order = int(order.Int64)
 		teams = append(teams, item)
 	}
 	return teams, rows.Err()

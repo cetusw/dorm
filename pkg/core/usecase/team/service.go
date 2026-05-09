@@ -3,6 +3,7 @@ package team
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/domain/user"
@@ -48,6 +49,41 @@ func (s *Service) GetTeamsList(ctx context.Context, dormID int64) ([]dto.TeamLis
 	return s.queryService.GetTeamsDetailedList(ctx, dormID)
 }
 
+func (s *Service) GetTeamsListByGroup(ctx context.Context, groupID uuid.UUID) ([]dto.TeamListItem, error) {
+	group, err := s.groupRepo.FindByID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if group == nil {
+		return nil, fmt.Errorf("group not found")
+	}
+
+	teams, err := s.teamRepo.FindByGroupID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]dto.TeamListItem, 0, len(teams))
+	for _, team := range teams {
+		members, err := s.userRepo.FindByTeamID(ctx, team.ID())
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, dto.TeamListItem{
+			ID:           team.ID(),
+			Name:         team.Name(),
+			Color:        team.Color(),
+			Order:        team.Order(),
+			GroupID:      team.GroupID(),
+			GroupName:    group.Name(),
+			DormitoryID:  group.DormitoryID(),
+			MembersCount: len(members),
+			LeaderID:     team.LeaderID(),
+		})
+	}
+	return items, nil
+}
+
 func (s *Service) GetTeamByID(ctx context.Context, id uuid.UUID) (*dto.TeamListItem, error) {
 	team, err := s.teamRepo.FindByID(ctx, id)
 	if err != nil {
@@ -62,11 +98,12 @@ func (s *Service) GetTeamByID(ctx context.Context, id uuid.UUID) (*dto.TeamListI
 	}
 	group := groupMap[team.GroupID()]
 	item := &dto.TeamListItem{
-		ID:      team.ID(),
-		Name:    team.Name(),
-		Color:   team.Color(),
-		Order:   team.Order(),
-		GroupID: team.GroupID(),
+		ID:       team.ID(),
+		Name:     team.Name(),
+		Color:    team.Color(),
+		Order:    team.Order(),
+		GroupID:  team.GroupID(),
+		LeaderID: team.LeaderID(),
 	}
 	if group != nil {
 		item.GroupName = group.Name()
@@ -88,8 +125,37 @@ func (s *Service) CreateTeam(ctx context.Context, req dto.CreateTeamRequest) err
 	if err != nil {
 		return fmt.Errorf("invalid group id")
 	}
-	team := structure.NewTeam(req.Name, groupID, req.Color, req.Order)
-	return s.teamRepo.Save(ctx, team)
+	return s.CreateTeamInGroup(ctx, groupID, req)
+}
+
+func (s *Service) CreateTeamInGroup(ctx context.Context, groupID uuid.UUID, req dto.CreateTeamRequest) error {
+	if strings.TrimSpace(req.Name) == "" {
+		return fmt.Errorf("team name is required")
+	}
+	group, err := s.requireGroup(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	memberIDs, err := parseMemberIDs(req.MemberIDs)
+	if err != nil {
+		return err
+	}
+	leaderID, err := parseOptionalUUID(req.LeaderID)
+	if err != nil {
+		return err
+	}
+	if err := s.requireUsersInDormitory(ctx, group.DormitoryID(), appendOptionalUUID(memberIDs, leaderID)); err != nil {
+		return err
+	}
+
+	team := structure.NewTeam(req.Name, groupID, normalizeColor(req.Color), req.Order)
+	if leaderID != nil {
+		team = structure.RestoreTeam(team.ID(), team.Name(), team.GroupID(), leaderID, team.Color(), team.Order())
+	}
+	if err := s.teamRepo.Save(ctx, team); err != nil {
+		return err
+	}
+	return s.moveMembers(ctx, team.ID(), memberIDs)
 }
 
 func (s *Service) UpdateTeam(ctx context.Context, id uuid.UUID, req dto.UpdateTeamRequest) error {
@@ -106,8 +172,41 @@ func (s *Service) UpdateTeam(ctx context.Context, id uuid.UUID, req dto.UpdateTe
 		return fmt.Errorf("invalid group id")
 	}
 
-	updated := structure.RestoreTeam(id, req.Name, groupID, current.LeaderID(), req.Color, req.Order)
-	return s.teamRepo.Save(ctx, updated)
+	return s.UpdateTeamInGroup(ctx, groupID, id, req)
+}
+
+func (s *Service) UpdateTeamInGroup(ctx context.Context, groupID uuid.UUID, id uuid.UUID, req dto.UpdateTeamRequest) error {
+	current, err := s.teamRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if current == nil {
+		return fmt.Errorf("team not found")
+	}
+	if strings.TrimSpace(req.Name) == "" {
+		return fmt.Errorf("team name is required")
+	}
+	group, err := s.requireGroup(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	memberIDs, err := parseMemberIDs(req.MemberIDs)
+	if err != nil {
+		return err
+	}
+	leaderID, err := parseOptionalUUID(req.LeaderID)
+	if err != nil {
+		return err
+	}
+	if err := s.requireUsersInDormitory(ctx, group.DormitoryID(), appendOptionalUUID(memberIDs, leaderID)); err != nil {
+		return err
+	}
+
+	updated := structure.RestoreTeam(id, req.Name, groupID, leaderID, normalizeColor(req.Color), req.Order)
+	if err := s.teamRepo.Save(ctx, updated); err != nil {
+		return err
+	}
+	return s.syncMembers(ctx, id, memberIDs)
 }
 
 func (s *Service) DeleteTeam(ctx context.Context, id uuid.UUID) error {
@@ -130,12 +229,147 @@ func (s *Service) GetTeamMembersForEdit(ctx context.Context, teamID uuid.UUID) (
 		return nil, fmt.Errorf("group not found")
 	}
 
-	users, err := s.userRepo.FindByDormitoryID(ctx, group.DormitoryID())
+	return s.getTeamMemberItems(ctx, group.DormitoryID(), teamID)
+}
+
+func (s *Service) GetTeamMembersForNewTeam(ctx context.Context, groupID uuid.UUID) ([]dto.TeamMemberItem, error) {
+	group, err := s.groupRepo.FindByID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if group == nil {
+		return nil, fmt.Errorf("group not found")
+	}
+	return s.getTeamMemberItems(ctx, group.DormitoryID(), uuid.Nil)
+}
+
+func (s *Service) MoveUserToTeam(ctx context.Context, teamID uuid.UUID, userID uuid.UUID) error {
+	team, err := s.teamRepo.FindByID(ctx, teamID)
+	if err != nil {
+		return err
+	}
+	if team == nil {
+		return fmt.Errorf("team not found")
+	}
+	group, err := s.requireGroup(ctx, team.GroupID())
+	if err != nil {
+		return err
+	}
+	if err := s.requireUsersInDormitory(ctx, group.DormitoryID(), []uuid.UUID{userID}); err != nil {
+		return err
+	}
+	return s.userRepo.MoveUserToTeam(ctx, userID, &teamID)
+}
+
+func (s *Service) RemoveUserFromTeam(ctx context.Context, userID uuid.UUID) error {
+	return s.userRepo.MoveUserToTeam(ctx, userID, nil)
+}
+
+func (s *Service) requireGroup(ctx context.Context, id uuid.UUID) (*structure.Group, error) {
+	group, err := s.groupRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if group == nil {
+		return nil, fmt.Errorf("group not found")
+	}
+	return group, nil
+}
+
+func (s *Service) moveMembers(ctx context.Context, teamID uuid.UUID, memberIDs []uuid.UUID) error {
+	for _, userID := range memberIDs {
+		if err := s.userRepo.MoveUserToTeam(ctx, userID, &teamID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) syncMembers(ctx context.Context, teamID uuid.UUID, memberIDs []uuid.UUID) error {
+	selected := make(map[uuid.UUID]struct{}, len(memberIDs))
+	for _, userID := range memberIDs {
+		selected[userID] = struct{}{}
+	}
+
+	currentMembers, err := s.userRepo.FindByTeamID(ctx, teamID)
+	if err != nil {
+		return err
+	}
+	for _, resident := range currentMembers {
+		if _, ok := selected[resident.ID()]; ok {
+			continue
+		}
+		if err := s.userRepo.MoveUserToTeam(ctx, resident.ID(), nil); err != nil {
+			return err
+		}
+	}
+
+	for _, userID := range memberIDs {
+		if err := s.userRepo.MoveUserToTeam(ctx, userID, &teamID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func parseMemberIDs(rawIDs []string) ([]uuid.UUID, error) {
+	memberIDs := make([]uuid.UUID, 0, len(rawIDs))
+	for _, rawID := range rawIDs {
+		userID, err := uuid.Parse(rawID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid member id")
+		}
+		memberIDs = append(memberIDs, userID)
+	}
+	return memberIDs, nil
+}
+
+func parseOptionalUUID(rawID string) (*uuid.UUID, error) {
+	if strings.TrimSpace(rawID) == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(rawID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id")
+	}
+	return &id, nil
+}
+
+func appendOptionalUUID(ids []uuid.UUID, optionalID *uuid.UUID) []uuid.UUID {
+	if optionalID == nil {
+		return ids
+	}
+	return append(ids, *optionalID)
+}
+
+func (s *Service) requireUsersInDormitory(ctx context.Context, dormitoryID int64, userIDs []uuid.UUID) error {
+	for _, userID := range userIDs {
+		resident, err := s.userRepo.FindByID(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if resident == nil {
+			return fmt.Errorf("user not found")
+		}
+		if resident.DormitoryID() == nil || *resident.DormitoryID() != dormitoryID {
+			return fmt.Errorf("user does not belong to dormitory")
+		}
+	}
+	return nil
+}
+
+func normalizeColor(color string) string {
+	color = strings.TrimSpace(color)
+	return strings.TrimPrefix(color, "#")
+}
+
+func (s *Service) getTeamMemberItems(ctx context.Context, dormitoryID int64, currentTeamID uuid.UUID) ([]dto.TeamMemberItem, error) {
+	users, err := s.userRepo.FindByDormitoryID(ctx, dormitoryID)
 	if err != nil {
 		return nil, err
 	}
 
-	teams, err := s.GetTeamsByDormitory(ctx, group.DormitoryID())
+	teams, err := s.GetTeamsByDormitory(ctx, dormitoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +380,7 @@ func (s *Service) GetTeamMembersForEdit(ctx context.Context, teamID uuid.UUID) (
 
 	items := make([]dto.TeamMemberItem, 0, len(users))
 	for _, u := range users {
-		fullName := fmt.Sprintf("%s %s", u.FirstName(), u.LastName())
+		fullName := strings.TrimSpace(fmt.Sprintf("%s %s", u.LastName(), u.FirstName()))
 		var currentTeamName string
 		if u.TeamID() != nil {
 			currentTeamName = teamNames[*u.TeamID()]
@@ -156,18 +390,10 @@ func (s *Service) GetTeamMembersForEdit(ctx context.Context, teamID uuid.UUID) (
 			FullName:        fullName,
 			CurrentTeamID:   u.TeamID(),
 			CurrentTeamName: currentTeamName,
-			IsInCurrentTeam: u.TeamID() != nil && *u.TeamID() == teamID,
+			IsInCurrentTeam: currentTeamID != uuid.Nil && u.TeamID() != nil && *u.TeamID() == currentTeamID,
 		})
 	}
 	return items, nil
-}
-
-func (s *Service) MoveUserToTeam(ctx context.Context, teamID uuid.UUID, userID uuid.UUID) error {
-	return s.userRepo.MoveUserToTeam(ctx, userID, &teamID)
-}
-
-func (s *Service) RemoveUserFromTeam(ctx context.Context, userID uuid.UUID) error {
-	return s.userRepo.MoveUserToTeam(ctx, userID, nil)
 }
 
 func (s *Service) loadGroupDormitoryMaps(ctx context.Context) (map[uuid.UUID]*structure.Group, map[int64]*structure.Dormitory, error) {

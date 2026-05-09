@@ -1,8 +1,11 @@
 package http
 
 import (
+	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
+	"fmt"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -38,20 +41,33 @@ func (h *AdminHandler) RegisterRoutes(app *fiber.App) {
 	admin.Get("/", h.HandleIndex)
 	admin.Get("/users", h.HandleGetUsers)
 	admin.Get("/users/create", h.HandleCreateUserModal)
-	admin.Get("/users/teams-select", h.HandleTeamsDropdown)
 	admin.Post("/users", h.HandleStoreUser)
 	admin.Get("/users/:id/edit", h.HandleEditUserModal)
 	admin.Put("/users/:id", h.HandleUpdateUser)
 	admin.Delete("/users/:id", h.HandleDeleteUser)
 
-	admin.Get("/teams", h.HandleGetTeams)
-	admin.Get("/teams/create", h.HandleCreateTeamModal)
-	admin.Post("/teams", h.HandleStoreTeam)
-	admin.Get("/teams/:id/edit", h.HandleEditTeamModal)
-	admin.Put("/teams/:id", h.HandleUpdateTeam)
-	admin.Delete("/teams/:id", h.HandleDeleteTeam)
-	admin.Put("/teams/:teamID/members/:userID", h.HandleAddTeamMember)
-	admin.Delete("/teams/members/:userID", h.HandleRemoveTeamMember)
+	admin.Get("/dormitories", h.HandleGetDormitories)
+	admin.Get("/dormitories/create", h.HandleCreateDormitoryModal)
+	admin.Post("/dormitories", h.HandleStoreDormitory)
+	admin.Get("/dormitories/:dormId/edit", h.HandleEditDormitoryModal)
+	admin.Put("/dormitories/:dormId", h.HandleUpdateDormitory)
+	admin.Delete("/dormitories/:dormId", h.HandleDeleteDormitory)
+
+	admin.Get("/dormitories/:dormId/groups", h.HandleGetGroups)
+	admin.Get("/dormitories/:dormId/groups/create", h.HandleCreateGroupModal)
+	admin.Post("/dormitories/:dormId/groups", h.HandleStoreGroup)
+	admin.Get("/dormitories/:dormId/groups/:groupId/edit", h.HandleEditGroupModal)
+	admin.Put("/dormitories/:dormId/groups/:groupId", h.HandleUpdateGroup)
+	admin.Delete("/dormitories/:dormId/groups/:groupId", h.HandleDeleteGroup)
+
+	admin.Get("/dormitories/:dormId/groups/:groupId/teams", h.HandleGetDormitoryGroupTeams)
+	admin.Get("/dormitories/:dormId/groups/:groupId/teams/create", h.HandleCreateTeamModal)
+	admin.Post("/dormitories/:dormId/groups/:groupId/teams", h.HandleStoreTeam)
+	admin.Get("/dormitories/:dormId/groups/:groupId/teams/:teamId/edit", h.HandleEditTeamModal)
+	admin.Put("/dormitories/:dormId/groups/:groupId/teams/:teamId", h.HandleUpdateTeam)
+	admin.Delete("/dormitories/:dormId/groups/:groupId/teams/:teamId", h.HandleDeleteTeam)
+	admin.Put("/dormitories/:dormId/groups/:groupId/teams/:teamId/members/:userID", h.HandleAddTeamMember)
+	admin.Delete("/dormitories/:dormId/groups/:groupId/teams/members/:userID", h.HandleRemoveTeamMember)
 
 	admin.Get("/tasks", h.HandleGetTasks)
 	admin.Get("/tasks/create", h.HandleCreateTaskModal)
@@ -73,7 +89,8 @@ func (h *AdminHandler) HandleGetUsers(c *fiber.Ctx) error {
 	}
 
 	return c.Render("users", fiber.Map{
-		"Users": users,
+		"Users":         users,
+		"ActiveSection": "users",
 	}, "layouts/main")
 }
 
@@ -84,17 +101,6 @@ func (h *AdminHandler) HandleCreateUserModal(c *fiber.Ctx) error {
 	}
 	return c.Render("partials/modal_create_user", fiber.Map{
 		"Dormitories": dorms,
-	})
-}
-
-func (h *AdminHandler) HandleTeamsDropdown(c *fiber.Ctx) error {
-	dormID := c.QueryInt("dormitory_id")
-	teams, err := h.teamUC.GetTeamsByDormitory(c.Context(), int64(dormID))
-	if err != nil {
-		return c.Status(500).SendString("Ошибка при получении команд")
-	}
-	return c.Render("partials/team_options", fiber.Map{
-		"Teams": teams,
 	})
 }
 
@@ -191,50 +197,249 @@ func (h *AdminHandler) HandleDeleteUser(c *fiber.Ctx) error {
 	return c.SendString("")
 }
 
-func (h *AdminHandler) HandleGetTeams(c *fiber.Ctx) error {
-	dorms, err := h.dormitoryUC.GetDormitories(c.Context())
+func (h *AdminHandler) HandleGetDormitories(c *fiber.Ctx) error {
+	dormitories, err := h.dormitoryUC.GetDormitoriesList(c.Context())
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении общежитий")
 	}
-	selectedDormID := int64(c.QueryInt("dormitory_id"))
-	if selectedDormID == 0 && len(dorms) > 0 {
-		selectedDormID = dorms[0].ID()
+	return c.Render("dormitories", fiber.Map{
+		"Dormitories":   dormitories,
+		"ActiveSection": "dormitories",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleCreateDormitoryModal(c *fiber.Ctx) error {
+	users, err := h.dormitoryUC.GetUserOptions(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении пользователей")
 	}
-	teams, err := h.teamUC.GetTeamsList(c.Context(), selectedDormID)
+	return c.Render("partials/modal_create_dormitory", fiber.Map{"Users": users})
+}
+
+func (h *AdminHandler) HandleStoreDormitory(c *fiber.Ctx) error {
+	var req dto.UpsertDormitoryRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).SendString("Invalid data")
+	}
+	if err := h.dormitoryUC.CreateDormitory(c.Context(), req); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", "/admin/dormitories")
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleEditDormitoryModal(c *fiber.Ctx) error {
+	dormID, err := parseIntParam(c, "dormId")
+	if err != nil {
+		return c.Status(400).SendString("Invalid dormitory id")
+	}
+	dormitory, err := h.dormitoryUC.GetDormitoryByID(c.Context(), dormID)
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении общежития")
+	}
+	if dormitory == nil {
+		return c.Status(404).SendString("Dormitory not found")
+	}
+	users, err := h.dormitoryUC.GetUserOptions(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении пользователей")
+	}
+	leaderID := uuid.Nil
+	if dormitory.LeaderID() != nil {
+		leaderID = *dormitory.LeaderID()
+	}
+	return c.Render("partials/modal_edit_dormitory", fiber.Map{
+		"Dormitory": dormitory,
+		"LeaderID":  leaderID,
+		"Users":     users,
+	})
+}
+
+func (h *AdminHandler) HandleUpdateDormitory(c *fiber.Ctx) error {
+	dormID, err := parseIntParam(c, "dormId")
+	if err != nil {
+		return c.Status(400).SendString("Invalid dormitory id")
+	}
+	var req dto.UpsertDormitoryRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).SendString("Invalid data")
+	}
+	if err := h.dormitoryUC.UpdateDormitory(c.Context(), dormID, req); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", "/admin/dormitories")
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleDeleteDormitory(c *fiber.Ctx) error {
+	dormID, err := parseIntParam(c, "dormId")
+	if err != nil {
+		return c.Status(400).SendString("Invalid dormitory id")
+	}
+	if err := h.dormitoryUC.DeleteDormitory(c.Context(), dormID); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", "/admin/dormitories")
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleGetGroups(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	groups, err := h.dormitoryUC.GetGroupsList(c.Context(), dormitory.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении групп")
+	}
+	return c.Render("dormitory_groups", fiber.Map{
+		"Dormitory":     dormitory,
+		"Groups":        groups,
+		"ActiveSection": "dormitories",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleCreateGroupModal(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	residents, err := h.dormitoryUC.GetDormitoryUserOptions(c.Context(), dormitory.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении жителей")
+	}
+	return c.Render("partials/modal_create_group", fiber.Map{
+		"Dormitory": dormitory,
+		"Residents": residents,
+	})
+}
+
+func (h *AdminHandler) HandleStoreGroup(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	var req dto.UpsertGroupRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).SendString("Invalid data")
+	}
+	if err := h.dormitoryUC.CreateGroup(c.Context(), dormitory.ID(), req); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", groupsURL(dormitory.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleEditGroupModal(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	residents, err := h.dormitoryUC.GetDormitoryUserOptions(c.Context(), dormitory.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении жителей")
+	}
+	leaderID := uuid.Nil
+	if group.LeaderID() != nil {
+		leaderID = *group.LeaderID()
+	}
+	return c.Render("partials/modal_edit_group", fiber.Map{
+		"Dormitory": dormitory,
+		"Group":     group,
+		"LeaderID":  leaderID,
+		"Residents": residents,
+	})
+}
+
+func (h *AdminHandler) HandleUpdateGroup(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	var req dto.UpsertGroupRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).SendString("Invalid data")
+	}
+	if err := h.dormitoryUC.UpdateGroup(c.Context(), group.ID(), req); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", groupsURL(dormitory.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleDeleteGroup(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	if err := h.dormitoryUC.DeleteGroup(c.Context(), group.ID()); err != nil {
+		return c.Status(500).SendString("Ошибка при удалении группы")
+	}
+	c.Response().Header.Set("HX-Redirect", groupsURL(dormitory.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleGetDormitoryGroupTeams(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	teams, err := h.teamUC.GetTeamsListByGroup(c.Context(), group.ID())
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении команд")
 	}
-	return c.Render("teams", fiber.Map{
-		"Dormitories":    dorms,
-		"SelectedDormID": selectedDormID,
-		"Teams":          teams,
+	return c.Render("dormitory_group_teams", fiber.Map{
+		"Dormitory":     dormitory,
+		"Group":         group,
+		"Teams":         teams,
+		"ActiveSection": "dormitories",
 	}, "layouts/main")
 }
 
 func (h *AdminHandler) HandleCreateTeamModal(c *fiber.Ctx) error {
-	groups, err := h.teamUC.GetGroups(c.Context())
+	dormitory, group, err := h.requireDormitoryGroup(c)
 	if err != nil {
-		return c.Status(500).SendString("Ошибка при получении групп")
+		return err
+	}
+	members, err := h.teamUC.GetTeamMembersForNewTeam(c.Context(), group.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении жителей")
+	}
+	residents, err := h.dormitoryUC.GetDormitoryUserOptions(c.Context(), dormitory.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении жителей")
 	}
 	return c.Render("partials/modal_create_team", fiber.Map{
-		"Groups": groups,
+		"Dormitory": dormitory,
+		"Group":     group,
+		"Members":   members,
+		"Residents": residents,
 	})
 }
 
 func (h *AdminHandler) HandleStoreTeam(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
 	var req dto.CreateTeamRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).SendString("Invalid data")
 	}
-	if err := h.teamUC.CreateTeam(c.Context(), req); err != nil {
+	req.MemberIDs = formValues(c, "member_ids")
+	if err := h.teamUC.CreateTeamInGroup(c.Context(), group.ID(), req); err != nil {
 		return c.Status(400).SendString(err.Error())
 	}
-	c.Response().Header.Set("HX-Redirect", "/admin/teams")
+	c.Response().Header.Set("HX-Redirect", teamsURL(dormitory.ID(), group.ID()))
 	return c.SendString("")
 }
 
 func (h *AdminHandler) HandleEditTeamModal(c *fiber.Ctx) error {
-	teamID, err := uuid.Parse(c.Params("id"))
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	teamID, err := parseUUIDParam(c, "teamId")
 	if err != nil {
 		return c.Status(400).SendString("Invalid team id")
 	}
@@ -246,77 +451,205 @@ func (h *AdminHandler) HandleEditTeamModal(c *fiber.Ctx) error {
 	if teamItem == nil {
 		return c.Status(404).SendString("Team not found")
 	}
-
-	groups, err := h.teamUC.GetGroups(c.Context())
-	if err != nil {
-		return c.Status(500).SendString("Ошибка при получении групп")
+	if teamItem.GroupID != group.ID() {
+		return c.Status(404).SendString("Team not found")
 	}
+
 	members, err := h.teamUC.GetTeamMembersForEdit(c.Context(), teamID)
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении участников команды")
 	}
+	residents, err := h.dormitoryUC.GetDormitoryUserOptions(c.Context(), dormitory.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении жителей")
+	}
+	leaderID := uuid.Nil
+	if teamItem.LeaderID != nil {
+		leaderID = *teamItem.LeaderID
+	}
 	return c.Render("partials/modal_edit_team", fiber.Map{
-		"Team":    teamItem,
-		"Groups":  groups,
-		"Members": members,
+		"Dormitory": dormitory,
+		"Group":     group,
+		"Team":      teamItem,
+		"Members":   members,
+		"LeaderID":  leaderID,
+		"Residents": residents,
 	})
 }
 
 func (h *AdminHandler) HandleUpdateTeam(c *fiber.Ctx) error {
-	teamID, err := uuid.Parse(c.Params("id"))
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	teamID, err := parseUUIDParam(c, "teamId")
 	if err != nil {
 		return c.Status(400).SendString("Invalid team id")
+	}
+	if err := h.requireTeamInGroup(c, teamID, group.ID()); err != nil {
+		return err
 	}
 
 	var req dto.UpdateTeamRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).SendString("Invalid data")
 	}
-	if err := h.teamUC.UpdateTeam(c.Context(), teamID, req); err != nil {
+	req.MemberIDs = formValues(c, "member_ids")
+	if err := h.teamUC.UpdateTeamInGroup(c.Context(), group.ID(), teamID, req); err != nil {
 		return c.Status(400).SendString(err.Error())
 	}
-	c.Response().Header.Set("HX-Redirect", "/admin/teams")
+	c.Response().Header.Set("HX-Redirect", teamsURL(dormitory.ID(), group.ID()))
 	return c.SendString("")
 }
 
 func (h *AdminHandler) HandleDeleteTeam(c *fiber.Ctx) error {
-	teamID, err := uuid.Parse(c.Params("id"))
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	teamID, err := parseUUIDParam(c, "teamId")
 	if err != nil {
 		return c.Status(400).SendString("Invalid team id")
+	}
+	if err := h.requireTeamInGroup(c, teamID, group.ID()); err != nil {
+		return err
 	}
 	if err := h.teamUC.DeleteTeam(c.Context(), teamID); err != nil {
 		return c.Status(500).SendString("Ошибка при удалении команды")
 	}
-	c.Response().Header.Set("HX-Redirect", "/admin/teams")
+	c.Response().Header.Set("HX-Redirect", teamsURL(dormitory.ID(), group.ID()))
 	return c.SendString("")
 }
 
 func (h *AdminHandler) HandleAddTeamMember(c *fiber.Ctx) error {
-	teamID, err := uuid.Parse(c.Params("teamID"))
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	teamID, err := parseUUIDParam(c, "teamId")
 	if err != nil {
 		return c.Status(400).SendString("Invalid team id")
 	}
-	userID, err := uuid.Parse(c.Params("userID"))
+	if err := h.requireTeamInGroup(c, teamID, group.ID()); err != nil {
+		return err
+	}
+	userID, err := parseUUIDParam(c, "userID")
 	if err != nil {
 		return c.Status(400).SendString("Invalid user id")
 	}
 	if err := h.teamUC.MoveUserToTeam(c.Context(), teamID, userID); err != nil {
 		return c.Status(500).SendString("Ошибка при добавлении участника")
 	}
-	c.Response().Header.Set("HX-Redirect", "/admin/teams")
+	c.Response().Header.Set("HX-Redirect", teamsURL(dormitory.ID(), group.ID()))
 	return c.SendString("")
 }
 
 func (h *AdminHandler) HandleRemoveTeamMember(c *fiber.Ctx) error {
-	userID, err := uuid.Parse(c.Params("userID"))
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	userID, err := parseUUIDParam(c, "userID")
 	if err != nil {
 		return c.Status(400).SendString("Invalid user id")
+	}
+	if err := h.requireMemberFromGroup(c, userID, group.ID()); err != nil {
+		return err
 	}
 	if err := h.teamUC.RemoveUserFromTeam(c.Context(), userID); err != nil {
 		return c.Status(500).SendString("Ошибка при удалении участника")
 	}
-	c.Response().Header.Set("HX-Redirect", "/admin/teams")
+	c.Response().Header.Set("HX-Redirect", teamsURL(dormitory.ID(), group.ID()))
 	return c.SendString("")
+}
+
+func (h *AdminHandler) requireDormitory(c *fiber.Ctx) (*structure.Dormitory, error) {
+	dormID, err := parseIntParam(c, "dormId")
+	if err != nil {
+		return nil, c.Status(400).SendString("Invalid dormitory id")
+	}
+	dormitory, err := h.dormitoryUC.GetDormitoryByID(c.Context(), dormID)
+	if err != nil {
+		return nil, c.Status(500).SendString("Ошибка при получении общежития")
+	}
+	if dormitory == nil {
+		return nil, c.Status(404).SendString("Dormitory not found")
+	}
+	return dormitory, nil
+}
+
+func (h *AdminHandler) requireDormitoryGroup(c *fiber.Ctx) (*structure.Dormitory, *structure.Group, error) {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return nil, nil, err
+	}
+	groupID, err := parseUUIDParam(c, "groupId")
+	if err != nil {
+		return nil, nil, c.Status(400).SendString("Invalid group id")
+	}
+	group, err := h.dormitoryUC.GetGroupByID(c.Context(), groupID)
+	if err != nil {
+		return nil, nil, c.Status(500).SendString("Ошибка при получении группы")
+	}
+	if group == nil || group.DormitoryID() != dormitory.ID() {
+		return nil, nil, c.Status(404).SendString("Group not found")
+	}
+	return dormitory, group, nil
+}
+
+func (h *AdminHandler) requireTeamInGroup(c *fiber.Ctx, teamID uuid.UUID, groupID uuid.UUID) error {
+	team, err := h.teamUC.GetTeamByID(c.Context(), teamID)
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении команды")
+	}
+	if team == nil || team.GroupID != groupID {
+		return c.Status(404).SendString("Team not found")
+	}
+	return nil
+}
+
+func (h *AdminHandler) requireMemberFromGroup(c *fiber.Ctx, userID uuid.UUID, groupID uuid.UUID) error {
+	resident, err := h.userUC.GetUserByID(c.Context(), userID)
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении пользователя")
+	}
+	if resident == nil || resident.TeamID() == nil {
+		return c.Status(404).SendString("Member not found")
+	}
+	team, err := h.teamUC.GetTeamByID(c.Context(), *resident.TeamID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении команды")
+	}
+	if team == nil || team.GroupID != groupID {
+		return c.Status(404).SendString("Member not found")
+	}
+	return nil
+}
+
+func parseIntParam(c *fiber.Ctx, name string) (int64, error) {
+	return strconv.ParseInt(c.Params(name), 10, 64)
+}
+
+func parseUUIDParam(c *fiber.Ctx, name string) (uuid.UUID, error) {
+	return uuid.Parse(c.Params(name))
+}
+
+func groupsURL(dormID int64) string {
+	return fmt.Sprintf("/admin/dormitories/%d/groups", dormID)
+}
+
+func teamsURL(dormID int64, groupID uuid.UUID) string {
+	return fmt.Sprintf("/admin/dormitories/%d/groups/%s/teams", dormID, groupID)
+}
+
+func formValues(c *fiber.Ctx, key string) []string {
+	values := make([]string, 0)
+	c.Request().PostArgs().VisitAll(func(argKey []byte, value []byte) {
+		if string(argKey) == key {
+			values = append(values, string(value))
+		}
+	})
+	return values
 }
 
 func (h *AdminHandler) HandleGetTasks(c *fiber.Ctx) error {
@@ -324,7 +657,7 @@ func (h *AdminHandler) HandleGetTasks(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении задач")
 	}
-	return c.Render("tasks", fiber.Map{"Tasks": tasks}, "layouts/main")
+	return c.Render("tasks", fiber.Map{"Tasks": tasks, "ActiveSection": "tasks"}, "layouts/main")
 }
 
 func (h *AdminHandler) HandleCreateTaskModal(c *fiber.Ctx) error {

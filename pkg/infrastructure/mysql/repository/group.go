@@ -20,16 +20,17 @@ func NewGroupRepository(db *sql.DB) *GroupRepository {
 }
 
 func (r *GroupRepository) FindByID(ctx context.Context, id uuid.UUID) (*structure.Group, error) {
-	const query = "SELECT id, name, spreadsheet_id, dormitory_id FROM `group` WHERE id = ?"
+	const query = "SELECT id, leader_id, name, spreadsheet_id, dormitory_id FROM `group` WHERE id = ?"
 
 	idBytes, _ := id.MarshalBinary()
 	row := r.db.QueryRowContext(ctx, query, idBytes)
 
-	var gID []byte
-	var name, sheetID string
+	var gID, leaderIDBytes []byte
+	var name string
+	var sheetID sql.NullString
 	var dormID int64
 
-	if err := row.Scan(&gID, &name, &sheetID, &dormID); err != nil {
+	if err := row.Scan(&gID, &leaderIDBytes, &name, &sheetID, &dormID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -37,11 +38,11 @@ func (r *GroupRepository) FindByID(ctx context.Context, id uuid.UUID) (*structur
 	}
 
 	groupID, _ := uuid.FromBytes(gID)
-	return structure.RestoreGroup(groupID, name, sheetID, dormID), nil
+	return structure.RestoreGroup(groupID, uuidPtrFromBytes(leaderIDBytes), name, sheetID.String, dormID), nil
 }
 
 func (r *GroupRepository) FindAll(ctx context.Context) ([]*structure.Group, error) {
-	const query = "SELECT id, name, spreadsheet_id, dormitory_id FROM `group`"
+	const query = "SELECT id, leader_id, name, spreadsheet_id, dormitory_id FROM `group` ORDER BY dormitory_id, name"
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -51,14 +52,92 @@ func (r *GroupRepository) FindAll(ctx context.Context) ([]*structure.Group, erro
 
 	var groups []*structure.Group
 	for rows.Next() {
-		var gID []byte
-		var name, sheetID string
+		var gID, leaderIDBytes []byte
+		var name string
+		var sheetID sql.NullString
 		var dormID int64
-		if err := rows.Scan(&gID, &name, &sheetID, &dormID); err != nil {
+		if err := rows.Scan(&gID, &leaderIDBytes, &name, &sheetID, &dormID); err != nil {
 			return nil, err
 		}
 		uid, _ := uuid.FromBytes(gID)
-		groups = append(groups, structure.RestoreGroup(uid, name, sheetID, dormID))
+		groups = append(groups, structure.RestoreGroup(uid, uuidPtrFromBytes(leaderIDBytes), name, sheetID.String, dormID))
 	}
 	return groups, nil
+}
+
+func (r *GroupRepository) FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*structure.Group, error) {
+	const query = "SELECT id, leader_id, name, spreadsheet_id, dormitory_id FROM `group` WHERE dormitory_id = ? ORDER BY name"
+
+	rows, err := r.db.QueryContext(ctx, query, dormitoryID)
+	if err != nil {
+		return nil, fmt.Errorf("FindGroupsByDormitoryID: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []*structure.Group
+	for rows.Next() {
+		var gID, leaderIDBytes []byte
+		var name string
+		var sheetID sql.NullString
+		var dormID int64
+		if err := rows.Scan(&gID, &leaderIDBytes, &name, &sheetID, &dormID); err != nil {
+			return nil, fmt.Errorf("FindGroupsByDormitoryID scan: %w", err)
+		}
+		uid, _ := uuid.FromBytes(gID)
+		groups = append(groups, structure.RestoreGroup(uid, uuidPtrFromBytes(leaderIDBytes), name, sheetID.String, dormID))
+	}
+	return groups, rows.Err()
+}
+
+func (r *GroupRepository) Save(ctx context.Context, group *structure.Group) error {
+	const query = `
+		INSERT INTO ` + "`group`" + ` (id, leader_id, name, spreadsheet_id, dormitory_id)
+		VALUES (?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE
+			leader_id = VALUES(leader_id),
+			name = VALUES(name),
+			spreadsheet_id = VALUES(spreadsheet_id),
+			dormitory_id = VALUES(dormitory_id)
+	`
+	idBytes, _ := group.ID().MarshalBinary()
+	var leaderID interface{} = nil
+	if group.LeaderID() != nil {
+		leaderID, _ = group.LeaderID().MarshalBinary()
+	}
+	var spreadsheetID interface{} = nil
+	if group.SpreadsheetID() != "" {
+		spreadsheetID = group.SpreadsheetID()
+	}
+
+	_, err := r.db.ExecContext(
+		ctx,
+		query,
+		idBytes,
+		leaderID,
+		group.Name(),
+		spreadsheetID,
+		group.DormitoryID(),
+	)
+	if err != nil {
+		return fmt.Errorf("SaveGroup: %w", err)
+	}
+	return nil
+}
+
+func uuidPtrFromBytes(value []byte) *uuid.UUID {
+	if len(value) == 0 {
+		return nil
+	}
+	id, _ := uuid.FromBytes(value)
+	return &id
+}
+
+func (r *GroupRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	const query = "DELETE FROM `group` WHERE id = ?"
+	idBytes, _ := id.MarshalBinary()
+	_, err := r.db.ExecContext(ctx, query, idBytes)
+	if err != nil {
+		return fmt.Errorf("DeleteGroup: %w", err)
+	}
+	return nil
 }

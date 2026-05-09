@@ -101,7 +101,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		userQueryService,
 	)
 
-	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo)
+	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo, groupRepo, teamRepo, userRepo)
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo)
 
