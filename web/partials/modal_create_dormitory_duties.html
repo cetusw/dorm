@@ -1,0 +1,81 @@
+<div id="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" data-modal-backdrop>
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+        <div class="flex justify-between items-start p-6 border-b border-slate-100">
+            <div>
+                <h3 class="text-xl font-bold text-slate-900">Создать новую дежурную неделю</h3>
+                <p class="mt-1 text-sm text-slate-500">{{ .Dormitory.Name }}</p>
+            </div>
+            <button type="button" class="text-slate-400 hover:text-slate-600 rounded-lg p-1" onclick="this.closest('[data-modal-backdrop]').remove()">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form hx-post="/admin/duties/{{ .Dormitory.ID }}" hx-swap="none" class="flex min-h-0 flex-1 flex-col">
+            <div class="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-slate-700">Период дежурства</label>
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 transition focus-within:border-blue-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/10">
+                        <input type="text" name="start_date" required placeholder="дд.мм.гггг" pattern="\d{2}\.\d{2}\.\d{4}" inputmode="numeric"
+                               class="w-full border-0 bg-transparent px-1 py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-400">
+                        <span class="px-3 text-sm font-semibold text-slate-400">-</span>
+                        <input type="text" name="end_date" required placeholder="дд.мм.гггг" pattern="\d{2}\.\d{2}\.\d{4}" inputmode="numeric"
+                               class="w-full border-0 bg-transparent px-1 py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-400">
+                    </div>
+                </div>
+
+                {{ if .Tasks }}
+                <div data-member-search-scope>
+                    <div class="mb-3">
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Общие задачи</label>
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+                            <input type="search" data-member-search placeholder="Поиск по общим задачам"
+                                   class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        {{ range .Tasks }}
+                        <section class="overflow-hidden rounded-xl border border-slate-200" data-member-group>
+                            <div class="flex items-center justify-between gap-3 bg-slate-50 px-4 py-3">
+                                <h4 class="text-sm font-bold text-slate-900">{{ .Floor }} этаж. {{ .AreaName }}</h4>
+                                <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">Общая зона</span>
+                            </div>
+                            <div class="divide-y divide-slate-100">
+                                {{ range .Tasks }}
+                                <label class="flex cursor-pointer items-center gap-3 p-4 hover:bg-blue-50/40 transition-colors" data-member-row data-member-search="{{ .AreaName }} {{ .Title }}">
+                                    <input type="checkbox" name="common_task_ids" value="{{ .ID }}" {{ if .IsActive }}checked{{ end }}
+                                           class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block truncate text-sm font-semibold text-slate-900">{{ .Title }}</span>
+                                    </span>
+                                </label>
+                                {{ end }}
+                            </div>
+                        </section>
+                        {{ end }}
+                        <div class="hidden rounded-xl border border-slate-200 p-8 text-center text-sm text-slate-500" data-member-search-empty>Ничего не найдено</div>
+                    </div>
+                </div>
+                {{ else }}
+                <div class="px-6 py-12 text-center text-slate-500">
+                    <div class="flex flex-col items-center">
+                        <i data-lucide="clipboard-x" class="w-12 h-12 text-slate-200 mb-3"></i>
+                        <p>Общие задачи не найдены</p>
+                    </div>
+                </div>
+                {{ end }}
+            </div>
+
+            <div class="flex justify-end gap-3 p-6 border-t border-slate-100 bg-slate-50/80">
+                <button type="button" onclick="this.closest('[data-modal-backdrop]').remove()"
+                        class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-white transition-colors">Отмена</button>
+                <button type="submit"
+                        class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors">Создать</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    lucide.createIcons();
+    setupMemberSearch(document.currentScript.previousElementSibling);
+</script>

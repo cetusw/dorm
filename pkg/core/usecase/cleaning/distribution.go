@@ -29,8 +29,20 @@ type distributingContext struct {
 	end           time.Time
 }
 
+type schedulingOptions struct {
+	dormitoryID        *int64
+	start              time.Time
+	end                time.Time
+	commonTaskIDs      map[uuid.UUID]struct{}
+	commonTaskOverride bool
+}
+
 func (s *Service) StartNewWeek(ctx context.Context) error {
-	distributingCtx, err := s.loadSchedulingData(ctx)
+	now := time.Now()
+	distributingCtx, err := s.loadSchedulingData(ctx, schedulingOptions{
+		start: now,
+		end:   now.Add(7 * 24 * time.Hour),
+	})
 	if err != nil {
 		return err
 	}
@@ -46,18 +58,50 @@ func (s *Service) StartNewWeek(ctx context.Context) error {
 	return s.finalizeNewWeek(ctx, distributingCtx)
 }
 
-func (s *Service) loadSchedulingData(ctx context.Context) (*distributingContext, error) {
-	groups, err := s.groupRepo.FindAll(ctx)
+func (s *Service) StartNewDutiesForDormitory(ctx context.Context, dormitoryID int64, startDate, endDate time.Time, commonTaskIDs []uuid.UUID) error {
+	if !startDate.Before(endDate) {
+		return fmt.Errorf("start date must be before end date")
+	}
+
+	selectedCommonTasks := make(map[uuid.UUID]struct{}, len(commonTaskIDs))
+	for _, taskID := range commonTaskIDs {
+		selectedCommonTasks[taskID] = struct{}{}
+	}
+
+	distributingCtx, err := s.loadSchedulingData(ctx, schedulingOptions{
+		dormitoryID:        &dormitoryID,
+		start:              startDate,
+		end:                endDate,
+		commonTaskIDs:      selectedCommonTasks,
+		commonTaskOverride: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := s.initializeDuties(ctx, distributingCtx); err != nil {
+		return err
+	}
+
+	if err := s.distributeTasks(ctx, distributingCtx); err != nil {
+		return err
+	}
+
+	return s.finalizeNewWeek(ctx, distributingCtx)
+}
+
+func (s *Service) loadSchedulingData(ctx context.Context, opts schedulingOptions) (*distributingContext, error) {
+	groups, err := s.loadSchedulingGroups(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("load groups: %w", err)
-	}
-	taskDefs, err := s.taskRepo.GetAllTaskDefinitions(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("load tasks: %w", err)
 	}
 	areas, err := s.areaRepo.GetAllAreas(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load areas: %w", err)
+	}
+	taskDefs, err := s.loadSchedulingTasks(ctx, groups, areas, opts)
+	if err != nil {
+		return nil, fmt.Errorf("load tasks: %w", err)
 	}
 
 	weekNum, err := s.dutyRepo.CountDistinctStartDates(ctx)
@@ -70,8 +114,8 @@ func (s *Service) loadSchedulingData(ctx context.Context) (*distributingContext,
 		taskDefs:      taskDefs,
 		areas:         areas,
 		weekNumber:    weekNum,
-		start:         time.Now(),
-		end:           time.Now().Add(7 * 24 * time.Hour),
+		start:         opts.start,
+		end:           opts.end,
 		areaGroupMap:  make(map[int]*uuid.UUID),
 		tasksByArea:   make(map[int][]*catalog.TaskDefinition),
 		dutiesByGroup: make(map[uuid.UUID]*duty.Duty),
@@ -79,6 +123,51 @@ func (s *Service) loadSchedulingData(ctx context.Context) (*distributingContext,
 
 	s.indexData(distributingCtx)
 	return distributingCtx, nil
+}
+
+func (s *Service) loadSchedulingGroups(ctx context.Context, opts schedulingOptions) ([]*structure.Group, error) {
+	if opts.dormitoryID != nil {
+		return s.groupRepo.FindByDormitoryID(ctx, *opts.dormitoryID)
+	}
+	return s.groupRepo.FindAll(ctx)
+}
+
+func (s *Service) loadSchedulingTasks(ctx context.Context, groups []*structure.Group, areas []*catalog.Area, opts schedulingOptions) ([]*catalog.TaskDefinition, error) {
+	if !opts.commonTaskOverride {
+		return s.taskRepo.GetActiveTaskDefinitions(ctx)
+	}
+
+	allTasks, err := s.taskRepo.GetAllTaskDefinitions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	groupSet := make(map[uuid.UUID]struct{}, len(groups))
+	for _, group := range groups {
+		groupSet[group.ID()] = struct{}{}
+	}
+	areaMap := make(map[int]*catalog.Area, len(areas))
+	for _, area := range areas {
+		areaMap[area.ID()] = area
+	}
+
+	taskDefs := make([]*catalog.TaskDefinition, 0, len(allTasks))
+	for _, task := range allTasks {
+		area := areaMap[task.AreaID()]
+		if area == nil {
+			continue
+		}
+		if area.GroupID() == nil {
+			if _, ok := opts.commonTaskIDs[task.ID()]; ok {
+				taskDefs = append(taskDefs, task)
+			}
+			continue
+		}
+		if _, ok := groupSet[*area.GroupID()]; ok && task.IsActive() {
+			taskDefs = append(taskDefs, task)
+		}
+	}
+	return taskDefs, nil
 }
 
 func (s *Service) indexData(c *distributingContext) {
@@ -98,7 +187,7 @@ func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) 
 
 	skippedGroups := 0
 	for _, group := range c.groups {
-		nextTeam, err := s.determineNextTeam(ctx, group.ID())
+		nextTeam, err := s.determineNextTeam(ctx, group)
 		if err != nil {
 			log.Printf("Skipping group %s: %v", group.Name(), err)
 			skippedGroups++
@@ -144,7 +233,7 @@ func (s *Service) distributeTasks(ctx context.Context, c *distributingContext) e
 			continue
 		}
 
-		if err := s.assignBatchToDuty(ctx, targetDuty, tasks); err != nil {
+		if err := s.assignBatchToDuty(ctx, targetDuty, tasks, c.start); err != nil {
 			return err
 		}
 	}
@@ -168,9 +257,9 @@ func (s *Service) resolveTargetDuty(area *catalog.Area, c *distributingContext, 
 	return nil
 }
 
-func (s *Service) assignBatchToDuty(ctx context.Context, d *duty.Duty, tasks []*catalog.TaskDefinition) error {
+func (s *Service) assignBatchToDuty(ctx context.Context, d *duty.Duty, tasks []*catalog.TaskDefinition, referenceDate time.Time) error {
 	for _, def := range tasks {
-		isDue, err := s.isTaskDue(ctx, def)
+		isDue, err := s.isTaskDue(ctx, def, referenceDate)
 		if err != nil {
 			fmt.Printf("Frequency check failed for %s: %v\n", def.Title(), err)
 			isDue = true
@@ -183,8 +272,8 @@ func (s *Service) assignBatchToDuty(ctx context.Context, d *duty.Duty, tasks []*
 	return nil
 }
 
-func (s *Service) determineNextTeam(ctx context.Context, groupID uuid.UUID) (*structure.Team, error) {
-	teams, err := s.teamRepo.FindByGroupID(ctx, groupID)
+func (s *Service) determineNextTeam(ctx context.Context, group *structure.Group) (*structure.Team, error) {
+	teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -196,42 +285,26 @@ func (s *Service) determineNextTeam(ctx context.Context, groupID uuid.UUID) (*st
 		return teams[i].Order() < teams[j].Order()
 	})
 
-	var lastDuty *duty.Duty
-
-	for _, team := range teams {
-		d, err := s.dutyRepo.FindCurrentByTeamID(ctx, team.ID())
-		if err != nil {
-			continue
-		}
-		if d != nil {
-			if lastDuty == nil || d.Start().After(lastDuty.Start()) {
-				lastDuty = d
+	dutyTeamIndex := 0
+	if group.NextDutyTeam() != nil {
+		for index, team := range teams {
+			if team.Order() == *group.NextDutyTeam() {
+				dutyTeamIndex = index
+				break
 			}
 		}
 	}
 
-	if lastDuty == nil {
-		return teams[0], nil
+	nextIndex := (dutyTeamIndex + 1) % len(teams)
+	nextOrder := teams[nextIndex].Order()
+	group.SetNextDutyTeam(&nextOrder)
+	if err := s.groupRepo.Save(ctx, group); err != nil {
+		return nil, fmt.Errorf("update next duty team: %w", err)
 	}
-
-	lastIdx := -1
-	for i, t := range teams {
-		if t.ID() == lastDuty.TeamID() {
-			lastIdx = i
-			break
-		}
-	}
-
-	// If previous team is missing (data drift), start from first deterministic item.
-	if lastIdx < 0 {
-		return teams[0], nil
-	}
-
-	nextIdx := (lastIdx + 1) % len(teams)
-	return teams[nextIdx], nil
+	return teams[dutyTeamIndex], nil
 }
 
-func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition) (bool, error) {
+func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition, referenceDate time.Time) (bool, error) {
 	if def.Frequency() <= 1 {
 		return true, nil
 	}
@@ -244,7 +317,7 @@ func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition) (b
 		return true, nil
 	}
 
-	daysPassed := int(time.Since(lastDuty.Start()).Hours() / 24)
+	daysPassed := int(referenceDate.Sub(lastDuty.Start()).Hours() / 24)
 
 	return daysPassed >= def.Frequency(), nil
 }
@@ -260,7 +333,6 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 		}
 	}
 
-	// Publishing sheets/report events must not block duty creation.
 	duties, err := s.GetLatestDuties(ctx)
 	if err != nil {
 		log.Printf("Failed to load duties for week started event: %v", err)

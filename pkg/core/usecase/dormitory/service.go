@@ -242,7 +242,7 @@ func (s *Service) UpdateGroup(ctx context.Context, id uuid.UUID, req dto.UpsertG
 		return err
 	}
 
-	updated := structure.RestoreGroup(id, leaderID, req.Name, req.SpreadsheetID, current.DormitoryID())
+	updated := structure.RestoreGroup(id, leaderID, req.Name, req.SpreadsheetID, current.DormitoryID(), current.NextDutyTeam())
 	return s.groupRepo.Save(ctx, updated)
 }
 

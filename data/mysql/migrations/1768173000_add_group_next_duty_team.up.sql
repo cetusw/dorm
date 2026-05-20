@@ -1,0 +1,1 @@
+ALTER TABLE `group` ADD COLUMN `next_duty_team` INT DEFAULT NULL

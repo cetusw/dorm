@@ -9,6 +9,7 @@ type TaskCatalogItem struct {
 	Title     string
 	Cost      int
 	Frequency int
+	IsActive  bool
 }
 
 type UpsertTaskCatalogRequest struct {
@@ -17,4 +18,3 @@ type UpsertTaskCatalogRequest struct {
 	Cost      int    `form:"cost"`
 	Frequency int    `form:"frequency"`
 }
-

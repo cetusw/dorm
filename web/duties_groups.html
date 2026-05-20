@@ -1,25 +1,24 @@
-<div class="flex justify-between items-end mb-8">
+<div class="mb-8 flex items-end justify-between gap-4">
     <div>
         <nav class="mb-3 flex items-center gap-2 text-sm font-medium text-slate-500">
-            <a href="/admin/dormitories" class="hover:text-blue-700">Общежития</a>
+            <a href="/admin/duties" class="hover:text-blue-700">Дежурства</a>
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
             <span class="text-slate-900">{{ .Dormitory.Name }}</span>
         </nav>
         <h1 class="text-3xl font-bold text-slate-900 tracking-tight">{{ .Dormitory.Name }}</h1>
     </div>
-
-    <button hx-get="/admin/dormitories/{{ .Dormitory.ID }}/groups/create" hx-target="body" hx-swap="beforeend"
+    <button hx-get="/admin/duties/{{ .Dormitory.ID }}/create" hx-target="body" hx-swap="beforeend"
             class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200 flex items-center gap-2 group">
-        <i data-lucide="plus" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
-        Создать группу
+        <i data-lucide="calendar-plus" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
+        Создать новую дежурную неделю
     </button>
 </div>
 
 <div class="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-    <label for="structure-search" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">Поиск</label>
+    <label for="duties-groups-search" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">Поиск</label>
     <div class="relative">
         <i data-lucide="search" class="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
-        <input id="structure-search" type="search" data-structure-search placeholder="Название, лидер или spreadsheet_id"
+        <input id="duties-groups-search" type="search" data-structure-search placeholder="Название, лидер или spreadsheet_id"
                class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
     </div>
 </div>
@@ -37,14 +36,15 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
             {{ range .Groups }}
-            <tr id="group-{{ .ID }}" class="hover:bg-blue-50/30 transition-colors group" data-structure-row data-search="{{ .Name }} {{ .LeaderName }} {{ .SpreadsheetID }}">
-                <td class="px-6 py-5">
-                    <a href="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/teams" class="font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{{ .Name }}</a>
-                </td>
+            <tr class="hover:bg-blue-50/30 transition-colors group cursor-pointer"
+                data-structure-row
+                data-search="{{ .Name }} {{ .LeaderName }} {{ .SpreadsheetID }}"
+                onclick="window.location='/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/duties'">
+                <td class="px-6 py-5 font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{{ .Name }}</td>
                 <td class="px-6 py-5 text-sm text-slate-700">{{ .LeaderName }}</td>
                 <td class="px-6 py-5 text-sm text-slate-700">
                     {{ if .SpreadsheetURL }}
-                    <a href="{{ .SpreadsheetURL }}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-2 font-medium text-blue-700 hover:text-blue-800">
+                    <a href="{{ .SpreadsheetURL }}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-2 font-medium text-blue-700 hover:text-blue-800" onclick="event.stopPropagation()">
                         <i data-lucide="external-link" class="w-4 h-4"></i>
                         Открыть таблицу
                     </a>
@@ -53,22 +53,9 @@
                     {{ end }}
                 </td>
                 <td class="px-6 py-5 text-right">
-                    <div class="flex justify-end gap-1">
-                        <a href="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/teams" class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Команды">
-                            <i data-lucide="shield" class="w-4 h-4"></i>
-                        </a>
-                        <a href="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/duties" class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Дежурства">
-                            <i data-lucide="calendar-check" class="w-4 h-4"></i>
-                        </a>
-                        <button class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Редактировать"
-                                hx-get="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/edit" hx-target="body" hx-swap="beforeend">
-                            <i data-lucide="pencil" class="w-4 h-4"></i>
-                        </button>
-                        <button class="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Удалить"
-                                hx-delete="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}" hx-confirm="Удалить группу {{ .Name }}?" hx-swap="none">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </div>
+                    <a href="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/duties" class="inline-flex p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Дежурства" onclick="event.stopPropagation()">
+                        <i data-lucide="calendar-check" class="w-4 h-4"></i>
+                    </a>
                 </td>
             </tr>
             {{ else }}

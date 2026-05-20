@@ -44,14 +44,16 @@ func TestRestoreGroup(t *testing.T) {
 	name := "Cleaning Group A"
 	sheetID := "spreadsheet-123"
 	dormID := int64(10)
+	nextDutyTeam := 2
 
-	group := RestoreGroup(id, &leaderID, name, sheetID, dormID)
+	group := RestoreGroup(id, &leaderID, name, sheetID, dormID, &nextDutyTeam)
 
 	assert.Equal(t, id, group.ID())
 	assert.Equal(t, &leaderID, group.LeaderID())
 	assert.Equal(t, name, group.Name())
 	assert.Equal(t, sheetID, group.SpreadsheetID())
 	assert.Equal(t, dormID, group.DormitoryID())
+	assert.Equal(t, &nextDutyTeam, group.NextDutyTeam())
 }
 
 func TestRestoreDormitory(t *testing.T) {

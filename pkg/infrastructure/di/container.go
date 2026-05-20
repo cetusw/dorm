@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"dorm/pkg/adapters/http"
 	"dorm/pkg/core/usecase/dormitory"
+	dutyuc "dorm/pkg/core/usecase/duty"
 	"dorm/pkg/core/usecase/team"
 	"dorm/pkg/infrastructure/mysql/query"
 	"fmt"
@@ -103,6 +104,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 
 	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo, groupRepo, teamRepo, userRepo)
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
+	dutyService := dutyuc.NewDutyService(dutyRepo, teamRepo, groupRepo, dormitoryRepo, taskRepo, areaRepo, userRepo)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
@@ -122,7 +124,15 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		Views: engine,
 	})
 
-	adminHandler := http.NewAdminHandler(userService, dormitoryService, teamService, taskCatalogService, sheetsAdapter)
+	adminHandler := http.NewAdminHandler(
+		userService,
+		dormitoryService,
+		teamService,
+		dutyService,
+		taskCatalogService,
+		cleaningService,
+		sheetsAdapter,
+	)
 	adminHandler.RegisterRoutes(app)
 
 	return &Container{

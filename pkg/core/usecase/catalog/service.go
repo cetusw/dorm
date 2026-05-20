@@ -44,6 +44,7 @@ func (s *Service) ListTasks(ctx context.Context) ([]dto.TaskCatalogItem, error) 
 			Title:     t.Title(),
 			Cost:      t.Cost(),
 			Frequency: t.Frequency(),
+			IsActive:  t.IsActive(),
 		})
 	}
 	return out, nil
@@ -71,6 +72,7 @@ func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (*dto.TaskCatalogIt
 		Title:     task.Title(),
 		Cost:      task.Cost(),
 		Frequency: task.Frequency(),
+		IsActive:  task.IsActive(),
 	}
 	for _, a := range areas {
 		if a.ID() == task.AreaID() {
@@ -93,7 +95,14 @@ func (s *Service) UpdateTask(ctx context.Context, id uuid.UUID, req dto.UpsertTa
 	if req.AreaID == 0 || req.Title == "" {
 		return fmt.Errorf("area and title are required")
 	}
-	return s.taskRepo.Save(ctx, catalog.RestoreTaskDefinition(id, req.AreaID, req.Title, req.Cost, req.Frequency))
+	existing, err := s.taskRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return nil
+	}
+	return s.taskRepo.Save(ctx, catalog.RestoreTaskDefinitionWithActive(id, req.AreaID, req.Title, req.Cost, req.Frequency, existing.IsActive()))
 }
 
 func (s *Service) DeleteTask(ctx context.Context, id uuid.UUID) error {

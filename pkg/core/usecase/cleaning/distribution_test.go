@@ -57,6 +57,35 @@ func TestStartNewWeek_DistributionByAreaScope(t *testing.T) {
 	})
 }
 
+func TestDetermineNextTeam_UsesGroupNextDutyTeam(t *testing.T) {
+	ctx := context.Background()
+	groupID := uuid.New()
+	firstTeamID := uuid.New()
+	secondTeamID := uuid.New()
+	env := newTestEnv()
+	group := structure.RestoreGroup(groupID, nil, "Boys", "s1", 1, nil)
+	teams := []*structure.Team{
+		structure.RestoreTeam(secondTeamID, "Second Team", groupID, nil, "pink", 20),
+		structure.RestoreTeam(firstTeamID, "First Team", groupID, nil, "blue", 10),
+	}
+
+	env.teamRepo.On("FindByGroupID", ctx, groupID).Return(teams, nil).Once()
+	selectedTeam, err := env.service.determineNextTeam(ctx, group)
+
+	assert.NoError(t, err)
+	assert.Equal(t, firstTeamID, selectedTeam.ID())
+	assert.NotNil(t, group.NextDutyTeam())
+	assert.Equal(t, 20, *group.NextDutyTeam())
+
+	env.teamRepo.On("FindByGroupID", ctx, groupID).Return(teams, nil).Once()
+	selectedTeam, err = env.service.determineNextTeam(ctx, group)
+
+	assert.NoError(t, err)
+	assert.Equal(t, secondTeamID, selectedTeam.ID())
+	assert.NotNil(t, group.NextDutyTeam())
+	assert.Equal(t, 10, *group.NextDutyTeam())
+}
+
 func runWeekTest(t *testing.T, f *testFixtures, weekNum int, assertions func(dBoys, dGirls *duty.Duty)) {
 	ctx := context.Background()
 	env := newTestEnv()
@@ -98,8 +127,8 @@ func createFixtures() *testFixtures {
 		taskPrivate: taskPrivate,
 		taskPublic:  taskPublic,
 		groups: []*structure.Group{
-			structure.RestoreGroup(groupID1, nil, "Boys", "s1", 1),
-			structure.RestoreGroup(groupID2, nil, "Girls", "s2", 1),
+			structure.RestoreGroup(groupID1, nil, "Boys", "s1", 1, nil),
+			structure.RestoreGroup(groupID2, nil, "Girls", "s2", 1, nil),
 		},
 		teams1: []*structure.Team{structure.RestoreTeam(teamID1, "Boys Team", groupID1, nil, "blue", 1)},
 		teams2: []*structure.Team{structure.RestoreTeam(teamID2, "Girls Team", groupID2, nil, "pink", 2)},
@@ -126,9 +155,8 @@ func setupCommonExpectations(ctx context.Context, e *testEnv, f *testFixtures) {
 	e.teamRepo.On("FindByGroupID", ctx, f.groups[0].ID()).Return(f.teams1, nil)
 	e.teamRepo.On("FindByGroupID", ctx, f.groups[1].ID()).Return(f.teams2, nil)
 	e.areaRepo.On("GetAllAreas", ctx).Return(f.areas, nil)
-	e.catRepo.On("GetAllTaskDefinitions", ctx).Return(f.tasks, nil)
+	e.catRepo.On("GetActiveTaskDefinitions", ctx).Return(f.tasks, nil)
 
-	e.dutyRepo.On("FindCurrentByTeamID", ctx, mock.Anything).Return(nil, nil)
 	e.dutyRepo.On("FindLastByTaskDefID", ctx, mock.Anything).Return(nil, nil)
 	e.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))
 

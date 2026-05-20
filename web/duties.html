@@ -1,0 +1,65 @@
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Дежурства</h1>
+</div>
+
+<div class="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <label for="duties-search" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">Поиск</label>
+    <div class="relative">
+        <i data-lucide="search" class="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+        <input id="duties-search" type="search" data-structure-search placeholder="Название, адрес или лидер"
+               class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" data-structure-table>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+            <tr class="bg-slate-50/50 border-b border-slate-200">
+                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Название</th>
+                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Адрес</th>
+                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Лидер</th>
+                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Группы</th>
+                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Действия</th>
+            </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+            {{ range .Dormitories }}
+            <tr class="hover:bg-blue-50/30 transition-colors group cursor-pointer"
+                data-structure-row
+                data-search="{{ .Name }} {{ .Address }} {{ .LeaderName }}"
+                onclick="window.location='/admin/duties/{{ .ID }}/groups'">
+                <td class="px-6 py-5 font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{{ .Name }}</td>
+                <td class="px-6 py-5 text-sm text-slate-700">{{ .Address }}</td>
+                <td class="px-6 py-5 text-sm text-slate-700">{{ .LeaderName }}</td>
+                <td class="px-6 py-5 text-sm text-slate-700">{{ .GroupsCount }}</td>
+                <td class="px-6 py-5 text-right">
+                    <a href="/admin/duties/{{ .ID }}/groups" class="inline-flex p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Выбрать группы" onclick="event.stopPropagation()">
+                        <i data-lucide="folder-tree" class="w-4 h-4"></i>
+                    </a>
+                </td>
+            </tr>
+            {{ else }}
+            <tr>
+                <td colspan="5" class="px-6 py-12 text-center text-slate-500">
+                    <div class="flex flex-col items-center">
+                        <i data-lucide="building-2" class="w-12 h-12 text-slate-200 mb-3"></i>
+                        <p>Общежития не найдены</p>
+                    </div>
+                </td>
+            </tr>
+            {{ end }}
+            <tr class="hidden" data-filter-empty>
+                <td colspan="5" class="px-6 py-12 text-center text-slate-500">
+                    <div class="flex flex-col items-center">
+                        <i data-lucide="search-x" class="w-12 h-12 text-slate-200 mb-3"></i>
+                        <p>Ничего не найдено</p>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>lucide.createIcons();</script>

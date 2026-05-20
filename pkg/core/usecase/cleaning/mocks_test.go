@@ -27,7 +27,17 @@ func (m *MockDutyRepo) FindCurrentByTeamID(ctx context.Context, id uuid.UUID) (*
 }
 func (m *MockDutyRepo) FindByID(ctx context.Context, id uuid.UUID) (*duty.Duty, error) {
 	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*duty.Duty), args.Error(1)
+}
+func (m *MockDutyRepo) FindByGroupID(ctx context.Context, id uuid.UUID) ([]*duty.Duty, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*duty.Duty), args.Error(1)
 }
 func (m *MockDutyRepo) CountDistinctStartDates(ctx context.Context) (int, error) {
 	args := m.Called(ctx)
@@ -81,10 +91,23 @@ func (m *MockCatalogRepo) GetAllTaskDefinitions(ctx context.Context) ([]*catalog
 	args := m.Called(ctx)
 	return args.Get(0).([]*catalog.TaskDefinition), args.Error(1)
 }
+func (m *MockCatalogRepo) GetActiveTaskDefinitions(ctx context.Context) ([]*catalog.TaskDefinition, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]*catalog.TaskDefinition), args.Error(1)
+}
+func (m *MockCatalogRepo) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*catalog.TaskDefinition, error) {
+	return nil, nil
+}
+func (m *MockCatalogRepo) FindCommon(ctx context.Context) ([]*catalog.TaskDefinition, error) {
+	return nil, nil
+}
 func (m *MockCatalogRepo) FindByID(ctx context.Context, id uuid.UUID) (*catalog.TaskDefinition, error) {
 	return nil, nil
 }
 func (m *MockCatalogRepo) Save(ctx context.Context, task *catalog.TaskDefinition) error {
+	return nil
+}
+func (m *MockCatalogRepo) UpdateGroupTaskActivity(ctx context.Context, groupID uuid.UUID, activeTaskIDs []uuid.UUID) error {
 	return nil
 }
 func (m *MockCatalogRepo) Delete(ctx context.Context, id uuid.UUID) error { return nil }

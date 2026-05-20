@@ -6,6 +6,7 @@ import (
 	"dorm/pkg/core/ports/dto"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -15,7 +16,9 @@ type AdminHandler struct {
 	userUC      ports.UserUseCase
 	dormitoryUC ports.DormitoryUseCase
 	teamUC      ports.TeamUseCase
+	dutyUC      ports.DutyUseCase
 	taskUC      ports.TaskCatalogUseCase
+	cleaningUC  ports.CleaningUseCase
 	sheetsUC    ports.SheetsUseCase
 }
 
@@ -23,14 +26,18 @@ func NewAdminHandler(
 	userUC ports.UserUseCase,
 	dormitoryUC ports.DormitoryUseCase,
 	teamUC ports.TeamUseCase,
+	dutyUC ports.DutyUseCase,
 	taskUC ports.TaskCatalogUseCase,
+	cleaningUC ports.CleaningUseCase,
 	sheetsUC ports.SheetsUseCase,
 ) *AdminHandler {
 	return &AdminHandler{
 		userUC:      userUC,
 		dormitoryUC: dormitoryUC,
 		teamUC:      teamUC,
+		dutyUC:      dutyUC,
 		taskUC:      taskUC,
+		cleaningUC:  cleaningUC,
 		sheetsUC:    sheetsUC,
 	}
 }
@@ -68,6 +75,16 @@ func (h *AdminHandler) RegisterRoutes(app *fiber.App) {
 	admin.Delete("/dormitories/:dormId/groups/:groupId/teams/:teamId", h.HandleDeleteTeam)
 	admin.Put("/dormitories/:dormId/groups/:groupId/teams/:teamId/members/:userID", h.HandleAddTeamMember)
 	admin.Delete("/dormitories/:dormId/groups/:groupId/teams/members/:userID", h.HandleRemoveTeamMember)
+
+	admin.Get("/dormitories/:dormId/groups/:groupId/duties", h.HandleGetGroupDuties)
+	admin.Get("/dormitories/:dormId/groups/:groupId/duties/future", h.HandleFutureDutyModal)
+	admin.Put("/dormitories/:dormId/groups/:groupId/duties/future", h.HandleUpdateFutureDuty)
+	admin.Get("/dormitories/:dormId/groups/:groupId/duties/:dutyId", h.HandleGetDutyDetail)
+
+	admin.Get("/duties", h.HandleGetDutyDormitories)
+	admin.Get("/duties/:dormId/groups", h.HandleGetDutyGroups)
+	admin.Get("/duties/:dormId/create", h.HandleCreateDormitoryDutiesModal)
+	admin.Post("/duties/:dormId", h.HandleStoreDormitoryDuties)
 
 	admin.Get("/tasks", h.HandleGetTasks)
 	admin.Get("/tasks/create", h.HandleCreateTaskModal)
@@ -563,6 +580,161 @@ func (h *AdminHandler) HandleRemoveTeamMember(c *fiber.Ctx) error {
 	return c.SendString("")
 }
 
+func (h *AdminHandler) HandleGetGroupDuties(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	duties, err := h.dutyUC.GetGroupDuties(c.Context(), group.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении дежурств")
+	}
+	return c.Render("dormitory_group_duties", fiber.Map{
+		"Dormitory":     dormitory,
+		"Group":         group,
+		"Duties":        duties,
+		"ActiveSection": "duties",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleFutureDutyModal(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	tasks, err := h.dutyUC.GetFutureDutyTasks(c.Context(), group.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении задач")
+	}
+	teams, err := h.teamUC.GetTeamsListByGroup(c.Context(), group.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении команд")
+	}
+	nextDutyTeam := ""
+	if group.NextDutyTeam() != nil {
+		nextDutyTeam = strconv.Itoa(*group.NextDutyTeam())
+	}
+	return c.Render("partials/modal_future_duty", fiber.Map{
+		"Dormitory":    dormitory,
+		"Group":        group,
+		"Tasks":        tasks,
+		"Teams":        teams,
+		"NextDutyTeam": nextDutyTeam,
+	})
+}
+
+func (h *AdminHandler) HandleUpdateFutureDuty(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	taskIDs, err := parseUUIDValues(formValues(c, "task_ids"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+	nextDutyTeam, err := parseOptionalInt(c.FormValue("next_duty_team"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid next duty team")
+	}
+	if err := h.dutyUC.UpdateGroupDutySettings(c.Context(), group.ID(), nextDutyTeam, taskIDs); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", dutiesURL(dormitory.ID(), group.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleGetDutyDetail(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	dutyID, err := parseUUIDParam(c, "dutyId")
+	if err != nil {
+		return c.Status(400).SendString("Invalid duty id")
+	}
+	dutyItem, err := h.dutyUC.GetDutyDetail(c.Context(), group.ID(), dutyID)
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении дежурства")
+	}
+	if dutyItem == nil {
+		return c.Status(404).SendString("Duty not found")
+	}
+	return c.Render("duty_detail", fiber.Map{
+		"Dormitory":     dormitory,
+		"Group":         group,
+		"Duty":          dutyItem,
+		"ActiveSection": "duties",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleGetDutyDormitories(c *fiber.Ctx) error {
+	dormitories, err := h.dormitoryUC.GetDormitoriesList(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении общежитий")
+	}
+	return c.Render("duties", fiber.Map{
+		"Dormitories":   dormitories,
+		"ActiveSection": "duties",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleGetDutyGroups(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	groups, err := h.dormitoryUC.GetGroupsList(c.Context(), dormitory.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении групп")
+	}
+	return c.Render("duties_groups", fiber.Map{
+		"Dormitory":     dormitory,
+		"Groups":        groups,
+		"ActiveSection": "duties",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleCreateDormitoryDutiesModal(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	tasks, err := h.dutyUC.GetCommonFutureDutyTasks(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении общих задач")
+	}
+	return c.Render("partials/modal_create_dormitory_duties", fiber.Map{
+		"Dormitory": dormitory,
+		"Tasks":     tasks,
+	})
+}
+
+func (h *AdminHandler) HandleStoreDormitoryDuties(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+
+	startDate, err := parseDateFormValue(c, "start_date")
+	if err != nil {
+		return c.Status(400).SendString("Invalid start date")
+	}
+	endDate, err := parseDateFormValue(c, "end_date")
+	if err != nil {
+		return c.Status(400).SendString("Invalid end date")
+	}
+	taskIDs, err := parseUUIDValues(formValues(c, "common_task_ids"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+
+	if err := h.cleaningUC.StartNewDutiesForDormitory(c.Context(), dormitory.ID(), startDate, endDate, taskIDs); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", fmt.Sprintf("/admin/duties/%d/groups", dormitory.ID()))
+	return c.SendString("")
+}
+
 func (h *AdminHandler) requireDormitory(c *fiber.Ctx) (*structure.Dormitory, error) {
 	dormID, err := parseIntParam(c, "dormId")
 	if err != nil {
@@ -634,12 +806,31 @@ func parseUUIDParam(c *fiber.Ctx, name string) (uuid.UUID, error) {
 	return uuid.Parse(c.Params(name))
 }
 
+func parseDateFormValue(c *fiber.Ctx, name string) (time.Time, error) {
+	return time.Parse("02.01.2006", c.FormValue(name))
+}
+
+func parseOptionalInt(rawValue string) (*int, error) {
+	if rawValue == "" {
+		return nil, nil
+	}
+	value, err := strconv.Atoi(rawValue)
+	if err != nil {
+		return nil, err
+	}
+	return &value, nil
+}
+
 func groupsURL(dormID int64) string {
 	return fmt.Sprintf("/admin/dormitories/%d/groups", dormID)
 }
 
 func teamsURL(dormID int64, groupID uuid.UUID) string {
 	return fmt.Sprintf("/admin/dormitories/%d/groups/%s/teams", dormID, groupID)
+}
+
+func dutiesURL(dormID int64, groupID uuid.UUID) string {
+	return fmt.Sprintf("/admin/dormitories/%d/groups/%s/duties", dormID, groupID)
 }
 
 func formValues(c *fiber.Ctx, key string) []string {
@@ -650,6 +841,18 @@ func formValues(c *fiber.Ctx, key string) []string {
 		}
 	})
 	return values
+}
+
+func parseUUIDValues(values []string) ([]uuid.UUID, error) {
+	ids := make([]uuid.UUID, 0, len(values))
+	for _, value := range values {
+		id, err := uuid.Parse(value)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 func (h *AdminHandler) HandleGetTasks(c *fiber.Ctx) error {

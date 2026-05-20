@@ -4,6 +4,7 @@ import (
 	"context"
 	"dorm/pkg/core/domain/duty"
 	"dorm/pkg/core/ports/dto"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -14,6 +15,7 @@ type CleaningUseCase interface {
 	CompleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	OpenTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	StartNewWeek(ctx context.Context) error
+	StartNewDutiesForDormitory(ctx context.Context, dormitoryID int64, startDate, endDate time.Time, commonTaskIDs []uuid.UUID) error
 
 	IsUserOnDuty(ctx context.Context, userID uuid.UUID) (bool, error)
 
