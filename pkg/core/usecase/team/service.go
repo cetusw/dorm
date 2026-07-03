@@ -3,6 +3,7 @@ package team
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"dorm/pkg/core/domain/structure"
@@ -393,6 +394,12 @@ func (s *Service) getTeamMemberItems(ctx context.Context, dormitoryID int64, cur
 			IsInCurrentTeam: currentTeamID != uuid.Nil && u.TeamID() != nil && *u.TeamID() == currentTeamID,
 		})
 	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].IsInCurrentTeam != items[j].IsInCurrentTeam {
+			return items[i].IsInCurrentTeam
+		}
+		return strings.ToLower(items[i].FullName) < strings.ToLower(items[j].FullName)
+	})
 	return items, nil
 }
 

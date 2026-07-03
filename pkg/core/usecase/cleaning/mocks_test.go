@@ -91,10 +91,6 @@ func (m *MockCatalogRepo) GetAllTaskDefinitions(ctx context.Context) ([]*catalog
 	args := m.Called(ctx)
 	return args.Get(0).([]*catalog.TaskDefinition), args.Error(1)
 }
-func (m *MockCatalogRepo) GetActiveTaskDefinitions(ctx context.Context) ([]*catalog.TaskDefinition, error) {
-	args := m.Called(ctx)
-	return args.Get(0).([]*catalog.TaskDefinition), args.Error(1)
-}
 func (m *MockCatalogRepo) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*catalog.TaskDefinition, error) {
 	return nil, nil
 }
@@ -107,10 +103,25 @@ func (m *MockCatalogRepo) FindByID(ctx context.Context, id uuid.UUID) (*catalog.
 func (m *MockCatalogRepo) Save(ctx context.Context, task *catalog.TaskDefinition) error {
 	return nil
 }
-func (m *MockCatalogRepo) UpdateGroupTaskActivity(ctx context.Context, groupID uuid.UUID, activeTaskIDs []uuid.UUID) error {
-	return nil
-}
 func (m *MockCatalogRepo) Delete(ctx context.Context, id uuid.UUID) error { return nil }
+
+type MockTaskOverrideRepo struct{ mock.Mock }
+
+func (m *MockTaskOverrideRepo) FindAll(ctx context.Context) ([]*catalog.DutyTaskOverride, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*catalog.DutyTaskOverride), args.Error(1)
+}
+
+func (m *MockTaskOverrideRepo) ReplaceForTasks(ctx context.Context, taskIDs []uuid.UUID, overrides []*catalog.DutyTaskOverride) error {
+	return m.Called(ctx, taskIDs, overrides).Error(0)
+}
+
+func (m *MockTaskOverrideRepo) DeleteByTaskIDs(ctx context.Context, taskIDs []uuid.UUID) error {
+	return m.Called(ctx, taskIDs).Error(0)
+}
 
 type MockAreaRepo struct{ mock.Mock }
 

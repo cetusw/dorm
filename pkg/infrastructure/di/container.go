@@ -79,6 +79,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	dutyRepo := repository.NewDutyRepository(db)
 	areaRepo := repository.NewAreaRepository(db)
 	taskRepo := repository.NewTaskRepository(db)
+	taskOverrideRepo := repository.NewDutyTaskOverrideRepository(db)
 	dormitoryRepo := repository.NewDormitoryRepository(db)
 
 	cleaningService := cleaning.NewCleaningService(
@@ -87,6 +88,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		groupRepo,
 		dutyRepo,
 		taskRepo,
+		taskOverrideRepo,
 		areaRepo,
 		bus,
 	)
@@ -104,7 +106,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 
 	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo, groupRepo, teamRepo, userRepo)
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
-	dutyService := dutyuc.NewDutyService(dutyRepo, teamRepo, groupRepo, dormitoryRepo, taskRepo, areaRepo, userRepo)
+	dutyService := dutyuc.NewDutyService(dutyRepo, teamRepo, groupRepo, dormitoryRepo, taskRepo, taskOverrideRepo, areaRepo, userRepo)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)

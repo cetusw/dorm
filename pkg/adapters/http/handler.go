@@ -22,6 +22,13 @@ type AdminHandler struct {
 	sheetsUC    ports.SheetsUseCase
 }
 
+type dutyGroupSettingsItem struct {
+	Group        dto.GroupListItem
+	Tasks        []dto.FutureDutyTaskGroup
+	Teams        []dto.TeamListItem
+	NextDutyTeam string
+}
+
 func NewAdminHandler(
 	userUC ports.UserUseCase,
 	dormitoryUC ports.DormitoryUseCase,
@@ -83,12 +90,26 @@ func (h *AdminHandler) RegisterRoutes(app *fiber.App) {
 
 	admin.Get("/duties", h.HandleGetDutyDormitories)
 	admin.Get("/duties/:dormId/groups", h.HandleGetDutyGroups)
+	admin.Put("/duties/:dormId/settings", h.HandleUpdateDormitoryDutySettings)
 	admin.Get("/duties/:dormId/create", h.HandleCreateDormitoryDutiesModal)
 	admin.Post("/duties/:dormId", h.HandleStoreDormitoryDuties)
+	admin.Get("/duties/:dormId/common-settings", h.HandleCommonDutySettingsModal)
+	admin.Put("/duties/:dormId/common-settings", h.HandleUpdateCommonDutySettings)
 
 	admin.Get("/tasks", h.HandleGetTasks)
-	admin.Get("/tasks/create", h.HandleCreateTaskModal)
-	admin.Post("/tasks", h.HandleStoreTask)
+	admin.Get("/tasks/:dormId/groups", h.HandleGetTaskGroups)
+	admin.Get("/tasks/:dormId/groups/common", h.HandleGetCommonTasks)
+	admin.Get("/tasks/:dormId/groups/common/create", h.HandleCreateCommonTaskModal)
+	admin.Post("/tasks/:dormId/groups/common", h.HandleStoreCommonTask)
+	admin.Get("/tasks/:dormId/groups/common/items/:id/edit", h.HandleEditCommonTaskModal)
+	admin.Put("/tasks/:dormId/groups/common/items/:id", h.HandleUpdateCommonTask)
+	admin.Delete("/tasks/:dormId/groups/common/items/:id", h.HandleDeleteCommonTask)
+	admin.Get("/tasks/:dormId/groups/:groupId", h.HandleGetGroupTasks)
+	admin.Get("/tasks/:dormId/groups/:groupId/create", h.HandleCreateGroupTaskModal)
+	admin.Post("/tasks/:dormId/groups/:groupId", h.HandleStoreGroupTask)
+	admin.Get("/tasks/:dormId/groups/:groupId/items/:id/edit", h.HandleEditGroupTaskModal)
+	admin.Put("/tasks/:dormId/groups/:groupId/items/:id", h.HandleUpdateGroupTask)
+	admin.Delete("/tasks/:dormId/groups/:groupId/items/:id", h.HandleDeleteGroupTask)
 	admin.Get("/tasks/:id/edit", h.HandleEditTaskModal)
 	admin.Put("/tasks/:id", h.HandleUpdateTask)
 	admin.Delete("/tasks/:id", h.HandleDeleteTask)
@@ -624,7 +645,7 @@ func (h *AdminHandler) HandleFutureDutyModal(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) HandleUpdateFutureDuty(c *fiber.Ctx) error {
-	dormitory, group, err := h.requireDormitoryGroup(c)
+	_, group, err := h.requireDormitoryGroup(c)
 	if err != nil {
 		return err
 	}
@@ -639,7 +660,7 @@ func (h *AdminHandler) HandleUpdateFutureDuty(c *fiber.Ctx) error {
 	if err := h.dutyUC.UpdateGroupDutySettings(c.Context(), group.ID(), nextDutyTeam, taskIDs); err != nil {
 		return c.Status(400).SendString(err.Error())
 	}
-	c.Response().Header.Set("HX-Redirect", dutiesURL(dormitory.ID(), group.ID()))
+	c.Response().Header.Set("HX-Trigger", "closeModal")
 	return c.SendString("")
 }
 
@@ -687,11 +708,80 @@ func (h *AdminHandler) HandleGetDutyGroups(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении групп")
 	}
+	commonTasks, err := h.dutyUC.GetCommonFutureDutyTasks(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении общих задач")
+	}
+	groupSettings := make([]dutyGroupSettingsItem, 0, len(groups))
+	for _, groupItem := range groups {
+		group, err := h.dormitoryUC.GetGroupByID(c.Context(), groupItem.ID)
+		if err != nil {
+			return c.Status(500).SendString("Ошибка при получении группы")
+		}
+		if group == nil || group.DormitoryID() != dormitory.ID() {
+			continue
+		}
+		tasks, err := h.dutyUC.GetFutureDutyTasks(c.Context(), group.ID())
+		if err != nil {
+			return c.Status(500).SendString("Ошибка при получении задач")
+		}
+		teams, err := h.teamUC.GetTeamsListByGroup(c.Context(), group.ID())
+		if err != nil {
+			return c.Status(500).SendString("Ошибка при получении команд")
+		}
+		nextDutyTeam := ""
+		if group.NextDutyTeam() != nil {
+			nextDutyTeam = strconv.Itoa(*group.NextDutyTeam())
+		}
+		groupSettings = append(groupSettings, dutyGroupSettingsItem{
+			Group:        groupItem,
+			Tasks:        tasks,
+			Teams:        teams,
+			NextDutyTeam: nextDutyTeam,
+		})
+	}
 	return c.Render("duties_groups", fiber.Map{
 		"Dormitory":     dormitory,
-		"Groups":        groups,
+		"CommonTasks":   commonTasks,
+		"GroupSettings": groupSettings,
 		"ActiveSection": "duties",
 	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleUpdateDormitoryDutySettings(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	groups, err := h.dormitoryUC.GetGroupsList(c.Context(), dormitory.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении групп")
+	}
+	commonTaskIDs, err := parseUUIDValues(formValues(c, "common_task_ids"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+	req := dto.UpdateDormitoryDutySettingsRequest{CommonTaskIDs: commonTaskIDs}
+	for _, group := range groups {
+		taskIDs, err := parseUUIDValues(formValues(c, fmt.Sprintf("group_task_ids_%s", group.ID)))
+		if err != nil {
+			return c.Status(400).SendString("Invalid task id")
+		}
+		nextDutyTeam, err := parseOptionalInt(c.FormValue(fmt.Sprintf("next_duty_team_%s", group.ID)))
+		if err != nil {
+			return c.Status(400).SendString("Invalid next duty team")
+		}
+		req.Groups = append(req.Groups, dto.DutyGroupSettingsUpdate{
+			GroupID:        group.ID,
+			NextDutyTeam:   nextDutyTeam,
+			IncludeTaskIDs: taskIDs,
+		})
+	}
+	if err := h.dutyUC.UpdateDormitoryDutySettings(c.Context(), dormitory.ID(), req); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", fmt.Sprintf("/admin/duties/%d/groups", dormitory.ID()))
+	return c.SendString("")
 }
 
 func (h *AdminHandler) HandleCreateDormitoryDutiesModal(c *fiber.Ctx) error {
@@ -699,13 +789,8 @@ func (h *AdminHandler) HandleCreateDormitoryDutiesModal(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	tasks, err := h.dutyUC.GetCommonFutureDutyTasks(c.Context())
-	if err != nil {
-		return c.Status(500).SendString("Ошибка при получении общих задач")
-	}
 	return c.Render("partials/modal_create_dormitory_duties", fiber.Map{
 		"Dormitory": dormitory,
-		"Tasks":     tasks,
 	})
 }
 
@@ -723,12 +808,38 @@ func (h *AdminHandler) HandleStoreDormitoryDuties(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(400).SendString("Invalid end date")
 	}
+	if err := h.cleaningUC.StartNewDutiesForDormitory(c.Context(), dormitory.ID(), startDate, endDate); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", fmt.Sprintf("/admin/duties/%d/groups", dormitory.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleCommonDutySettingsModal(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	tasks, err := h.dutyUC.GetCommonFutureDutyTasks(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении общих задач")
+	}
+	return c.Render("partials/modal_common_duty_settings", fiber.Map{
+		"Dormitory": dormitory,
+		"Tasks":     tasks,
+	})
+}
+
+func (h *AdminHandler) HandleUpdateCommonDutySettings(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
 	taskIDs, err := parseUUIDValues(formValues(c, "common_task_ids"))
 	if err != nil {
 		return c.Status(400).SendString("Invalid task id")
 	}
-
-	if err := h.cleaningUC.StartNewDutiesForDormitory(c.Context(), dormitory.ID(), startDate, endDate, taskIDs); err != nil {
+	if err := h.dutyUC.UpdateCommonDutySettings(c.Context(), taskIDs); err != nil {
 		return c.Status(400).SendString(err.Error())
 	}
 	c.Response().Header.Set("HX-Redirect", fmt.Sprintf("/admin/duties/%d/groups", dormitory.ID()))
@@ -833,6 +944,14 @@ func dutiesURL(dormID int64, groupID uuid.UUID) string {
 	return fmt.Sprintf("/admin/dormitories/%d/groups/%s/duties", dormID, groupID)
 }
 
+func taskGroupURL(dormID int64, groupID uuid.UUID) string {
+	return fmt.Sprintf("/admin/tasks/%d/groups/%s", dormID, groupID)
+}
+
+func commonTaskURL(dormID int64) string {
+	return fmt.Sprintf("/admin/tasks/%d/groups/common", dormID)
+}
+
 func formValues(c *fiber.Ctx, key string) []string {
 	values := make([]string, 0)
 	c.Request().PostArgs().VisitAll(func(argKey []byte, value []byte) {
@@ -856,30 +975,244 @@ func parseUUIDValues(values []string) ([]uuid.UUID, error) {
 }
 
 func (h *AdminHandler) HandleGetTasks(c *fiber.Ctx) error {
-	tasks, err := h.taskUC.ListTasks(c.Context())
+	dormitories, err := h.dormitoryUC.GetDormitoriesList(c.Context())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении общежитий")
+	}
+	return c.Render("tasks", fiber.Map{
+		"Dormitories":   dormitories,
+		"ActiveSection": "tasks",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleGetTaskGroups(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	groups, err := h.dormitoryUC.GetGroupsList(c.Context(), dormitory.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении групп")
+	}
+	return c.Render("task_groups", fiber.Map{
+		"Dormitory":     dormitory,
+		"Groups":        groups,
+		"ActiveSection": "tasks",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleGetCommonTasks(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	taskGroups, err := h.taskUC.ListCommonTaskGroups(c.Context())
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении задач")
 	}
-	return c.Render("tasks", fiber.Map{"Tasks": tasks, "ActiveSection": "tasks"}, "layouts/main")
+	return c.Render("common_tasks", fiber.Map{
+		"Dormitory":     dormitory,
+		"TaskGroups":    taskGroups,
+		"ActiveSection": "tasks",
+	}, "layouts/main")
 }
 
-func (h *AdminHandler) HandleCreateTaskModal(c *fiber.Ctx) error {
-	areas, err := h.taskUC.ListAreas(c.Context())
+func (h *AdminHandler) HandleGetGroupTasks(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	taskGroups, err := h.taskUC.ListTaskGroupsByGroup(c.Context(), group.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении задач")
+	}
+	return c.Render("group_tasks", fiber.Map{
+		"Dormitory":     dormitory,
+		"Group":         group,
+		"TaskGroups":    taskGroups,
+		"ActiveSection": "tasks",
+	}, "layouts/main")
+}
+
+func (h *AdminHandler) HandleCreateCommonTaskModal(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	return c.Render("partials/modal_create_task", fiber.Map{
+		"Dormitory": dormitory,
+		"Common":    true,
+	})
+}
+
+func (h *AdminHandler) HandleCreateGroupTaskModal(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	areas, err := h.taskUC.ListAreasByGroup(c.Context(), group.ID())
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении зон")
 	}
-	return c.Render("partials/modal_create_task", fiber.Map{"Areas": areas})
+	return c.Render("partials/modal_create_task", fiber.Map{
+		"Dormitory": dormitory,
+		"Group":     group,
+		"Areas":     areas,
+	})
 }
 
-func (h *AdminHandler) HandleStoreTask(c *fiber.Ctx) error {
+func (h *AdminHandler) HandleStoreCommonTask(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
 	var req dto.UpsertTaskCatalogRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).SendString("Invalid data")
 	}
-	if err := h.taskUC.CreateTask(c.Context(), req); err != nil {
+	if err := h.taskUC.CreateCommonTask(c.Context(), req); err != nil {
 		return c.Status(400).SendString(err.Error())
 	}
-	c.Response().Header.Set("HX-Redirect", "/admin/tasks")
+	c.Response().Header.Set("HX-Redirect", commonTaskURL(dormitory.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleStoreGroupTask(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	var req dto.UpsertTaskCatalogRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).SendString("Invalid data")
+	}
+	if err := h.taskUC.CreateTaskInGroup(c.Context(), group.ID(), req); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", taskGroupURL(dormitory.ID(), group.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleEditCommonTaskModal(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+	task, err := h.taskUC.GetTask(c.Context(), id)
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении задачи")
+	}
+	if task == nil {
+		return c.Status(404).SendString("Task not found")
+	}
+	return c.Render("partials/modal_edit_task", fiber.Map{
+		"Dormitory": dormitory,
+		"Common":    true,
+		"Task":      task,
+	})
+}
+
+func (h *AdminHandler) HandleEditGroupTaskModal(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+	task, err := h.taskUC.GetTask(c.Context(), id)
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении задачи")
+	}
+	if task == nil {
+		return c.Status(404).SendString("Task not found")
+	}
+	areas, err := h.taskUC.ListAreasByGroup(c.Context(), group.ID())
+	if err != nil {
+		return c.Status(500).SendString("Ошибка при получении зон")
+	}
+	return c.Render("partials/modal_edit_task", fiber.Map{
+		"Dormitory": dormitory,
+		"Group":     group,
+		"Task":      task,
+		"Areas":     areas,
+	})
+}
+
+func (h *AdminHandler) HandleUpdateCommonTask(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+	var req dto.UpsertTaskCatalogRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).SendString("Invalid data")
+	}
+	if err := h.taskUC.UpdateCommonTask(c.Context(), id, req); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", commonTaskURL(dormitory.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleUpdateGroupTask(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+	var req dto.UpsertTaskCatalogRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).SendString("Invalid data")
+	}
+	if err := h.taskUC.UpdateTaskInGroup(c.Context(), group.ID(), id, req); err != nil {
+		return c.Status(400).SendString(err.Error())
+	}
+	c.Response().Header.Set("HX-Redirect", taskGroupURL(dormitory.ID(), group.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleDeleteCommonTask(c *fiber.Ctx) error {
+	dormitory, err := h.requireDormitory(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+	if err := h.taskUC.DeleteCommonTask(c.Context(), id); err != nil {
+		return c.Status(500).SendString("Ошибка при удалении задачи")
+	}
+	c.Response().Header.Set("HX-Redirect", commonTaskURL(dormitory.ID()))
+	return c.SendString("")
+}
+
+func (h *AdminHandler) HandleDeleteGroupTask(c *fiber.Ctx) error {
+	dormitory, group, err := h.requireDormitoryGroup(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid task id")
+	}
+	if err := h.taskUC.DeleteTaskInGroup(c.Context(), group.ID(), id); err != nil {
+		return c.Status(500).SendString("Ошибка при удалении задачи")
+	}
+	c.Response().Header.Set("HX-Redirect", taskGroupURL(dormitory.ID(), group.ID()))
 	return c.SendString("")
 }
 

@@ -1,4 +1,4 @@
-<div class="flex justify-between items-end mb-8">
+<div class="mb-8">
     <div>
         <nav class="mb-3 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
             <a href="/admin/duties" class="hover:text-blue-700">Дежурства</a>
@@ -9,12 +9,6 @@
         </nav>
         <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Дежурства {{ .Group.Name }}</h1>
     </div>
-
-    <button hx-get="/admin/dormitories/{{ .Dormitory.ID }}/groups/{{ .Group.ID }}/duties/future" hx-target="body" hx-swap="beforeend"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200 flex items-center gap-2 group">
-        <i data-lucide="list-checks" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
-        Настройки дежурства группы
-    </button>
 </div>
 
 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">

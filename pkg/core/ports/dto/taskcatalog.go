@@ -6,10 +6,17 @@ type TaskCatalogItem struct {
 	ID        uuid.UUID
 	AreaID    int
 	AreaName  string
+	AreaFloor int
 	Title     string
 	Cost      int
 	Frequency int
-	IsActive  bool
+}
+
+type TaskCatalogGroup struct {
+	AreaID   int
+	AreaName string
+	Floor    int
+	Tasks    []TaskCatalogItem
 }
 
 type UpsertTaskCatalogRequest struct {

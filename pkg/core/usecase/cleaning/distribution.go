@@ -22,6 +22,7 @@ type distributingContext struct {
 	areas         []*catalog.Area
 	areaGroupMap  map[int]*uuid.UUID
 	tasksByArea   map[int][]*catalog.TaskDefinition
+	taskOverrides map[uuid.UUID]bool
 	dutiesByGroup map[uuid.UUID]*duty.Duty
 	dutiesList    []*duty.Duty
 	weekNumber    int
@@ -30,11 +31,9 @@ type distributingContext struct {
 }
 
 type schedulingOptions struct {
-	dormitoryID        *int64
-	start              time.Time
-	end                time.Time
-	commonTaskIDs      map[uuid.UUID]struct{}
-	commonTaskOverride bool
+	dormitoryID *int64
+	start       time.Time
+	end         time.Time
 }
 
 func (s *Service) StartNewWeek(ctx context.Context) error {
@@ -58,22 +57,15 @@ func (s *Service) StartNewWeek(ctx context.Context) error {
 	return s.finalizeNewWeek(ctx, distributingCtx)
 }
 
-func (s *Service) StartNewDutiesForDormitory(ctx context.Context, dormitoryID int64, startDate, endDate time.Time, commonTaskIDs []uuid.UUID) error {
+func (s *Service) StartNewDutiesForDormitory(ctx context.Context, dormitoryID int64, startDate, endDate time.Time) error {
 	if !startDate.Before(endDate) {
 		return fmt.Errorf("start date must be before end date")
 	}
 
-	selectedCommonTasks := make(map[uuid.UUID]struct{}, len(commonTaskIDs))
-	for _, taskID := range commonTaskIDs {
-		selectedCommonTasks[taskID] = struct{}{}
-	}
-
 	distributingCtx, err := s.loadSchedulingData(ctx, schedulingOptions{
-		dormitoryID:        &dormitoryID,
-		start:              startDate,
-		end:                endDate,
-		commonTaskIDs:      selectedCommonTasks,
-		commonTaskOverride: true,
+		dormitoryID: &dormitoryID,
+		start:       startDate,
+		end:         endDate,
 	})
 	if err != nil {
 		return err
@@ -103,6 +95,10 @@ func (s *Service) loadSchedulingData(ctx context.Context, opts schedulingOptions
 	if err != nil {
 		return nil, fmt.Errorf("load tasks: %w", err)
 	}
+	overrides, err := s.overrideRepo.FindAll(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load task overrides: %w", err)
+	}
 
 	weekNum, err := s.dutyRepo.CountDistinctStartDates(ctx)
 	if err != nil {
@@ -118,7 +114,11 @@ func (s *Service) loadSchedulingData(ctx context.Context, opts schedulingOptions
 		end:           opts.end,
 		areaGroupMap:  make(map[int]*uuid.UUID),
 		tasksByArea:   make(map[int][]*catalog.TaskDefinition),
+		taskOverrides: make(map[uuid.UUID]bool, len(overrides)),
 		dutiesByGroup: make(map[uuid.UUID]*duty.Duty),
+	}
+	for _, override := range overrides {
+		distributingCtx.taskOverrides[override.TaskID()] = override.IncludeInNextDuty()
 	}
 
 	s.indexData(distributingCtx)
@@ -133,8 +133,8 @@ func (s *Service) loadSchedulingGroups(ctx context.Context, opts schedulingOptio
 }
 
 func (s *Service) loadSchedulingTasks(ctx context.Context, groups []*structure.Group, areas []*catalog.Area, opts schedulingOptions) ([]*catalog.TaskDefinition, error) {
-	if !opts.commonTaskOverride {
-		return s.taskRepo.GetActiveTaskDefinitions(ctx)
+	if opts.dormitoryID == nil {
+		return s.taskRepo.GetAllTaskDefinitions(ctx)
 	}
 
 	allTasks, err := s.taskRepo.GetAllTaskDefinitions(ctx)
@@ -158,12 +158,10 @@ func (s *Service) loadSchedulingTasks(ctx context.Context, groups []*structure.G
 			continue
 		}
 		if area.GroupID() == nil {
-			if _, ok := opts.commonTaskIDs[task.ID()]; ok {
-				taskDefs = append(taskDefs, task)
-			}
+			taskDefs = append(taskDefs, task)
 			continue
 		}
-		if _, ok := groupSet[*area.GroupID()]; ok && task.IsActive() {
+		if _, ok := groupSet[*area.GroupID()]; ok {
 			taskDefs = append(taskDefs, task)
 		}
 	}
@@ -233,7 +231,7 @@ func (s *Service) distributeTasks(ctx context.Context, c *distributingContext) e
 			continue
 		}
 
-		if err := s.assignBatchToDuty(ctx, targetDuty, tasks, c.start); err != nil {
+		if err := s.assignBatchToDuty(ctx, targetDuty, tasks, c); err != nil {
 			return err
 		}
 	}
@@ -257,12 +255,16 @@ func (s *Service) resolveTargetDuty(area *catalog.Area, c *distributingContext, 
 	return nil
 }
 
-func (s *Service) assignBatchToDuty(ctx context.Context, d *duty.Duty, tasks []*catalog.TaskDefinition, referenceDate time.Time) error {
+func (s *Service) assignBatchToDuty(ctx context.Context, d *duty.Duty, tasks []*catalog.TaskDefinition, c *distributingContext) error {
 	for _, def := range tasks {
-		isDue, err := s.isTaskDue(ctx, def, referenceDate)
+		isDue, err := s.isTaskDue(ctx, def, c.start)
 		if err != nil {
 			fmt.Printf("Frequency check failed for %s: %v\n", def.Title(), err)
 			isDue = true
+		}
+
+		if include, ok := c.taskOverrides[def.ID()]; ok {
+			isDue = include
 		}
 
 		if isDue {
@@ -317,7 +319,7 @@ func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition, re
 		return true, nil
 	}
 
-	daysPassed := int(referenceDate.Sub(lastDuty.Start()).Hours() / 24)
+	daysPassed := int(referenceDate.Sub(lastDuty.End()).Hours() / 24)
 
 	return daysPassed >= def.Frequency(), nil
 }
@@ -331,6 +333,9 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 		if err := s.dutyRepo.Save(ctx, d); err != nil {
 			return fmt.Errorf("save duty %s: %w", d.ID(), err)
 		}
+	}
+	if err := s.clearAppliedTaskOverrides(ctx, c.taskDefs); err != nil {
+		return fmt.Errorf("clear task overrides: %w", err)
 	}
 
 	duties, err := s.GetLatestDuties(ctx)
@@ -353,4 +358,12 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 	}(duties, c.start, c.end)
 
 	return nil
+}
+
+func (s *Service) clearAppliedTaskOverrides(ctx context.Context, tasks []*catalog.TaskDefinition) error {
+	taskIDs := make([]uuid.UUID, 0, len(tasks))
+	for _, task := range tasks {
+		taskIDs = append(taskIDs, task.ID())
+	}
+	return s.overrideRepo.DeleteByTaskIDs(ctx, taskIDs)
 }

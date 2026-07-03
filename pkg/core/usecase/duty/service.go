@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"dorm/pkg/core/domain/catalog"
 	dutydomain "dorm/pkg/core/domain/duty"
@@ -16,13 +17,14 @@ import (
 )
 
 type Service struct {
-	dutyRepo  dutydomain.Repository
-	teamRepo  structure.TeamRepository
-	groupRepo structure.GroupRepository
-	dormRepo  structure.DormitoryRepository
-	taskRepo  catalog.TaskDefinitionRepository
-	areaRepo  catalog.AreaRepository
-	userRepo  user.Repository
+	dutyRepo     dutydomain.Repository
+	teamRepo     structure.TeamRepository
+	groupRepo    structure.GroupRepository
+	dormRepo     structure.DormitoryRepository
+	taskRepo     catalog.TaskDefinitionRepository
+	overrideRepo catalog.DutyTaskOverrideRepository
+	areaRepo     catalog.AreaRepository
+	userRepo     user.Repository
 }
 
 func NewDutyService(
@@ -31,17 +33,19 @@ func NewDutyService(
 	groupRepo structure.GroupRepository,
 	dormRepo structure.DormitoryRepository,
 	taskRepo catalog.TaskDefinitionRepository,
+	overrideRepo catalog.DutyTaskOverrideRepository,
 	areaRepo catalog.AreaRepository,
 	userRepo user.Repository,
 ) *Service {
 	return &Service{
-		dutyRepo:  dutyRepo,
-		teamRepo:  teamRepo,
-		groupRepo: groupRepo,
-		dormRepo:  dormRepo,
-		taskRepo:  taskRepo,
-		areaRepo:  areaRepo,
-		userRepo:  userRepo,
+		dutyRepo:     dutyRepo,
+		teamRepo:     teamRepo,
+		groupRepo:    groupRepo,
+		dormRepo:     dormRepo,
+		taskRepo:     taskRepo,
+		overrideRepo: overrideRepo,
+		areaRepo:     areaRepo,
+		userRepo:     userRepo,
 	}
 }
 
@@ -143,7 +147,7 @@ func (s *Service) GetFutureDutyTasks(ctx context.Context, groupID uuid.UUID) ([]
 	if err != nil {
 		return nil, err
 	}
-	return s.groupFutureDutyTasks(ctx, tasks)
+	return s.groupFutureDutyTasks(ctx, tasks, time.Now())
 }
 
 func (s *Service) GetCommonFutureDutyTasks(ctx context.Context) ([]dto.FutureDutyTaskGroup, error) {
@@ -151,13 +155,21 @@ func (s *Service) GetCommonFutureDutyTasks(ctx context.Context) ([]dto.FutureDut
 	if err != nil {
 		return nil, err
 	}
-	return s.groupFutureDutyTasks(ctx, tasks)
+	return s.groupFutureDutyTasks(ctx, tasks, time.Now())
 }
 
-func (s *Service) groupFutureDutyTasks(ctx context.Context, tasks []*catalog.TaskDefinition) ([]dto.FutureDutyTaskGroup, error) {
+func (s *Service) groupFutureDutyTasks(ctx context.Context, tasks []*catalog.TaskDefinition, referenceDate time.Time) ([]dto.FutureDutyTaskGroup, error) {
 	areas, err := s.areaRepo.GetAllAreas(ctx)
 	if err != nil {
 		return nil, err
+	}
+	overrides, err := s.overrideRepo.FindAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	overrideMap := make(map[uuid.UUID]bool, len(overrides))
+	for _, override := range overrides {
+		overrideMap[override.TaskID()] = override.IncludeInNextDuty()
 	}
 
 	areaMap := make(map[int]*catalog.Area, len(areas))
@@ -171,6 +183,22 @@ func (s *Service) groupFutureDutyTasks(ctx context.Context, tasks []*catalog.Tas
 		if area == nil {
 			continue
 		}
+		lastDuty, err := s.dutyRepo.FindLastByTaskDefID(ctx, task.ID())
+		if err != nil {
+			return nil, err
+		}
+		var lastCompletedAt *time.Time
+		if lastDuty != nil {
+			completedAt := lastDuty.End()
+			lastCompletedAt = &completedAt
+		}
+		isDue := isTaskDueByLastCompletion(task, lastCompletedAt, referenceDate)
+		includeInNextDuty := isDue
+		overrideValue, hasOverride := overrideMap[task.ID()]
+		if hasOverride {
+			includeInNextDuty = overrideValue
+		}
+
 		taskGroup := groupMap[area.ID()]
 		if taskGroup == nil {
 			taskGroup = &dto.FutureDutyTaskGroup{
@@ -181,29 +209,71 @@ func (s *Service) groupFutureDutyTasks(ctx context.Context, tasks []*catalog.Tas
 			}
 			groupMap[area.ID()] = taskGroup
 		}
+		if includeInNextDuty {
+			taskGroup.IncludeTasksCount++
+		}
 		taskGroup.Tasks = append(taskGroup.Tasks, dto.FutureDutyTaskItem{
-			ID:       task.ID(),
-			AreaID:   area.ID(),
-			AreaName: area.Name(),
-			Title:    task.Title(),
-			IsActive: task.IsActive(),
-			IsCommon: area.GroupID() == nil,
+			ID:                task.ID(),
+			AreaID:            area.ID(),
+			AreaName:          area.Name(),
+			Title:             task.Title(),
+			Frequency:         task.Frequency(),
+			LastCompletedAt:   lastCompletedAt,
+			IsDueByFrequency:  isDue,
+			HasOverride:       hasOverride,
+			IncludeInNextDuty: includeInNextDuty,
+			IsCommon:          area.GroupID() == nil,
 		})
 	}
 	groups := make([]dto.FutureDutyTaskGroup, 0, len(groupMap))
 	for _, taskGroup := range groupMap {
+		sort.Slice(taskGroup.Tasks, func(i, j int) bool {
+			if taskGroup.Tasks[i].IncludeInNextDuty != taskGroup.Tasks[j].IncludeInNextDuty {
+				return taskGroup.Tasks[i].IncludeInNextDuty
+			}
+			return taskGroup.Tasks[i].Title < taskGroup.Tasks[j].Title
+		})
 		groups = append(groups, *taskGroup)
 	}
 	sort.Slice(groups, func(i, j int) bool {
-		if groups[i].IsCommon != groups[j].IsCommon {
-			return !groups[i].IsCommon
+		if groups[i].IncludeTasksCount != groups[j].IncludeTasksCount {
+			return groups[i].IncludeTasksCount > groups[j].IncludeTasksCount
 		}
 		return groups[i].AreaName < groups[j].AreaName
 	})
 	return groups, nil
 }
 
-func (s *Service) UpdateGroupDutySettings(ctx context.Context, groupID uuid.UUID, nextDutyTeam *int, activeTaskIDs []uuid.UUID) error {
+func (s *Service) UpdateDormitoryDutySettings(ctx context.Context, dormitoryID int64, req dto.UpdateDormitoryDutySettingsRequest) error {
+	dormitory, err := s.dormRepo.FindByID(ctx, dormitoryID)
+	if err != nil {
+		return err
+	}
+	if dormitory == nil {
+		return fmt.Errorf("dormitory not found")
+	}
+	if err := s.UpdateCommonDutySettings(ctx, req.CommonTaskIDs); err != nil {
+		return err
+	}
+	for _, groupSettings := range req.Groups {
+		group, err := s.groupRepo.FindByID(ctx, groupSettings.GroupID)
+		if err != nil {
+			return err
+		}
+		if group == nil {
+			return fmt.Errorf("group not found")
+		}
+		if group.DormitoryID() != dormitoryID {
+			return fmt.Errorf("group %s does not belong to dormitory", group.ID())
+		}
+		if err := s.UpdateGroupDutySettings(ctx, groupSettings.GroupID, groupSettings.NextDutyTeam, groupSettings.IncludeTaskIDs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) UpdateGroupDutySettings(ctx context.Context, groupID uuid.UUID, nextDutyTeam *int, includeTaskIDs []uuid.UUID) error {
 	group, err := s.groupRepo.FindByID(ctx, groupID)
 	if err != nil {
 		return err
@@ -219,22 +289,84 @@ func (s *Service) UpdateGroupDutySettings(ctx context.Context, groupID uuid.UUID
 	if err != nil {
 		return err
 	}
-
 	allowed := make(map[uuid.UUID]struct{}, len(groupTasks))
 	for _, task := range groupTasks {
 		allowed[task.ID()] = struct{}{}
 	}
-	for _, taskID := range activeTaskIDs {
+	for _, taskID := range includeTaskIDs {
 		if _, ok := allowed[taskID]; !ok {
 			return fmt.Errorf("task %s does not belong to group", taskID)
 		}
+	}
+	if err := s.saveTaskOverrides(ctx, groupTasks, includeTaskIDs, time.Now()); err != nil {
+		return err
 	}
 
 	group.SetNextDutyTeam(nextDutyTeam)
 	if err := s.groupRepo.Save(ctx, group); err != nil {
 		return err
 	}
-	return s.taskRepo.UpdateGroupTaskActivity(ctx, groupID, activeTaskIDs)
+	return nil
+}
+
+func (s *Service) UpdateCommonDutySettings(ctx context.Context, includeTaskIDs []uuid.UUID) error {
+	commonTasks, err := s.taskRepo.FindCommon(ctx)
+	if err != nil {
+		return err
+	}
+	allowed := make(map[uuid.UUID]struct{}, len(commonTasks))
+	for _, task := range commonTasks {
+		allowed[task.ID()] = struct{}{}
+	}
+	for _, taskID := range includeTaskIDs {
+		if _, ok := allowed[taskID]; !ok {
+			return fmt.Errorf("task %s is not a common task", taskID)
+		}
+	}
+	if err := s.saveTaskOverrides(ctx, commonTasks, includeTaskIDs, time.Now()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) saveTaskOverrides(ctx context.Context, tasks []*catalog.TaskDefinition, includeTaskIDs []uuid.UUID, referenceDate time.Time) error {
+	includeSet := make(map[uuid.UUID]struct{}, len(includeTaskIDs))
+	for _, taskID := range includeTaskIDs {
+		includeSet[taskID] = struct{}{}
+	}
+
+	taskIDs := make([]uuid.UUID, 0, len(tasks))
+	overrides := make([]*catalog.DutyTaskOverride, 0)
+	for _, task := range tasks {
+		taskIDs = append(taskIDs, task.ID())
+		lastDuty, err := s.dutyRepo.FindLastByTaskDefID(ctx, task.ID())
+		if err != nil {
+			return err
+		}
+		var lastCompletedAt *time.Time
+		if lastDuty != nil {
+			completedAt := lastDuty.End()
+			lastCompletedAt = &completedAt
+		}
+		isDue := isTaskDueByLastCompletion(task, lastCompletedAt, referenceDate)
+		_, include := includeSet[task.ID()]
+		if include != isDue {
+			overrides = append(overrides, catalog.NewDutyTaskOverride(task.ID(), include))
+		}
+	}
+	return s.overrideRepo.ReplaceForTasks(ctx, taskIDs, overrides)
+}
+
+func isTaskDueByLastCompletion(task *catalog.TaskDefinition, lastCompletedAt *time.Time, referenceDate time.Time) bool {
+	if task.Frequency() <= 1 {
+		return true
+	}
+	if lastCompletedAt == nil {
+		return true
+	}
+	daysPassed := int(referenceDate.Sub(*lastCompletedAt).Hours() / 24)
+	return daysPassed >= task.Frequency()
 }
 
 func (s *Service) validateNextDutyTeam(ctx context.Context, groupID uuid.UUID, nextDutyTeam *int) error {

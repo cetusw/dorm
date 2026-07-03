@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -25,13 +26,14 @@ type testFixtures struct {
 }
 
 type testEnv struct {
-	groupRepo *MockGroupRepo
-	teamRepo  *MockTeamRepo
-	dutyRepo  *MockDutyRepo
-	catRepo   *MockCatalogRepo
-	areaRepo  *MockAreaRepo
-	eventBus  *MockEventBus
-	service   *Service
+	groupRepo    *MockGroupRepo
+	teamRepo     *MockTeamRepo
+	dutyRepo     *MockDutyRepo
+	catRepo      *MockCatalogRepo
+	overrideRepo *MockTaskOverrideRepo
+	areaRepo     *MockAreaRepo
+	eventBus     *MockEventBus
+	service      *Service
 }
 
 func TestStartNewWeek_DistributionByAreaScope(t *testing.T) {
@@ -84,6 +86,90 @@ func TestDetermineNextTeam_UsesGroupNextDutyTeam(t *testing.T) {
 	assert.Equal(t, secondTeamID, selectedTeam.ID())
 	assert.NotNil(t, group.NextDutyTeam())
 	assert.Equal(t, 10, *group.NextDutyTeam())
+}
+
+func TestStartNewWeek_AppliesOverrideIncludeForTaskNotDue(t *testing.T) {
+	ctx := context.Background()
+	data := createFixtures()
+	data.taskPublic = catalog.RestoreTaskDefinition(uuid.New(), data.areas[1].ID(), "Clean Kitchen", 10, 7)
+	data.tasks = []*catalog.TaskDefinition{data.taskPrivate, data.taskPublic}
+
+	env := newTestEnv()
+	env.groupRepo.On("FindAll", ctx).Return(data.groups, nil)
+	env.teamRepo.On("FindByGroupID", ctx, data.groups[0].ID()).Return(data.teams1, nil)
+	env.teamRepo.On("FindByGroupID", ctx, data.groups[1].ID()).Return(data.teams2, nil)
+	env.areaRepo.On("GetAllAreas", ctx).Return(data.areas, nil)
+	env.catRepo.On("GetAllTaskDefinitions", ctx).Return(data.tasks, nil)
+	env.dutyRepo.On("CountDistinctStartDates", ctx).Return(0, nil).Once()
+
+	lastDuty := duty.NewDuty(uuid.New(), time.Now().Add(-48*time.Hour), time.Now().Add(-24*time.Hour))
+	env.dutyRepo.On("FindLastByTaskDefID", ctx, data.taskPrivate.ID()).Return(nil, nil)
+	env.dutyRepo.On("FindLastByTaskDefID", ctx, data.taskPublic.ID()).Return(lastDuty, nil)
+	env.overrideRepo.On("FindAll", ctx).Return([]*catalog.DutyTaskOverride{
+		catalog.NewDutyTaskOverride(data.taskPublic.ID(), true),
+	}, nil)
+	env.overrideRepo.On("DeleteByTaskIDs", ctx, mock.Anything).Return(nil)
+	env.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))
+	env.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
+
+	var savedDuties []*duty.Duty
+	env.dutyRepo.On("Save", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
+		savedDuties = append(savedDuties, d)
+		return true
+	})).Return(nil)
+
+	err := env.service.StartNewWeek(ctx)
+	assert.NoError(t, err)
+
+	dBoys := findDutyByTeam(savedDuties, data.teamID1)
+	assert.True(t, hasTask(dBoys, data.taskPublic.ID()))
+}
+
+func TestStartNewWeek_AppliesOverrideExcludeForTaskDue(t *testing.T) {
+	ctx := context.Background()
+	data := createFixtures()
+
+	env := newTestEnv()
+	env.groupRepo.On("FindAll", ctx).Return(data.groups, nil)
+	env.teamRepo.On("FindByGroupID", ctx, data.groups[0].ID()).Return(data.teams1, nil)
+	env.teamRepo.On("FindByGroupID", ctx, data.groups[1].ID()).Return(data.teams2, nil)
+	env.areaRepo.On("GetAllAreas", ctx).Return(data.areas, nil)
+	env.catRepo.On("GetAllTaskDefinitions", ctx).Return(data.tasks, nil)
+	env.dutyRepo.On("CountDistinctStartDates", ctx).Return(0, nil).Once()
+	env.dutyRepo.On("FindLastByTaskDefID", ctx, data.taskPrivate.ID()).Return(nil, nil)
+	env.dutyRepo.On("FindLastByTaskDefID", ctx, data.taskPublic.ID()).Return(nil, nil)
+	env.overrideRepo.On("FindAll", ctx).Return([]*catalog.DutyTaskOverride{
+		catalog.NewDutyTaskOverride(data.taskPublic.ID(), false),
+	}, nil)
+	env.overrideRepo.On("DeleteByTaskIDs", ctx, mock.Anything).Return(nil)
+	env.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))
+	env.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
+
+	var savedDuties []*duty.Duty
+	env.dutyRepo.On("Save", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
+		savedDuties = append(savedDuties, d)
+		return true
+	})).Return(nil)
+
+	err := env.service.StartNewWeek(ctx)
+	assert.NoError(t, err)
+
+	dBoys := findDutyByTeam(savedDuties, data.teamID1)
+	assert.False(t, hasTask(dBoys, data.taskPublic.ID()))
+}
+
+func TestStartNewWeek_DoesNotClearOverridesWhenSaveFails(t *testing.T) {
+	ctx := context.Background()
+	data := createFixtures()
+
+	env := newTestEnv()
+	setupCommonExpectations(ctx, env, data)
+	env.dutyRepo.On("CountDistinctStartDates", ctx).Return(0, nil).Once()
+	env.dutyRepo.On("Save", ctx, mock.Anything).Return(errors.New("save failed")).Once()
+
+	err := env.service.StartNewWeek(ctx)
+	assert.Error(t, err)
+	env.overrideRepo.AssertNotCalled(t, "DeleteByTaskIDs", mock.Anything, mock.Anything)
 }
 
 func runWeekTest(t *testing.T, f *testFixtures, weekNum int, assertions func(dBoys, dGirls *duty.Duty)) {
@@ -139,14 +225,15 @@ func createFixtures() *testFixtures {
 
 func newTestEnv() *testEnv {
 	e := &testEnv{
-		groupRepo: new(MockGroupRepo),
-		teamRepo:  new(MockTeamRepo),
-		dutyRepo:  new(MockDutyRepo),
-		catRepo:   new(MockCatalogRepo),
-		areaRepo:  new(MockAreaRepo),
-		eventBus:  new(MockEventBus),
+		groupRepo:    new(MockGroupRepo),
+		teamRepo:     new(MockTeamRepo),
+		dutyRepo:     new(MockDutyRepo),
+		catRepo:      new(MockCatalogRepo),
+		overrideRepo: new(MockTaskOverrideRepo),
+		areaRepo:     new(MockAreaRepo),
+		eventBus:     new(MockEventBus),
 	}
-	e.service = NewCleaningService(nil, e.teamRepo, e.groupRepo, e.dutyRepo, e.catRepo, e.areaRepo, e.eventBus)
+	e.service = NewCleaningService(nil, e.teamRepo, e.groupRepo, e.dutyRepo, e.catRepo, e.overrideRepo, e.areaRepo, e.eventBus)
 	return e
 }
 
@@ -155,7 +242,9 @@ func setupCommonExpectations(ctx context.Context, e *testEnv, f *testFixtures) {
 	e.teamRepo.On("FindByGroupID", ctx, f.groups[0].ID()).Return(f.teams1, nil)
 	e.teamRepo.On("FindByGroupID", ctx, f.groups[1].ID()).Return(f.teams2, nil)
 	e.areaRepo.On("GetAllAreas", ctx).Return(f.areas, nil)
-	e.catRepo.On("GetActiveTaskDefinitions", ctx).Return(f.tasks, nil)
+	e.catRepo.On("GetAllTaskDefinitions", ctx).Return(f.tasks, nil)
+	e.overrideRepo.On("FindAll", ctx).Return([]*catalog.DutyTaskOverride{}, nil)
+	e.overrideRepo.On("DeleteByTaskIDs", ctx, mock.Anything).Return(nil)
 
 	e.dutyRepo.On("FindLastByTaskDefID", ctx, mock.Anything).Return(nil, nil)
 	e.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))

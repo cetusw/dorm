@@ -7,78 +7,205 @@
         </nav>
         <h1 class="text-3xl font-bold text-slate-900 tracking-tight">{{ .Dormitory.Name }}</h1>
     </div>
-    <button hx-get="/admin/duties/{{ .Dormitory.ID }}/create" hx-target="body" hx-swap="beforeend"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200 flex items-center gap-2 group">
-        <i data-lucide="calendar-plus" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
-        Создать новую дежурную неделю
-    </button>
-</div>
-
-<div class="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-    <label for="duties-groups-search" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">Поиск</label>
-    <div class="relative">
-        <i data-lucide="search" class="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
-        <input id="duties-groups-search" type="search" data-structure-search placeholder="Название, лидер или spreadsheet_id"
-               class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
+    <div class="flex items-center gap-2">
+        <button hx-get="/admin/duties/{{ .Dormitory.ID }}/create" hx-target="body" hx-swap="beforeend"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200 flex items-center gap-2 group">
+            <i data-lucide="calendar-plus" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
+            Новая дежурная неделя
+        </button>
+        <button type="submit" form="duty-settings-form"
+                class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:bg-blue-50 hover:text-blue-700">
+            <i data-lucide="save" class="h-5 w-5"></i>
+            Сохранить
+        </button>
     </div>
 </div>
 
-<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" data-structure-table>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-            <thead>
-            <tr class="bg-slate-50/50 border-b border-slate-200">
-                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Название</th>
-                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Лидер</th>
-                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Таблица</th>
-                <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Действия</th>
-            </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-            {{ range .Groups }}
-            <tr class="hover:bg-blue-50/30 transition-colors group cursor-pointer"
-                data-structure-row
-                data-search="{{ .Name }} {{ .LeaderName }} {{ .SpreadsheetID }}"
-                onclick="window.location='/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/duties'">
-                <td class="px-6 py-5 font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{{ .Name }}</td>
-                <td class="px-6 py-5 text-sm text-slate-700">{{ .LeaderName }}</td>
-                <td class="px-6 py-5 text-sm text-slate-700">
-                    {{ if .SpreadsheetURL }}
-                    <a href="{{ .SpreadsheetURL }}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-2 font-medium text-blue-700 hover:text-blue-800" onclick="event.stopPropagation()">
-                        <i data-lucide="external-link" class="w-4 h-4"></i>
-                        Открыть таблицу
-                    </a>
-                    {{ else }}
-                    <span class="text-slate-400">Не указана</span>
+<form id="duty-settings-form" hx-put="/admin/duties/{{ .Dormitory.ID }}/settings" hx-swap="none" class="space-y-4">
+    <details class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 transition-colors hover:bg-blue-50/40">
+            <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <i data-lucide="layers-3" class="h-5 w-5"></i>
+                </span>
+                <div>
+                    <h2 class="font-bold text-slate-900">Общие задачи</h2>
+                    <p class="text-sm text-slate-500">Задачи из общих зон</p>
+                </div>
+            </div>
+            <i data-lucide="chevron-down" class="h-5 w-5 text-slate-400"></i>
+        </summary>
+        <div class="border-t border-slate-100 p-6">
+            {{ if .CommonTasks }}
+            <div data-member-search-scope>
+                <div class="mb-4">
+                    <label class="mb-2 block text-sm font-semibold text-slate-700">Общие задачи</label>
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+                        <input type="search" data-member-search placeholder="Поиск по общим задачам"
+                               class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    {{ range .CommonTasks }}
+                    <section class="overflow-hidden rounded-xl border border-slate-200" data-member-group data-task-group>
+                        <div class="flex items-center justify-between gap-3 bg-slate-50 px-4 py-3">
+                            <label class="flex cursor-pointer items-center gap-3">
+                                <input type="checkbox" data-task-group-toggle class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm font-bold text-slate-900">{{ .Floor }} этаж. {{ .AreaName }}</span>
+                            </label>
+                            <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">Общая зона</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="border-b border-slate-100 bg-white">
+                                <tr>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Задача</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Частота</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Последнее выполнение</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-500">Следующая неделя</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                            {{ range .Tasks }}
+                            <tr class="transition-colors hover:bg-blue-50/40" data-member-row data-member-search="{{ .AreaName }} {{ .Title }}">
+                                <td class="px-4 py-3 align-top">
+                                    <div class="text-sm font-semibold text-slate-900">{{ .Title }}</div>
+                                    {{ if .HasOverride }}<div class="mt-1 text-xs font-medium text-amber-600">Изменено вручную</div>{{ end }}
+                                </td>
+                                <td class="px-4 py-3 align-top text-sm text-slate-700">{{ .Frequency }} дн.</td>
+                                <td class="px-4 py-3 align-top text-sm text-slate-700">{{ if .LastCompletedAt }}{{ .LastCompletedAt.Format "02.01.2006" }}{{ else }}Не выполнялась{{ end }}</td>
+                                <td class="px-4 py-3 text-center align-top">
+                                    <input type="checkbox" name="common_task_ids" value="{{ .ID }}" {{ if .IncludeInNextDuty }}checked{{ end }}
+                                           data-task-checkbox class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                </td>
+                            </tr>
+                            {{ end }}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                     {{ end }}
-                </td>
-                <td class="px-6 py-5 text-right">
-                    <a href="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/duties" class="inline-flex p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Дежурства" onclick="event.stopPropagation()">
-                        <i data-lucide="calendar-check" class="w-4 h-4"></i>
-                    </a>
-                </td>
-            </tr>
+                    <div class="hidden rounded-xl border border-slate-200 p-8 text-center text-sm text-slate-500" data-member-search-empty>Ничего не найдено</div>
+                </div>
+            </div>
             {{ else }}
-            <tr>
-                <td colspan="4" class="px-6 py-12 text-center text-slate-500">
-                    <div class="flex flex-col items-center">
-                        <i data-lucide="folder-tree" class="w-12 h-12 text-slate-200 mb-3"></i>
-                        <p>В этом общежитии пока нет групп</p>
-                    </div>
-                </td>
-            </tr>
+            <div class="px-6 py-12 text-center text-slate-500">
+                <div class="flex flex-col items-center">
+                    <i data-lucide="clipboard-x" class="mb-3 h-12 w-12 text-slate-200"></i>
+                    <p>Общие задачи не найдены</p>
+                </div>
+            </div>
             {{ end }}
-            <tr class="hidden" data-filter-empty>
-                <td colspan="4" class="px-6 py-12 text-center text-slate-500">
-                    <div class="flex flex-col items-center">
-                        <i data-lucide="search-x" class="w-12 h-12 text-slate-200 mb-3"></i>
-                        <p>Ничего не найдено</p>
-                    </div>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
+        </div>
+    </details>
 
-<script>lucide.createIcons();</script>
+    {{ range .GroupSettings }}
+    {{ $group := .Group }}
+    {{ $nextDutyTeam := .NextDutyTeam }}
+    <details class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 transition-colors hover:bg-blue-50/40">
+            <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                    <i data-lucide="folder-tree" class="h-5 w-5"></i>
+                </span>
+                <div>
+                    <h2 class="font-bold text-slate-900">{{ .Group.Name }}</h2>
+                    <p class="text-sm text-slate-500">{{ .Group.LeaderName }}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .Group.ID }}/duties"
+                   class="inline-flex p-2.5 text-slate-400 transition-all hover:bg-blue-50 hover:text-blue-600 rounded-lg"
+                   title="Дежурства" onclick="event.stopPropagation()">
+                    <i data-lucide="calendar-check" class="h-4 w-4"></i>
+                </a>
+                <i data-lucide="chevron-down" class="h-5 w-5 text-slate-400"></i>
+            </div>
+        </summary>
+        <div class="space-y-5 border-t border-slate-100 p-6">
+            <div class="max-w-md space-y-1">
+                <label class="text-xs font-semibold uppercase text-slate-500">Следующая дежурная команда</label>
+                <select name="next_duty_team_{{ .Group.ID }}" class="admin-select">
+                    <option value="">Следующая по порядку</option>
+                    {{ range .Teams }}
+                    <option value="{{ .Order }}" {{ if eq (printf "%d" .Order) $nextDutyTeam }}selected{{ end }}>{{ .Name }}</option>
+                    {{ end }}
+                </select>
+            </div>
+
+            {{ if .Tasks }}
+            <div data-member-search-scope>
+                <h4 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Задачи группы</h4>
+                <div class="relative">
+                    <i data-lucide="search" class="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+                    <input type="search" data-member-search placeholder="Поиск по задачам"
+                           class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
+                </div>
+                <div class="mt-4 space-y-4">
+                    {{ range .Tasks }}
+                    <section class="overflow-hidden rounded-xl border border-slate-200" data-member-group data-task-group>
+                        <div class="flex items-center justify-between gap-3 bg-slate-50 px-4 py-3">
+                            <label class="flex cursor-pointer items-center gap-3">
+                                <input type="checkbox" data-task-group-toggle class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm font-bold text-slate-900">{{ .Floor }} этаж. {{ .AreaName }}</span>
+                            </label>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="border-b border-slate-100 bg-white">
+                                <tr>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Задача</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Частота</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Последнее выполнение</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-500">Следующая неделя</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                            {{ range .Tasks }}
+                            <tr class="transition-colors hover:bg-blue-50/40" data-member-row data-member-search="{{ .AreaName }} {{ .Title }}">
+                                <td class="px-4 py-3 align-top">
+                                    <div class="text-sm font-semibold text-slate-900">{{ .Title }}</div>
+                                    {{ if .HasOverride }}<div class="mt-1 text-xs font-medium text-amber-600">Изменено вручную</div>{{ end }}
+                                </td>
+                                <td class="px-4 py-3 align-top text-sm text-slate-700">{{ .Frequency }} дн.</td>
+                                <td class="px-4 py-3 align-top text-sm text-slate-700">{{ if .LastCompletedAt }}{{ .LastCompletedAt.Format "02.01.2006" }}{{ else }}Не выполнялась{{ end }}</td>
+                                <td class="px-4 py-3 text-center align-top">
+                                    <input type="checkbox" name="group_task_ids_{{ $group.ID }}" value="{{ .ID }}" {{ if .IncludeInNextDuty }}checked{{ end }}
+                                           data-task-checkbox class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                </td>
+                            </tr>
+                            {{ end }}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    {{ end }}
+                    <div class="hidden rounded-xl border border-slate-200 p-8 text-center text-sm text-slate-500" data-member-search-empty>Ничего не найдено</div>
+                </div>
+            </div>
+            {{ else }}
+            <div class="px-6 py-12 text-center text-slate-500">
+                <div class="flex flex-col items-center">
+                    <i data-lucide="clipboard-x" class="mb-3 h-12 w-12 text-slate-200"></i>
+                    <p>Задачи не найдены</p>
+                </div>
+            </div>
+            {{ end }}
+        </div>
+    </details>
+    {{ else }}
+    <div class="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-slate-500 shadow-sm">
+        <div class="flex flex-col items-center">
+            <i data-lucide="folder-tree" class="mb-3 h-12 w-12 text-slate-200"></i>
+            <p>В этом общежитии пока нет групп</p>
+        </div>
+    </div>
+    {{ end }}
+</form>
+
+<script>
+    lucide.createIcons();
+    setupMemberSearch();
+    setupTaskGroupToggles();
+</script>

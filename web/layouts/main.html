@@ -473,6 +473,73 @@
         });
     }
 
+    function setupTaskGroupToggles(root = document) {
+        root.querySelectorAll('[data-task-group]').forEach((group) => {
+            if (group.dataset.taskGroupReady === 'true') return;
+            group.dataset.taskGroupReady = 'true';
+
+            const toggle = group.querySelector('[data-task-group-toggle]');
+            const checkboxes = Array.from(group.querySelectorAll('[data-task-checkbox]'));
+            if (!toggle || checkboxes.length === 0) return;
+
+            const syncToggle = () => {
+                const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+                toggle.checked = checkedCount === checkboxes.length;
+                toggle.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+            };
+
+            toggle.addEventListener('change', () => {
+                checkboxes.forEach((checkbox) => {
+                    checkbox.checked = toggle.checked;
+                });
+                syncToggle();
+            });
+
+            checkboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', syncToggle);
+            });
+
+            syncToggle();
+        });
+    }
+
+    function setupTaskCatalogSearch(root = document) {
+        root.querySelectorAll('[data-task-catalog]').forEach((catalog) => {
+            if (catalog.dataset.searchReady === 'true') return;
+            catalog.dataset.searchReady = 'true';
+
+            const searchInput = document.querySelector('[data-task-catalog-search]');
+            const rows = Array.from(catalog.querySelectorAll('[data-task-catalog-row]'));
+            const groups = Array.from(catalog.querySelectorAll('[data-task-group-block]'));
+            const emptyState = catalog.querySelector('[data-task-catalog-empty]');
+
+            const applySearch = () => {
+                const query = normalizeSearchValue(searchInput ? searchInput.value : '');
+                let visibleCount = 0;
+
+                rows.forEach((row) => {
+                    const isVisible = query === '' || normalizeSearchValue(row.dataset.search).includes(query);
+                    row.classList.toggle('hidden', !isVisible);
+                    if (isVisible) visibleCount++;
+                });
+
+                groups.forEach((group) => {
+                    const hasVisibleRows = Array.from(group.querySelectorAll('[data-task-catalog-row]')).some((row) => !row.classList.contains('hidden'));
+                    group.classList.toggle('hidden', !hasVisibleRows);
+                });
+
+                if (emptyState) {
+                    emptyState.classList.toggle('hidden', visibleCount !== 0 || rows.length === 0);
+                }
+            };
+
+            if (searchInput) {
+                searchInput.addEventListener('input', applySearch);
+            }
+            applySearch();
+        });
+    }
+
     document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
 
@@ -493,6 +560,13 @@
         }
     });
 
+    document.body.addEventListener('closeModal', () => {
+        const modal = document.getElementById('modal');
+        if (modal) {
+            modal.remove();
+        }
+    });
+
     document.addEventListener('submit', (event) => {
         const form = event.target.closest('[data-team-form]');
         if (!form) return;
@@ -507,10 +581,14 @@
     lucide.createIcons();
     setupUserSearch();
     setupMemberSearch();
+    setupTaskGroupToggles();
+    setupTaskCatalogSearch();
     document.body.addEventListener('htmx:afterSettle', () => {
         enhanceAdminSelects();
         setupUserSearch();
         setupMemberSearch();
+        setupTaskGroupToggles();
+        setupTaskCatalogSearch();
         lucide.createIcons();
     });
 </script>

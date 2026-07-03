@@ -19,7 +19,7 @@
     <label for="structure-search" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">Поиск</label>
     <div class="relative">
         <i data-lucide="search" class="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
-        <input id="structure-search" type="search" data-structure-search placeholder="Название, лидер или spreadsheet_id"
+        <input id="structure-search" type="search" data-structure-search placeholder="Название, лидер или ID таблицы"
                class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
     </div>
 </div>
@@ -56,9 +56,6 @@
                     <div class="flex justify-end gap-1">
                         <a href="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/teams" class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Команды">
                             <i data-lucide="shield" class="w-4 h-4"></i>
-                        </a>
-                        <a href="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/duties" class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Дежурства">
-                            <i data-lucide="calendar-check" class="w-4 h-4"></i>
                         </a>
                         <button class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Редактировать"
                                 hx-get="/admin/dormitories/{{ $.Dormitory.ID }}/groups/{{ .ID }}/edit" hx-target="body" hx-swap="beforeend">

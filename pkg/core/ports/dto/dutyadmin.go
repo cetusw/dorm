@@ -18,20 +18,36 @@ type DutyListItem struct {
 }
 
 type FutureDutyTaskItem struct {
-	ID       uuid.UUID
-	AreaID   int
-	AreaName string
-	Title    string
-	IsActive bool
-	IsCommon bool
+	ID                uuid.UUID
+	AreaID            int
+	AreaName          string
+	Title             string
+	Frequency         int
+	LastCompletedAt   *time.Time
+	IsDueByFrequency  bool
+	HasOverride       bool
+	IncludeInNextDuty bool
+	IsCommon          bool
 }
 
 type FutureDutyTaskGroup struct {
-	AreaID   int
-	AreaName string
-	Floor    int
-	IsCommon bool
-	Tasks    []FutureDutyTaskItem
+	AreaID            int
+	AreaName          string
+	Floor             int
+	IsCommon          bool
+	IncludeTasksCount int
+	Tasks             []FutureDutyTaskItem
+}
+
+type DutyGroupSettingsUpdate struct {
+	GroupID        uuid.UUID
+	NextDutyTeam   *int
+	IncludeTaskIDs []uuid.UUID
+}
+
+type UpdateDormitoryDutySettingsRequest struct {
+	CommonTaskIDs []uuid.UUID
+	Groups        []DutyGroupSettingsUpdate
 }
 
 type DutyTaskListItem struct {

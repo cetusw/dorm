@@ -15,13 +15,14 @@ import (
 )
 
 type Service struct {
-	userRepo  user.Repository
-	teamRepo  structure.TeamRepository
-	groupRepo structure.GroupRepository
-	dutyRepo  duty.Repository
-	taskRepo  catalog.TaskDefinitionRepository
-	areaRepo  catalog.AreaRepository
-	eventBus  ports.EventBus
+	userRepo     user.Repository
+	teamRepo     structure.TeamRepository
+	groupRepo    structure.GroupRepository
+	dutyRepo     duty.Repository
+	taskRepo     catalog.TaskDefinitionRepository
+	overrideRepo catalog.DutyTaskOverrideRepository
+	areaRepo     catalog.AreaRepository
+	eventBus     ports.EventBus
 }
 
 func NewCleaningService(
@@ -30,17 +31,19 @@ func NewCleaningService(
 	groupRepo structure.GroupRepository,
 	dutyRepo duty.Repository,
 	taskRepo catalog.TaskDefinitionRepository,
+	overrideRepo catalog.DutyTaskOverrideRepository,
 	areaRepo catalog.AreaRepository,
 	eventBus ports.EventBus,
 ) *Service {
 	return &Service{
-		userRepo:  userRepo,
-		teamRepo:  teamRepo,
-		groupRepo: groupRepo,
-		dutyRepo:  dutyRepo,
-		taskRepo:  taskRepo,
-		areaRepo:  areaRepo,
-		eventBus:  eventBus,
+		userRepo:     userRepo,
+		teamRepo:     teamRepo,
+		groupRepo:    groupRepo,
+		dutyRepo:     dutyRepo,
+		taskRepo:     taskRepo,
+		overrideRepo: overrideRepo,
+		areaRepo:     areaRepo,
+		eventBus:     eventBus,
 	}
 }
 
