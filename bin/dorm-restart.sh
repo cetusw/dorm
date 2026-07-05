@@ -1,5 +1,24 @@
 #!/bin/bash
+set -euo pipefail
 
-docker compose down
+COMPOSE_FILES="-f docker-compose.yml -f docker-compose.local.yml"
 
-docker compose up --build "$@"
+echo "Restarting local environment..."
+docker compose $COMPOSE_FILES down
+
+echo "Starting local database..."
+docker compose $COMPOSE_FILES up -d db
+
+echo "Waiting for database health..."
+until [ "$(docker inspect -f '{{.State.Health.Status}}' dorm-db)" = "healthy" ]; do
+  sleep 2
+done
+
+echo "Applying migrations..."
+docker compose $COMPOSE_FILES run --rm -T migrate </dev/null
+
+echo "Starting local application and tools..."
+docker compose $COMPOSE_FILES up -d --build app adminer
+
+echo "Local environment restarted."
+docker compose $COMPOSE_FILES ps

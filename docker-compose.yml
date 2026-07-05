@@ -1,11 +1,7 @@
 services:
   app:
     image: dorm-app:latest
-    build: .
-    container_name: dorm
-    ports:
-      - "8080:8080"
-    restart: no
+    container_name: dorm-app
     env_file:
       - .env
     depends_on:
@@ -14,46 +10,32 @@ services:
 
   migrate:
     image: dorm-app:latest
-    build: .
-    profiles:
-      - tools
+    container_name: dorm-migrate
     env_file:
       - .env
     depends_on:
       db:
         condition: service_healthy
-    command: ["./dorm-migrate", "up"]
+    command: [ "./dorm-migrate", "up" ]
 
   db:
-    build: ./mysql
+    build:
+      context: ./mysql
     container_name: dorm-db
-    ports:
-      - "3307:3306"
-    restart: always
+    env_file:
+      - .env
     environment:
-      - LANG=C.UTF-8
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${DB_NAME}
-      - MYSQL_USER=${DB_USER}
-      - MYSQL_PASSWORD=${DB_PASSWORD}
-      - TZ=${TZ}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     volumes:
-      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
-      - dorm-db:/var/lib/mysql
+      - dorm-db-data:/var/lib/mysql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "$$MYSQL_USER", "-p$$MYSQL_PASSWORD" ]
       interval: 5s
-      timeout: 10s
-      retries: 10
-
-  adminer:
-    image: adminer
-    restart: always
-    ports:
-      - "8081:8080"
-    depends_on:
-      - db
-
+      timeout: 5s
+      retries: 20
 
 volumes:
-  dorm-db:
+  dorm-db-data:

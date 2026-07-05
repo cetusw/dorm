@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "8080:8080"
+
+  migrate:
+    build:
+      context: .
+
+  db:
+    ports:
+      - "3307:3306"
+
+  adminer:
+    image: adminer
+    container_name: dorm-adminer
+    depends_on:
+      - db
+    ports:
+      - "8081:8080"
