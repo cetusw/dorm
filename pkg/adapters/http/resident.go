@@ -24,6 +24,7 @@ func (h *ResidentAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) 
 	api.Post("/tasks/:taskId/take", h.HandleTakeTask)
 	api.Post("/tasks/:taskId/return", h.HandleReturnTask)
 	api.Post("/tasks/:taskId/complete", h.HandleCompleteTask)
+	api.Post("/tasks/:taskId/open", h.HandleOpenTask)
 }
 
 func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
@@ -53,7 +54,7 @@ func (h *ResidentAPIHandler) HandleTakeTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	return c.SendStatus(fiber.StatusNoContent)
+	return h.respondWithCurrentDuty(c, userID)
 }
 
 func (h *ResidentAPIHandler) HandleReturnTask(c *fiber.Ctx) error {
@@ -66,7 +67,7 @@ func (h *ResidentAPIHandler) HandleReturnTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	return c.SendStatus(fiber.StatusNoContent)
+	return h.respondWithCurrentDuty(c, userID)
 }
 
 func (h *ResidentAPIHandler) HandleCompleteTask(c *fiber.Ctx) error {
@@ -79,7 +80,20 @@ func (h *ResidentAPIHandler) HandleCompleteTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	return c.SendStatus(fiber.StatusNoContent)
+	return h.respondWithCurrentDuty(c, userID)
+}
+
+func (h *ResidentAPIHandler) HandleOpenTask(c *fiber.Ctx) error {
+	userID, taskID, err := parseResidentTaskAction(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	if err := h.residentDutyUC.OpenTask(c.Context(), userID, taskID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	return h.respondWithCurrentDuty(c, userID)
 }
 
 func parseResidentTaskAction(c *fiber.Ctx) (uuid.UUID, uuid.UUID, error) {
@@ -100,4 +114,16 @@ func errorResponse(message string) fiber.Map {
 	return fiber.Map{
 		"error": message,
 	}
+}
+
+func (h *ResidentAPIHandler) respondWithCurrentDuty(c *fiber.Ctx, userID uuid.UUID) error {
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+	if currentDuty == nil {
+		return c.Status(fiber.StatusNotFound).JSON(errorResponse("current duty not found"))
+	}
+
+	return c.JSON(currentDuty)
 }

@@ -83,6 +83,23 @@ func TestDuty_UnassignTask(t *testing.T) {
 	assert.Nil(t, tasks[0].CompletionDate())
 }
 
+func TestDuty_OpenTask(t *testing.T) {
+	d := NewDuty(uuid.New(), time.Now(), time.Now())
+	taskID := uuid.New()
+	userID := uuid.New()
+
+	d.AddTask(taskID, uuid.New())
+	_ = d.AssignTask(taskID, userID)
+	_ = d.CompleteTask(taskID)
+
+	err := d.OpenTask(taskID)
+	assert.NoError(t, err)
+
+	tasks := d.Tasks()
+	assert.Equal(t, &userID, tasks[0].AssigneeID())
+	assert.Nil(t, tasks[0].CompletionDate())
+}
+
 func TestRestoreDuty(t *testing.T) {
 	id := uuid.New()
 	teamID := uuid.New()

@@ -68,7 +68,7 @@ func (h *AdminHandler) RegisterRoutes(app *fiber.App) {
 	admin.Delete("/dormitories/:dormId", h.HandleDeleteDormitory)
 
 	admin.Get("/dormitories/:dormId/groups", h.HandleGetGroups)
-	admin.Get("/dormitories/:dormId/groups/create", h.HandleCreateGroupModal)
+	admin.Get("/dormitories/:dormIresidentDutyUCd/groups/create", h.HandleCreateGroupModal)
 	admin.Post("/dormitories/:dormId/groups", h.HandleStoreGroup)
 	admin.Get("/dormitories/:dormId/groups/:groupId/edit", h.HandleEditGroupModal)
 	admin.Put("/dormitories/:dormId/groups/:groupId", h.HandleUpdateGroup)

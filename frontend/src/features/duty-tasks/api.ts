@@ -25,20 +25,26 @@ export async function getCurrentDuty(): Promise<ResidentCurrentDuty> {
     return response.json()
 }
 
-export async function takeTask(taskId: string): Promise<void> {
-    await request(`/api/v1/resident/tasks/${taskId}/take`, {
+async function requestDutyAction(taskId: string, action: string): Promise<ResidentCurrentDuty> {
+    const response = await request(`/api/v1/resident/tasks/${taskId}/${action}`, {
         method: 'POST',
     })
+
+    return response.json()
 }
 
-export async function returnTask(taskId: string): Promise<void> {
-    await request(`/api/v1/resident/tasks/${taskId}/return`, {
-        method: 'POST',
-    })
+export async function takeTask(taskId: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'take')
 }
 
-export async function completeTask(taskId: string): Promise<void> {
-    await request(`/api/v1/resident/tasks/${taskId}/complete`, {
-        method: 'POST',
-    })
+export async function returnTask(taskId: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'return')
+}
+
+export async function completeTask(taskId: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'complete')
+}
+
+export async function openTask(taskId: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'open')
 }

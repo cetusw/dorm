@@ -127,6 +127,10 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		Views: engine,
 	})
 
+	app.Get("/app", func(c *fiber.Ctx) error {
+		return c.Redirect("/app/tasks", fiber.StatusTemporaryRedirect)
+	})
+
 	app.Static("/app", "./web/app")
 
 	app.Get("/app/*", func(c *fiber.Ctx) error {

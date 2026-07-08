@@ -16,6 +16,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type currentDutyContext struct {
+	resident *user.User
+	team     *structure.Team
+	group    *structure.Group
+	duty     *dutydomain.Duty
+}
+
+type currentDutyLookups struct {
+	taskDefinitions map[uuid.UUID]*catalog.TaskDefinition
+	areas           map[int]*catalog.Area
+	userNames       map[uuid.UUID]string
+}
+
 type Service struct {
 	userRepo   user.Repository
 	teamRepo   structure.TeamRepository
@@ -52,6 +65,49 @@ func (s *Service) GetCurrentDuty(
 	ctx context.Context,
 	userID uuid.UUID,
 ) (*dto.ResidentCurrentDutyResponse, error) {
+	currentDuty, err := s.loadCurrentDutyContext(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if currentDuty.duty == nil {
+		return nil, nil
+	}
+
+	lookups, err := s.loadCurrentDutyLookups(ctx, currentDuty.team.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := buildResidentDutyTasks(currentDuty.duty.Tasks(), userID, lookups)
+	sortResidentDutyTasks(tasks)
+
+	return buildResidentCurrentDutyResponse(
+		currentDuty,
+		tasks,
+		len(lookups.userNames),
+	), nil
+}
+
+func (s *Service) TakeTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+	return s.cleaningUC.AssignTask(ctx, taskID, userID)
+}
+
+func (s *Service) ReturnTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+	return s.cleaningUC.UnassignTask(ctx, taskID, userID)
+}
+
+func (s *Service) CompleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+	return s.cleaningUC.CompleteTask(ctx, taskID, userID)
+}
+
+func (s *Service) OpenTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+	return s.cleaningUC.OpenTask(ctx, taskID, userID)
+}
+
+func (s *Service) loadCurrentDutyContext(
+	ctx context.Context,
+	userID uuid.UUID,
+) (*currentDutyContext, error) {
 	resident, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("load resident: %w", err)
@@ -79,14 +135,23 @@ func (s *Service) GetCurrentDuty(
 		return nil, fmt.Errorf("group not found")
 	}
 
-	currentDuty, err := s.dutyRepo.FindActiveByTeamID(ctx, team.ID(), s.now())
+	duty, err := s.dutyRepo.FindActiveByTeamID(ctx, team.ID(), s.now())
 	if err != nil {
 		return nil, fmt.Errorf("load active duty: %w", err)
 	}
-	if currentDuty == nil {
-		return nil, nil
-	}
 
+	return &currentDutyContext{
+		resident: resident,
+		team:     team,
+		group:    group,
+		duty:     duty,
+	}, nil
+}
+
+func (s *Service) loadCurrentDutyLookups(
+	ctx context.Context,
+	teamID uuid.UUID,
+) (*currentDutyLookups, error) {
 	taskDefinitions, err := s.taskDefinitionsByID(ctx)
 	if err != nil {
 		return nil, err
@@ -97,78 +162,121 @@ func (s *Service) GetCurrentDuty(
 		return nil, err
 	}
 
-	users, err := s.userNamesByID(ctx, team.ID())
+	userNames, err := s.userNamesByID(ctx, teamID)
 	if err != nil {
 		return nil, err
 	}
 
-	tasks := make([]dto.ResidentDutyTask, 0, len(currentDuty.Tasks()))
-
-	for _, dutyTask := range currentDuty.Tasks() {
-		taskDefinition, ok := taskDefinitions[dutyTask.TaskDefID()]
-		if !ok {
-			continue
-		}
-
-		area, ok := areas[taskDefinition.AreaID()]
-		if !ok {
-			continue
-		}
-
-		status := resolveTaskStatus(dutyTask)
-		isMine := dutyTask.AssigneeID() != nil && *dutyTask.AssigneeID() == userID
-		canTake, canReturn, canComplete := buildTaskPermissions(status, isMine)
-
-		var assigneeID *string
-		var assigneeName *string
-
-		if dutyTask.AssigneeID() != nil {
-			rawAssigneeID := dutyTask.AssigneeID().String()
-			assigneeID = &rawAssigneeID
-
-			if name, ok := users[*dutyTask.AssigneeID()]; ok {
-				assigneeName = &name
-			}
-		}
-
-		tasks = append(tasks, dto.ResidentDutyTask{
-			ID:           dutyTask.ID().String(),
-			AreaName:     area.Name(),
-			AreaFloor:    area.Floor(),
-			Title:        taskDefinition.Title(),
-			Cost:         taskDefinition.Cost(),
-			Status:       status,
-			AssigneeID:   assigneeID,
-			AssigneeName: assigneeName,
-			IsMine:       isMine,
-			CanTake:      canTake,
-			CanReturn:    canReturn,
-			CanComplete:  canComplete,
-		})
-	}
-
-	sortResidentDutyTasks(tasks)
-
-	return &dto.ResidentCurrentDutyResponse{
-		DutyID:    currentDuty.ID().String(),
-		Group:     group.Name(),
-		Team:      team.Name(),
-		StartDate: currentDuty.Start().Format("2006-01-02"),
-		EndDate:   currentDuty.End().Format("2006-01-02"),
-		Tasks:     tasks,
+	return &currentDutyLookups{
+		taskDefinitions: taskDefinitions,
+		areas:           areas,
+		userNames:       userNames,
 	}, nil
 }
 
-func (s *Service) TakeTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
-	return s.cleaningUC.AssignTask(ctx, taskID, userID)
+func buildResidentDutyTasks(
+	dutyTasks []*dutydomain.DutyTask,
+	userID uuid.UUID,
+	lookups *currentDutyLookups,
+) []dto.ResidentDutyTask {
+	tasks := make([]dto.ResidentDutyTask, 0, len(dutyTasks))
+
+	for _, dutyTask := range dutyTasks {
+		taskDefinition, area, ok := resolveResidentDutyTaskDetails(dutyTask, lookups)
+		if !ok {
+			continue
+		}
+
+		tasks = append(tasks, buildResidentDutyTask(
+			dutyTask,
+			taskDefinition,
+			area,
+			userID,
+			lookups.userNames,
+		))
+	}
+
+	return tasks
 }
 
-func (s *Service) ReturnTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
-	return s.cleaningUC.UnassignTask(ctx, taskID, userID)
+func resolveResidentDutyTaskDetails(
+	dutyTask *dutydomain.DutyTask,
+	lookups *currentDutyLookups,
+) (*catalog.TaskDefinition, *catalog.Area, bool) {
+	taskDefinition, ok := lookups.taskDefinitions[dutyTask.TaskDefID()]
+	if !ok {
+		return nil, nil, false
+	}
+
+	area, ok := lookups.areas[taskDefinition.AreaID()]
+	if !ok {
+		return nil, nil, false
+	}
+
+	return taskDefinition, area, true
 }
 
-func (s *Service) CompleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
-	return s.cleaningUC.CompleteTask(ctx, taskID, userID)
+func buildResidentDutyTask(
+	dutyTask *dutydomain.DutyTask,
+	taskDefinition *catalog.TaskDefinition,
+	area *catalog.Area,
+	userID uuid.UUID,
+	userNames map[uuid.UUID]string,
+) dto.ResidentDutyTask {
+	status := resolveTaskStatus(dutyTask)
+	isMine := dutyTask.AssigneeID() != nil && *dutyTask.AssigneeID() == userID
+	canTake, canReturn, canComplete, canOpen := buildTaskPermissions(status, isMine)
+	assigneeID, assigneeName := resolveAssignee(dutyTask, userNames)
+
+	return dto.ResidentDutyTask{
+		ID:           dutyTask.ID().String(),
+		AreaName:     area.Name(),
+		AreaFloor:    area.Floor(),
+		Title:        taskDefinition.Title(),
+		Cost:         taskDefinition.Cost(),
+		Status:       status,
+		AssigneeID:   assigneeID,
+		AssigneeName: assigneeName,
+		IsMine:       isMine,
+		CanTake:      canTake,
+		CanReturn:    canReturn,
+		CanComplete:  canComplete,
+		CanOpen:      canOpen,
+	}
+}
+
+func resolveAssignee(
+	dutyTask *dutydomain.DutyTask,
+	userNames map[uuid.UUID]string,
+) (*string, *string) {
+	if dutyTask.AssigneeID() == nil {
+		return nil, nil
+	}
+
+	rawAssigneeID := dutyTask.AssigneeID().String()
+	assigneeName, ok := userNames[*dutyTask.AssigneeID()]
+	if !ok {
+		return &rawAssigneeID, nil
+	}
+
+	return &rawAssigneeID, &assigneeName
+}
+
+func buildResidentCurrentDutyResponse(
+	currentDuty *currentDutyContext,
+	tasks []dto.ResidentDutyTask,
+	residentCount int,
+) *dto.ResidentCurrentDutyResponse {
+	return &dto.ResidentCurrentDutyResponse{
+		DutyID:              currentDuty.duty.ID().String(),
+		Group:               currentDuty.group.Name(),
+		Team:                currentDuty.team.Name(),
+		StartDate:           currentDuty.duty.Start().Format("2006-01-02"),
+		EndDate:             currentDuty.duty.End().Format("2006-01-02"),
+		CostPerResidentGoal: calculateCostPerResidentGoal(tasks, residentCount),
+		MyTakenCostSum:      countMyTakenCost(tasks),
+		Tasks:               tasks,
+	}
 }
 
 func (s *Service) taskDefinitionsByID(
@@ -231,18 +339,50 @@ func resolveTaskStatus(task *dutydomain.DutyTask) string {
 	return dto.ResidentDutyTaskStatusFree
 }
 
-func buildTaskPermissions(status string, isMine bool) (canTake bool, canReturn bool, canComplete bool) {
+func buildTaskPermissions(
+	status string,
+	isMine bool,
+) (canTake bool, canReturn bool, canComplete bool, canOpen bool) {
 	switch status {
 	case dto.ResidentDutyTaskStatusFree:
-		return true, false, false
+		return true, false, false, false
 	case dto.ResidentDutyTaskStatusAssigned:
 		if isMine {
-			return false, true, true
+			return false, true, true, false
 		}
-		return false, false, false
+		return false, false, false, false
+	case dto.ResidentDutyTaskStatusCompleted:
+		if isMine {
+			return false, false, false, true
+		}
+		return false, false, false, false
 	default:
-		return false, false, false
+		return false, false, false, false
 	}
+}
+
+func countMyTakenCost(tasks []dto.ResidentDutyTask) int {
+	total := 0
+	for _, task := range tasks {
+		if task.IsMine {
+			total += task.Cost
+		}
+	}
+
+	return total
+}
+
+func calculateCostPerResidentGoal(tasks []dto.ResidentDutyTask, residentCount int) int {
+	if len(tasks) == 0 || residentCount == 0 {
+		return 0
+	}
+
+	totalCost := 0
+	for _, task := range tasks {
+		totalCost += task.Cost
+	}
+
+	return (totalCost + residentCount - 1) / residentCount
 }
 
 func sortResidentDutyTasks(tasks []dto.ResidentDutyTask) {

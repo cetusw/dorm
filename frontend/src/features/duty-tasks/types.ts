@@ -13,6 +13,7 @@ export type ResidentDutyTask = {
     can_take: boolean
     can_return: boolean
     can_complete: boolean
+    can_open: boolean
 }
 
 export type ResidentCurrentDuty = {
@@ -21,5 +22,7 @@ export type ResidentCurrentDuty = {
     team: string
     start_date: string
     end_date: string
+    cost_per_resident_goal: number
+    my_taken_cost_sum: number
     tasks: ResidentDutyTask[]
 }

@@ -8,12 +8,14 @@ const (
 )
 
 type ResidentCurrentDutyResponse struct {
-	DutyID    string             `json:"duty_id"`
-	Group     string             `json:"group"`
-	Team      string             `json:"team"`
-	StartDate string             `json:"start_date"`
-	EndDate   string             `json:"end_date"`
-	Tasks     []ResidentDutyTask `json:"tasks"`
+	DutyID              string             `json:"duty_id"`
+	Group               string             `json:"group"`
+	Team                string             `json:"team"`
+	StartDate           string             `json:"start_date"`
+	EndDate             string             `json:"end_date"`
+	CostPerResidentGoal int                `json:"cost_per_resident_goal"`
+	MyTakenCostSum      int                `json:"my_taken_cost_sum"`
+	Tasks               []ResidentDutyTask `json:"tasks"`
 }
 
 type ResidentDutyTask struct {
@@ -30,4 +32,5 @@ type ResidentDutyTask struct {
 	CanTake     bool `json:"can_take"`
 	CanReturn   bool `json:"can_return"`
 	CanComplete bool `json:"can_complete"`
+	CanOpen     bool `json:"can_open"`
 }

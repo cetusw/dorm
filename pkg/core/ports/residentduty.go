@@ -13,4 +13,5 @@ type ResidentDutyUseCase interface {
 	TakeTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
 	ReturnTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
 	CompleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
+	OpenTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
 }
