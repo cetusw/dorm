@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { completeTask, getCurrentDuty, openTask, returnTask, takeTask } from './api'
+import { ApiError, completeTask, getCurrentDuty, openTask, returnTask, takeTask } from './api'
 import type { ResidentCurrentDuty } from './types'
 import {
     preserveTaskOrder,
@@ -25,12 +25,17 @@ export function useCurrentDuty() {
     async function reload() {
         setLoading(true)
         setError(null)
+        setDuty(null)
 
         try {
             const loadedDuty = applyInitialTaskOrdering(await getCurrentDuty())
             orderedTaskIdsRef.current = loadedDuty.tasks.map((task) => task.id)
             setDuty(loadedDuty)
         } catch (currentError) {
+            if (currentError instanceof ApiError && currentError.status === 404) {
+                return
+            }
+
             setError(toErrorMessage(currentError))
         } finally {
             setLoading(false)

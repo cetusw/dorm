@@ -24,7 +24,11 @@ export function TaskGroups({
     const groups = groupTasksByArea(tasks)
 
     if (groups.length === 0) {
-        return <Alert color="gray">На текущее дежурство нет задач.</Alert>
+        return (
+            <Alert color="gray">
+                На текущее дежурство не заведены задачи, сообщите об этом главе вашей команды
+            </Alert>
+        )
     }
 
     return (

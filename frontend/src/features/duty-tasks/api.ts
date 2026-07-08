@@ -2,6 +2,16 @@ import type { ResidentCurrentDuty } from './types'
 
 const DEV_USER_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
 
+export class ApiError extends Error {
+    status: number
+
+    constructor(message: string, status: number) {
+        super(message)
+        this.name = 'ApiError'
+        this.status = status
+    }
+}
+
 async function request(path: string, options: RequestInit = {}) {
     const response = await fetch(path, {
         ...options,
@@ -14,7 +24,7 @@ async function request(path: string, options: RequestInit = {}) {
     if (!response.ok) {
         const body = await response.json().catch(() => null)
         const message = body?.error ?? 'Ошибка запроса'
-        throw new Error(message)
+        throw new ApiError(message, response.status)
     }
 
     return response

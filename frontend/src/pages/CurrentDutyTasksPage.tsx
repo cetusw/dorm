@@ -38,7 +38,7 @@ export function CurrentDutyTasksPage() {
     if (!duty) {
         return (
             <Box px={{ base: 'md', md: 'xl' }} py="xl">
-                <Alert color="gray">Текущее дежурство не найдено.</Alert>
+                <Alert color="gray">Ваша команда не дежурит на этой неделе</Alert>
             </Box>
         )
     }
