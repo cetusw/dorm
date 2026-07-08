@@ -1,6 +1,5 @@
 import { Divider, Paper, ScrollArea, Table, Text, Tooltip } from '@mantine/core'
 
-import { TaskStatusBadge } from './TaskStatusBadge'
 import { TaskRowActions } from './TaskRowActions'
 import type { ResidentDutyTask } from './types'
 import type { TaskAreaGroup } from './utils'
@@ -68,13 +67,6 @@ export function TaskGroupSection({
                                 <Table.Td w="34%">
                                     <Tooltip label="Задача">
                                         <Text fw={600}>{task.title}</Text>
-                                    </Tooltip>
-                                </Table.Td>
-                                <Table.Td w="16%">
-                                    <Tooltip label="Статус">
-                                        <span>
-                                            <TaskStatusBadge status={task.status} />
-                                        </span>
                                     </Tooltip>
                                 </Table.Td>
                                 <Table.Td w="12%">
