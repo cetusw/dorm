@@ -5,6 +5,7 @@ import (
 	"dorm/pkg/adapters/http"
 	"dorm/pkg/core/usecase/dormitory"
 	dutyuc "dorm/pkg/core/usecase/duty"
+	residentusecase "dorm/pkg/core/usecase/resident"
 	"dorm/pkg/core/usecase/team"
 	"dorm/pkg/infrastructure/mysql/query"
 	"fmt"
@@ -142,6 +143,19 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		sheetsAdapter,
 	)
 	adminHandler.RegisterRoutes(app)
+
+	residentDutyService := residentusecase.NewResidentDutyService(
+		userRepo,
+		teamRepo,
+		groupRepo,
+		dutyRepo,
+		taskRepo,
+		areaRepo,
+		cleaningService,
+	)
+
+	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService)
+	residentAPIHandler.RegisterRoutes(app, http.DevCurrentUserMiddleware())
 
 	return &Container{
 		Config:          cfg,

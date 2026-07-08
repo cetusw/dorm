@@ -114,6 +114,56 @@ func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UU
 	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
 }
 
+func (r *DutyRepository) FindActiveByTeamID(
+	ctx context.Context,
+	teamID uuid.UUID,
+	at time.Time,
+) (*duty.Duty, error) {
+	const query = `
+		SELECT id, team_id, start_date, end_date
+		FROM duty
+		WHERE team_id = ?
+		  AND start_date <= ?
+		  AND end_date > ?
+		ORDER BY start_date DESC
+		LIMIT 1
+	`
+
+	teamIDBytes, err := teamID.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("find active duty: marshal team id: %w", err)
+	}
+
+	row := r.db.QueryRowContext(ctx, query, teamIDBytes, at, at)
+
+	var dutyIDBytes, teamIDResultBytes []byte
+	var startDate, endDate time.Time
+
+	if err := row.Scan(&dutyIDBytes, &teamIDResultBytes, &startDate, &endDate); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find active duty: %w", err)
+	}
+
+	dutyID, err := uuid.FromBytes(dutyIDBytes)
+	if err != nil {
+		return nil, fmt.Errorf("find active duty: parse duty id: %w", err)
+	}
+
+	teamIDResult, err := uuid.FromBytes(teamIDResultBytes)
+	if err != nil {
+		return nil, fmt.Errorf("find active duty: parse team id: %w", err)
+	}
+
+	tasks, err := r.findTasksByDutyID(ctx, dutyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return duty.RestoreDuty(dutyID, teamIDResult, startDate, endDate, tasks), nil
+}
+
 func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
 	const dutyQuery = `
 		SELECT id, team_id, start_date, end_date

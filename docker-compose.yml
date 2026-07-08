@@ -29,6 +29,8 @@ services:
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     volumes:
       - dorm-db-data:/var/lib/mysql
     healthcheck:
