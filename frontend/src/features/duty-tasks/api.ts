@@ -1,6 +1,22 @@
 import type { ResidentCurrentDuty } from './types'
 
-const DEV_USER_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+const DEV_USER_ID = '0x2E614C967FB9461AA03FA54E0DBA1641'
+
+function hexToUuid(hex: string): string {
+    const value = hex.replace(/^0x/i, '').toLowerCase();
+
+    if (!/^[0-9a-f]{32}$/.test(value)) {
+        throw new Error('Invalid UUID hex string');
+    }
+
+    return [
+        value.slice(0, 8),
+        value.slice(8, 12),
+        value.slice(12, 16),
+        value.slice(16, 20),
+        value.slice(20),
+    ].join('-');
+}
 
 export class ApiError extends Error {
     status: number
