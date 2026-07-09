@@ -9,7 +9,7 @@ import (
 )
 
 type ResidentDutyUseCase interface {
-	GetCurrentDuty(ctx context.Context, userID uuid.UUID) (*dto.ResidentCurrentDutyResponse, error)
+	GetCurrentDuty(ctx context.Context, userID uuid.UUID, groupID *uuid.UUID) (*dto.ResidentCurrentDutyResponse, error)
 	TakeTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
 	ReturnTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
 	CompleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error

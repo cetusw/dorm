@@ -34,12 +34,14 @@ func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse(err.Error()))
 	}
 
-	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID)
+	groupID, err := optionalGroupID(c)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
-	if currentDuty == nil {
-		return c.Status(fiber.StatusNotFound).JSON(errorResponse("current duty not found"))
+
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
 	return c.JSON(currentDuty)
@@ -131,13 +133,29 @@ func errorResponse(message string) fiber.Map {
 }
 
 func (h *ResidentAPIHandler) respondWithCurrentDuty(c *fiber.Ctx, userID uuid.UUID) error {
-	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID)
+	groupID, err := optionalGroupID(c)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
-	if currentDuty == nil {
-		return c.Status(fiber.StatusNotFound).JSON(errorResponse("current duty not found"))
+
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
 	return c.JSON(currentDuty)
+}
+
+func optionalGroupID(c *fiber.Ctx) (*uuid.UUID, error) {
+	rawGroupID := c.Query("group_id")
+	if rawGroupID == "" {
+		return nil, nil
+	}
+
+	groupID, err := uuid.Parse(rawGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &groupID, nil
 }

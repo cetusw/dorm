@@ -30,10 +30,12 @@ function readStoredTab(): DutyTaskTab {
 
 export function CurrentDutyTasksPage() {
     const {
+        selectedGroupId,
         duty,
         error,
         loading,
         pendingTaskId,
+        selectGroup,
         handleTake,
         handleReturn,
         handleComplete,
@@ -59,7 +61,15 @@ export function CurrentDutyTasksPage() {
                 .filter((task) => task.status === 'completed')
                 .map((task) => task.id),
         )
-    }, [activeTab])
+    }, [activeTab, duty])
+
+    useEffect(() => {
+        if (!duty || duty.can_manage_tasks || activeTab !== 'mine') {
+            return
+        }
+
+        setActiveTab('all')
+    }, [activeTab, duty])
 
     if (loading) {
         return (
@@ -82,7 +92,37 @@ export function CurrentDutyTasksPage() {
     if (!duty) {
         return (
             <Box px={{ base: 'md', md: 'xl' }} py="xl">
-                <Alert color="gray">Ваша команда не дежурит на этой неделе</Alert>
+                <Alert color="gray">Не удалось загрузить текущее дежурство</Alert>
+            </Box>
+        )
+    }
+
+    const isReadOnly = !duty.can_manage_tasks
+
+    if (!duty.has_active_duty) {
+        return (
+            <Box px={{ base: 'md', md: 'xl' }} py="xl">
+                <Stack gap="lg" maw={1240} mx="auto">
+                    {error && (
+                        <Alert color="red" title="Ошибка">
+                            {error}
+                        </Alert>
+                    )}
+
+                    <Title order={1}>Текущее дежурство</Title>
+
+                    <DutyTaskTabs
+                        activeTab={activeTab}
+                        groups={duty.groups}
+                        selectedGroupId={selectedGroupId ?? duty.selected_group_id}
+                        onGroupChange={selectGroup}
+                        onChange={setActiveTab}
+                    />
+
+                    <Alert color="gray">
+                        В выбранной группе сейчас нет активного дежурства.
+                    </Alert>
+                </Stack>
             </Box>
         )
     }
@@ -91,12 +131,26 @@ export function CurrentDutyTasksPage() {
         return (
             <Box px={{ base: 'md', md: 'xl' }} py="xl">
                 <Stack gap="lg" maw={1240} mx="auto">
+                    {error && (
+                        <Alert color="red" title="Ошибка">
+                            {error}
+                        </Alert>
+                    )}
+
                     <Title order={1}>
                         Текущее дежурство · {formatDutyPeriod(duty.start_date, duty.end_date)}
                     </Title>
+
+                    <DutyTaskTabs
+                        activeTab={activeTab}
+                        groups={duty.groups}
+                        selectedGroupId={selectedGroupId ?? duty.selected_group_id}
+                        onGroupChange={selectGroup}
+                        onChange={setActiveTab}
+                    />
+
                     <Alert color="gray">
-                        На текущее дежурство не заведены задачи, сообщите об этом главе вашей
-                        команды
+                        На текущее дежурство не заведены задачи.
                     </Alert>
                 </Stack>
             </Box>
@@ -138,31 +192,40 @@ export function CurrentDutyTasksPage() {
                     Текущее дежурство · {formatDutyPeriod(duty.start_date, duty.end_date)}
                 </Title>
 
-                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-                    <DutyAnalyticsCard
-                        label="Взято задач"
-                        currentValue={takenCostSum}
-                        targetValue={duty.cost_per_resident_goal}
-                        unitLabel="баллов"
-                        progressColor="blue"
-                    />
-                    <DutyAnalyticsCard
-                        label="Выполнено"
-                        currentValue={completedTasksCount}
-                        targetValue={takenTasksCount}
-                        unitLabel="задач"
-                        progressColor="green"
-                    />
-                </SimpleGrid>
+                {!isReadOnly && (
+                    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+                        <DutyAnalyticsCard
+                            label="Взято задач"
+                            currentValue={takenCostSum}
+                            targetValue={duty.cost_per_resident_goal}
+                            unitLabel="баллов"
+                            progressColor="blue"
+                        />
+                        <DutyAnalyticsCard
+                            label="Выполнено"
+                            currentValue={completedTasksCount}
+                            targetValue={takenTasksCount}
+                            unitLabel="задач"
+                            progressColor="green"
+                        />
+                    </SimpleGrid>
+                )}
 
-                <DutyTaskTabs activeTab={activeTab} onChange={setActiveTab} />
+                <DutyTaskTabs
+                    activeTab={activeTab}
+                    groups={duty.groups}
+                    selectedGroupId={selectedGroupId ?? duty.selected_group_id}
+                    onGroupChange={selectGroup}
+                    onChange={setActiveTab}
+                />
 
                 <TaskGroups
+                    isReadOnly={isReadOnly}
                     actionMode={activeTab === 'review' ? 'review' : 'default'}
                     pendingTaskId={pendingTaskId}
                     tasks={tasksByTab[activeTab]}
                     emptyMessage={activeTab === 'review' ? 'Нет задач на проверке' : 'В этом разделе нет задач.'}
-                    showAssigneeColumn={activeTab === 'all' || activeTab === 'review'}
+                    showAssigneeColumn={isReadOnly || activeTab === 'all' || activeTab === 'review'}
                     onTake={handleTake}
                     onReturn={handleReturn}
                     onComplete={handleComplete}

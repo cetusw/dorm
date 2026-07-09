@@ -25,6 +25,7 @@ function appendUniqueTaskId(taskIds: string[], taskId: string): string[] {
 
 export function useCurrentDuty() {
     const [duty, setDuty] = useState<ResidentCurrentDuty | null>(null)
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
@@ -32,21 +33,26 @@ export function useCurrentDuty() {
     const initialMineTaskIdsRef = useRef<string[]>([])
     const initialFreeTaskIdsRef = useRef<string[]>([])
 
-    async function reload() {
+    function applyLoadedDuty(loadedDuty: ResidentCurrentDuty) {
+        orderedTaskIdsRef.current = loadedDuty.tasks.map((task) => task.id)
+        initialMineTaskIdsRef.current = loadedDuty.tasks
+            .filter((task) => task.is_mine)
+            .map((task) => task.id)
+        initialFreeTaskIdsRef.current = loadedDuty.tasks
+            .filter((task) => !task.assignee_id)
+            .map((task) => task.id)
+        setSelectedGroupId(loadedDuty.selected_group_id)
+        setDuty(loadedDuty)
+    }
+
+    async function reload(groupId?: string) {
         setLoading(true)
         setError(null)
         setDuty(null)
 
         try {
-            const loadedDuty = applyInitialTaskOrdering(await getCurrentDuty())
-            orderedTaskIdsRef.current = loadedDuty.tasks.map((task) => task.id)
-            initialMineTaskIdsRef.current = loadedDuty.tasks
-                .filter((task) => task.is_mine)
-                .map((task) => task.id)
-            initialFreeTaskIdsRef.current = loadedDuty.tasks
-                .filter((task) => !task.assignee_id)
-                .map((task) => task.id)
-            setDuty(loadedDuty)
+            const loadedDuty = applyInitialTaskOrdering(await getCurrentDuty(groupId))
+            applyLoadedDuty(loadedDuty)
         } catch (currentError) {
             if (currentError instanceof ApiError && currentError.status === 404) {
                 return
@@ -60,14 +66,14 @@ export function useCurrentDuty() {
 
     async function runTaskAction(
         taskId: string,
-        action: (currentTaskId: string) => Promise<ResidentCurrentDuty>,
+        action: (currentTaskId: string, groupId?: string) => Promise<ResidentCurrentDuty>,
     ): Promise<boolean> {
         setPendingTaskId(taskId)
         setError(null)
 
         try {
-            const updatedDuty = await action(taskId)
-            setDuty({
+            const updatedDuty = await action(taskId, selectedGroupId ?? undefined)
+            applyLoadedDuty({
                 ...updatedDuty,
                 tasks: preserveTaskOrder(updatedDuty.tasks, orderedTaskIdsRef.current),
             })
@@ -103,10 +109,12 @@ export function useCurrentDuty() {
     }, [])
 
     return {
+        selectedGroupId,
         duty,
         error,
         loading,
         pendingTaskId,
+        selectGroup: (groupId: string) => reload(groupId),
         handleTake,
         handleReturn,
         handleComplete: (taskId: string) => runTaskAction(taskId, completeTask),

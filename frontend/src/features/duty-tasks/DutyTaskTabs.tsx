@@ -1,9 +1,14 @@
-import { Button, Group } from '@mantine/core'
+import { Button, Group, Select } from '@mantine/core'
+
+import type { ResidentDutyGroupOption } from './types'
 
 export type DutyTaskTab = 'mine' | 'free' | 'all' | 'review'
 
 type Props = {
     activeTab: DutyTaskTab
+    groups: ResidentDutyGroupOption[]
+    selectedGroupId: string
+    onGroupChange: (groupId: string) => void
     onChange: (tab: DutyTaskTab) => void
 }
 
@@ -14,9 +19,30 @@ const tabs: Array<{ label: string; value: DutyTaskTab }> = [
     { label: 'Задачи на проверку', value: 'review' },
 ]
 
-export function DutyTaskTabs({ activeTab, onChange }: Props) {
+export function DutyTaskTabs({
+    activeTab,
+    groups,
+    selectedGroupId,
+    onGroupChange,
+    onChange,
+}: Props) {
     return (
         <Group gap="sm" wrap="wrap">
+            <Select
+                aria-label="Группа"
+                placeholder="Группа"
+                data={groups.map((group) => ({
+                    value: group.id,
+                    label: group.name,
+                }))}
+                value={selectedGroupId}
+                onChange={(value) => {
+                    if (value) {
+                        onGroupChange(value)
+                    }
+                }}
+                w={{ base: '100%', sm: 240 }}
+            />
             {tabs.map((tab) => {
                 const isActive = tab.value === activeTab
 

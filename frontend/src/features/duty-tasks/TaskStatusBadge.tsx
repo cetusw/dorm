@@ -10,10 +10,10 @@ export function TaskStatusBadge({ status }: Props) {
         case 'free':
             return <Badge color="gray">Свободна</Badge>
         case 'assigned':
-            return <Badge color="blue">Взята</Badge>
+            return <Badge color="blue">В работе</Badge>
         case 'completed':
             return <Badge color="yellow">На проверке</Badge>
         case 'verified':
-            return <Badge color="green">Проверена</Badge>
+            return <Badge color="green">Подтверждена</Badge>
     }
 }

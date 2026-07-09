@@ -7,6 +7,7 @@ import { groupTasksByArea } from './utils'
 
 type Props = {
     actionMode?: TaskRowActionMode
+    isReadOnly?: boolean
     pendingTaskId: string | null
     tasks: ResidentDutyTask[]
     emptyMessage?: string
@@ -20,6 +21,7 @@ type Props = {
 
 export function TaskGroups({
     actionMode = 'default',
+    isReadOnly = false,
     pendingTaskId,
     tasks,
     emptyMessage = 'В этом разделе нет задач.',
@@ -41,6 +43,7 @@ export function TaskGroups({
             {groups.map((group) => (
                 <TaskGroupSection
                     actionMode={actionMode}
+                    isReadOnly={isReadOnly}
                     key={group.key}
                     group={group}
                     pendingTaskId={pendingTaskId}

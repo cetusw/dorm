@@ -1,12 +1,14 @@
 import { Divider, Paper, ScrollArea, Table, Text, Tooltip } from '@mantine/core'
 
 import { TaskRowActions, type TaskRowActionMode } from './TaskRowActions'
+import { TaskStatusBadge } from './TaskStatusBadge'
 import type { ResidentDutyTask } from './types'
 import type { TaskAreaGroup } from './utils'
 
 type Props = {
     actionMode?: TaskRowActionMode
     group: TaskAreaGroup
+    isReadOnly?: boolean
     pendingTaskId: string | null
     showAssigneeColumn: boolean
     onTake: (taskId: string) => void | Promise<unknown>
@@ -49,6 +51,7 @@ function renderAssignee(task: ResidentDutyTask) {
 export function TaskGroupSection({
     actionMode = 'default',
     group,
+    isReadOnly = false,
     pendingTaskId,
     showAssigneeColumn,
     onTake,
@@ -70,30 +73,36 @@ export function TaskGroupSection({
                     <Table.Tbody>
                         {group.tasks.map((task) => (
                             <Table.Tr key={task.id}>
-                                <Table.Td w={showAssigneeColumn ? '34%' : '52%'}>
+                                <Table.Td w={isReadOnly ? '52%' : showAssigneeColumn ? '34%' : '52%'}>
                                     <Tooltip label="Задача">
                                         <Text fw={600}>{task.title}</Text>
                                     </Tooltip>
                                 </Table.Td>
-                                <Table.Td w="12%">
-                                    <Tooltip label="Стоимость">
-                                        <Text fw={600}>{task.cost}</Text>
-                                    </Tooltip>
-                                </Table.Td>
-                                {showAssigneeColumn && (
-                                    <Table.Td w="18%">{renderAssignee(task)}</Table.Td>
+                                {!isReadOnly && (
+                                    <Table.Td w="12%">
+                                        <Tooltip label="Стоимость">
+                                            <Text fw={600}>{task.cost}</Text>
+                                        </Tooltip>
+                                    </Table.Td>
                                 )}
-                                <Table.Td w={showAssigneeColumn ? '20%' : '36%'}>
-                                    <TaskRowActions
-                                        mode={actionMode}
-                                        pending={pendingTaskId === task.id}
-                                        task={task}
-                                        onTake={onTake}
-                                        onReturn={onReturn}
-                                        onComplete={onComplete}
-                                        onOpen={onOpen}
-                                        onVerify={onVerify}
-                                    />
+                                {showAssigneeColumn && (
+                                    <Table.Td w={isReadOnly ? '24%' : '18%'}>{renderAssignee(task)}</Table.Td>
+                                )}
+                                <Table.Td w={isReadOnly ? '24%' : showAssigneeColumn ? '20%' : '36%'}>
+                                    {isReadOnly ? (
+                                        <TaskStatusBadge status={task.status} />
+                                    ) : (
+                                        <TaskRowActions
+                                            mode={actionMode}
+                                            pending={pendingTaskId === task.id}
+                                            task={task}
+                                            onTake={onTake}
+                                            onReturn={onReturn}
+                                            onComplete={onComplete}
+                                            onOpen={onOpen}
+                                            onVerify={onVerify}
+                                        />
+                                    )}
                                 </Table.Td>
                             </Table.Tr>
                         ))}

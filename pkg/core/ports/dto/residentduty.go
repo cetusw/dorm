@@ -8,14 +8,23 @@ const (
 )
 
 type ResidentCurrentDutyResponse struct {
-	DutyID              string             `json:"duty_id"`
-	Group               string             `json:"group"`
-	Team                string             `json:"team"`
-	StartDate           string             `json:"start_date"`
-	EndDate             string             `json:"end_date"`
-	CostPerResidentGoal int                `json:"cost_per_resident_goal"`
-	MyTakenCostSum      int                `json:"my_taken_cost_sum"`
-	Tasks               []ResidentDutyTask `json:"tasks"`
+	SelectedGroupID     string                    `json:"selected_group_id"`
+	HasActiveDuty       bool                      `json:"has_active_duty"`
+	CanManageTasks      bool                      `json:"can_manage_tasks"`
+	Groups              []ResidentDutyGroupOption `json:"groups"`
+	DutyID              string                    `json:"duty_id"`
+	Group               string                    `json:"group"`
+	Team                string                    `json:"team"`
+	StartDate           string                    `json:"start_date"`
+	EndDate             string                    `json:"end_date"`
+	CostPerResidentGoal int                       `json:"cost_per_resident_goal"`
+	MyTakenCostSum      int                       `json:"my_taken_cost_sum"`
+	Tasks               []ResidentDutyTask        `json:"tasks"`
+}
+
+type ResidentDutyGroupOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type ResidentDutyTask struct {

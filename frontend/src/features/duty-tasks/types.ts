@@ -18,7 +18,16 @@ export type ResidentDutyTask = {
     can_review_open: boolean
 }
 
+export type ResidentDutyGroupOption = {
+    id: string
+    name: string
+}
+
 export type ResidentCurrentDuty = {
+    selected_group_id: string
+    has_active_duty: boolean
+    can_manage_tasks: boolean
+    groups: ResidentDutyGroupOption[]
     duty_id: string
     group: string
     team: string
