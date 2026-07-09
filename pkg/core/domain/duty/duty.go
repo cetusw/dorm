@@ -85,6 +85,7 @@ func (d *Duty) CompleteTask(taskID uuid.UUID) error {
 	}
 	now := time.Now()
 	task.completionDate = &now
+	task.verificationDate = nil
 	return nil
 }
 
@@ -97,6 +98,23 @@ func (d *Duty) OpenTask(taskID uuid.UUID) error {
 		return ErrTaskNotAssigned
 	}
 	task.completionDate = nil
+	task.verificationDate = nil
+	return nil
+}
+
+func (d *Duty) VerifyTask(taskID uuid.UUID) error {
+	task, exists := d.tasks[taskID]
+	if !exists {
+		return ErrTaskNotFound
+	}
+	if task.assigneeID == nil {
+		return ErrTaskNotAssigned
+	}
+	if task.completionDate == nil {
+		return ErrTaskNotAssigned
+	}
+	now := time.Now()
+	task.verificationDate = &now
 	return nil
 }
 

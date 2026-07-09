@@ -58,3 +58,7 @@ export async function completeTask(taskId: string): Promise<ResidentCurrentDuty>
 export async function openTask(taskId: string): Promise<ResidentCurrentDuty> {
     return requestDutyAction(taskId, 'open')
 }
+
+export async function verifyTask(taskId: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'verify')
+}

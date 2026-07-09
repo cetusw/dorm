@@ -14,6 +14,8 @@ export type ResidentDutyTask = {
     can_return: boolean
     can_complete: boolean
     can_open: boolean
+    can_verify: boolean
+    can_review_open: boolean
 }
 
 export type ResidentCurrentDuty = {

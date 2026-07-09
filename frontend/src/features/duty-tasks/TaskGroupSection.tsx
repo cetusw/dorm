@@ -1,16 +1,19 @@
 import { Divider, Paper, ScrollArea, Table, Text, Tooltip } from '@mantine/core'
 
-import { TaskRowActions } from './TaskRowActions'
+import { TaskRowActions, type TaskRowActionMode } from './TaskRowActions'
 import type { ResidentDutyTask } from './types'
 import type { TaskAreaGroup } from './utils'
 
 type Props = {
+    actionMode?: TaskRowActionMode
     group: TaskAreaGroup
     pendingTaskId: string | null
-    onTake: (taskId: string) => void
-    onReturn: (taskId: string) => void
-    onComplete: (taskId: string) => void
-    onOpen: (taskId: string) => void
+    showAssigneeColumn: boolean
+    onTake: (taskId: string) => void | Promise<unknown>
+    onReturn: (taskId: string) => void | Promise<unknown>
+    onComplete: (taskId: string) => void | Promise<unknown>
+    onOpen: (taskId: string) => void | Promise<unknown>
+    onVerify?: (taskId: string) => void | Promise<unknown>
 }
 
 function renderAssignee(task: ResidentDutyTask) {
@@ -44,12 +47,15 @@ function renderAssignee(task: ResidentDutyTask) {
 }
 
 export function TaskGroupSection({
+    actionMode = 'default',
     group,
     pendingTaskId,
+    showAssigneeColumn,
     onTake,
     onReturn,
     onComplete,
     onOpen,
+    onVerify,
 }: Props) {
     return (
         <Paper withBorder radius="lg" bg="white">
@@ -64,7 +70,7 @@ export function TaskGroupSection({
                     <Table.Tbody>
                         {group.tasks.map((task) => (
                             <Table.Tr key={task.id}>
-                                <Table.Td w="34%">
+                                <Table.Td w={showAssigneeColumn ? '34%' : '52%'}>
                                     <Tooltip label="Задача">
                                         <Text fw={600}>{task.title}</Text>
                                     </Tooltip>
@@ -74,15 +80,19 @@ export function TaskGroupSection({
                                         <Text fw={600}>{task.cost}</Text>
                                     </Tooltip>
                                 </Table.Td>
-                                <Table.Td w="18%">{renderAssignee(task)}</Table.Td>
-                                <Table.Td w="20%">
+                                {showAssigneeColumn && (
+                                    <Table.Td w="18%">{renderAssignee(task)}</Table.Td>
+                                )}
+                                <Table.Td w={showAssigneeColumn ? '20%' : '36%'}>
                                     <TaskRowActions
+                                        mode={actionMode}
                                         pending={pendingTaskId === task.id}
                                         task={task}
                                         onTake={onTake}
                                         onReturn={onReturn}
                                         onComplete={onComplete}
                                         onOpen={onOpen}
+                                        onVerify={onVerify}
                                     />
                                 </Table.Td>
                             </Table.Tr>

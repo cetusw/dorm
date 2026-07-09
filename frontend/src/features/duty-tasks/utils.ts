@@ -107,3 +107,19 @@ export function formatDutyPeriod(startDate: string, endDate: string): string {
 
     return `${formatDate(startDate)} - ${formatDate(endDate)}`
 }
+
+export function countTasksCompletedByMe(tasks: ResidentDutyTask[]): number {
+    return tasks.filter(
+        (task) => task.is_mine && (task.status === 'completed' || task.status === 'verified'),
+    ).length
+}
+
+export function countTasksTakenByMe(tasks: ResidentDutyTask[]): number {
+    return tasks.filter((task) => task.is_mine).length
+}
+
+export function sumCostTakenByMe(tasks: ResidentDutyTask[]): number {
+    return tasks
+        .filter((task) => task.is_mine)
+        .reduce((sum, task) => sum + task.cost, 0)
+}

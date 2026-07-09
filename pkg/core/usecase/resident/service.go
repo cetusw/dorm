@@ -104,6 +104,10 @@ func (s *Service) OpenTask(ctx context.Context, userID uuid.UUID, taskID uuid.UU
 	return s.cleaningUC.OpenTask(ctx, taskID, userID)
 }
 
+func (s *Service) VerifyTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+	return s.cleaningUC.VerifyTask(ctx, taskID, userID)
+}
+
 func (s *Service) loadCurrentDutyContext(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -225,23 +229,25 @@ func buildResidentDutyTask(
 ) dto.ResidentDutyTask {
 	status := resolveTaskStatus(dutyTask)
 	isMine := dutyTask.AssigneeID() != nil && *dutyTask.AssigneeID() == userID
-	canTake, canReturn, canComplete, canOpen := buildTaskPermissions(status, isMine)
+	canTake, canReturn, canComplete, canOpen, canVerify, canReviewOpen := buildTaskPermissions(status, isMine)
 	assigneeID, assigneeName := resolveAssignee(dutyTask, userNames)
 
 	return dto.ResidentDutyTask{
-		ID:           dutyTask.ID().String(),
-		AreaName:     area.Name(),
-		AreaFloor:    area.Floor(),
-		Title:        taskDefinition.Title(),
-		Cost:         taskDefinition.Cost(),
-		Status:       status,
-		AssigneeID:   assigneeID,
-		AssigneeName: assigneeName,
-		IsMine:       isMine,
-		CanTake:      canTake,
-		CanReturn:    canReturn,
-		CanComplete:  canComplete,
-		CanOpen:      canOpen,
+		ID:            dutyTask.ID().String(),
+		AreaName:      area.Name(),
+		AreaFloor:     area.Floor(),
+		Title:         taskDefinition.Title(),
+		Cost:          taskDefinition.Cost(),
+		Status:        status,
+		AssigneeID:    assigneeID,
+		AssigneeName:  assigneeName,
+		IsMine:        isMine,
+		CanTake:       canTake,
+		CanReturn:     canReturn,
+		CanComplete:   canComplete,
+		CanOpen:       canOpen,
+		CanVerify:     canVerify,
+		CanReviewOpen: canReviewOpen,
 	}
 }
 
@@ -342,22 +348,22 @@ func resolveTaskStatus(task *dutydomain.DutyTask) string {
 func buildTaskPermissions(
 	status string,
 	isMine bool,
-) (canTake bool, canReturn bool, canComplete bool, canOpen bool) {
+) (canTake bool, canReturn bool, canComplete bool, canOpen bool, canVerify bool, canReviewOpen bool) {
 	switch status {
 	case dto.ResidentDutyTaskStatusFree:
-		return true, false, false, false
+		return true, false, false, false, false, false
 	case dto.ResidentDutyTaskStatusAssigned:
 		if isMine {
-			return false, true, true, false
+			return false, true, true, false, false, false
 		}
-		return false, false, false, false
+		return false, false, false, false, false, false
 	case dto.ResidentDutyTaskStatusCompleted:
 		if isMine {
-			return false, false, false, true
+			return false, false, false, true, true, true
 		}
-		return false, false, false, false
+		return false, false, false, false, true, true
 	default:
-		return false, false, false, false
+		return false, false, false, false, false, false
 	}
 }
 

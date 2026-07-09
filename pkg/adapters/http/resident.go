@@ -25,6 +25,7 @@ func (h *ResidentAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) 
 	api.Post("/tasks/:taskId/return", h.HandleReturnTask)
 	api.Post("/tasks/:taskId/complete", h.HandleCompleteTask)
 	api.Post("/tasks/:taskId/open", h.HandleOpenTask)
+	api.Post("/tasks/:taskId/verify", h.HandleVerifyTask)
 }
 
 func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
@@ -90,6 +91,19 @@ func (h *ResidentAPIHandler) HandleOpenTask(c *fiber.Ctx) error {
 	}
 
 	if err := h.residentDutyUC.OpenTask(c.Context(), userID, taskID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	return h.respondWithCurrentDuty(c, userID)
+}
+
+func (h *ResidentAPIHandler) HandleVerifyTask(c *fiber.Ctx) error {
+	userID, taskID, err := parseResidentTaskAction(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	if err := h.residentDutyUC.VerifyTask(c.Context(), userID, taskID); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 

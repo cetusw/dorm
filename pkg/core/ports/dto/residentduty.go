@@ -29,8 +29,10 @@ type ResidentDutyTask struct {
 	AssigneeName *string `json:"assignee_name,omitempty"`
 	IsMine       bool    `json:"is_mine"`
 
-	CanTake     bool `json:"can_take"`
-	CanReturn   bool `json:"can_return"`
-	CanComplete bool `json:"can_complete"`
-	CanOpen     bool `json:"can_open"`
+	CanTake       bool `json:"can_take"`
+	CanReturn     bool `json:"can_return"`
+	CanComplete   bool `json:"can_complete"`
+	CanOpen       bool `json:"can_open"`
+	CanVerify     bool `json:"can_verify"`
+	CanReviewOpen bool `json:"can_review_open"`
 }

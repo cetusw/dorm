@@ -173,3 +173,28 @@ func (s *Service) OpenTask(ctx context.Context, taskID uuid.UUID, userID uuid.UU
 
 	return nil
 }
+
+func (s *Service) VerifyTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
+	u, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if u.TeamID() == nil {
+		return fmt.Errorf("user not in team")
+	}
+
+	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
+	if err != nil || d == nil {
+		return fmt.Errorf("duty not found")
+	}
+
+	if err := d.VerifyTask(taskID); err != nil {
+		return err
+	}
+
+	if err := s.dutyRepo.Save(ctx, d); err != nil {
+		return err
+	}
+
+	return nil
+}
