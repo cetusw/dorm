@@ -32,7 +32,7 @@ async function request(path: string, options: RequestInit = {}) {
     const response = await fetch(path, {
         ...options,
         headers: {
-            'X-User-ID': DEV_USER_ID,
+            'X-User-ID': hexToUuid(DEV_USER_ID),
             ...options.headers,
         },
     })
