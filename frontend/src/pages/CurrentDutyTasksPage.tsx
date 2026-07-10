@@ -46,10 +46,21 @@ export function CurrentDutyTasksPage() {
     } = useCurrentDuty()
     const [activeTab, setActiveTab] = useState<DutyTaskTab>(readStoredTab)
     const [reviewVisibleTaskIds, setReviewVisibleTaskIds] = useState<string[]>([])
+    const visibleTabs = duty?.visible_tabs ?? []
 
     useEffect(() => {
         window.localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab)
     }, [activeTab])
+
+    useEffect(() => {
+        if (visibleTabs.length === 0) {
+            return
+        }
+
+        if (!visibleTabs.includes(activeTab)) {
+            setActiveTab(visibleTabs[0])
+        }
+    }, [activeTab, visibleTabs])
 
     useEffect(() => {
         if (!duty || activeTab !== 'review') {
@@ -61,14 +72,6 @@ export function CurrentDutyTasksPage() {
                 .filter((task) => task.status === 'completed')
                 .map((task) => task.id),
         )
-    }, [activeTab, duty])
-
-    useEffect(() => {
-        if (!duty || duty.can_manage_tasks || activeTab !== 'mine') {
-            return
-        }
-
-        setActiveTab('all')
     }, [activeTab, duty])
 
     if (loading) {
@@ -97,7 +100,7 @@ export function CurrentDutyTasksPage() {
         )
     }
 
-    const isReadOnly = !duty.can_manage_tasks
+    const isReadOnly = duty.read_only
 
     if (!duty.has_active_duty) {
         return (
@@ -111,17 +114,39 @@ export function CurrentDutyTasksPage() {
 
                     <Title order={1}>Текущее дежурство</Title>
 
-                    <DutyTaskTabs
-                        activeTab={activeTab}
-                        groups={duty.groups}
-                        selectedGroupId={selectedGroupId ?? duty.selected_group_id}
-                        onGroupChange={selectGroup}
-                        onChange={setActiveTab}
-                    />
+                    {(duty.show_group_select || duty.visible_tabs.length > 0) && (
+                        <DutyTaskTabs
+                            activeTab={activeTab}
+                            groups={duty.groups}
+                            selectedGroupId={selectedGroupId ?? duty.selected_group_id}
+                            showGroupSelect={duty.show_group_select}
+                            visibleTabs={duty.visible_tabs}
+                            onGroupChange={selectGroup}
+                            onChange={setActiveTab}
+                        />
+                    )}
 
                     <Alert color="gray">
                         В выбранной группе сейчас нет активного дежурства.
                     </Alert>
+                </Stack>
+            </Box>
+        )
+    }
+
+    if (duty.notice_message) {
+        return (
+            <Box px={{ base: 'md', md: 'xl' }} py="xl">
+                <Stack gap="lg" maw={1240} mx="auto">
+                    {error && (
+                        <Alert color="red" title="Ошибка">
+                            {error}
+                        </Alert>
+                    )}
+
+                    <Title order={1}>Текущее дежурство</Title>
+
+                    <Alert color="gray">{duty.notice_message}</Alert>
                 </Stack>
             </Box>
         )
@@ -141,13 +166,17 @@ export function CurrentDutyTasksPage() {
                         Текущее дежурство · {formatDutyPeriod(duty.start_date, duty.end_date)}
                     </Title>
 
-                    <DutyTaskTabs
-                        activeTab={activeTab}
-                        groups={duty.groups}
-                        selectedGroupId={selectedGroupId ?? duty.selected_group_id}
-                        onGroupChange={selectGroup}
-                        onChange={setActiveTab}
-                    />
+                    {(duty.show_group_select || duty.visible_tabs.length > 0) && (
+                        <DutyTaskTabs
+                            activeTab={activeTab}
+                            groups={duty.groups}
+                            selectedGroupId={selectedGroupId ?? duty.selected_group_id}
+                            showGroupSelect={duty.show_group_select}
+                            visibleTabs={duty.visible_tabs}
+                            onGroupChange={selectGroup}
+                            onChange={setActiveTab}
+                        />
+                    )}
 
                     <Alert color="gray">
                         На текущее дежурство не заведены задачи.
@@ -192,7 +221,7 @@ export function CurrentDutyTasksPage() {
                     Текущее дежурство · {formatDutyPeriod(duty.start_date, duty.end_date)}
                 </Title>
 
-                {!isReadOnly && (
+                {!isReadOnly && duty.visible_tabs.length > 0 && (
                     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
                         <DutyAnalyticsCard
                             label="Взято задач"
@@ -211,13 +240,17 @@ export function CurrentDutyTasksPage() {
                     </SimpleGrid>
                 )}
 
-                <DutyTaskTabs
-                    activeTab={activeTab}
-                    groups={duty.groups}
-                    selectedGroupId={selectedGroupId ?? duty.selected_group_id}
-                    onGroupChange={selectGroup}
-                    onChange={setActiveTab}
-                />
+                {(duty.show_group_select || duty.visible_tabs.length > 0) && (
+                    <DutyTaskTabs
+                        activeTab={activeTab}
+                        groups={duty.groups}
+                        selectedGroupId={selectedGroupId ?? duty.selected_group_id}
+                        showGroupSelect={duty.show_group_select}
+                        visibleTabs={duty.visible_tabs}
+                        onGroupChange={selectGroup}
+                        onChange={setActiveTab}
+                    />
+                )}
 
                 <TaskGroups
                     isReadOnly={isReadOnly}

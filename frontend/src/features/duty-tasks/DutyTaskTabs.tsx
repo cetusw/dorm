@@ -8,6 +8,8 @@ type Props = {
     activeTab: DutyTaskTab
     groups: ResidentDutyGroupOption[]
     selectedGroupId: string
+    showGroupSelect?: boolean
+    visibleTabs: DutyTaskTab[]
     onGroupChange: (groupId: string) => void
     onChange: (tab: DutyTaskTab) => void
 }
@@ -23,27 +25,31 @@ export function DutyTaskTabs({
     activeTab,
     groups,
     selectedGroupId,
+    showGroupSelect = true,
+    visibleTabs,
     onGroupChange,
     onChange,
 }: Props) {
     return (
         <Group gap="sm" wrap="wrap">
-            <Select
-                aria-label="Группа"
-                placeholder="Группа"
-                data={groups.map((group) => ({
-                    value: group.id,
-                    label: group.name,
-                }))}
-                value={selectedGroupId}
-                onChange={(value) => {
-                    if (value) {
-                        onGroupChange(value)
-                    }
-                }}
-                w={{ base: '100%', sm: 240 }}
-            />
-            {tabs.map((tab) => {
+            {showGroupSelect && (
+                <Select
+                    aria-label="Группа"
+                    placeholder="Группа"
+                    data={groups.map((group) => ({
+                        value: group.id,
+                        label: group.name,
+                    }))}
+                    value={selectedGroupId}
+                    onChange={(value) => {
+                        if (value) {
+                            onGroupChange(value)
+                        }
+                    }}
+                    w={{ base: '100%', sm: 240 }}
+                />
+            )}
+            {tabs.filter((tab) => visibleTabs.includes(tab.value)).map((tab) => {
                 const isActive = tab.value === activeTab
 
                 return (

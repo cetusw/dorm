@@ -28,7 +28,7 @@ export function TaskRowActions({
     if (mode === 'review') {
         return (
             <Group gap="xs" wrap="nowrap" justify="flex-end">
-                {task.status === 'completed' && (
+                {task.status === 'completed' && task.can_review_open && (
                     <Button
                         size="xs"
                         radius="md"

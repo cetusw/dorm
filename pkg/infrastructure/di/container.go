@@ -155,6 +155,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		userRepo,
 		teamRepo,
 		groupRepo,
+		dormitoryRepo,
 		dutyRepo,
 		taskRepo,
 		areaRepo,

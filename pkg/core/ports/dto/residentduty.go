@@ -11,6 +11,10 @@ type ResidentCurrentDutyResponse struct {
 	SelectedGroupID     string                    `json:"selected_group_id"`
 	HasActiveDuty       bool                      `json:"has_active_duty"`
 	CanManageTasks      bool                      `json:"can_manage_tasks"`
+	ReadOnly            bool                      `json:"read_only"`
+	ShowGroupSelect     bool                      `json:"show_group_select"`
+	VisibleTabs         []string                  `json:"visible_tabs"`
+	NoticeMessage       string                    `json:"notice_message"`
 	Groups              []ResidentDutyGroupOption `json:"groups"`
 	DutyID              string                    `json:"duty_id"`
 	Group               string                    `json:"group"`
