@@ -527,75 +527,64 @@ func resolveResidentDutyView(currentDuty *currentDutyContext) residentDutyView {
 		return residentDutyView{}
 	}
 
-	if currentDuty.dormitory != nil && isDormitoryLeader(currentDuty.dormitory, currentDuty.resident.ID()) {
-		return residentDutyView{
-			showGroupSelect: true,
-			readOnly:        true,
-			canViewTasks:    currentDuty.duty != nil && currentDuty.dutyTeam != nil,
-		}
-	}
-
 	isOnDutyTeam := currentDuty.duty != nil &&
 		currentDuty.dutyTeam != nil &&
 		currentDuty.resident.TeamID() != nil &&
 		*currentDuty.resident.TeamID() == currentDuty.dutyTeam.ID()
 
-	isGroupLeader := isGroupLeader(currentDuty.residentGroup, currentDuty.resident.ID())
 	isTeamLeader := isTeamLeader(currentDuty.residentTeam, currentDuty.resident.ID())
 
-	if isGroupLeader {
+	if currentDuty.dormitory != nil && isDormitoryLeader(currentDuty.dormitory, currentDuty.resident.ID()) {
+		visibleTabs := []string{}
+		canManageTasks := false
+		canVerifyTasks := false
+		readOnly := true
+
 		if isOnDutyTeam {
-			tabs := []string{"mine", "free", "all"}
-			canVerifyTasks := false
+			visibleTabs = []string{"all", "mine"}
+			canManageTasks = true
+			readOnly = false
+
 			if isTeamLeader {
-				tabs = append(tabs, "review")
+				visibleTabs = append(visibleTabs, "review")
 				canVerifyTasks = true
 			}
-
-			return residentDutyView{
-				visibleTabs:    tabs,
-				canViewTasks:   true,
-				canManageTasks: true,
-				canVerifyTasks: canVerifyTasks,
-			}
 		}
 
 		return residentDutyView{
-			readOnly:     true,
-			canViewTasks: currentDuty.duty != nil && currentDuty.dutyTeam != nil,
-		}
-	}
-
-	if isTeamLeader {
-		if isOnDutyTeam {
-			return residentDutyView{
-				visibleTabs:    []string{"mine", "free", "all", "review"},
-				canViewTasks:   true,
-				canManageTasks: true,
-				canVerifyTasks: true,
-			}
-		}
-
-		return residentDutyView{
-			noticeMessage: buildOtherTeamDutyMessage(currentDuty),
+			showGroupSelect: true,
+			visibleTabs:     visibleTabs,
+			readOnly:        readOnly,
+			canViewTasks:    currentDuty.duty != nil && currentDuty.dutyTeam != nil,
+			canManageTasks:  canManageTasks,
+			canVerifyTasks:  canVerifyTasks,
+			noticeMessage:   observerNoticeMessage(currentDuty, isOnDutyTeam),
 		}
 	}
 
 	if isOnDutyTeam {
+		tabs := []string{"all", "mine"}
+		if isTeamLeader {
+			tabs = append(tabs, "review")
+		}
+
 		return residentDutyView{
-			visibleTabs:    []string{"mine", "free", "all"},
+			visibleTabs:    tabs,
 			canViewTasks:   true,
 			canManageTasks: true,
+			canVerifyTasks: isTeamLeader,
 		}
 	}
 
 	return residentDutyView{
-		noticeMessage: buildOtherTeamDutyMessage(currentDuty),
+		readOnly:      true,
+		canViewTasks:  currentDuty.duty != nil && currentDuty.dutyTeam != nil,
+		noticeMessage: observerNoticeMessage(currentDuty, false),
 	}
 }
 
-func buildOtherTeamDutyMessage(currentDuty *currentDutyContext) string {
-	if currentDuty == nil || currentDuty.dutyTeam == nil {
+func observerNoticeMessage(currentDuty *currentDutyContext, isOnDutyTeam bool) string {
+	if isOnDutyTeam || currentDuty == nil || currentDuty.dutyTeam == nil {
 		return ""
 	}
 

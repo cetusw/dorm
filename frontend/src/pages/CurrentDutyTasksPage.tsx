@@ -134,24 +134,6 @@ export function CurrentDutyTasksPage() {
         )
     }
 
-    if (duty.notice_message) {
-        return (
-            <Box px={{ base: 'md', md: 'xl' }} py="xl">
-                <Stack gap="lg" maw={1240} mx="auto">
-                    {error && (
-                        <Alert color="red" title="Ошибка">
-                            {error}
-                        </Alert>
-                    )}
-
-                    <Title order={1}>Текущее дежурство</Title>
-
-                    <Alert color="gray">{duty.notice_message}</Alert>
-                </Stack>
-            </Box>
-        )
-    }
-
     if (duty.tasks.length === 0) {
         return (
             <Box px={{ base: 'md', md: 'xl' }} py="xl">
@@ -194,6 +176,10 @@ export function CurrentDutyTasksPage() {
         all: duty.tasks,
         review: duty.tasks.filter((task) => reviewVisibleTaskIds.includes(task.id)),
     } satisfies Record<DutyTaskTab, typeof duty.tasks>
+    const displayedTasks =
+        isReadOnly || duty.visible_tabs.length === 0
+            ? duty.tasks
+            : (tasksByTab[activeTab] ?? duty.tasks)
 
     const takenCostSum = sumCostTakenByMe(duty.tasks)
     const takenTasksCount = countTasksTakenByMe(duty.tasks)
@@ -215,6 +201,10 @@ export function CurrentDutyTasksPage() {
                     <Alert color="red" title="Ошибка">
                         {error}
                     </Alert>
+                )}
+
+                {duty.notice_message && (
+                    <Alert color="gray">{duty.notice_message}</Alert>
                 )}
 
                 <Title order={1}>
@@ -256,7 +246,7 @@ export function CurrentDutyTasksPage() {
                     isReadOnly={isReadOnly}
                     actionMode={activeTab === 'review' ? 'review' : 'default'}
                     pendingTaskId={pendingTaskId}
-                    tasks={tasksByTab[activeTab]}
+                    tasks={displayedTasks}
                     emptyMessage={activeTab === 'review' ? 'Нет задач на проверке' : 'В этом разделе нет задач.'}
                     showAssigneeColumn={isReadOnly || activeTab === 'all' || activeTab === 'review'}
                     onTake={handleTake}

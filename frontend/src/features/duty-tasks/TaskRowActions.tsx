@@ -1,6 +1,7 @@
 import { Button, Group, Text } from '@mantine/core'
 
 import type { ResidentDutyTask } from './types'
+import { TaskStatusBadge } from './TaskStatusBadge'
 
 export type TaskRowActionMode = 'default' | 'review'
 
@@ -25,6 +26,9 @@ export function TaskRowActions({
     onOpen,
     onVerify,
 }: Props) {
+    const hasDefaultActions =
+        task.can_take || task.can_return || task.can_complete || task.can_open
+
     if (mode === 'review') {
         return (
             <Group gap="xs" wrap="nowrap" justify="flex-end">
@@ -66,6 +70,20 @@ export function TaskRowActions({
                 )}
             </Group>
         )
+    }
+
+    if (!hasDefaultActions) {
+        if (task.status === 'verified' && task.is_mine) {
+            return (
+                <Group gap="xs" wrap="nowrap" justify="flex-end">
+                    <Text size="sm" fw={600} c="green">
+                        Подтверждено
+                    </Text>
+                </Group>
+            )
+        }
+
+        return <TaskStatusBadge status={task.status} />
     }
 
     if (task.status === 'verified' && task.is_mine) {
