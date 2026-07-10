@@ -1,5 +1,10 @@
-import {Button, Paper, PasswordInput, Stack, TextInput, Title} from '@mantine/core'
+import {useState} from 'react'
+
+import {Alert, Button, Paper, PasswordInput, Stack, TextInput, Title} from '@mantine/core'
 import {useForm} from '@mantine/form'
+
+import {loginResident} from '../../features/auth/api'
+import {ApiError} from '../../features/duty-tasks/api'
 
 import './LoginPage.css'
 
@@ -9,6 +14,9 @@ type LoginFormValues = {
 }
 
 export function LoginPage() {
+    const [submitError, setSubmitError] = useState<string | null>(null)
+    const [submitting, setSubmitting] = useState(false)
+
     const form = useForm<LoginFormValues>({
         mode: 'controlled',
         initialValues: {
@@ -29,11 +37,31 @@ export function LoginPage() {
                 </Title>
 
                 <form
-                    onSubmit={form.onSubmit(() => {
-                        return
+                    onSubmit={form.onSubmit(async (values) => {
+                        setSubmitError(null)
+                        setSubmitting(true)
+
+                        try {
+                            const response = await loginResident(values.login, values.password)
+                            window.location.assign(response.redirect_url)
+                        } catch (error) {
+                            if (error instanceof ApiError) {
+                                setSubmitError(error.message)
+                            } else {
+                                setSubmitError('Не удалось выполнить вход')
+                            }
+                        } finally {
+                            setSubmitting(false)
+                        }
                     })}
                 >
                     <Stack gap="md" mt="xl">
+                        {submitError && (
+                            <Alert color="red" variant="light">
+                                {submitError}
+                            </Alert>
+                        )}
+
                         <TextInput
                             withAsterisk
                             label="Логин"
@@ -50,7 +78,7 @@ export function LoginPage() {
                             {...form.getInputProps('password')}
                         />
 
-                        <Button type="submit" fullWidth mt="sm">
+                        <Button type="submit" fullWidth mt="sm" loading={submitting}>
                             Войти
                         </Button>
                     </Stack>

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -207,6 +208,15 @@ func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User
 	idBytes, _ := id.MarshalBinary()
 	row := r.db.QueryRowContext(ctx, query, idBytes)
 
+	return r.scanUser(row)
+}
+
+func (r *UserRepository) FindByLogin(ctx context.Context, login string) (*user.User, error) {
+	const query = `
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at, login, password_hash
+		FROM user WHERE login = ? AND deleted_at IS NULL
+	`
+	row := r.db.QueryRowContext(ctx, query, strings.TrimSpace(login))
 	return r.scanUser(row)
 }
 

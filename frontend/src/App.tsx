@@ -7,6 +7,14 @@ function App() {
         return <LoginPage />
     }
 
+    if (window.location.pathname === '/app/tasks' || window.location.pathname === '/app') {
+        return (
+            <ResidentAppShell>
+                <CurrentDutyTasksPage />
+            </ResidentAppShell>
+        )
+    }
+
     return (
         <ResidentAppShell>
             <CurrentDutyTasksPage />

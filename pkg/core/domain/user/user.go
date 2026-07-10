@@ -178,6 +178,7 @@ type Repository interface {
 	Save(ctx context.Context, user *User) error
 	FindAll(ctx context.Context) ([]*User, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
+	FindByLogin(ctx context.Context, login string) (*User, error)
 	FindByTelegramID(ctx context.Context, telegramID int64) (*User, error)
 	FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]*User, error)
 	FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*User, error)

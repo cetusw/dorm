@@ -41,6 +41,11 @@ type UpdateUserRequest struct {
 	RoomNumber   string `form:"room_number"`
 }
 
+type ResidentLoginRequest struct {
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
 type ProfileViewModel struct {
 	FirstName     string
 	LastName      string

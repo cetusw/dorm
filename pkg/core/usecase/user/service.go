@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"dorm/pkg/core/ports/dto"
 	ports "dorm/pkg/core/ports/query"
 	"encoding/hex"
@@ -62,6 +63,29 @@ func (s *Service) CreateUser(ctx context.Context, request dto.CreateUserRequest)
 	return s.userRepo.Save(ctx, u)
 }
 
+func (s *Service) AuthenticateResident(ctx context.Context, login string, password string) (*user.User, error) {
+	login = strings.TrimSpace(login)
+	password = strings.TrimSpace(password)
+	if login == "" || password == "" {
+		return nil, fmt.Errorf("логин и пароль обязательны")
+	}
+
+	u, err := s.userRepo.FindByLogin(ctx, login)
+	if err != nil {
+		return nil, fmt.Errorf("find user by login: %w", err)
+	}
+	if u == nil {
+		return nil, fmt.Errorf("неверный логин или пароль")
+	}
+
+	passwordHash := hashResidentPassword(password)
+	if subtle.ConstantTimeCompare([]byte(u.PasswordHash()), []byte(passwordHash)) != 1 {
+		return nil, fmt.Errorf("неверный логин или пароль")
+	}
+
+	return u, nil
+}
+
 func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, request dto.UpdateUserRequest) error {
 	if request.DormitoryID == 0 {
 		return fmt.Errorf("dormitory is required")
@@ -108,6 +132,11 @@ func (s *Service) RegisterUser(ctx context.Context, telegramID int64, fullName s
 
 func telegramPlaceholderPasswordHash(telegramID int64) string {
 	sum := sha256.Sum256([]byte(fmt.Sprintf("telegram:%d", telegramID)))
+	return hex.EncodeToString(sum[:])
+}
+
+func hashResidentPassword(password string) string {
+	sum := sha256.Sum256([]byte(password))
 	return hex.EncodeToString(sum[:])
 }
 

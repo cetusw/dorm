@@ -14,6 +14,7 @@ type UserUseCase interface {
 	UpdateUser(ctx context.Context, id uuid.UUID, req dto.UpdateUserRequest) error
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	RegisterUser(ctx context.Context, telegramID int64, fullName string) error
+	AuthenticateResident(ctx context.Context, login string, password string) (*user.User, error)
 	GetUserByTelegramID(ctx context.Context, telegramID int64) (*user.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*user.User, error)
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (*dto.ProfileViewModel, error)

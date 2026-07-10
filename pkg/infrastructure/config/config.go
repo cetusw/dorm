@@ -21,6 +21,7 @@ type AppConfig struct {
 	DBName     string
 	TZ         string
 	DBDriver   string
+	AuthSecret string
 
 	Cron              CronConfig
 	BotToken          string
@@ -45,6 +46,8 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	cfg.getAuthConfig()
 
 	return cfg, nil
 }
@@ -123,4 +126,20 @@ func (cfg *AppConfig) getDBConfig() error {
 		log.Println("Warning: TZ environment variable not set, defaulting may occur.")
 	}
 	return nil
+}
+
+func (cfg *AppConfig) getAuthConfig() {
+	cfg.AuthSecret = os.Getenv("AUTH_SECRET")
+	if cfg.AuthSecret != "" {
+		return
+	}
+
+	if cfg.DBPassword != "" {
+		cfg.AuthSecret = cfg.DBPassword
+		log.Println("Warning: AUTH_SECRET not set, using DB_PASSWORD as auth secret fallback.")
+		return
+	}
+
+	cfg.AuthSecret = "dev-auth-secret"
+	log.Println("Warning: AUTH_SECRET not set, using insecure development fallback secret.")
 }

@@ -148,6 +148,9 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	)
 	adminHandler.RegisterRoutes(app)
 
+	residentAuthHandler := http.NewResidentAuthHandler(userService, cfg.AuthSecret)
+	residentAuthHandler.RegisterRoutes(app)
+
 	residentDutyService := residentusecase.NewResidentDutyService(
 		userRepo,
 		teamRepo,
@@ -159,7 +162,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	)
 
 	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService)
-	residentAPIHandler.RegisterRoutes(app, http.DevCurrentUserMiddleware())
+	residentAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	return &Container{
 		Config:          cfg,
