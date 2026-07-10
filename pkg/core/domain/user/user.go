@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,49 +12,68 @@ import (
 var (
 	ErrInvalidTelegramID = errors.New("invalid telegram id")
 	ErrEmptyName         = errors.New("name cannot be empty")
+	ErrEmptyLogin        = errors.New("login cannot be empty")
+	ErrEmptyPasswordHash = errors.New("password hash cannot be empty")
 )
 
 type User struct {
-	id          uuid.UUID
-	telegramID  *int64
-	firstName   string
-	middleName  *string
-	lastName    string
-	teamID      *uuid.UUID
-	roomNumber  *string
-	floorNumber *int
-	dormitoryID *int64
-	createdAt   time.Time
+	id           uuid.UUID
+	telegramID   *int64
+	login        string
+	passwordHash string
+	firstName    string
+	middleName   *string
+	lastName     string
+	teamID       *uuid.UUID
+	roomNumber   *string
+	floorNumber  *int
+	dormitoryID  *int64
+	createdAt    time.Time
 }
 
-func NewUser(telegramID int64, firstName, lastName string) (*User, error) {
+func NewUser(telegramID int64, firstName, lastName, login, passwordHash string) (*User, error) {
 	if telegramID <= 0 {
 		return nil, ErrInvalidTelegramID
 	}
-	return newUserWithTelegramID(&telegramID, firstName, lastName)
+	return newUserWithTelegramID(&telegramID, firstName, lastName, login, passwordHash)
 }
 
-func NewManualUser(firstName, lastName string) (*User, error) {
-	return newUserWithTelegramID(nil, firstName, lastName)
+func NewManualUser(firstName, lastName, login, passwordHash string) (*User, error) {
+	return newUserWithTelegramID(nil, firstName, lastName, login, passwordHash)
 }
 
-func newUserWithTelegramID(telegramID *int64, firstName, lastName string) (*User, error) {
+func newUserWithTelegramID(telegramID *int64, firstName, lastName, login, passwordHash string) (*User, error) {
+	firstName = strings.TrimSpace(firstName)
+	lastName = strings.TrimSpace(lastName)
+	login = strings.TrimSpace(login)
+	passwordHash = strings.TrimSpace(passwordHash)
+
 	if firstName == "" {
 		return nil, ErrEmptyName
 	}
+	if login == "" {
+		return nil, ErrEmptyLogin
+	}
+	if passwordHash == "" {
+		return nil, ErrEmptyPasswordHash
+	}
 
 	return &User{
-		id:         uuid.New(),
-		telegramID: telegramID,
-		firstName:  firstName,
-		lastName:   lastName,
-		createdAt:  time.Now(),
+		id:           uuid.New(),
+		telegramID:   telegramID,
+		login:        login,
+		passwordHash: passwordHash,
+		firstName:    firstName,
+		lastName:     lastName,
+		createdAt:    time.Now(),
 	}, nil
 }
 
 func RestoreUser(
 	id uuid.UUID,
 	telegramID *int64,
+	login string,
+	passwordHash string,
 	firstName string,
 	middleName *string,
 	lastName string,
@@ -64,16 +84,18 @@ func RestoreUser(
 	createdAt time.Time,
 ) *User {
 	return &User{
-		id:          id,
-		telegramID:  telegramID,
-		firstName:   firstName,
-		middleName:  middleName,
-		lastName:    lastName,
-		teamID:      teamID,
-		roomNumber:  roomNumber,
-		floorNumber: floorNumber,
-		dormitoryID: dormitoryID,
-		createdAt:   createdAt,
+		id:           id,
+		telegramID:   telegramID,
+		login:        login,
+		passwordHash: passwordHash,
+		firstName:    firstName,
+		middleName:   middleName,
+		lastName:     lastName,
+		teamID:       teamID,
+		roomNumber:   roomNumber,
+		floorNumber:  floorNumber,
+		dormitoryID:  dormitoryID,
+		createdAt:    createdAt,
 	}
 }
 
@@ -107,11 +129,29 @@ func (u *User) SetFloorNumber(floorNumber int) {
 }
 
 func (u *User) Rename(firstName, lastName string) error {
+	firstName = strings.TrimSpace(firstName)
+	lastName = strings.TrimSpace(lastName)
 	if firstName == "" {
 		return ErrEmptyName
 	}
 	u.firstName = firstName
 	u.lastName = lastName
+	return nil
+}
+
+func (u *User) SetCredentials(login, passwordHash string) error {
+	login = strings.TrimSpace(login)
+	passwordHash = strings.TrimSpace(passwordHash)
+
+	if login == "" {
+		return ErrEmptyLogin
+	}
+	if passwordHash == "" {
+		return ErrEmptyPasswordHash
+	}
+
+	u.login = login
+	u.passwordHash = passwordHash
 	return nil
 }
 
@@ -123,6 +163,8 @@ func (u *User) TelegramID() int64 {
 	return *u.telegramID
 }
 func (u *User) TelegramIDValue() *int64 { return u.telegramID }
+func (u *User) Login() string           { return u.login }
+func (u *User) PasswordHash() string    { return u.passwordHash }
 func (u *User) FirstName() string       { return u.firstName }
 func (u *User) MiddleName() *string     { return u.middleName }
 func (u *User) LastName() string        { return u.lastName }

@@ -21,16 +21,18 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 }
 
 type userDTO struct {
-	ID          []byte
-	TelegramID  sql.NullInt64
-	FirstName   string
-	MiddleName  sql.NullString
-	LastName    string
-	TeamID      []byte
-	RoomNumber  sql.NullString
-	FloorNumber sql.NullInt64
-	DormitoryID sql.NullInt64
-	CreatedAt   time.Time
+	ID           []byte
+	TelegramID   sql.NullInt64
+	Login        string
+	PasswordHash string
+	FirstName    string
+	MiddleName   sql.NullString
+	LastName     string
+	TeamID       []byte
+	RoomNumber   sql.NullString
+	FloorNumber  sql.NullInt64
+	DormitoryID  sql.NullInt64
+	CreatedAt    time.Time
 }
 
 func (dto *userDTO) toDomain() *user.User {
@@ -57,6 +59,8 @@ func (dto *userDTO) toDomain() *user.User {
 	return user.RestoreUser(
 		id,
 		nullInt64Ptr(dto.TelegramID),
+		dto.Login,
+		dto.PasswordHash,
 		dto.FirstName,
 		nullStringPtr(dto.MiddleName),
 		dto.LastName,
@@ -94,9 +98,11 @@ func nullIntPtr(value sql.NullInt64) *int {
 
 func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 	const query = `
-		INSERT INTO user (id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user (id, telegram_id, login, password_hash, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
+			login = VALUES(login),
+			password_hash = VALUES(password_hash),
 			first_name = VALUES(first_name),
 			middle_name = VALUES(middle_name),
 			last_name = VALUES(last_name),
@@ -136,6 +142,8 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 	_, err := r.db.ExecContext(ctx, query,
 		idBytes,
 		u.TelegramIDValue(),
+		u.Login(),
+		u.PasswordHash(),
 		u.FirstName(),
 		middleName,
 		u.LastName(),
@@ -155,6 +163,7 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 func (r *UserRepository) FindAll(ctx context.Context) ([]*user.User, error) {
 	const query = `
 		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
+		, login, password_hash
 		FROM user
 		WHERE deleted_at IS NULL
 		ORDER BY last_name, first_name
@@ -179,6 +188,8 @@ func (r *UserRepository) FindAll(ctx context.Context) ([]*user.User, error) {
 			&dto.FloorNumber,
 			&dto.DormitoryID,
 			&dto.CreatedAt,
+			&dto.Login,
+			&dto.PasswordHash,
 		)
 		if err != nil {
 			return nil, err
@@ -190,7 +201,7 @@ func (r *UserRepository) FindAll(ctx context.Context) ([]*user.User, error) {
 
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	const query = `
-		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at, login, password_hash
 		FROM user WHERE id = ? AND deleted_at IS NULL
 	`
 	idBytes, _ := id.MarshalBinary()
@@ -201,7 +212,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User
 
 func (r *UserRepository) FindByTelegramID(ctx context.Context, telegramID int64) (*user.User, error) {
 	const query = `
-		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at, login, password_hash
 		FROM user WHERE telegram_id = ? AND deleted_at IS NULL
 	`
 	row := r.db.QueryRowContext(ctx, query, telegramID)
@@ -210,7 +221,7 @@ func (r *UserRepository) FindByTelegramID(ctx context.Context, telegramID int64)
 
 func (r *UserRepository) FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]*user.User, error) {
 	const query = `
-		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at, login, password_hash
 		FROM user WHERE team_id = ? AND deleted_at IS NULL
 	`
 	idBytes, _ := teamID.MarshalBinary()
@@ -234,6 +245,8 @@ func (r *UserRepository) FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]
 			&dto.FloorNumber,
 			&dto.DormitoryID,
 			&dto.CreatedAt,
+			&dto.Login,
+			&dto.PasswordHash,
 		)
 		if err != nil {
 			return nil, err
@@ -245,7 +258,7 @@ func (r *UserRepository) FindByTeamID(ctx context.Context, teamID uuid.UUID) ([]
 
 func (r *UserRepository) FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*user.User, error) {
 	const query = `
-		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at
+		SELECT id, telegram_id, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at, login, password_hash
 		FROM user
 		WHERE dormitory_id = ? AND deleted_at IS NULL
 		ORDER BY last_name, first_name
@@ -270,6 +283,8 @@ func (r *UserRepository) FindByDormitoryID(ctx context.Context, dormitoryID int6
 			&dto.FloorNumber,
 			&dto.DormitoryID,
 			&dto.CreatedAt,
+			&dto.Login,
+			&dto.PasswordHash,
 		)
 		if err != nil {
 			return nil, err
@@ -292,6 +307,8 @@ func (r *UserRepository) scanUser(row *sql.Row) (*user.User, error) {
 		&dto.FloorNumber,
 		&dto.DormitoryID,
 		&dto.CreatedAt,
+		&dto.Login,
+		&dto.PasswordHash,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

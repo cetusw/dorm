@@ -9,6 +9,7 @@ import (
 
 type UserListItem struct {
 	ID            uuid.UUID
+	Login         string
 	TelegramID    int64
 	FullName      string
 	DormitoryName string
@@ -18,22 +19,26 @@ type UserListItem struct {
 }
 
 type CreateUserRequest struct {
-	FirstName   string `form:"first_name"`
-	LastName    string `form:"last_name"`
-	MiddleName  string `form:"middle_name"`
-	DormitoryID int64  `form:"dormitory_id"`
-	Floor       int    `form:"floor"`
-	RoomNumber  string `form:"room_number"`
-	TeamID      string `form:"team_id"`
+	FirstName    string `form:"first_name"`
+	LastName     string `form:"last_name"`
+	MiddleName   string `form:"middle_name"`
+	Login        string `form:"login"`
+	PasswordHash string `form:"password_hash"`
+	DormitoryID  int64  `form:"dormitory_id"`
+	Floor        int    `form:"floor"`
+	RoomNumber   string `form:"room_number"`
+	TeamID       string `form:"team_id"`
 }
 
 type UpdateUserRequest struct {
-	FirstName   string `form:"first_name"`
-	MiddleName  string `form:"middle_name"`
-	LastName    string `form:"last_name"`
-	DormitoryID int64  `form:"dormitory_id"`
-	Floor       int    `form:"floor"`
-	RoomNumber  string `form:"room_number"`
+	FirstName    string `form:"first_name"`
+	MiddleName   string `form:"middle_name"`
+	LastName     string `form:"last_name"`
+	Login        string `form:"login"`
+	PasswordHash string `form:"password_hash"`
+	DormitoryID  int64  `form:"dormitory_id"`
+	Floor        int    `form:"floor"`
+	RoomNumber   string `form:"room_number"`
 }
 
 type ProfileViewModel struct {

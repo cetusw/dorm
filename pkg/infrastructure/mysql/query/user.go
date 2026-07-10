@@ -20,7 +20,7 @@ func NewUserQueryService(db *sql.DB) *UserQueryService {
 func (q *UserQueryService) GetUsersDetailedList(ctx context.Context) ([]dto.UserListItem, error) {
 	const query = `
 		SELECT 
-			u.id, COALESCE(u.telegram_id, 0), u.first_name, u.last_name, COALESCE(u.middle_name, ''),
+			u.id, u.login, COALESCE(u.telegram_id, 0), u.first_name, u.last_name, COALESCE(u.middle_name, ''),
 			COALESCE(u.room_number, '-'),
 			COALESCE(d.name, 'Не назначено'),
 			COALESCE(g.name, 'Нет группы'),
@@ -47,6 +47,7 @@ func (q *UserQueryService) GetUsersDetailedList(ctx context.Context) ([]dto.User
 
 		err := rows.Scan(
 			&idBytes,
+			&item.Login,
 			&item.TelegramID,
 			&firstName,
 			&lastName,

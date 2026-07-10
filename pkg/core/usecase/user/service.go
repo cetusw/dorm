@@ -2,8 +2,10 @@ package user
 
 import (
 	"context"
+	"crypto/sha256"
 	"dorm/pkg/core/ports/dto"
 	ports "dorm/pkg/core/ports/query"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -41,7 +43,7 @@ func (s *Service) CreateUser(ctx context.Context, request dto.CreateUserRequest)
 	if request.DormitoryID == 0 {
 		return fmt.Errorf("dormitory is required")
 	}
-	u, err := user.NewManualUser(request.FirstName, request.LastName)
+	u, err := user.NewManualUser(request.FirstName, request.LastName, request.Login, request.PasswordHash)
 	if err != nil {
 		return err
 	}
@@ -75,6 +77,9 @@ func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, request dto.Upda
 	if err := u.Rename(request.FirstName, request.LastName); err != nil {
 		return err
 	}
+	if err := u.SetCredentials(request.Login, request.PasswordHash); err != nil {
+		return err
+	}
 	u.SetMiddleName(request.MiddleName)
 	u.MoveInto(request.DormitoryID, request.RoomNumber)
 	u.SetFloorNumber(request.Floor)
@@ -88,11 +93,22 @@ func (s *Service) SoftDeleteUser(ctx context.Context, id uuid.UUID) error {
 
 func (s *Service) RegisterUser(ctx context.Context, telegramID int64, fullName string) error {
 	parts := strings.Split(fullName, " ")
-	u, err := user.NewUser(telegramID, parts[0], parts[1])
+	u, err := user.NewUser(
+		telegramID,
+		parts[0],
+		parts[1],
+		fmt.Sprintf("tg_%d", telegramID),
+		telegramPlaceholderPasswordHash(telegramID),
+	)
 	if err != nil {
 		return err
 	}
 	return s.userRepo.Save(ctx, u)
+}
+
+func telegramPlaceholderPasswordHash(telegramID int64) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("telegram:%d", telegramID)))
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *Service) GetUserByTelegramID(ctx context.Context, telegramID int64) (*user.User, error) {

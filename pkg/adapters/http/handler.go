@@ -193,13 +193,15 @@ func (h *AdminHandler) HandleEditUserModal(c *fiber.Ctx) error {
 
 	return c.Render("partials/modal_edit_user", fiber.Map{
 		"User": fiber.Map{
-			"ID":          u.ID(),
-			"FirstName":   u.FirstName(),
-			"MiddleName":  middleName,
-			"LastName":    u.LastName(),
-			"RoomNumber":  room,
-			"Floor":       floor,
-			"DormitoryID": dormID,
+			"ID":           u.ID(),
+			"FirstName":    u.FirstName(),
+			"MiddleName":   middleName,
+			"LastName":     u.LastName(),
+			"Login":        u.Login(),
+			"PasswordHash": u.PasswordHash(),
+			"RoomNumber":   room,
+			"Floor":        floor,
+			"DormitoryID":  dormID,
 		},
 		"Dormitories": dorms,
 	})
