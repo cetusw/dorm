@@ -44,7 +44,12 @@ func (s *Service) CreateUser(ctx context.Context, request dto.CreateUserRequest)
 	if request.DormitoryID == 0 {
 		return fmt.Errorf("dormitory is required")
 	}
-	u, err := user.NewManualUser(request.FirstName, request.LastName, request.Login, request.PasswordHash)
+	passwordHash, err := hashRequiredResidentPassword(request.Password)
+	if err != nil {
+		return err
+	}
+
+	u, err := user.NewManualUser(request.FirstName, request.LastName, request.Login, passwordHash)
 	if err != nil {
 		return err
 	}
@@ -101,8 +106,17 @@ func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, request dto.Upda
 	if err := u.Rename(request.FirstName, request.LastName); err != nil {
 		return err
 	}
-	if err := u.SetCredentials(request.Login, request.PasswordHash); err != nil {
+	if err := u.SetLogin(request.Login); err != nil {
 		return err
+	}
+	if strings.TrimSpace(request.Password) != "" {
+		passwordHash, err := hashRequiredResidentPassword(request.Password)
+		if err != nil {
+			return err
+		}
+		if err := u.SetPasswordHash(passwordHash); err != nil {
+			return err
+		}
 	}
 	u.SetMiddleName(request.MiddleName)
 	u.MoveInto(request.DormitoryID, request.RoomNumber)
@@ -138,6 +152,15 @@ func telegramPlaceholderPasswordHash(telegramID int64) string {
 func hashResidentPassword(password string) string {
 	sum := sha256.Sum256([]byte(password))
 	return hex.EncodeToString(sum[:])
+}
+
+func hashRequiredResidentPassword(password string) (string, error) {
+	password = strings.TrimSpace(password)
+	if password == "" {
+		return "", fmt.Errorf("пароль обязателен")
+	}
+
+	return hashResidentPassword(password), nil
 }
 
 func (s *Service) GetUserByTelegramID(ctx context.Context, telegramID int64) (*user.User, error) {

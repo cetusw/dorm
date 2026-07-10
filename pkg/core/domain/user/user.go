@@ -155,6 +155,26 @@ func (u *User) SetCredentials(login, passwordHash string) error {
 	return nil
 }
 
+func (u *User) SetLogin(login string) error {
+	login = strings.TrimSpace(login)
+	if login == "" {
+		return ErrEmptyLogin
+	}
+
+	u.login = login
+	return nil
+}
+
+func (u *User) SetPasswordHash(passwordHash string) error {
+	passwordHash = strings.TrimSpace(passwordHash)
+	if passwordHash == "" {
+		return ErrEmptyPasswordHash
+	}
+
+	u.passwordHash = passwordHash
+	return nil
+}
+
 func (u *User) ID() uuid.UUID { return u.id }
 func (u *User) TelegramID() int64 {
 	if u.telegramID == nil {
