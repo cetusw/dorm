@@ -7,6 +7,10 @@ import {
 } from './utils'
 
 export type DutyAnalytics = {
+    totalTasksCount: number
+    totalTakenTasksCount: number
+    totalCompletedTasksCount: number
+    totalVerifiedTasksCount: number
     takenCostSum: number
     takenTasksCount: number
     completedTasksCount: number
@@ -31,6 +35,12 @@ type SelectTasksForTabParams = {
 
 export function calculateDutyAnalytics(tasks: ResidentDutyTask[]): DutyAnalytics {
     return {
+        totalTasksCount: tasks.length,
+        totalTakenTasksCount: tasks.filter((task) => task.status !== 'free').length,
+        totalCompletedTasksCount: tasks.filter(
+            (task) => task.status === 'completed' || task.status === 'verified',
+        ).length,
+        totalVerifiedTasksCount: tasks.filter((task) => task.status === 'verified').length,
         takenCostSum: sumCostTakenByMe(tasks),
         takenTasksCount: countTasksTakenByMe(tasks),
         completedTasksCount: countTasksCompletedByMe(tasks),

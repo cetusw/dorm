@@ -113,11 +113,10 @@ export function CurrentDutyPage() {
             notice={duty.notice_message}
             controls={controls}
         >
-            {viewOptions.showAnalytics && (
+            {(viewOptions.showAnalytics || viewOptions.isReadOnly) && (
                 <CurrentDutyAnalytics
-                    completedTasksCount={analytics.completedTasksCount}
-                    takenCostSum={analytics.takenCostSum}
-                    takenTasksCount={analytics.takenTasksCount}
+                    analytics={analytics}
+                    isReadOnly={viewOptions.isReadOnly}
                     targetValue={duty.cost_per_resident_goal}
                 />
             )}
