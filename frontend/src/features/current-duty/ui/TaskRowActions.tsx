@@ -1,7 +1,7 @@
-import { Button, Group, Text } from '@mantine/core'
+import {Button, Group} from '@mantine/core'
 
-import type { ResidentDutyTask } from '../model/types'
-import { TaskStatusBadge } from './TaskStatusBadge'
+import type {ResidentDutyTask} from '../model/types'
+import {TaskStatusBadge} from './TaskStatusBadge'
 
 export type TaskRowActionMode = 'default' | 'review'
 
@@ -17,15 +17,15 @@ type Props = {
 }
 
 export function TaskRowActions({
-    mode = 'default',
-    pending,
-    task,
-    onTake,
-    onReturn,
-    onComplete,
-    onOpen,
-    onVerify,
-}: Props) {
+                                   mode = 'default',
+                                   pending,
+                                   task,
+                                   onTake,
+                                   onReturn,
+                                   onComplete,
+                                   onOpen,
+                                   onVerify,
+                               }: Props) {
     const hasDefaultActions =
         task.can_take || task.can_return || task.can_complete || task.can_open
 
@@ -73,27 +73,7 @@ export function TaskRowActions({
     }
 
     if (!hasDefaultActions) {
-        if (task.status === 'verified' && task.is_mine) {
-            return (
-                <Group gap="xs" wrap="nowrap" justify="flex-end">
-                    <Text size="sm" fw={600} c="green">
-                        Подтверждено
-                    </Text>
-                </Group>
-            )
-        }
-
-        return <TaskStatusBadge status={task.status} />
-    }
-
-    if (task.status === 'verified' && task.is_mine) {
-        return (
-            <Group gap="xs" wrap="nowrap" justify="flex-end">
-                <Text size="sm" fw={600} c="green">
-                    Подтверждено
-                </Text>
-            </Group>
-        )
+        return <TaskStatusBadge status={task.status}/>
     }
 
     return (

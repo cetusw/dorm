@@ -18,21 +18,21 @@ export function CurrentDutyAnalytics({
         return (
             <SimpleGrid cols={3} spacing="lg">
                 <DutyAnalyticsCard
-                    label="Всего взято задач"
+                    label="Всего взято"
                     currentValue={analytics.totalTakenTasksCount}
                     targetValue={analytics.totalTasksCount}
                     unitLabel="задач"
                     progressColor="blue"
                 />
                 <DutyAnalyticsCard
-                    label="Всего выполнено задач"
+                    label="Всего выполнено"
                     currentValue={analytics.totalCompletedTasksCount}
                     targetValue={analytics.totalTasksCount}
                     unitLabel="задач"
                     progressColor="yellow"
                 />
                 <DutyAnalyticsCard
-                    label="Всего проверено задач"
+                    label="Всего проверено"
                     currentValue={analytics.totalVerifiedTasksCount}
                     targetValue={analytics.totalTasksCount}
                     unitLabel="задач"
@@ -43,9 +43,9 @@ export function CurrentDutyAnalytics({
     }
 
     return (
-        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="lg">
             <DutyAnalyticsCard
-                label="Взято задач"
+                label="Взято"
                 currentValue={analytics.takenCostSum}
                 targetValue={targetValue}
                 unitLabel="баллов"
@@ -57,6 +57,13 @@ export function CurrentDutyAnalytics({
                 targetValue={analytics.takenTasksCount}
                 unitLabel="задач"
                 progressColor="green"
+            />
+            <DutyAnalyticsCard
+                label="Проверено"
+                currentValue={analytics.myVerifiedTasksCount}
+                targetValue={analytics.takenTasksCount}
+                unitLabel="задач"
+                progressColor="teal"
             />
         </SimpleGrid>
     )

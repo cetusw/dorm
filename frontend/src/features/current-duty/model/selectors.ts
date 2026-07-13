@@ -7,6 +7,7 @@ import {
 } from './utils'
 
 export type DutyAnalytics = {
+    myVerifiedTasksCount: number
     totalTasksCount: number
     totalTakenTasksCount: number
     totalCompletedTasksCount: number
@@ -35,6 +36,7 @@ type SelectTasksForTabParams = {
 
 export function calculateDutyAnalytics(tasks: ResidentDutyTask[]): DutyAnalytics {
     return {
+        myVerifiedTasksCount: tasks.filter((task) => task.is_mine && task.status === 'verified').length,
         totalTasksCount: tasks.length,
         totalTakenTasksCount: tasks.filter((task) => task.status !== 'free').length,
         totalCompletedTasksCount: tasks.filter(
