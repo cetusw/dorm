@@ -1,5 +1,7 @@
 export type DutyTaskStatus = 'free' | 'assigned' | 'completed' | 'verified'
 
+export type DutyTaskTab = 'mine' | 'free' | 'all' | 'review'
+
 export type ResidentDutyTask = {
     id: string
     area_name: string
@@ -29,7 +31,7 @@ export type ResidentCurrentDuty = {
     can_manage_tasks: boolean
     read_only: boolean
     show_group_select: boolean
-    visible_tabs: Array<'mine' | 'free' | 'all' | 'review'>
+    visible_tabs: DutyTaskTab[]
     notice_message: string
     groups: ResidentDutyGroupOption[]
     duty_id: string

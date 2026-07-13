@@ -1,8 +1,6 @@
 import { Button, Group, Select } from '@mantine/core'
 
-import type { ResidentDutyGroupOption } from './types'
-
-export type DutyTaskTab = 'mine' | 'free' | 'all' | 'review'
+import type { ResidentDutyGroupOption, DutyTaskTab } from '../model/types'
 
 type Props = {
     activeTab: DutyTaskTab

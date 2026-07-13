@@ -4,10 +4,6 @@
 
 .loginPage {
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
     background-color: #f3f4f6;
     background-image:
         linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)),
@@ -15,10 +11,4 @@
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
-}
-
-.loginCard {
-    width: 100%;
-    max-width: 420px;
-    background-color: rgba(255, 255, 255, 0.96);
 }

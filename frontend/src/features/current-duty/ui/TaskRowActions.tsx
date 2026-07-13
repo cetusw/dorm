@@ -1,6 +1,6 @@
 import { Button, Group, Text } from '@mantine/core'
 
-import type { ResidentDutyTask } from './types'
+import type { ResidentDutyTask } from '../model/types'
 import { TaskStatusBadge } from './TaskStatusBadge'
 
 export type TaskRowActionMode = 'default' | 'review'

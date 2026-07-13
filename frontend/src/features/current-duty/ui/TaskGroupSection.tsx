@@ -1,9 +1,9 @@
 import { Divider, Paper, ScrollArea, Table, Text, Tooltip } from '@mantine/core'
 
+import type { ResidentDutyTask } from '../model/types'
+import type { TaskAreaGroup } from '../model/utils'
 import { TaskRowActions, type TaskRowActionMode } from './TaskRowActions'
 import { TaskStatusBadge } from './TaskStatusBadge'
-import type { ResidentDutyTask } from './types'
-import type { TaskAreaGroup } from './utils'
 
 type Props = {
     actionMode?: TaskRowActionMode

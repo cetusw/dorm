@@ -1,9 +1,9 @@
 import { Alert, Stack } from '@mantine/core'
 
+import type { ResidentDutyTask } from '../model/types'
+import { groupTasksByArea } from '../model/utils'
 import { TaskGroupSection } from './TaskGroupSection'
 import type { TaskRowActionMode } from './TaskRowActions'
-import type { ResidentDutyTask } from './types'
-import { groupTasksByArea } from './utils'
 
 type Props = {
     actionMode?: TaskRowActionMode

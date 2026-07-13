@@ -146,9 +146,6 @@ func (s *Service) loadCurrentDutyContext(
 	if resident == nil {
 		return nil, fmt.Errorf("resident not found")
 	}
-	if resident.TeamID() == nil {
-		return nil, fmt.Errorf("resident is not assigned to a team")
-	}
 	if resident.DormitoryID() == nil {
 		return nil, fmt.Errorf("resident is not assigned to a dormitory")
 	}
@@ -161,28 +158,22 @@ func (s *Service) loadCurrentDutyContext(
 		return nil, fmt.Errorf("dormitory not found")
 	}
 
-	residentTeam, err := s.teamRepo.FindByID(ctx, *resident.TeamID())
-	if err != nil {
-		return nil, fmt.Errorf("load resident team: %w", err)
-	}
-	if residentTeam == nil {
-		return nil, fmt.Errorf("team not found")
-	}
-
-	residentGroup, err := s.groupRepo.FindByID(ctx, residentTeam.GroupID())
-	if err != nil {
-		return nil, fmt.Errorf("load resident group: %w", err)
-	}
-	if residentGroup == nil {
-		return nil, fmt.Errorf("group not found")
-	}
-
 	groups, err := s.groupRepo.FindByDormitoryID(ctx, *resident.DormitoryID())
 	if err != nil {
 		return nil, fmt.Errorf("load dormitory groups: %w", err)
 	}
 	if len(groups) == 0 {
 		return nil, fmt.Errorf("no groups found for resident dormitory")
+	}
+
+	residentTeam, residentGroup, err := s.resolveResidentAffiliation(
+		ctx,
+		resident,
+		groups,
+		isDormitoryLeader(dormitory, resident.ID()),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	canSelectGroup := isDormitoryLeader(dormitory, resident.ID())
@@ -208,6 +199,53 @@ func (s *Service) loadCurrentDutyContext(
 	}, nil
 }
 
+func (s *Service) resolveResidentAffiliation(
+	ctx context.Context,
+	resident *user.User,
+	groups []*structure.Group,
+	isDormitoryLeader bool,
+) (*structure.Team, *structure.Group, error) {
+	if resident.TeamID() != nil {
+		residentTeam, err := s.teamRepo.FindByID(ctx, *resident.TeamID())
+		if err != nil {
+			return nil, nil, fmt.Errorf("load resident team: %w", err)
+		}
+		if residentTeam != nil {
+			residentGroup, err := s.groupRepo.FindByID(ctx, residentTeam.GroupID())
+			if err != nil {
+				return nil, nil, fmt.Errorf("load resident group: %w", err)
+			}
+			if residentGroup != nil {
+				return residentTeam, residentGroup, nil
+			}
+		}
+	}
+
+	for _, group := range groups {
+		if isGroupLeader(group, resident.ID()) {
+			return nil, group, nil
+		}
+	}
+
+	for _, group := range groups {
+		teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
+		if err != nil {
+			return nil, nil, fmt.Errorf("load group teams: %w", err)
+		}
+		for _, team := range teams {
+			if isTeamLeader(team, resident.ID()) {
+				return team, group, nil
+			}
+		}
+	}
+
+	if isDormitoryLeader {
+		return nil, nil, nil
+	}
+
+	return nil, nil, fmt.Errorf("resident is not assigned to a team")
+}
+
 func resolveSelectedGroup(
 	groups []*structure.Group,
 	residentGroup *structure.Group,
@@ -215,7 +253,13 @@ func resolveSelectedGroup(
 	canSelectGroup bool,
 ) (*structure.Group, error) {
 	if !canSelectGroup || groupID == nil {
-		return residentGroup, nil
+		if residentGroup != nil {
+			return residentGroup, nil
+		}
+		if canSelectGroup && len(groups) > 0 {
+			return groups[0], nil
+		}
+		return nil, fmt.Errorf("resident is not assigned to a group")
 	}
 
 	for _, group := range groups {

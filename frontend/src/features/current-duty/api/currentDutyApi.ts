@@ -1,32 +1,13 @@
-import type { ResidentCurrentDuty } from './types'
+import { apiRequest } from '../../../shared/api/apiClient'
+import type { ResidentCurrentDuty } from '../model/types'
 
-export class ApiError extends Error {
-    status: number
-
-    constructor(message: string, status: number) {
-        super(message)
-        this.name = 'ApiError'
-        this.status = status
+function normalizeCurrentDuty(duty: ResidentCurrentDuty): ResidentCurrentDuty {
+    return {
+        ...duty,
+        visible_tabs: Array.isArray(duty.visible_tabs) ? duty.visible_tabs : [],
+        groups: Array.isArray(duty.groups) ? duty.groups : [],
+        tasks: Array.isArray(duty.tasks) ? duty.tasks : [],
     }
-}
-
-async function request(path: string, options: RequestInit = {}) {
-    const response = await fetch(path, {
-        ...options,
-        credentials: 'same-origin',
-        headers: options.headers,
-    })
-
-    if (!response.ok) {
-        const body = await response.json().catch(() => null)
-        const message = body?.error ?? 'Ошибка запроса'
-        if (response.status === 401) {
-            window.location.assign('/app/login')
-        }
-        throw new ApiError(message, response.status)
-    }
-
-    return response
 }
 
 function buildCurrentDutyPath(groupId?: string): string {
@@ -38,8 +19,8 @@ function buildCurrentDutyPath(groupId?: string): string {
 }
 
 export async function getCurrentDuty(groupId?: string): Promise<ResidentCurrentDuty> {
-    const response = await request(buildCurrentDutyPath(groupId))
-    return response.json()
+    const response = await apiRequest(buildCurrentDutyPath(groupId))
+    return normalizeCurrentDuty(await response.json())
 }
 
 async function requestDutyAction(
@@ -51,11 +32,11 @@ async function requestDutyAction(
         ? `/api/v1/resident/tasks/${taskId}/${action}?group_id=${encodeURIComponent(groupId)}`
         : `/api/v1/resident/tasks/${taskId}/${action}`
 
-    const response = await request(path, {
+    const response = await apiRequest(path, {
         method: 'POST',
     })
 
-    return response.json()
+    return normalizeCurrentDuty(await response.json())
 }
 
 export async function takeTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {

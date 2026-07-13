@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { ApiError, completeTask, getCurrentDuty, openTask, returnTask, takeTask, verifyTask } from './api'
+import { ApiError } from '../../../shared/api/ApiError'
+import {
+    completeTask,
+    getCurrentDuty,
+    openTask,
+    returnTask,
+    takeTask,
+    verifyTask,
+} from '../api/currentDutyApi'
 import type { ResidentCurrentDuty } from './types'
 import {
     preserveTaskOrder,
@@ -30,15 +38,15 @@ export function useCurrentDuty() {
     const [loading, setLoading] = useState(true)
     const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
     const orderedTaskIdsRef = useRef<string[]>([])
-    const initialMineTaskIdsRef = useRef<string[]>([])
-    const initialFreeTaskIdsRef = useRef<string[]>([])
+    const visibleMineTaskIdsRef = useRef<string[]>([])
+    const visibleFreeTaskIdsRef = useRef<string[]>([])
 
     function applyLoadedDuty(loadedDuty: ResidentCurrentDuty) {
         orderedTaskIdsRef.current = loadedDuty.tasks.map((task) => task.id)
-        initialMineTaskIdsRef.current = loadedDuty.tasks
+        visibleMineTaskIdsRef.current = loadedDuty.tasks
             .filter((task) => task.is_mine)
             .map((task) => task.id)
-        initialFreeTaskIdsRef.current = loadedDuty.tasks
+        visibleFreeTaskIdsRef.current = loadedDuty.tasks
             .filter((task) => !task.assignee_id)
             .map((task) => task.id)
         setSelectedGroupId(loadedDuty.selected_group_id)
@@ -92,7 +100,7 @@ export function useCurrentDuty() {
             return
         }
 
-        initialMineTaskIdsRef.current = appendUniqueTaskId(initialMineTaskIdsRef.current, taskId)
+        visibleMineTaskIdsRef.current = appendUniqueTaskId(visibleMineTaskIdsRef.current, taskId)
     }
 
     async function handleReturn(taskId: string) {
@@ -101,7 +109,7 @@ export function useCurrentDuty() {
             return
         }
 
-        initialFreeTaskIdsRef.current = appendUniqueTaskId(initialFreeTaskIdsRef.current, taskId)
+        visibleFreeTaskIdsRef.current = appendUniqueTaskId(visibleFreeTaskIdsRef.current, taskId)
     }
 
     useEffect(() => {
@@ -120,7 +128,7 @@ export function useCurrentDuty() {
         handleComplete: (taskId: string) => runTaskAction(taskId, completeTask),
         handleOpen: (taskId: string) => runTaskAction(taskId, openTask),
         handleVerify: (taskId: string) => runTaskAction(taskId, verifyTask),
-        initialMineTaskIds: initialMineTaskIdsRef.current,
-        initialFreeTaskIds: initialFreeTaskIdsRef.current,
+        visibleMineTaskIds: visibleMineTaskIdsRef.current,
+        visibleFreeTaskIds: visibleFreeTaskIdsRef.current,
     }
 }
