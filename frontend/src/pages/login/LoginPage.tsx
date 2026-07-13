@@ -7,7 +7,7 @@ import classes from './LoginPage.module.css'
 export function LoginPage() {
     return (
         <div className={classes.loginPage}>
-            <Center mih="100vh" px="md">
+            <Center mih="100dvh" px={{ base: 'md', sm: 'xl' }}>
                 <LoginForm />
             </Center>
         </div>

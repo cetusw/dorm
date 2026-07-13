@@ -4,6 +4,8 @@
 
 .loginPage {
     min-height: 100vh;
+    min-height: 100dvh;
+
     background-color: #f3f4f6;
     background-image:
         linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)),
