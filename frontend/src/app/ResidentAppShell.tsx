@@ -1,15 +1,25 @@
 import type {ReactNode} from 'react'
-import {AppShell, Group, Stack, Text, ThemeIcon} from '@mantine/core'
+import {AppShell, Burger, Group, NavLink, Title} from '@mantine/core'
+import {useDisclosure} from '@mantine/hooks'
 
 type Props = {
     children: ReactNode
 }
 
 export function ResidentAppShell({children}: Props) {
+    const [navbarOpened, {toggle: toggleNavbar, close: closeNavbar}] =
+        useDisclosure(false)
+
     return (
         <AppShell
-            navbar={{width: 88, breakpoint: 0}}
-            header={{height: 72}}
+            navbar={{
+                width: 280,
+                breakpoint: 'sm',
+                collapsed: {
+                    mobile: !navbarOpened,
+                },
+            }}
+            header={{height: 60}}
             padding={0}
             styles={{
                 main: {
@@ -27,20 +37,34 @@ export function ResidentAppShell({children}: Props) {
             }}
         >
             <AppShell.Navbar p="md">
-                <Stack justify="space-between" h="100%">
-                    <Stack align="center" gap="md">
-                        <ThemeIcon size={48} radius="md" color="blue">
-                            Д
-                        </ThemeIcon>
-                    </Stack>
-                </Stack>
+                <NavLink
+                    label="Дежурство"
+                    onClick={closeNavbar}
+                    styles={{
+                        root: {
+                            color: '#f9fafb',
+                            borderRadius: 8,
+                        },
+                        label: {
+                            color: '#f9fafb',
+                        },
+                    }}
+                />
             </AppShell.Navbar>
 
             <AppShell.Header px="xl">
                 <Group align="center" h="100%">
-                    <Text size="lg" c="dimmed">
+                    <Burger
+                        opened={navbarOpened}
+                        onClick={toggleNavbar}
+                        hiddenFrom="sm"
+                        size="sm"
+                        aria-label="Открыть навигацию"
+                    />
+
+                    <Title order={3}>
                         Dorm
-                    </Text>
+                    </Title>
                 </Group>
             </AppShell.Header>
 

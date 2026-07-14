@@ -87,7 +87,7 @@ export function CurrentDutyPage() {
 
     if (!duty.has_active_duty) {
         return (
-            <PageFrame title="Текущее дежурство" error={error} controls={controls}>
+            <PageFrame title="Дежурство" error={error} controls={controls}>
                 <Alert color="gray">В выбранной группе сейчас нет активного дежурства.</Alert>
             </PageFrame>
         )
@@ -96,7 +96,8 @@ export function CurrentDutyPage() {
     if (duty.tasks.length === 0) {
         return (
             <PageFrame
-                title={`Текущее дежурство · ${formatDutyPeriod(duty.start_date, duty.end_date)}`}
+                title="Дежурство"
+                subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
                 error={error}
                 notice={duty.notice_message}
                 controls={controls}
@@ -108,7 +109,8 @@ export function CurrentDutyPage() {
 
     return (
         <PageFrame
-            title={`Текущее дежурство · ${formatDutyPeriod(duty.start_date, duty.end_date)}`}
+            title="Дежурство"
+            subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
             error={error}
             notice={duty.notice_message}
             controls={controls}
