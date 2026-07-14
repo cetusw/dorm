@@ -3,11 +3,21 @@ package dto
 import "github.com/google/uuid"
 
 type DormitoryListItem struct {
-	ID          int64
-	Name        string
-	Address     string
-	LeaderName  string
-	GroupsCount int
+	ID          int64        `json:"id"`
+	Name        string       `json:"name"`
+	Address     string       `json:"address"`
+	Leader      *UserSummary `json:"leader"`
+	LeaderName  string       `json:"-"`
+	GroupsCount int          `json:"-"`
+}
+
+type DormitoryListResponse struct {
+	Dormitories []DormitoryListItem `json:"dormitories"`
+}
+
+type UserSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type GroupListItem struct {

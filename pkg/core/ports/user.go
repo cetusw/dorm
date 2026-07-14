@@ -17,6 +17,7 @@ type UserUseCase interface {
 	AuthenticateResident(ctx context.Context, login string, password string) (*user.User, error)
 	GetUserByTelegramID(ctx context.Context, telegramID int64) (*user.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*user.User, error)
+	GetCurrentUser(ctx context.Context, userID uuid.UUID) (*dto.CurrentUserResponse, error)
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (*dto.ProfileViewModel, error)
 	GetUsersList(ctx context.Context) ([]dto.UserListItem, error)
 }

@@ -60,6 +60,7 @@ func (d *Dormitory) Address() string {
 type DormitoryRepository interface {
 	FindAll(ctx context.Context) ([]*Dormitory, error)
 	FindByID(ctx context.Context, id int64) (*Dormitory, error)
+	ExistsByLeaderID(ctx context.Context, leaderID uuid.UUID) (bool, error)
 	Save(ctx context.Context, dormitory *Dormitory) error
 	Delete(ctx context.Context, id int64) error
 }

@@ -46,6 +46,13 @@ type ResidentLoginRequest struct {
 	Password string `json:"password"`
 }
 
+type CurrentUserResponse struct {
+	ID                   string `json:"id"`
+	FirstName            string `json:"first_name"`
+	LastName             string `json:"last_name"`
+	CanManageDormitories bool   `json:"can_manage_dormitories"`
+}
+
 type ProfileViewModel struct {
 	FirstName     string
 	LastName      string

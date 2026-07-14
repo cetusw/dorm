@@ -171,6 +171,28 @@ func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*user.User, er
 	return s.userRepo.FindByID(ctx, id)
 }
 
+func (s *Service) GetCurrentUser(ctx context.Context, userID uuid.UUID) (*dto.CurrentUserResponse, error) {
+	u, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("find current user: %w", err)
+	}
+	if u == nil {
+		return nil, nil
+	}
+
+	canManageDormitories, err := s.dormitoryRepo.ExistsByLeaderID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("check dormitory management access: %w", err)
+	}
+
+	return &dto.CurrentUserResponse{
+		ID:                   u.ID().String(),
+		FirstName:            u.FirstName(),
+		LastName:             u.LastName(),
+		CanManageDormitories: canManageDormitories,
+	}, nil
+}
+
 func (s *Service) GetUserProfile(ctx context.Context, userID uuid.UUID) (*dto.ProfileViewModel, error) {
 	u, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {

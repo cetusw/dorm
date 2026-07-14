@@ -74,6 +74,22 @@ func (r *DormitoryRepository) FindAll(ctx context.Context) ([]*structure.Dormito
 	return dormitories, nil
 }
 
+func (r *DormitoryRepository) ExistsByLeaderID(ctx context.Context, leaderID uuid.UUID) (bool, error) {
+	const query = `SELECT EXISTS(SELECT 1 FROM dormitory WHERE leader_id = ?)`
+
+	leaderIDBytes, err := leaderID.MarshalBinary()
+	if err != nil {
+		return false, fmt.Errorf("marshal dormitory leader id: %w", err)
+	}
+
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, query, leaderIDBytes).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check dormitory leader: %w", err)
+	}
+
+	return exists, nil
+}
+
 func (r *DormitoryRepository) Save(ctx context.Context, dormitory *structure.Dormitory) error {
 	if dormitory.ID() == 0 {
 		const query = `

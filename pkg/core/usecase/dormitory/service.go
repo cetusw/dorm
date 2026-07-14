@@ -68,6 +68,41 @@ func (s *Service) GetDormitoriesList(ctx context.Context) ([]dto.DormitoryListIt
 	return items, nil
 }
 
+func (s *Service) GetDormitoriesResponse(ctx context.Context) (dto.DormitoryListResponse, error) {
+	dormitories, err := s.dormitoryRepo.FindAll(ctx)
+	if err != nil {
+		return dto.DormitoryListResponse{}, fmt.Errorf("load dormitories: %w", err)
+	}
+
+	userNames, err := s.userNames(ctx)
+	if err != nil {
+		return dto.DormitoryListResponse{}, fmt.Errorf("load dormitory leaders: %w", err)
+	}
+
+	items := make([]dto.DormitoryListItem, 0, len(dormitories))
+	for _, dormitory := range dormitories {
+		items = append(items, dto.DormitoryListItem{
+			ID:      dormitory.ID(),
+			Name:    dormitory.Name(),
+			Address: dormitory.Address(),
+			Leader:  userSummaryFromMap(userNames, dormitory.LeaderID()),
+		})
+	}
+
+	return dto.DormitoryListResponse{
+		Dormitories: items,
+	}, nil
+}
+
+func (s *Service) CanManageDormitories(ctx context.Context, userID uuid.UUID) (bool, error) {
+	canManage, err := s.dormitoryRepo.ExistsByLeaderID(ctx, userID)
+	if err != nil {
+		return false, fmt.Errorf("check dormitory management access: %w", err)
+	}
+
+	return canManage, nil
+}
+
 func (s *Service) CreateDormitory(ctx context.Context, req dto.UpsertDormitoryRequest) error {
 	if strings.TrimSpace(req.Name) == "" {
 		return fmt.Errorf("dormitory name is required")
@@ -347,4 +382,20 @@ func leaderNameFromMap(names map[uuid.UUID]string, leaderID *uuid.UUID) string {
 		return "Не назначен"
 	}
 	return name
+}
+
+func userSummaryFromMap(names map[uuid.UUID]string, leaderID *uuid.UUID) *dto.UserSummary {
+	if leaderID == nil {
+		return nil
+	}
+
+	name, ok := names[*leaderID]
+	if !ok || strings.TrimSpace(name) == "" {
+		return nil
+	}
+
+	return &dto.UserSummary{
+		ID:   leaderID.String(),
+		Name: name,
+	}
 }

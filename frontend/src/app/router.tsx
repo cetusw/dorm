@@ -1,21 +1,15 @@
 import { ResidentAppShell } from './ResidentAppShell'
+import { useCurrentUserState } from '../features/current-user/model/useCurrentUser'
 import { CurrentDutyPage } from '../pages/current-duty/CurrentDutyPage'
+import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
 import { LoginPage } from '../pages/login/LoginPage'
 
-function renderResidentRoute(pathname: string) {
-    if (pathname === '/app' || pathname === '/app/tasks') {
-        return (
-            <ResidentAppShell>
-                <CurrentDutyPage />
-            </ResidentAppShell>
-        )
+function renderResidentPage(pathname: string) {
+    if (pathname === '/app/dormitories') {
+        return <DormitoriesPage />
     }
 
-    return (
-        <ResidentAppShell>
-            <CurrentDutyPage />
-        </ResidentAppShell>
-    )
+    return <CurrentDutyPage />
 }
 
 export function AppRouter() {
@@ -25,5 +19,16 @@ export function AppRouter() {
         return <LoginPage />
     }
 
-    return renderResidentRoute(pathname)
+    const { currentUser, loading, error } = useCurrentUserState()
+
+    return (
+        <ResidentAppShell
+            currentPath={pathname}
+            currentUser={currentUser}
+            currentUserError={error}
+            currentUserLoading={loading}
+        >
+            {renderResidentPage(pathname)}
+        </ResidentAppShell>
+    )
 }

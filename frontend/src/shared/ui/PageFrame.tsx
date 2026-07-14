@@ -1,16 +1,17 @@
 import type { ReactNode } from 'react'
 
-import { Alert, Box, Stack, Title } from '@mantine/core'
+import { Alert, Box, Group, Stack, Title } from '@mantine/core'
 
 type Props = {
     title: string
     error?: string | null
     notice?: string | null
+    titleActions?: ReactNode
     controls?: ReactNode
     children: ReactNode
 }
 
-export function PageFrame({ title, error, notice, controls, children }: Props) {
+export function PageFrame({ title, error, notice, titleActions, controls, children }: Props) {
     return (
         <Box px={{ base: 'md', md: 'xl' }} py="xl">
             <Stack gap="lg" maw={1240} mx="auto">
@@ -24,7 +25,10 @@ export function PageFrame({ title, error, notice, controls, children }: Props) {
                     <Alert color="gray">{notice}</Alert>
                 )}
 
-                <Title order={1}>{title}</Title>
+                <Group justify="space-between" align="center" wrap="wrap" gap="md">
+                    <Title order={1}>{title}</Title>
+                    {titleActions}
+                </Group>
 
                 {controls}
 

@@ -24,6 +24,7 @@ func (h *ResidentAuthHandler) RegisterRoutes(app *fiber.App) {
 
 	auth.Post("/login", h.HandleLogin)
 	auth.Post("/logout", h.HandleLogout)
+	auth.Get("/me", ResidentAuthMiddleware(h.authSecret), h.HandleCurrentUser)
 }
 
 func (h *ResidentAuthHandler) HandleLogin(c *fiber.Ctx) error {
@@ -50,4 +51,22 @@ func (h *ResidentAuthHandler) HandleLogin(c *fiber.Ctx) error {
 func (h *ResidentAuthHandler) HandleLogout(c *fiber.Ctx) error {
 	clearResidentSession(c)
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *ResidentAuthHandler) HandleCurrentUser(c *fiber.Ctx) error {
+	userID, err := currentUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+	}
+
+	currentUser, err := h.userUC.GetCurrentUser(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить текущего пользователя"))
+	}
+	if currentUser == nil {
+		clearResidentSession(c)
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+	}
+
+	return c.JSON(currentUser)
 }

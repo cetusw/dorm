@@ -1,14 +1,46 @@
-import type {ReactNode} from 'react'
-import {AppShell, Group, Stack, Text, ThemeIcon} from '@mantine/core'
+import type { ReactNode } from 'react'
+
+import { Alert, AppShell, Center, Group, Loader, NavLink, Stack, Text } from '@mantine/core'
+
+import type { CurrentUser } from '../features/current-user/model/types'
 
 type Props = {
+    currentPath: string
+    currentUser: CurrentUser | null
+    currentUserError: string | null
+    currentUserLoading: boolean
     children: ReactNode
 }
 
-export function ResidentAppShell({children}: Props) {
+type NavigationItem = {
+    href: string
+    label: string
+}
+
+export function ResidentAppShell({
+    currentPath,
+    currentUser,
+    currentUserError,
+    currentUserLoading,
+    children,
+}: Props) {
+    const navigationItems: NavigationItem[] = [
+        {
+            href: '/app/tasks',
+            label: 'Дежурство',
+        },
+    ]
+
+    if (currentUser?.can_manage_dormitories) {
+        navigationItems.push({
+            href: '/app/dormitories',
+            label: 'Общежития',
+        })
+    }
+
     return (
         <AppShell
-            navbar={{width: 88, breakpoint: 0}}
+            navbar={{ width: 240, breakpoint: 0 }}
             header={{height: 72}}
             padding={0}
             styles={{
@@ -28,10 +60,19 @@ export function ResidentAppShell({children}: Props) {
         >
             <AppShell.Navbar p="md">
                 <Stack justify="space-between" h="100%">
-                    <Stack align="center" gap="md">
-                        <ThemeIcon size={48} radius="md" color="blue">
-                            Д
-                        </ThemeIcon>
+                    <Stack gap="md">
+                        <Stack gap="xs" w="100%">
+                            {navigationItems.map((item) => (
+                                <NavLink
+                                    key={item.href}
+                                    active={currentPath === item.href}
+                                    label={item.label}
+                                    onClick={() => {
+                                        window.location.assign(item.href)
+                                    }}
+                                />
+                            ))}
+                        </Stack>
                     </Stack>
                 </Stack>
             </AppShell.Navbar>
@@ -44,7 +85,21 @@ export function ResidentAppShell({children}: Props) {
                 </Group>
             </AppShell.Header>
 
-            <AppShell.Main>{children}</AppShell.Main>
+            <AppShell.Main>
+                {currentUserLoading ? (
+                    <Center h="100vh">
+                        <Loader />
+                    </Center>
+                ) : currentUserError ? (
+                    <Center h="100vh" px="md">
+                        <Alert color="red" title="Ошибка">
+                            {currentUserError}
+                        </Alert>
+                    </Center>
+                ) : (
+                    children
+                )}
+            </AppShell.Main>
         </AppShell>
     )
 }

@@ -13,6 +13,8 @@ type DormitoryUseCase interface {
 	GetDormitories(ctx context.Context) ([]*structure.Dormitory, error)
 	GetDormitoryByID(ctx context.Context, id int64) (*structure.Dormitory, error)
 	GetDormitoriesList(ctx context.Context) ([]dto.DormitoryListItem, error)
+	GetDormitoriesResponse(ctx context.Context) (dto.DormitoryListResponse, error)
+	CanManageDormitories(ctx context.Context, userID uuid.UUID) (bool, error)
 	GetUserOptions(ctx context.Context) ([]dto.UserOption, error)
 	CreateDormitory(ctx context.Context, req dto.UpsertDormitoryRequest) error
 	UpdateDormitory(ctx context.Context, id int64, req dto.UpsertDormitoryRequest) error
