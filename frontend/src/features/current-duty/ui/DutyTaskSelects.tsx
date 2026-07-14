@@ -12,7 +12,7 @@ type Props = {
     onChange: (select: DutyTaskSelect) => void
 }
 
-const tabs: Array<{
+const selectOptions: Array<{
     label: string
     value: DutyTaskSelect
 }> = [
@@ -31,8 +31,8 @@ export function DutyTaskSelects({
                                     onGroupChange,
                                     onChange,
                                 }: Props) {
-    const visibleTabOptions = tabs.filter((tab) =>
-        visibleSelects.includes(tab.value),
+    const visibleSelectOptions = selectOptions.filter((selectOption) =>
+        visibleSelects.includes(selectOption.value),
     )
 
     return (
@@ -62,21 +62,23 @@ export function DutyTaskSelects({
                 />
             )}
 
-            <Select
-                aria-label="Раздел задач"
-                data={visibleTabOptions}
-                value={activeSelect}
-                onChange={(value) => {
-                    if (value) {
-                        onChange(value as DutyTaskSelect)
-                    }
-                }}
-                allowDeselect={false}
-                style={{
-                    flex: 1,
-                    minWidth: 0,
-                }}
-            />
+            {visibleSelectOptions.length > 0 && (
+                <Select
+                    aria-label="Раздел задач"
+                    data={visibleSelectOptions}
+                    value={activeSelect}
+                    onChange={(value) => {
+                        if (value) {
+                            onChange(value as DutyTaskSelect)
+                        }
+                    }}
+                    allowDeselect={false}
+                    style={{
+                        flex: 1,
+                        minWidth: 0,
+                    }}
+                />
+            )}
         </Group>
     )
 }

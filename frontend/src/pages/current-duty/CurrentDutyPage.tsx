@@ -3,11 +3,11 @@ import { Alert, Box, Center, Loader } from '@mantine/core'
 import {
     calculateDutyAnalytics,
     selectDutyViewOptions,
-    selectTasksForTab,
+    selectTasksForActiveSelect,
 } from '../../features/current-duty/model/selectors'
 import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty'
 import { useReviewTasks } from '../../features/current-duty/model/useReviewTasks'
-import { useStoredDutyTab } from '../../features/current-duty/model/useStoredDutyTab'
+import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
 import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
@@ -30,9 +30,9 @@ export function CurrentDutyPage() {
         visibleMineTaskIds,
         visibleFreeTaskIds,
     } = useCurrentDuty()
-    const [activeTab, setActiveTab] = useStoredDutyTab(duty?.visible_tabs ?? [])
+    const [activeSelect, setActiveSelect] = useStoredDutySelect(duty?.visible_tabs ?? [])
     const { reviewVisibleTaskIds, handleVerify: handleReviewVerify } = useReviewTasks({
-        activeTab,
+        activeSelect,
         duty,
         onVerify: handleVerify,
     })
@@ -63,9 +63,9 @@ export function CurrentDutyPage() {
         )
     }
 
-    const viewOptions = selectDutyViewOptions(duty, activeTab)
-    const displayedTasks = selectTasksForTab({
-        activeTab,
+    const viewOptions = selectDutyViewOptions(duty, activeSelect)
+    const displayedTasks = selectTasksForActiveSelect({
+        activeSelect,
         duty,
         reviewVisibleTaskIds,
         visibleFreeTaskIds,
@@ -75,13 +75,13 @@ export function CurrentDutyPage() {
 
     const controls = viewOptions.showControls ? (
         <DutyTaskSelects
-            activeSelect={activeTab}
+            activeSelect={activeSelect}
             groups={duty.groups}
             selectedGroupId={selectedGroupId ?? duty.selected_group_id}
             showGroupSelect={duty.show_group_select}
             visibleSelects={duty.visible_tabs}
             onGroupChange={selectGroup}
-            onChange={setActiveTab}
+            onChange={setActiveSelect}
         />
     ) : undefined
 

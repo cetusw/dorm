@@ -4,21 +4,21 @@ import { selectReviewVisibleTaskIds } from './selectors'
 import type { ResidentCurrentDuty, DutyTaskSelect } from './types'
 
 type Props = {
-    activeTab: DutyTaskSelect
+    activeSelect: DutyTaskSelect
     duty: ResidentCurrentDuty | null
     onVerify: (taskId: string) => Promise<boolean>
 }
 
-export function useReviewTasks({ activeTab, duty, onVerify }: Props) {
+export function useReviewTasks({ activeSelect, duty, onVerify }: Props) {
     const [reviewVisibleTaskIds, setReviewVisibleTaskIds] = useState<string[]>([])
 
     useEffect(() => {
-        if (!duty || activeTab !== 'review') {
+        if (!duty || activeSelect !== 'review') {
             return
         }
 
         setReviewVisibleTaskIds(selectReviewVisibleTaskIds(duty.tasks))
-    }, [activeTab, duty])
+    }, [activeSelect, duty])
 
     async function handleVerify(taskId: string) {
         const success = await onVerify(taskId)
