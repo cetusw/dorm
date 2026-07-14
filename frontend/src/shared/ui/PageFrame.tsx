@@ -64,9 +64,25 @@ export function PageFrame({
                     )}
                 </Title>
 
-                {analytics}
+                {(analytics || controls) && (
+                    <Box
+                        pos="sticky"
+                        top={60}
+                        style={{
+                            zIndex: 10,
+                        }}
+                    >
+                        <Stack
+                            gap="lg"
+                            py="sm"
+                            bg="#f5f7fb"
+                        >
+                            {analytics}
 
-                {controls}
+                            {controls}
+                        </Stack>
+                    </Box>
+                )}
 
                 {children}
             </Stack>
