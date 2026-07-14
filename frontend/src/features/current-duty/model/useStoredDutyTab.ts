@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 
-import type { DutyTaskTab } from './types'
+import type { DutyTaskSelect } from './types'
 
 const ACTIVE_TAB_STORAGE_KEY = 'current-duty-active-tab'
 
-function readStoredTab(): DutyTaskTab {
+function readStoredTab(): DutyTaskSelect {
     if (typeof window === 'undefined') {
         return 'mine'
     }
@@ -17,8 +17,8 @@ function readStoredTab(): DutyTaskTab {
     return 'mine'
 }
 
-export function useStoredDutyTab(visibleTabs: DutyTaskTab[]) {
-    const [activeTab, setActiveTab] = useState<DutyTaskTab>(readStoredTab)
+export function useStoredDutyTab(visibleTabs: DutyTaskSelect[]) {
+    const [activeTab, setActiveTab] = useState<DutyTaskSelect>(readStoredTab)
 
     useEffect(() => {
         window.localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab)

@@ -10,7 +10,7 @@ import { useReviewTasks } from '../../features/current-duty/model/useReviewTasks
 import { useStoredDutyTab } from '../../features/current-duty/model/useStoredDutyTab'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
-import { DutyTaskTabs } from '../../features/current-duty/ui/DutyTaskTabs'
+import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
 import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
 import { PageFrame } from '../../shared/ui/PageFrame'
 
@@ -74,14 +74,22 @@ export function CurrentDutyPage() {
     const analytics = calculateDutyAnalytics(duty.tasks)
 
     const controls = viewOptions.showControls ? (
-        <DutyTaskTabs
-            activeTab={activeTab}
+        <DutyTaskSelects
+            activeSelect={activeTab}
             groups={duty.groups}
             selectedGroupId={selectedGroupId ?? duty.selected_group_id}
             showGroupSelect={duty.show_group_select}
-            visibleTabs={duty.visible_tabs}
+            visibleSelects={duty.visible_tabs}
             onGroupChange={selectGroup}
             onChange={setActiveTab}
+        />
+    ) : undefined
+
+    const analyticsBlock = viewOptions.showAnalytics || viewOptions.isReadOnly ? (
+        <CurrentDutyAnalytics
+            analytics={analytics}
+            isReadOnly={viewOptions.isReadOnly}
+            targetValue={duty.cost_per_resident_goal}
         />
     ) : undefined
 
@@ -113,16 +121,9 @@ export function CurrentDutyPage() {
             subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
             error={error}
             notice={duty.notice_message}
+            analytics={analyticsBlock}
             controls={controls}
         >
-            {(viewOptions.showAnalytics || viewOptions.isReadOnly) && (
-                <CurrentDutyAnalytics
-                    analytics={analytics}
-                    isReadOnly={viewOptions.isReadOnly}
-                    targetValue={duty.cost_per_resident_goal}
-                />
-            )}
-
             <TaskGroups
                 isReadOnly={viewOptions.isReadOnly}
                 actionMode={viewOptions.actionMode}

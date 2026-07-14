@@ -8,6 +8,7 @@ type Props = {
     error?: string | null
     notice?: string | null
     controls?: ReactNode
+    analytics?: ReactNode
     children: ReactNode
 }
 
@@ -17,6 +18,7 @@ export function PageFrame({
                               error,
                               notice,
                               controls,
+                              analytics,
                               children,
                           }: Props) {
     return (
@@ -61,6 +63,8 @@ export function PageFrame({
                         </>
                     )}
                 </Title>
+
+                {analytics}
 
                 {controls}
 

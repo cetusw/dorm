@@ -1,5 +1,5 @@
 import type { TaskRowActionMode } from '../ui/TaskRowActions'
-import type { ResidentCurrentDuty, ResidentDutyTask, DutyTaskTab } from './types'
+import type { ResidentCurrentDuty, ResidentDutyTask, DutyTaskSelect } from './types'
 import {
     countTasksCompletedByMe,
     countTasksTakenByMe,
@@ -27,7 +27,7 @@ export type DutyViewOptions = {
 }
 
 type SelectTasksForTabParams = {
-    activeTab: DutyTaskTab
+    activeTab: DutyTaskSelect
     duty: ResidentCurrentDuty
     reviewVisibleTaskIds: string[]
     visibleFreeTaskIds: string[]
@@ -51,7 +51,7 @@ export function calculateDutyAnalytics(tasks: ResidentDutyTask[]): DutyAnalytics
 
 export function selectDutyViewOptions(
     duty: ResidentCurrentDuty,
-    activeTab: DutyTaskTab,
+    activeTab: DutyTaskSelect,
 ): DutyViewOptions {
     const isReadOnly = duty.read_only
 

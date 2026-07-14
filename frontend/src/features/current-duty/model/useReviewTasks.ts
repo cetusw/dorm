@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 
 import { selectReviewVisibleTaskIds } from './selectors'
-import type { ResidentCurrentDuty, DutyTaskTab } from './types'
+import type { ResidentCurrentDuty, DutyTaskSelect } from './types'
 
 type Props = {
-    activeTab: DutyTaskTab
+    activeTab: DutyTaskSelect
     duty: ResidentCurrentDuty | null
     onVerify: (taskId: string) => Promise<boolean>
 }
