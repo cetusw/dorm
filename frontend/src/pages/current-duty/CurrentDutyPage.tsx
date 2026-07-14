@@ -3,14 +3,14 @@ import { Alert, Box, Center, Loader } from '@mantine/core'
 import {
     calculateDutyAnalytics,
     selectDutyViewOptions,
-    selectTasksForTab,
+    selectTasksForActiveSelect,
 } from '../../features/current-duty/model/selectors'
 import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty'
 import { useReviewTasks } from '../../features/current-duty/model/useReviewTasks'
-import { useStoredDutyTab } from '../../features/current-duty/model/useStoredDutyTab'
+import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
-import { DutyTaskTabs } from '../../features/current-duty/ui/DutyTaskTabs'
+import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
 import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
 import { PageFrame } from '../../shared/ui/PageFrame'
 
@@ -30,9 +30,9 @@ export function CurrentDutyPage() {
         visibleMineTaskIds,
         visibleFreeTaskIds,
     } = useCurrentDuty()
-    const [activeTab, setActiveTab] = useStoredDutyTab(duty?.visible_tabs ?? [])
+    const [activeSelect, setActiveSelect] = useStoredDutySelect(duty?.visible_tabs ?? [])
     const { reviewVisibleTaskIds, handleVerify: handleReviewVerify } = useReviewTasks({
-        activeTab,
+        activeSelect,
         duty,
         onVerify: handleVerify,
     })
@@ -63,9 +63,9 @@ export function CurrentDutyPage() {
         )
     }
 
-    const viewOptions = selectDutyViewOptions(duty, activeTab)
-    const displayedTasks = selectTasksForTab({
-        activeTab,
+    const viewOptions = selectDutyViewOptions(duty, activeSelect)
+    const displayedTasks = selectTasksForActiveSelect({
+        activeSelect,
         duty,
         reviewVisibleTaskIds,
         visibleFreeTaskIds,
@@ -74,20 +74,28 @@ export function CurrentDutyPage() {
     const analytics = calculateDutyAnalytics(duty.tasks)
 
     const controls = viewOptions.showControls ? (
-        <DutyTaskTabs
-            activeTab={activeTab}
+        <DutyTaskSelects
+            activeSelect={activeSelect}
             groups={duty.groups}
             selectedGroupId={selectedGroupId ?? duty.selected_group_id}
             showGroupSelect={duty.show_group_select}
-            visibleTabs={duty.visible_tabs}
+            visibleSelects={duty.visible_tabs}
             onGroupChange={selectGroup}
-            onChange={setActiveTab}
+            onChange={setActiveSelect}
+        />
+    ) : undefined
+
+    const analyticsBlock = viewOptions.showAnalytics || viewOptions.isReadOnly ? (
+        <CurrentDutyAnalytics
+            analytics={analytics}
+            isReadOnly={viewOptions.isReadOnly}
+            targetValue={duty.cost_per_resident_goal}
         />
     ) : undefined
 
     if (!duty.has_active_duty) {
         return (
-            <PageFrame title="Текущее дежурство" error={error} controls={controls}>
+            <PageFrame title="Дежурство" error={error} controls={controls}>
                 <Alert color="gray">В выбранной группе сейчас нет активного дежурства.</Alert>
             </PageFrame>
         )
@@ -96,7 +104,8 @@ export function CurrentDutyPage() {
     if (duty.tasks.length === 0) {
         return (
             <PageFrame
-                title={`Текущее дежурство · ${formatDutyPeriod(duty.start_date, duty.end_date)}`}
+                title="Дежурство"
+                subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
                 error={error}
                 notice={duty.notice_message}
                 controls={controls}
@@ -108,19 +117,13 @@ export function CurrentDutyPage() {
 
     return (
         <PageFrame
-            title={`Текущее дежурство · ${formatDutyPeriod(duty.start_date, duty.end_date)}`}
+            title="Дежурство"
+            subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
             error={error}
             notice={duty.notice_message}
+            analytics={analyticsBlock}
             controls={controls}
         >
-            {(viewOptions.showAnalytics || viewOptions.isReadOnly) && (
-                <CurrentDutyAnalytics
-                    analytics={analytics}
-                    isReadOnly={viewOptions.isReadOnly}
-                    targetValue={duty.cost_per_resident_goal}
-                />
-            )}
-
             <TaskGroups
                 isReadOnly={viewOptions.isReadOnly}
                 actionMode={viewOptions.actionMode}

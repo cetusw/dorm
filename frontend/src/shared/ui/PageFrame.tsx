@@ -1,19 +1,28 @@
-import type { ReactNode } from 'react'
+import type {ReactNode} from 'react'
 
-import { Alert, Box, Group, Stack, Title } from '@mantine/core'
+import {Alert, Box, Stack, Title} from '@mantine/core'
 
 type Props = {
     title: string
+    subtitle?: string
     error?: string | null
     notice?: string | null
-    titleActions?: ReactNode
     controls?: ReactNode
+    analytics?: ReactNode
     children: ReactNode
 }
 
-export function PageFrame({ title, error, notice, titleActions, controls, children }: Props) {
+export function PageFrame({
+                              title,
+                              subtitle,
+                              error,
+                              notice,
+                              controls,
+                              analytics,
+                              children,
+                          }: Props) {
     return (
-        <Box px={{ base: 'md', md: 'xl' }} py="xl">
+        <Box px={{base: 'md', md: 'xl'}} py="xl">
             <Stack gap="lg" maw={1240} mx="auto">
                 {error && (
                     <Alert color="red" title="Ошибка">
@@ -22,15 +31,58 @@ export function PageFrame({ title, error, notice, titleActions, controls, childr
                 )}
 
                 {notice && (
-                    <Alert color="gray">{notice}</Alert>
+                    <Alert color="gray">
+                        {notice}
+                    </Alert>
                 )}
 
-                <Group justify="space-between" align="center" wrap="wrap" gap="md">
-                    <Title order={1}>{title}</Title>
-                    {titleActions}
-                </Group>
+                <Title order={1}>
+                    <Box component="span">
+                        {title}
+                    </Box>
 
-                {controls}
+                    {subtitle && (
+                        <>
+                            <Box
+                                component="span"
+                                visibleFrom="sm"
+                            >
+                                {' · '}
+                            </Box>
+
+                            <Box
+                                component="span"
+                                display={{base: 'block', sm: 'inline'}}
+                                mt={{base: 4, sm: 0}}
+                                style={{
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                {subtitle}
+                            </Box>
+                        </>
+                    )}
+                </Title>
+
+                {(analytics || controls) && (
+                    <Box
+                        pos="sticky"
+                        top={60}
+                        style={{
+                            zIndex: 10,
+                        }}
+                    >
+                        <Stack
+                            gap="lg"
+                            py="sm"
+                            bg="#f5f7fb"
+                        >
+                            {analytics}
+
+                            {controls}
+                        </Stack>
+                    </Box>
+                )}
 
                 {children}
             </Stack>

@@ -1,47 +1,25 @@
-import type { ReactNode } from 'react'
-
-import { Alert, AppShell, Center, Group, Loader, NavLink, Stack, Text } from '@mantine/core'
-
-import type { CurrentUser } from '../features/current-user/model/types'
+import type {ReactNode} from 'react'
+import {AppShell, Burger, Group, NavLink, Title} from '@mantine/core'
+import {useDisclosure} from '@mantine/hooks'
 
 type Props = {
-    currentPath: string
-    currentUser: CurrentUser | null
-    currentUserError: string | null
-    currentUserLoading: boolean
     children: ReactNode
 }
 
-type NavigationItem = {
-    href: string
-    label: string
-}
-
-export function ResidentAppShell({
-    currentPath,
-    currentUser,
-    currentUserError,
-    currentUserLoading,
-    children,
-}: Props) {
-    const navigationItems: NavigationItem[] = [
-        {
-            href: '/app/tasks',
-            label: 'Дежурство',
-        },
-    ]
-
-    if (currentUser?.can_manage_dormitories) {
-        navigationItems.push({
-            href: '/app/dormitories',
-            label: 'Общежития',
-        })
-    }
+export function ResidentAppShell({children}: Props) {
+    const [navbarOpened, {toggle: toggleNavbar, close: closeNavbar}] =
+        useDisclosure(false)
 
     return (
         <AppShell
-            navbar={{ width: 240, breakpoint: 0 }}
-            header={{height: 72}}
+            navbar={{
+                width: 280,
+                breakpoint: 'sm',
+                collapsed: {
+                    mobile: !navbarOpened,
+                },
+            }}
+            header={{height: 60}}
             padding={0}
             styles={{
                 main: {
@@ -59,47 +37,38 @@ export function ResidentAppShell({
             }}
         >
             <AppShell.Navbar p="md">
-                <Stack justify="space-between" h="100%">
-                    <Stack gap="md">
-                        <Stack gap="xs" w="100%">
-                            {navigationItems.map((item) => (
-                                <NavLink
-                                    key={item.href}
-                                    active={currentPath === item.href}
-                                    label={item.label}
-                                    onClick={() => {
-                                        window.location.assign(item.href)
-                                    }}
-                                />
-                            ))}
-                        </Stack>
-                    </Stack>
-                </Stack>
+                <NavLink
+                    label="Дежурство"
+                    onClick={closeNavbar}
+                    styles={{
+                        root: {
+                            color: '#f9fafb',
+                            borderRadius: 8,
+                        },
+                        label: {
+                            color: '#f9fafb',
+                        },
+                    }}
+                />
             </AppShell.Navbar>
 
             <AppShell.Header px="xl">
                 <Group align="center" h="100%">
-                    <Text size="lg" c="dimmed">
+                    <Burger
+                        opened={navbarOpened}
+                        onClick={toggleNavbar}
+                        hiddenFrom="sm"
+                        size="sm"
+                        aria-label="Открыть навигацию"
+                    />
+
+                    <Title order={3}>
                         Dorm
-                    </Text>
+                    </Title>
                 </Group>
             </AppShell.Header>
 
-            <AppShell.Main>
-                {currentUserLoading ? (
-                    <Center h="100vh">
-                        <Loader />
-                    </Center>
-                ) : currentUserError ? (
-                    <Center h="100vh" px="md">
-                        <Alert color="red" title="Ошибка">
-                            {currentUserError}
-                        </Alert>
-                    </Center>
-                ) : (
-                    children
-                )}
-            </AppShell.Main>
+            <AppShell.Main>{children}</AppShell.Main>
         </AppShell>
     )
 }

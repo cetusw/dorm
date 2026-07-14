@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import {useState} from 'react'
 
-import { Alert, Button, Paper, PasswordInput, Stack, TextInput, Title } from '@mantine/core'
-import { useForm } from '@mantine/form'
+import {Alert, Button, Paper, PasswordInput, Stack, TextInput, Title} from '@mantine/core'
+import {useForm} from '@mantine/form'
 
-import { ApiError } from '../../../shared/api/ApiError'
-import { loginResident } from '../api/authApi'
+import {ApiError} from '../../../shared/api/ApiError'
+import {loginResident} from '../api/authApi'
 
 type LoginFormValues = {
     login: string
@@ -28,7 +28,15 @@ export function LoginForm() {
     })
 
     return (
-        <Paper radius="lg" p="xl" shadow="sm" withBorder w="100%" maw={420} bg="rgba(255, 255, 255, 0.96)">
+        <Paper
+            radius="lg"
+            p={{base: 'lg', sm: 'xl'}}
+            shadow="sm"
+            withBorder
+            w="100%"
+            maw={420}
+            bg="rgba(255, 255, 255, 0.96)"
+        >
             <Title order={2} ta="center">
                 Добро пожаловать
             </Title>
@@ -60,6 +68,7 @@ export function LoginForm() {
                     )}
 
                     <TextInput
+                        size="md"
                         withAsterisk
                         label="Логин"
                         placeholder="Введите логин"
@@ -68,6 +77,7 @@ export function LoginForm() {
                     />
 
                     <PasswordInput
+                        size="md"
                         withAsterisk
                         label="Пароль"
                         placeholder="Введите пароль"
@@ -75,7 +85,13 @@ export function LoginForm() {
                         {...form.getInputProps('password')}
                     />
 
-                    <Button type="submit" fullWidth mt="sm" loading={submitting}>
+                    <Button
+                        size="md"
+                        type="submit"
+                        fullWidth
+                        mt="sm"
+                        loading={submitting}
+                    >
                         Войти
                     </Button>
                 </Stack>

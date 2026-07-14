@@ -1,5 +1,5 @@
 import type { TaskRowActionMode } from '../ui/TaskRowActions'
-import type { ResidentCurrentDuty, ResidentDutyTask, DutyTaskTab } from './types'
+import type { ResidentCurrentDuty, ResidentDutyTask, DutyTaskSelect } from './types'
 import {
     countTasksCompletedByMe,
     countTasksTakenByMe,
@@ -26,8 +26,8 @@ export type DutyViewOptions = {
     showControls: boolean
 }
 
-type SelectTasksForTabParams = {
-    activeTab: DutyTaskTab
+type SelectTasksForActiveSelectParams = {
+    activeSelect: DutyTaskSelect
     duty: ResidentCurrentDuty
     reviewVisibleTaskIds: string[]
     visibleFreeTaskIds: string[]
@@ -51,16 +51,16 @@ export function calculateDutyAnalytics(tasks: ResidentDutyTask[]): DutyAnalytics
 
 export function selectDutyViewOptions(
     duty: ResidentCurrentDuty,
-    activeTab: DutyTaskTab,
+    activeSelect: DutyTaskSelect,
 ): DutyViewOptions {
     const isReadOnly = duty.read_only
 
     return {
-        actionMode: activeTab === 'review' ? 'review' : 'default',
-        emptyMessage: activeTab === 'review' ? 'Нет задач на проверке' : 'В этом разделе нет задач.',
+        actionMode: activeSelect === 'review' ? 'review' : 'default',
+        emptyMessage: activeSelect === 'review' ? 'Нет задач на проверке' : 'В этом разделе нет задач.',
         isReadOnly,
         showAnalytics: !isReadOnly && duty.visible_tabs.length > 0,
-        showAssigneeColumn: isReadOnly || activeTab === 'all' || activeTab === 'review',
+        showAssigneeColumn: isReadOnly || activeSelect === 'all' || activeSelect === 'review',
         showControls: duty.show_group_select || duty.visible_tabs.length > 0,
     }
 }
@@ -71,18 +71,18 @@ export function selectReviewVisibleTaskIds(tasks: ResidentDutyTask[]): string[] 
         .map((task) => task.id)
 }
 
-export function selectTasksForTab({
-    activeTab,
+export function selectTasksForActiveSelect({
+    activeSelect,
     duty,
     reviewVisibleTaskIds,
     visibleFreeTaskIds,
     visibleMineTaskIds,
-}: SelectTasksForTabParams): ResidentDutyTask[] {
+}: SelectTasksForActiveSelectParams): ResidentDutyTask[] {
     if (duty.read_only || duty.visible_tabs.length === 0) {
         return duty.tasks
     }
 
-    switch (activeTab) {
+    switch (activeSelect) {
         case 'mine':
             return duty.tasks.filter((task) => visibleMineTaskIds.includes(task.id))
         case 'free':
