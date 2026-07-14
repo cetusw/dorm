@@ -3,6 +3,7 @@ import { Alert, Stack } from '@mantine/core'
 import type { ResidentDutyTask } from '../model/types'
 import { groupTasksByArea } from '../model/utils'
 import { TaskGroupSection } from './TaskGroupSection'
+import { TaskMobileGroupSection } from './TaskMobileGroupSection'
 import type { TaskRowActionMode } from './TaskRowActions'
 
 type Props = {
@@ -39,22 +40,41 @@ export function TaskGroups({
     }
 
     return (
-        <Stack gap="lg">
-            {groups.map((group) => (
-                <TaskGroupSection
-                    actionMode={actionMode}
-                    isReadOnly={isReadOnly}
-                    key={group.key}
-                    group={group}
-                    pendingTaskId={pendingTaskId}
-                    showAssigneeColumn={showAssigneeColumn}
-                    onTake={onTake}
-                    onReturn={onReturn}
-                    onComplete={onComplete}
-                    onOpen={onOpen}
-                    onVerify={onVerify}
-                />
-            ))}
-        </Stack>
+        <>
+            <Stack hiddenFrom="md" gap="sm">
+                {groups.map((group) => (
+                    <TaskMobileGroupSection
+                        actionMode={actionMode}
+                        isReadOnly={isReadOnly}
+                        key={group.key}
+                        group={group}
+                        pendingTaskId={pendingTaskId}
+                        onTake={onTake}
+                        onReturn={onReturn}
+                        onComplete={onComplete}
+                        onOpen={onOpen}
+                        onVerify={onVerify}
+                    />
+                ))}
+            </Stack>
+
+            <Stack visibleFrom="md" gap="lg">
+                {groups.map((group) => (
+                    <TaskGroupSection
+                        actionMode={actionMode}
+                        isReadOnly={isReadOnly}
+                        key={group.key}
+                        group={group}
+                        pendingTaskId={pendingTaskId}
+                        showAssigneeColumn={showAssigneeColumn}
+                        onTake={onTake}
+                        onReturn={onReturn}
+                        onComplete={onComplete}
+                        onOpen={onOpen}
+                        onVerify={onVerify}
+                    />
+                ))}
+            </Stack>
+        </>
     )
 }
