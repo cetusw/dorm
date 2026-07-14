@@ -130,6 +130,9 @@ func (dormRepoStub) FindAll(ctx context.Context) ([]*structure.Dormitory, error)
 func (dormRepoStub) FindByID(ctx context.Context, id int64) (*structure.Dormitory, error) {
 	return nil, nil
 }
+func (dormRepoStub) ExistsByLeaderID(ctx context.Context, leaderID uuid.UUID) (bool, error) {
+	return false, nil
+}
 func (dormRepoStub) Save(ctx context.Context, dormitory *structure.Dormitory) error { return nil }
 func (dormRepoStub) Delete(ctx context.Context, id int64) error                     { return nil }
 

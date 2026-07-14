@@ -40,6 +40,7 @@ func RestoreDormitory(id int64, name string, leaderID *uuid.UUID, city, streetTy
 }
 
 func (d *Dormitory) ID() int64            { return d.id }
+func (d *Dormitory) AssignID(id int64)    { d.id = id }
 func (d *Dormitory) Name() string         { return d.name }
 func (d *Dormitory) LeaderID() *uuid.UUID { return d.leaderID }
 func (d *Dormitory) City() string         { return d.city }

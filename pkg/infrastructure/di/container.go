@@ -168,6 +168,9 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	dormitoryAPIHandler := http.NewDormitoryAPIHandler(dormitoryService)
 	dormitoryAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
+	userAPIHandler := http.NewUserAPIHandler(dormitoryService)
+	userAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+
 	return &Container{
 		Config:          cfg,
 		DB:              db,

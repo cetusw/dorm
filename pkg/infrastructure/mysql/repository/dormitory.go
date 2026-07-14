@@ -96,10 +96,15 @@ func (r *DormitoryRepository) Save(ctx context.Context, dormitory *structure.Dor
 			INSERT INTO dormitory (leader_id, name, city, street_type, street_name, house_number)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`
-		_, err := r.db.ExecContext(ctx, query, leaderIDBytes(dormitory.LeaderID()), dormitory.Name(), dormitory.City(), dormitory.StreetType(), dormitory.StreetName(), dormitory.HouseNumber())
+		result, err := r.db.ExecContext(ctx, query, leaderIDBytes(dormitory.LeaderID()), dormitory.Name(), dormitory.City(), dormitory.StreetType(), dormitory.StreetName(), dormitory.HouseNumber())
 		if err != nil {
 			return fmt.Errorf("SaveDormitory insert: %w", err)
 		}
+		insertedID, err := result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("SaveDormitory last insert id: %w", err)
+		}
+		dormitory.AssignID(insertedID)
 		return nil
 	}
 

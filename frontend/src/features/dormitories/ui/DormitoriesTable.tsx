@@ -4,9 +4,11 @@ import type { DormitoryListItem } from '../model/types'
 
 type Props = {
     dormitories: DormitoryListItem[]
+    onDelete: (dormitory: DormitoryListItem) => void
+    onEdit: (dormitoryId: number) => void
 }
 
-export function DormitoriesTable({ dormitories }: Props) {
+export function DormitoriesTable({ dormitories, onDelete, onEdit }: Props) {
     return (
         <Paper withBorder radius="lg" bg="white">
             <ScrollArea>
@@ -51,10 +53,21 @@ export function DormitoriesTable({ dormitories }: Props) {
                                 </Table.Td>
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap">
-                                        <Button variant="default" size="compact-sm" radius="md">
+                                        <Button
+                                            variant="subtle"
+                                            size="compact-sm"
+                                            radius="md"
+                                            onClick={() => onEdit(dormitory.id)}
+                                        >
                                             Редактировать
                                         </Button>
-                                        <Button variant="default" color="red" size="compact-sm" radius="md">
+                                        <Button
+                                            variant="subtle"
+                                            color="red"
+                                            size="compact-sm"
+                                            radius="md"
+                                            onClick={() => onDelete(dormitory)}
+                                        >
                                             Удалить
                                         </Button>
                                     </Group>

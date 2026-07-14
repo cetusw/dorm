@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/domain/user"
@@ -94,6 +95,23 @@ func (s *Service) GetDormitoriesResponse(ctx context.Context) (dto.DormitoryList
 	}, nil
 }
 
+func (s *Service) GetDormitoryDetails(ctx context.Context, id int64) (*dto.DormitoryDetails, error) {
+	dormitory, err := s.dormitoryRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load dormitory: %w", err)
+	}
+	if dormitory == nil {
+		return nil, nil
+	}
+
+	userNames, err := s.userNames(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load dormitory leaders: %w", err)
+	}
+
+	return dormitoryDetailsFromDomain(dormitory, userNames), nil
+}
+
 func (s *Service) CanManageDormitories(ctx context.Context, userID uuid.UUID) (bool, error) {
 	canManage, err := s.dormitoryRepo.ExistsByLeaderID(ctx, userID)
 	if err != nil {
@@ -101,6 +119,25 @@ func (s *Service) CanManageDormitories(ctx context.Context, userID uuid.UUID) (b
 	}
 
 	return canManage, nil
+}
+
+func (s *Service) GetUserOptionsResponse(ctx context.Context) (dto.UserOptionsResponse, error) {
+	options, err := s.GetUserOptions(ctx)
+	if err != nil {
+		return dto.UserOptionsResponse{}, fmt.Errorf("load user options: %w", err)
+	}
+
+	items := make([]dto.UserOptionItem, 0, len(options))
+	for _, option := range options {
+		items = append(items, dto.UserOptionItem{
+			ID:   option.ID.String(),
+			Name: option.FullName,
+		})
+	}
+
+	return dto.UserOptionsResponse{
+		Users: items,
+	}, nil
 }
 
 func (s *Service) CreateDormitory(ctx context.Context, req dto.UpsertDormitoryRequest) error {
@@ -129,6 +166,41 @@ func (s *Service) CreateDormitory(ctx context.Context, req dto.UpsertDormitoryRe
 
 	dormitory := structure.RestoreDormitory(0, req.Name, leaderID, req.City, req.StreetType, req.StreetName, req.HouseNumber)
 	return s.dormitoryRepo.Save(ctx, dormitory)
+}
+
+func (s *Service) CreateDormitoryDetails(ctx context.Context, req dto.CreateDormitoryRequest) (*dto.DormitoryDetails, error) {
+	input, err := s.normalizeDormitoryInput(
+		ctx,
+		req.Name,
+		req.City,
+		req.StreetType,
+		req.StreetName,
+		req.HouseNumber,
+		req.LeaderID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	dormitory := structure.RestoreDormitory(
+		0,
+		input.name,
+		input.leaderID,
+		input.city,
+		input.streetType,
+		input.streetName,
+		input.houseNumber,
+	)
+	if err := s.dormitoryRepo.Save(ctx, dormitory); err != nil {
+		return nil, fmt.Errorf("create dormitory: %w", err)
+	}
+
+	userNames, err := s.userNames(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load dormitory leaders: %w", err)
+	}
+
+	return dormitoryDetailsFromDomain(dormitory, userNames), nil
 }
 
 func (s *Service) UpdateDormitory(ctx context.Context, id int64, req dto.UpsertDormitoryRequest) error {
@@ -163,6 +235,49 @@ func (s *Service) UpdateDormitory(ctx context.Context, id int64, req dto.UpsertD
 	}
 
 	return s.dormitoryRepo.Save(ctx, structure.RestoreDormitory(id, req.Name, leaderID, req.City, req.StreetType, req.StreetName, req.HouseNumber))
+}
+
+func (s *Service) UpdateDormitoryDetails(ctx context.Context, id int64, req dto.UpdateDormitoryRequest) (*dto.DormitoryDetails, error) {
+	current, err := s.dormitoryRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load dormitory: %w", err)
+	}
+	if current == nil {
+		return nil, nil
+	}
+
+	input, err := s.normalizeDormitoryInput(
+		ctx,
+		req.Name,
+		req.City,
+		req.StreetType,
+		req.StreetName,
+		req.HouseNumber,
+		req.LeaderID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	updated := structure.RestoreDormitory(
+		id,
+		input.name,
+		input.leaderID,
+		input.city,
+		input.streetType,
+		input.streetName,
+		input.houseNumber,
+	)
+	if err := s.dormitoryRepo.Save(ctx, updated); err != nil {
+		return nil, fmt.Errorf("update dormitory: %w", err)
+	}
+
+	userNames, err := s.userNames(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load dormitory leaders: %w", err)
+	}
+
+	return dormitoryDetailsFromDomain(updated, userNames), nil
 }
 
 func (s *Service) DeleteDormitory(ctx context.Context, id int64) error {
@@ -397,5 +512,103 @@ func userSummaryFromMap(names map[uuid.UUID]string, leaderID *uuid.UUID) *dto.Us
 	return &dto.UserSummary{
 		ID:   leaderID.String(),
 		Name: name,
+	}
+}
+
+type normalizedDormitoryInput struct {
+	name        string
+	city        string
+	streetType  string
+	streetName  string
+	houseNumber string
+	leaderID    *uuid.UUID
+}
+
+func (s *Service) normalizeDormitoryInput(
+	ctx context.Context,
+	name string,
+	city string,
+	streetType string,
+	streetName string,
+	houseNumber string,
+	leaderID *string,
+) (*normalizedDormitoryInput, error) {
+	result := &normalizedDormitoryInput{
+		name:        strings.TrimSpace(name),
+		city:        strings.TrimSpace(city),
+		streetType:  strings.TrimSpace(streetType),
+		streetName:  strings.TrimSpace(streetName),
+		houseNumber: strings.TrimSpace(houseNumber),
+	}
+
+	if err := validateRequiredDormitoryField(result.name, "Введите название", 255, "Название не должно превышать 255 символов"); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredDormitoryField(result.city, "Введите город", 255, "Город не должен превышать 255 символов"); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredDormitoryField(result.streetType, "Введите тип улицы", 100, "Тип улицы не должен превышать 100 символов"); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredDormitoryField(result.streetName, "Введите название улицы", 100, "Название улицы не должно превышать 100 символов"); err != nil {
+		return nil, err
+	}
+	if err := validateRequiredDormitoryField(result.houseNumber, "Введите номер дома", 50, "Номер дома не должен превышать 50 символов"); err != nil {
+		return nil, err
+	}
+
+	parsedLeaderID, err := parseOptionalStringUUIDPointer(leaderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireUser(ctx, parsedLeaderID); err != nil {
+		return nil, err
+	}
+
+	result.leaderID = parsedLeaderID
+	return result, nil
+}
+
+func validateRequiredDormitoryField(value string, requiredMessage string, maxLen int, maxLenMessage string) error {
+	if value == "" {
+		return fmt.Errorf("%s", requiredMessage)
+	}
+	if utf8.RuneCountInString(value) > maxLen {
+		return fmt.Errorf("%s", maxLenMessage)
+	}
+	return nil
+}
+
+func parseOptionalStringUUIDPointer(rawID *string) (*uuid.UUID, error) {
+	if rawID == nil {
+		return nil, nil
+	}
+
+	trimmed := strings.TrimSpace(*rawID)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	id, err := uuid.Parse(trimmed)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id")
+	}
+
+	return &id, nil
+}
+
+func dormitoryDetailsFromDomain(dormitory *structure.Dormitory, names map[uuid.UUID]string) *dto.DormitoryDetails {
+	if dormitory == nil {
+		return nil
+	}
+
+	return &dto.DormitoryDetails{
+		ID:          dormitory.ID(),
+		Name:        dormitory.Name(),
+		City:        dormitory.City(),
+		StreetType:  dormitory.StreetType(),
+		StreetName:  dormitory.StreetName(),
+		HouseNumber: dormitory.HouseNumber(),
+		Leader:      userSummaryFromMap(names, dormitory.LeaderID()),
 	}
 }

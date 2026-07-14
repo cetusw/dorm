@@ -16,43 +16,28 @@ export function useDormitories() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    async function reload(): Promise<void> {
+        setLoading(true)
+        setError(null)
+
+        try {
+            const response = await getDormitories()
+            setDormitories(response.dormitories)
+        } catch (currentError) {
+            setError(toErrorMessage(currentError))
+        } finally {
+            setLoading(false)
+        }
+    }
+
     useEffect(() => {
-        let active = true
-
-        async function loadDormitories() {
-            setLoading(true)
-            setError(null)
-
-            try {
-                const response = await getDormitories()
-                if (!active) {
-                    return
-                }
-
-                setDormitories(response.dormitories)
-            } catch (currentError) {
-                if (!active) {
-                    return
-                }
-
-                setError(toErrorMessage(currentError))
-            } finally {
-                if (active) {
-                    setLoading(false)
-                }
-            }
-        }
-
-        void loadDormitories()
-
-        return () => {
-            active = false
-        }
+        void reload()
     }, [])
 
     return {
         dormitories,
         loading,
         error,
+        reload,
     }
 }

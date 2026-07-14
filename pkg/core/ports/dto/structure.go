@@ -15,9 +15,46 @@ type DormitoryListResponse struct {
 	Dormitories []DormitoryListItem `json:"dormitories"`
 }
 
+type DormitoryDetails struct {
+	ID          int64        `json:"id"`
+	Name        string       `json:"name"`
+	City        string       `json:"city"`
+	StreetType  string       `json:"street_type"`
+	StreetName  string       `json:"street_name"`
+	HouseNumber string       `json:"house_number"`
+	Leader      *UserSummary `json:"leader"`
+}
+
+type CreateDormitoryRequest struct {
+	Name        string  `json:"name"`
+	City        string  `json:"city"`
+	StreetType  string  `json:"street_type"`
+	StreetName  string  `json:"street_name"`
+	HouseNumber string  `json:"house_number"`
+	LeaderID    *string `json:"leader_id"`
+}
+
+type UpdateDormitoryRequest struct {
+	Name        string  `json:"name"`
+	City        string  `json:"city"`
+	StreetType  string  `json:"street_type"`
+	StreetName  string  `json:"street_name"`
+	HouseNumber string  `json:"house_number"`
+	LeaderID    *string `json:"leader_id"`
+}
+
 type UserSummary struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type UserOptionItem struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type UserOptionsResponse struct {
+	Users []UserOptionItem `json:"users"`
 }
 
 type GroupListItem struct {
