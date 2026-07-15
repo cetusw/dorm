@@ -25,3 +25,38 @@ type UpsertTaskCatalogRequest struct {
 	Cost      int    `form:"cost"`
 	Frequency int    `form:"frequency"`
 }
+
+type AreaResponseItem struct {
+	ID    int          `json:"id"`
+	Name  string       `json:"name"`
+	Floor *int         `json:"floor"`
+	Group *GroupOption `json:"group"`
+}
+
+type AreaListResponse struct {
+	Areas []AreaResponseItem `json:"areas"`
+}
+
+type AreaDetails struct {
+	ID    int          `json:"id"`
+	Name  string       `json:"name"`
+	Floor *int         `json:"floor"`
+	Group *GroupOption `json:"group"`
+}
+
+type GroupOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type CreateAreaRequest struct {
+	Name    string  `json:"name"`
+	GroupID *string `json:"group_id"`
+	Floor   *int    `json:"floor"`
+}
+
+type UpdateAreaRequest struct {
+	Name    string  `json:"name"`
+	GroupID *string `json:"group_id"`
+	Floor   *int    `json:"floor"`
+}

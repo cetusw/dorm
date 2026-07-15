@@ -1,5 +1,6 @@
 import { navigateTo, useAppPathname } from './navigation'
 import { ResidentAppShell } from './ResidentAppShell'
+import { AreasPage } from '../pages/areas/AreasPage'
 import { useCurrentUserState } from '../features/current-user/model/useCurrentUser'
 import { CurrentDutyPage } from '../pages/current-duty/CurrentDutyPage'
 import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
@@ -29,6 +30,10 @@ function renderResidentPage(pathname: string) {
 
     if (pathname === '/app/groups') {
         return <GroupsPage />
+    }
+
+    if (pathname === '/app/areas') {
+        return <AreasPage />
     }
 
     return <CurrentDutyPage />

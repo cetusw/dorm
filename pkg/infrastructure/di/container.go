@@ -108,7 +108,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo, groupRepo, teamRepo, userRepo)
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
 	dutyService := dutyuc.NewDutyService(dutyRepo, teamRepo, groupRepo, dormitoryRepo, taskRepo, taskOverrideRepo, areaRepo, userRepo)
-	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo)
+	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo, groupRepo)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
 	//if err != nil {
@@ -173,6 +173,9 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 
 	teamAPIHandler := http.NewTeamAPIHandler(dormitoryService, teamService)
 	teamAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+
+	areaAPIHandler := http.NewAreaAPIHandler(dormitoryService, taskCatalogService)
+	areaAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	userAPIHandler := http.NewUserAPIHandler(userService, dormitoryService)
 	userAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))

@@ -3,20 +3,28 @@ package catalog
 import (
 	"context"
 	"dorm/pkg/core/domain/catalog"
+	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/ports/dto"
 	"fmt"
 	"sort"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
 
 type Service struct {
-	taskRepo catalog.TaskDefinitionRepository
-	areaRepo catalog.AreaRepository
+	taskRepo  catalog.TaskDefinitionRepository
+	areaRepo  catalog.AreaRepository
+	groupRepo structure.GroupRepository
 }
 
-func NewCatalogService(taskRepo catalog.TaskDefinitionRepository, areaRepo catalog.AreaRepository) *Service {
-	return &Service{taskRepo: taskRepo, areaRepo: areaRepo}
+func NewCatalogService(
+	taskRepo catalog.TaskDefinitionRepository,
+	areaRepo catalog.AreaRepository,
+	groupRepo structure.GroupRepository,
+) *Service {
+	return &Service{taskRepo: taskRepo, areaRepo: areaRepo, groupRepo: groupRepo}
 }
 
 func (s *Service) ListTaskGroupsByGroup(ctx context.Context, groupID uuid.UUID) ([]dto.TaskCatalogGroup, error) {
@@ -143,6 +151,159 @@ func (s *Service) ListCommonAreas(ctx context.Context) ([]*catalog.Area, error) 
 		}
 	}
 	return commonAreas, nil
+}
+
+func (s *Service) ListAreasByDormitory(ctx context.Context, dormitoryID int64) ([]*catalog.Area, error) {
+	areas, err := s.areaRepo.GetAllAreas(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	groups, err := s.groupRepo.FindByDormitoryID(ctx, dormitoryID)
+	if err != nil {
+		return nil, err
+	}
+	groupIDs := make(map[uuid.UUID]struct{}, len(groups))
+	for _, group := range groups {
+		groupIDs[group.ID()] = struct{}{}
+	}
+
+	result := make([]*catalog.Area, 0, len(areas))
+	for _, area := range areas {
+		if area.GroupID() == nil {
+			result = append(result, area)
+			continue
+		}
+
+		if _, ok := groupIDs[*area.GroupID()]; ok {
+			result = append(result, area)
+		}
+	}
+
+	return result, nil
+}
+
+func (s *Service) GetAreasResponse(ctx context.Context, dormitoryID int64) (dto.AreaListResponse, error) {
+	areas, err := s.ListAreasByDormitory(ctx, dormitoryID)
+	if err != nil {
+		return dto.AreaListResponse{}, fmt.Errorf("load areas: %w", err)
+	}
+
+	groups, err := s.groupRepo.FindByDormitoryID(ctx, dormitoryID)
+	if err != nil {
+		return dto.AreaListResponse{}, fmt.Errorf("load area groups: %w", err)
+	}
+	groupMap := make(map[uuid.UUID]*structure.Group, len(groups))
+	for _, group := range groups {
+		groupMap[group.ID()] = group
+	}
+
+	items := make([]dto.AreaResponseItem, 0, len(areas))
+	for _, area := range areas {
+		items = append(items, dto.AreaResponseItem{
+			ID:    area.ID(),
+			Name:  area.Name(),
+			Floor: areaFloor(area),
+			Group: areaGroupSummary(area, groupMap),
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Floor == nil && items[j].Floor != nil {
+			return false
+		}
+		if items[i].Floor != nil && items[j].Floor == nil {
+			return true
+		}
+		if items[i].Floor != nil && items[j].Floor != nil && *items[i].Floor != *items[j].Floor {
+			return *items[i].Floor > *items[j].Floor
+		}
+		return items[i].Name < items[j].Name
+	})
+
+	return dto.AreaListResponse{Areas: items}, nil
+}
+
+func (s *Service) GetAreaDetails(ctx context.Context, id int) (*dto.AreaDetails, error) {
+	area, err := s.areaRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load area: %w", err)
+	}
+	if area == nil {
+		return nil, nil
+	}
+
+	groupMap, err := s.allGroupsMap(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load area groups: %w", err)
+	}
+
+	return &dto.AreaDetails{
+		ID:    area.ID(),
+		Name:  area.Name(),
+		Floor: areaFloor(area),
+		Group: areaGroupSummary(area, groupMap),
+	}, nil
+}
+
+func (s *Service) CreateArea(ctx context.Context, dormitoryID int64, req dto.CreateAreaRequest) (*dto.AreaDetails, error) {
+	input, err := s.normalizeAreaInput(ctx, dormitoryID, req.Name, req.GroupID, req.Floor)
+	if err != nil {
+		return nil, err
+	}
+
+	area := catalog.NewArea(input.name, input.floorValue(), input.groupID)
+	if err := s.areaRepo.Save(ctx, area); err != nil {
+		return nil, fmt.Errorf("create area: %w", err)
+	}
+
+	return s.GetAreaDetails(ctx, area.ID())
+}
+
+func (s *Service) UpdateArea(ctx context.Context, dormitoryID int64, id int, req dto.UpdateAreaRequest) (*dto.AreaDetails, error) {
+	area, err := s.areaRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load area: %w", err)
+	}
+	if area == nil {
+		return nil, nil
+	}
+
+	if err := s.requireAreaInDormitory(ctx, area, dormitoryID); err != nil {
+		return nil, err
+	}
+
+	input, err := s.normalizeAreaInput(ctx, dormitoryID, req.Name, req.GroupID, req.Floor)
+	if err != nil {
+		return nil, err
+	}
+
+	updated := catalog.RestoreArea(id, input.name, input.floorValue(), input.groupID)
+	if err := s.areaRepo.Save(ctx, updated); err != nil {
+		return nil, fmt.Errorf("update area: %w", err)
+	}
+
+	return s.GetAreaDetails(ctx, updated.ID())
+}
+
+func (s *Service) DeleteArea(ctx context.Context, dormitoryID int64, id int) error {
+	area, err := s.areaRepo.FindByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("load area: %w", err)
+	}
+	if area == nil {
+		return nil
+	}
+
+	if err := s.requireAreaInDormitory(ctx, area, dormitoryID); err != nil {
+		return err
+	}
+
+	if err := s.areaRepo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("delete area: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (*dto.TaskCatalogItem, error) {
@@ -302,4 +463,133 @@ func (s *Service) defaultCommonArea(ctx context.Context) (*catalog.Area, error) 
 		return nil, fmt.Errorf("common area not found")
 	}
 	return areas[0], nil
+}
+
+type normalizedAreaInput struct {
+	name    string
+	groupID *uuid.UUID
+	floor   *int
+}
+
+func (i *normalizedAreaInput) floorValue() int {
+	if i.floor == nil {
+		return 0
+	}
+	return *i.floor
+}
+
+func (s *Service) normalizeAreaInput(
+	ctx context.Context,
+	dormitoryID int64,
+	name string,
+	groupID *string,
+	floor *int,
+) (*normalizedAreaInput, error) {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return nil, fmt.Errorf("Введите название")
+	}
+	if utf8.RuneCountInString(trimmedName) > 255 {
+		return nil, fmt.Errorf("Название не должно превышать 255 символов")
+	}
+
+	parsedGroupID, err := parseOptionalStringUUIDPointer(groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	if parsedGroupID != nil {
+		group, err := s.groupRepo.FindByID(ctx, *parsedGroupID)
+		if err != nil {
+			return nil, fmt.Errorf("load group: %w", err)
+		}
+		if group == nil {
+			return nil, fmt.Errorf("группа не найдена")
+		}
+		if group.DormitoryID() != dormitoryID {
+			return nil, fmt.Errorf("группа принадлежит другому общежитию")
+		}
+	}
+
+	return &normalizedAreaInput{
+		name:    trimmedName,
+		groupID: parsedGroupID,
+		floor:   floor,
+	}, nil
+}
+
+func (s *Service) requireAreaInDormitory(ctx context.Context, area *catalog.Area, dormitoryID int64) error {
+	if area.GroupID() == nil {
+		return nil
+	}
+
+	group, err := s.groupRepo.FindByID(ctx, *area.GroupID())
+	if err != nil {
+		return fmt.Errorf("load area group: %w", err)
+	}
+	if group == nil {
+		return fmt.Errorf("группа не найдена")
+	}
+	if group.DormitoryID() != dormitoryID {
+		return fmt.Errorf("территория принадлежит другому общежитию")
+	}
+
+	return nil
+}
+
+func (s *Service) allGroupsMap(ctx context.Context) (map[uuid.UUID]*structure.Group, error) {
+	groups, err := s.groupRepo.FindAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	groupMap := make(map[uuid.UUID]*structure.Group, len(groups))
+	for _, group := range groups {
+		groupMap[group.ID()] = group
+	}
+
+	return groupMap, nil
+}
+
+func areaFloor(area *catalog.Area) *int {
+	if area == nil || area.Floor() == 0 {
+		return nil
+	}
+
+	floor := area.Floor()
+	return &floor
+}
+
+func areaGroupSummary(area *catalog.Area, groups map[uuid.UUID]*structure.Group) *dto.GroupOption {
+	if area == nil || area.GroupID() == nil {
+		return nil
+	}
+
+	group, ok := groups[*area.GroupID()]
+	if !ok || group == nil {
+		return nil
+	}
+
+	return &dto.GroupOption{
+		ID:   group.ID().String(),
+		Name: group.Name(),
+	}
+}
+
+func parseOptionalStringUUIDPointer(rawID *string) (*uuid.UUID, error) {
+	if rawID == nil {
+		return nil, nil
+	}
+
+	trimmed := strings.TrimSpace(*rawID)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	id, err := uuid.Parse(trimmed)
+	if err != nil {
+		return nil, fmt.Errorf("invalid group id")
+	}
+
+	return &id, nil
 }
