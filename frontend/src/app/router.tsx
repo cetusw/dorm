@@ -1,3 +1,4 @@
+import { navigateTo, useAppPathname } from './navigation'
 import { ResidentAppShell } from './ResidentAppShell'
 import { useCurrentUserState } from '../features/current-user/model/useCurrentUser'
 import { CurrentDutyPage } from '../pages/current-duty/CurrentDutyPage'
@@ -22,7 +23,7 @@ function renderResidentPage(pathname: string) {
 }
 
 export function AppRouter() {
-    const pathname = window.location.pathname
+    const pathname = useAppPathname()
 
     if (pathname === '/app/login') {
         return <LoginPage />
@@ -36,6 +37,7 @@ export function AppRouter() {
             currentUser={currentUser}
             currentUserError={error}
             currentUserLoading={loading}
+            onNavigate={navigateTo}
         >
             {renderResidentPage(pathname)}
         </ResidentAppShell>

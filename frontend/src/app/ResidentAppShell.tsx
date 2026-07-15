@@ -23,6 +23,7 @@ type Props = {
     currentUser: CurrentUser | null
     currentUserError: string | null
     currentUserLoading: boolean
+    onNavigate: (pathname: string) => void
     children: ReactNode
 }
 
@@ -44,6 +45,7 @@ export function ResidentAppShell({
     currentUser,
     currentUserError,
     currentUserLoading,
+    onNavigate,
     children,
 }: Props) {
     const [navbarOpened, { toggle: toggleNavbar, close: closeNavbar }] =
@@ -91,7 +93,7 @@ export function ResidentAppShell({
 
             <Button
                 variant="default"
-                onClick={() => window.location.assign('/app/dormitories')}
+                onClick={() => onNavigate('/app/dormitories')}
             >
                 Управление общежитиями
             </Button>
@@ -116,7 +118,7 @@ export function ResidentAppShell({
                 variant="default"
                 onClick={() => {
                     closeNavbar()
-                    window.location.assign('/app/dormitories')
+                    onNavigate('/app/dormitories')
                 }}
             >
                 Управление общежитиями
@@ -165,7 +167,7 @@ export function ResidentAppShell({
                             label={item.label}
                             onClick={() => {
                                 closeNavbar()
-                                window.location.assign(item.href)
+                                onNavigate(item.href)
                             }}
                             styles={{
                                 root: {
