@@ -20,4 +20,5 @@ type UserUseCase interface {
 	GetCurrentUser(ctx context.Context, userID uuid.UUID) (*dto.CurrentUserResponse, error)
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (*dto.ProfileViewModel, error)
 	GetUsersList(ctx context.Context) ([]dto.UserListItem, error)
+	GetResidentsResponse(ctx context.Context, dormitoryID int64) (dto.ResidentListResponse, error)
 }

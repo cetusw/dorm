@@ -5,8 +5,9 @@ import type { DormitoryListItem } from './types'
 
 const SELECTED_DORMITORY_STORAGE_KEY = 'selected-dormitory-id'
 const DORMITORIES_CHANGED_EVENT = 'dormitories:changed'
+const SELECTED_DORMITORY_CHANGED_EVENT = 'selected-dormitory:changed'
 
-function readStoredDormitoryId(): string | null {
+export function readStoredDormitoryId(): string | null {
     return window.localStorage.getItem(SELECTED_DORMITORY_STORAGE_KEY)
 }
 
@@ -23,6 +24,34 @@ export function notifyDormitoriesChanged() {
     window.dispatchEvent(new CustomEvent(DORMITORIES_CHANGED_EVENT))
 }
 
+function notifySelectedDormitoryChanged() {
+    window.dispatchEvent(new CustomEvent(SELECTED_DORMITORY_CHANGED_EVENT))
+}
+
+export function useSelectedDormitoryId() {
+    const [selectedDormitoryId, setSelectedDormitoryId] = useState<string | null>(() =>
+        readStoredDormitoryId(),
+    )
+
+    useEffect(() => {
+        function syncSelectedDormitory() {
+            setSelectedDormitoryId(readStoredDormitoryId())
+        }
+
+        window.addEventListener(SELECTED_DORMITORY_CHANGED_EVENT, syncSelectedDormitory)
+        window.addEventListener(DORMITORIES_CHANGED_EVENT, syncSelectedDormitory)
+        window.addEventListener('storage', syncSelectedDormitory)
+
+        return () => {
+            window.removeEventListener(SELECTED_DORMITORY_CHANGED_EVENT, syncSelectedDormitory)
+            window.removeEventListener(DORMITORIES_CHANGED_EVENT, syncSelectedDormitory)
+            window.removeEventListener('storage', syncSelectedDormitory)
+        }
+    }, [])
+
+    return selectedDormitoryId
+}
+
 export function useDormitorySelection(enabled: boolean) {
     const [dormitories, setDormitories] = useState<DormitoryListItem[]>([])
     const [selectedDormitoryId, setSelectedDormitoryIdState] = useState<string | null>(null)
@@ -31,6 +60,7 @@ export function useDormitorySelection(enabled: boolean) {
     const setSelectedDormitoryId = useCallback((dormitoryId: string | null) => {
         setSelectedDormitoryIdState(dormitoryId)
         storeDormitoryId(dormitoryId)
+        notifySelectedDormitoryChanged()
     }, [])
 
     const reload = useCallback(async () => {

@@ -5,6 +5,7 @@ import { CurrentDutyPage } from '../pages/current-duty/CurrentDutyPage'
 import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
 import { LoginPage } from '../pages/login/LoginPage'
 import { ResidentSectionPlaceholderPage } from '../pages/placeholder/ResidentSectionPlaceholderPage'
+import { ResidentsPage } from '../pages/residents/ResidentsPage'
 
 function renderResidentPage(pathname: string) {
     if (pathname === '/app/dormitories') {
@@ -12,7 +13,7 @@ function renderResidentPage(pathname: string) {
     }
 
     if (pathname === '/app/residents') {
-        return <ResidentSectionPlaceholderPage title="Жители" />
+        return <ResidentsPage />
     }
 
     if (pathname === '/app/groups') {

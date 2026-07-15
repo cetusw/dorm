@@ -18,6 +18,16 @@ type UserListItem struct {
 	TeamName      string
 }
 
+type ResidentListItem struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	RoomNumber string `json:"room_number"`
+}
+
+type ResidentListResponse struct {
+	Users []ResidentListItem `json:"users"`
+}
+
 type CreateUserRequest struct {
 	FirstName   string `form:"first_name"`
 	LastName    string `form:"last_name"`

@@ -237,6 +237,17 @@ func (s *Service) GetUsersList(ctx context.Context) ([]dto.UserListItem, error) 
 	return s.queryService.GetUsersDetailedList(ctx)
 }
 
+func (s *Service) GetResidentsResponse(ctx context.Context, dormitoryID int64) (dto.ResidentListResponse, error) {
+	items, err := s.queryService.GetResidentsByDormitoryID(ctx, dormitoryID)
+	if err != nil {
+		return dto.ResidentListResponse{}, fmt.Errorf("load residents by dormitory: %w", err)
+	}
+
+	return dto.ResidentListResponse{
+		Users: items,
+	}, nil
+}
+
 func (s *Service) fillTeamData(ctx context.Context, p *dto.ProfileViewModel, u *user.User) (*structure.Team, error) {
 	if u.TeamID() == nil {
 		return nil, nil
