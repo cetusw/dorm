@@ -1,20 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import {
-    Alert,
-    Button,
-    Center,
-    Group,
-    Loader,
-    Modal,
     Select,
     SimpleGrid,
-    Stack,
     TextInput,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 import { ApiError } from '../../../shared/api/ApiError'
+import { EntityFormModal } from '../../../shared/ui/EntityFormModal'
 import {
     createDormitory,
     getDormitory,
@@ -151,130 +145,94 @@ export function DormitoryFormModal({
     )
 
     return (
-        <Modal
+        <EntityFormModal
             opened={opened}
             onClose={onClose}
             title={title}
-            centered
-            radius="xl"
-            size={760}
-            styles={{
-                title: {
-                    fontSize: '1.5rem',
-                    fontWeight: 700,
-                },
-                content: {
-                    padding: 8,
-                },
-                body: {
-                    paddingTop: 12,
-                },
-            }}
+            loading={loading}
+            saving={saving}
+            error={submitError}
+            onSubmit={form.onSubmit(async (values) => {
+                setSubmitError(null)
+                setSaving(true)
+
+                try {
+                    if (mode === 'create') {
+                        await createDormitory(toRequest(values))
+                    } else if (dormitoryId !== null) {
+                        await updateDormitory(dormitoryId, toRequest(values))
+                    }
+
+                    await onSaved()
+                    onClose()
+                } catch (error) {
+                    if (error instanceof ApiError) {
+                        setSubmitError(error.message)
+                    } else {
+                        setSubmitError('Не удалось сохранить общежитие')
+                    }
+                } finally {
+                    setSaving(false)
+                }
+            })}
         >
-            {loading ? (
-                <Center py="xl">
-                    <Loader />
-                </Center>
-            ) : (
-                <form
-                    onSubmit={form.onSubmit(async (values) => {
-                        setSubmitError(null)
-                        setSaving(true)
+            <TextInput
+                label="Название"
+                placeholder="Название"
+                withAsterisk
+                maxLength={255}
+                key={form.key('name')}
+                {...form.getInputProps('name')}
+            />
 
-                        try {
-                            if (mode === 'create') {
-                                await createDormitory(toRequest(values))
-                            } else if (dormitoryId !== null) {
-                                await updateDormitory(dormitoryId, toRequest(values))
-                            }
+            <TextInput
+                label="Город"
+                placeholder="Город"
+                withAsterisk
+                maxLength={255}
+                key={form.key('city')}
+                {...form.getInputProps('city')}
+            />
 
-                            await onSaved()
-                            onClose()
-                        } catch (error) {
-                            if (error instanceof ApiError) {
-                                setSubmitError(error.message)
-                            } else {
-                                setSubmitError('Не удалось сохранить общежитие')
-                            }
-                        } finally {
-                            setSaving(false)
-                        }
-                    })}
-                >
-                    <Stack gap="md">
-                        {submitError && (
-                            <Alert color="red">{submitError}</Alert>
-                        )}
+            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" verticalSpacing="md">
+                <TextInput
+                    label="Тип улицы"
+                    placeholder="Тип"
+                    withAsterisk
+                    maxLength={100}
+                    key={form.key('streetType')}
+                    {...form.getInputProps('streetType')}
+                />
 
-                        <TextInput
-                            label="Название"
-                            placeholder="Название"
-                            withAsterisk
-                            maxLength={255}
-                            key={form.key('name')}
-                            {...form.getInputProps('name')}
-                        />
+                <TextInput
+                    label="Название улицы"
+                    placeholder="Название ул."
+                    withAsterisk
+                    maxLength={100}
+                    key={form.key('streetName')}
+                    {...form.getInputProps('streetName')}
+                />
 
-                        <TextInput
-                            label="Город"
-                            placeholder="Город"
-                            withAsterisk
-                            maxLength={255}
-                            key={form.key('city')}
-                            {...form.getInputProps('city')}
-                        />
+                <TextInput
+                    label="Номер дома"
+                    placeholder="Номер"
+                    withAsterisk
+                    maxLength={50}
+                    key={form.key('houseNumber')}
+                    {...form.getInputProps('houseNumber')}
+                />
+            </SimpleGrid>
 
-                        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" verticalSpacing="md">
-                            <TextInput
-                                label="Тип улицы"
-                                placeholder="Тип"
-                                withAsterisk
-                                maxLength={100}
-                                key={form.key('streetType')}
-                                {...form.getInputProps('streetType')}
-                            />
-
-                            <TextInput
-                                label="Название улицы"
-                                placeholder="Название ул."
-                                withAsterisk
-                                maxLength={100}
-                                key={form.key('streetName')}
-                                {...form.getInputProps('streetName')}
-                            />
-
-                            <TextInput
-                                label="Номер дома"
-                                placeholder="Номер"
-                                withAsterisk
-                                maxLength={50}
-                                key={form.key('houseNumber')}
-                                {...form.getInputProps('houseNumber')}
-                            />
-                        </SimpleGrid>
-
-                        <Select
-                            label="Глава"
-                            placeholder="Выберите главу"
-                            searchable
-                            clearable
-                            data={userOptions}
-                            nothingFoundMessage="Житель не найден"
-                            value={form.values.leaderId}
-                            onChange={(value) => form.setFieldValue('leaderId', value)}
-                        />
-
-                        <Group justify="flex-end" mt="sm">
-                            <Button variant="default" onClick={onClose}>
-                                Отменить
-                            </Button>
-                            <Button type="submit" loading={saving}>
-                                Сохранить
-                            </Button>
-                        </Group>
-                    </Stack>
-                </form>
-            )}
-        </Modal>
+            <Select
+                label="Глава"
+                placeholder="Выберите главу"
+                searchable
+                clearable
+                data={userOptions}
+                nothingFoundMessage="Житель не найден"
+                value={form.values.leaderId}
+                onChange={(value) => form.setFieldValue('leaderId', value)}
+            />
+        </EntityFormModal>
     )
 }

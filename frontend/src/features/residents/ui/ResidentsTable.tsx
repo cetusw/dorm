@@ -19,13 +19,15 @@ type SortDirection = 'asc' | 'desc'
 
 type Props = {
     residents: ResidentListItem[]
+    onEdit: (residentId: string) => void
+    onDelete: (resident: ResidentListItem) => void
 }
 
 function normalize(value: string): string {
     return value.trim().toLowerCase()
 }
 
-export function ResidentsTable({ residents }: Props) {
+export function ResidentsTable({ residents, onEdit, onDelete }: Props) {
     const [search, setSearch] = useState('')
     const [sortField, setSortField] = useState<SortField>('name')
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -123,10 +125,10 @@ export function ResidentsTable({ residents }: Props) {
                                                 </Menu.Target>
 
                                                 <Menu.Dropdown>
-                                                    <Menu.Item>
+                                                    <Menu.Item onClick={() => onEdit(resident.id)}>
                                                         Редактировать
                                                     </Menu.Item>
-                                                    <Menu.Item color="red">
+                                                    <Menu.Item color="red" onClick={() => onDelete(resident)}>
                                                         Удалить
                                                     </Menu.Item>
                                                 </Menu.Dropdown>

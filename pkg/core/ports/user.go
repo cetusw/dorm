@@ -21,4 +21,8 @@ type UserUseCase interface {
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (*dto.ProfileViewModel, error)
 	GetUsersList(ctx context.Context) ([]dto.UserListItem, error)
 	GetResidentsResponse(ctx context.Context, dormitoryID int64) (dto.ResidentListResponse, error)
+	GetResidentDetails(ctx context.Context, id uuid.UUID) (*dto.ResidentDetails, error)
+	CreateResident(ctx context.Context, req dto.CreateResidentRequest) (*dto.ResidentDetails, error)
+	UpdateResident(ctx context.Context, id uuid.UUID, req dto.UpdateResidentRequest) (*dto.ResidentDetails, error)
+	DeleteResident(ctx context.Context, id uuid.UUID) error
 }

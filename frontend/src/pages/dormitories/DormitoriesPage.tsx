@@ -41,43 +41,39 @@ export function DormitoriesPage() {
         </Button>
     )
 
+    let content = null
+
     if (loading) {
-        return (
-            <ManagementPageFrame title="Общежития" titleActions={titleActions}>
-                <Center py="xl">
-                    <Loader />
-                </Center>
-            </ManagementPageFrame>
+        content = (
+            <Center py="xl">
+                <Loader />
+            </Center>
         )
-    }
-
-    if (error) {
-        return (
-            <ManagementPageFrame title="Общежития" titleActions={titleActions}>
-                <Alert color="red" title="Ошибка">
-                    {error}
-                </Alert>
-            </ManagementPageFrame>
+    } else if (error) {
+        content = (
+            <Alert color="red" title="Ошибка">
+                {error}
+            </Alert>
         )
-    }
-
-    if (dormitories.length === 0) {
-        return (
-            <ManagementPageFrame title="Общежития" titleActions={titleActions}>
-                <Alert color="gray">
-                    Общежития пока не добавлены.
-                </Alert>
-            </ManagementPageFrame>
+    } else if (dormitories.length === 0) {
+        content = (
+            <Alert color="gray">
+                Общежития пока не добавлены.
+            </Alert>
         )
-    }
-
-    return (
-        <ManagementPageFrame title="Общежития" titleActions={titleActions}>
+    } else {
+        content = (
             <DormitoriesTable
                 dormitories={dormitories}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
             />
+        )
+    }
+
+    return (
+        <ManagementPageFrame title="Общежития" titleActions={titleActions}>
+            {content}
 
             <DormitoryFormModal
                 opened={formOpened}
