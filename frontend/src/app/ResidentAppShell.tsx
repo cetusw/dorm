@@ -1,14 +1,46 @@
-import type {ReactNode} from 'react'
-import {AppShell, Burger, Group, NavLink, Title} from '@mantine/core'
-import {useDisclosure} from '@mantine/hooks'
+import type { ReactNode } from 'react'
+
+import { Alert, AppShell, Burger, Center, Group, Loader, NavLink, Stack, Title } from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
+
+import type { CurrentUser } from '../features/current-user/model/types'
 
 type Props = {
+    currentPath: string
+    currentUser: CurrentUser | null
+    currentUserError: string | null
+    currentUserLoading: boolean
     children: ReactNode
 }
 
-export function ResidentAppShell({children}: Props) {
-    const [navbarOpened, {toggle: toggleNavbar, close: closeNavbar}] =
+type NavigationItem = {
+    href: string
+    label: string
+}
+
+export function ResidentAppShell({
+    currentPath,
+    currentUser,
+    currentUserError,
+    currentUserLoading,
+    children,
+}: Props) {
+    const [navbarOpened, { toggle: toggleNavbar, close: closeNavbar }] =
         useDisclosure(false)
+
+    const navigationItems: NavigationItem[] = [
+        {
+            href: '/app/tasks',
+            label: 'Дежурство',
+        },
+    ]
+
+    if (currentUser?.can_manage_dormitories) {
+        navigationItems.push({
+            href: '/app/dormitories',
+            label: 'Общежития',
+        })
+    }
 
     return (
         <AppShell
@@ -19,7 +51,7 @@ export function ResidentAppShell({children}: Props) {
                     mobile: !navbarOpened,
                 },
             }}
-            header={{height: 60}}
+            header={{ height: 60 }}
             padding={0}
             styles={{
                 main: {
@@ -37,19 +69,28 @@ export function ResidentAppShell({children}: Props) {
             }}
         >
             <AppShell.Navbar p="md">
-                <NavLink
-                    label="Дежурство"
-                    onClick={closeNavbar}
-                    styles={{
-                        root: {
-                            color: '#f9fafb',
-                            borderRadius: 8,
-                        },
-                        label: {
-                            color: '#f9fafb',
-                        },
-                    }}
-                />
+                <Stack gap="xs">
+                    {navigationItems.map((item) => (
+                        <NavLink
+                            key={item.href}
+                            active={currentPath === item.href}
+                            label={item.label}
+                            onClick={() => {
+                                closeNavbar()
+                                window.location.assign(item.href)
+                            }}
+                            styles={{
+                                root: {
+                                    color: '#f9fafb',
+                                    borderRadius: 8,
+                                },
+                                label: {
+                                    color: '#f9fafb',
+                                },
+                            }}
+                        />
+                    ))}
+                </Stack>
             </AppShell.Navbar>
 
             <AppShell.Header px="xl">
@@ -68,7 +109,21 @@ export function ResidentAppShell({children}: Props) {
                 </Group>
             </AppShell.Header>
 
-            <AppShell.Main>{children}</AppShell.Main>
+            <AppShell.Main>
+                {currentUserLoading ? (
+                    <Center h="100vh">
+                        <Loader />
+                    </Center>
+                ) : currentUserError ? (
+                    <Center h="100vh" px="md">
+                        <Alert color="red" title="Ошибка">
+                            {currentUserError}
+                        </Alert>
+                    </Center>
+                ) : (
+                    children
+                )}
+            </AppShell.Main>
         </AppShell>
     )
 }

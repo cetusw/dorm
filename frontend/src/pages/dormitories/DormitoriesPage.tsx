@@ -1,13 +1,13 @@
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 
-import { Alert, Button, Center, Loader } from '@mantine/core'
+import { Alert, Box, Button, Center, Group, Loader, Stack, Title } from '@mantine/core'
 
 import { useDormitories } from '../../features/dormitories/model/useDormitories'
 import type { DormitoryListItem } from '../../features/dormitories/model/types'
 import { DeleteDormitoryModal } from '../../features/dormitories/ui/DeleteDormitoryModal'
 import { DormitoryFormModal } from '../../features/dormitories/ui/DormitoryFormModal'
 import { DormitoriesTable } from '../../features/dormitories/ui/DormitoriesTable'
-import { PageFrame } from '../../shared/ui/PageFrame'
 
 export function DormitoriesPage() {
     const { dormitories, loading, error, reload } = useDormitories()
@@ -37,36 +37,36 @@ export function DormitoriesPage() {
 
     if (loading) {
         return (
-            <PageFrame title="Общежития" titleActions={titleActions}>
+            <DormitoriesPageLayout titleActions={titleActions}>
                 <Center py="xl">
                     <Loader />
                 </Center>
-            </PageFrame>
+            </DormitoriesPageLayout>
         )
     }
 
     if (error) {
         return (
-            <PageFrame title="Общежития" titleActions={titleActions}>
+            <DormitoriesPageLayout titleActions={titleActions}>
                 <Alert color="red" title="Ошибка">
                     {error}
                 </Alert>
-            </PageFrame>
+            </DormitoriesPageLayout>
         )
     }
 
     if (dormitories.length === 0) {
         return (
-            <PageFrame title="Общежития" titleActions={titleActions}>
+            <DormitoriesPageLayout titleActions={titleActions}>
                 <Alert color="gray">
                     Общежития пока не добавлены.
                 </Alert>
-            </PageFrame>
+            </DormitoriesPageLayout>
         )
     }
 
     return (
-        <PageFrame title="Общежития" titleActions={titleActions}>
+        <DormitoriesPageLayout titleActions={titleActions}>
             <DormitoriesTable
                 dormitories={dormitories}
                 onEdit={handleEdit}
@@ -90,6 +90,27 @@ export function DormitoriesPage() {
                 onClose={() => setDeletingDormitory(null)}
                 onDeleted={reload}
             />
-        </PageFrame>
+        </DormitoriesPageLayout>
+    )
+}
+
+function DormitoriesPageLayout({
+    children,
+    titleActions,
+}: {
+    children: ReactNode
+    titleActions: ReactNode
+}) {
+    return (
+        <Box px={{ base: 'md', md: 'xl' }} py="xl">
+            <Stack gap="lg" maw={1240} mx="auto">
+                <Group justify="space-between" align="center" wrap="wrap" gap="md">
+                    <Title order={1}>Общежития</Title>
+                    {titleActions}
+                </Group>
+
+                {children}
+            </Stack>
+        </Box>
     )
 }
