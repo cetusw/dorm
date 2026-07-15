@@ -5,6 +5,7 @@ import { Alert, Box, Button, Center, Group, Loader, Stack, Title } from '@mantin
 
 import { useDormitories } from '../../features/dormitories/model/useDormitories'
 import type { DormitoryListItem } from '../../features/dormitories/model/types'
+import { notifyDormitoriesChanged } from '../../features/dormitories/model/useDormitorySelection'
 import { DeleteDormitoryModal } from '../../features/dormitories/ui/DeleteDormitoryModal'
 import { DormitoryFormModal } from '../../features/dormitories/ui/DormitoryFormModal'
 import { DormitoriesTable } from '../../features/dormitories/ui/DormitoriesTable'
@@ -27,6 +28,11 @@ export function DormitoriesPage() {
 
     function handleDelete(dormitory: DormitoryListItem) {
         setDeletingDormitory(dormitory)
+    }
+
+    async function handleDormitoriesChanged() {
+        await reload()
+        notifyDormitoriesChanged()
     }
 
     const titleActions = (
@@ -81,14 +87,14 @@ export function DormitoriesPage() {
                     setFormOpened(false)
                     setEditingDormitoryId(null)
                 }}
-                onSaved={reload}
+                onSaved={handleDormitoriesChanged}
             />
 
             <DeleteDormitoryModal
                 opened={deletingDormitory !== null}
                 dormitory={deletingDormitory}
                 onClose={() => setDeletingDormitory(null)}
-                onDeleted={reload}
+                onDeleted={handleDormitoriesChanged}
             />
         </DormitoriesPageLayout>
     )
