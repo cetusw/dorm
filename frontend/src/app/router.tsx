@@ -3,8 +3,8 @@ import { ResidentAppShell } from './ResidentAppShell'
 import { useCurrentUserState } from '../features/current-user/model/useCurrentUser'
 import { CurrentDutyPage } from '../pages/current-duty/CurrentDutyPage'
 import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
+import { GroupsPage } from '../pages/groups/GroupsPage'
 import { LoginPage } from '../pages/login/LoginPage'
-import { ResidentSectionPlaceholderPage } from '../pages/placeholder/ResidentSectionPlaceholderPage'
 import { ResidentsPage } from '../pages/residents/ResidentsPage'
 
 function renderResidentPage(pathname: string) {
@@ -17,7 +17,7 @@ function renderResidentPage(pathname: string) {
     }
 
     if (pathname === '/app/groups') {
-        return <ResidentSectionPlaceholderPage title="Группы" />
+        return <GroupsPage />
     }
 
     return <CurrentDutyPage />

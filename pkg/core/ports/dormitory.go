@@ -24,9 +24,14 @@ type DormitoryUseCase interface {
 	UpdateDormitoryDetails(ctx context.Context, id int64, req dto.UpdateDormitoryRequest) (*dto.DormitoryDetails, error)
 	DeleteDormitory(ctx context.Context, id int64) error
 	GetGroupsList(ctx context.Context, dormitoryID int64) ([]dto.GroupListItem, error)
+	GetGroupsResponse(ctx context.Context, dormitoryID int64) (dto.GroupListResponse, error)
 	GetGroupByID(ctx context.Context, id uuid.UUID) (*structure.Group, error)
+	GetGroupDetails(ctx context.Context, id uuid.UUID) (*dto.GroupDetails, error)
 	GetDormitoryUserOptions(ctx context.Context, dormitoryID int64) ([]dto.UserOption, error)
+	GetDormitoryUserOptionsResponse(ctx context.Context, dormitoryID int64) (dto.UserOptionsResponse, error)
 	CreateGroup(ctx context.Context, dormitoryID int64, req dto.UpsertGroupRequest) error
+	CreateGroupDetails(ctx context.Context, req dto.CreateGroupRequest) (*dto.GroupDetails, error)
 	UpdateGroup(ctx context.Context, id uuid.UUID, req dto.UpsertGroupRequest) error
+	UpdateGroupDetails(ctx context.Context, id uuid.UUID, req dto.UpdateGroupRequest) (*dto.GroupDetails, error)
 	DeleteGroup(ctx context.Context, id uuid.UUID) error
 }

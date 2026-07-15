@@ -57,6 +57,34 @@ type UserOptionsResponse struct {
 	Users []UserOptionItem `json:"users"`
 }
 
+type GroupResponseItem struct {
+	ID     string       `json:"id"`
+	Name   string       `json:"name"`
+	Leader *UserSummary `json:"leader"`
+}
+
+type GroupListResponse struct {
+	Groups []GroupResponseItem `json:"groups"`
+}
+
+type GroupDetails struct {
+	ID     string       `json:"id"`
+	Name   string       `json:"name"`
+	Leader *UserSummary `json:"leader"`
+}
+
+type CreateGroupRequest struct {
+	Name        string  `json:"name"`
+	LeaderID    *string `json:"leader_id"`
+	DormitoryID int64   `json:"dormitory_id"`
+}
+
+type UpdateGroupRequest struct {
+	Name        string  `json:"name"`
+	LeaderID    *string `json:"leader_id"`
+	DormitoryID int64   `json:"dormitory_id"`
+}
+
 type GroupListItem struct {
 	ID             uuid.UUID
 	Name           string

@@ -320,8 +320,48 @@ func (s *Service) GetGroupsList(ctx context.Context, dormitoryID int64) ([]dto.G
 	return items, nil
 }
 
+func (s *Service) GetGroupsResponse(ctx context.Context, dormitoryID int64) (dto.GroupListResponse, error) {
+	groups, err := s.groupRepo.FindByDormitoryID(ctx, dormitoryID)
+	if err != nil {
+		return dto.GroupListResponse{}, fmt.Errorf("load groups: %w", err)
+	}
+
+	residentNames, err := s.dormitoryUserNames(ctx, dormitoryID)
+	if err != nil {
+		return dto.GroupListResponse{}, fmt.Errorf("load group leaders: %w", err)
+	}
+
+	items := make([]dto.GroupResponseItem, 0, len(groups))
+	for _, group := range groups {
+		items = append(items, dto.GroupResponseItem{
+			ID:     group.ID().String(),
+			Name:   group.Name(),
+			Leader: userSummaryFromMap(residentNames, group.LeaderID()),
+		})
+	}
+
+	return dto.GroupListResponse{Groups: items}, nil
+}
+
 func (s *Service) GetGroupByID(ctx context.Context, id uuid.UUID) (*structure.Group, error) {
 	return s.groupRepo.FindByID(ctx, id)
+}
+
+func (s *Service) GetGroupDetails(ctx context.Context, id uuid.UUID) (*dto.GroupDetails, error) {
+	group, err := s.groupRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load group: %w", err)
+	}
+	if group == nil {
+		return nil, nil
+	}
+
+	residentNames, err := s.dormitoryUserNames(ctx, group.DormitoryID())
+	if err != nil {
+		return nil, fmt.Errorf("load group leaders: %w", err)
+	}
+
+	return groupDetailsFromDomain(group, residentNames), nil
 }
 
 func (s *Service) GetDormitoryUserOptions(ctx context.Context, dormitoryID int64) ([]dto.UserOption, error) {
@@ -337,6 +377,25 @@ func (s *Service) GetDormitoryUserOptions(ctx context.Context, dormitoryID int64
 		})
 	}
 	return options, nil
+}
+
+func (s *Service) GetDormitoryUserOptionsResponse(ctx context.Context, dormitoryID int64) (dto.UserOptionsResponse, error) {
+	options, err := s.GetDormitoryUserOptions(ctx, dormitoryID)
+	if err != nil {
+		return dto.UserOptionsResponse{}, fmt.Errorf("load dormitory user options: %w", err)
+	}
+
+	items := make([]dto.UserOptionItem, 0, len(options))
+	for _, option := range options {
+		items = append(items, dto.UserOptionItem{
+			ID:   option.ID.String(),
+			Name: option.FullName,
+		})
+	}
+
+	return dto.UserOptionsResponse{
+		Users: items,
+	}, nil
 }
 
 func (s *Service) GetUserOptions(ctx context.Context) ([]dto.UserOption, error) {
@@ -372,6 +431,25 @@ func (s *Service) CreateGroup(ctx context.Context, dormitoryID int64, req dto.Up
 	return s.groupRepo.Save(ctx, structure.NewGroup(req.Name, leaderID, req.SpreadsheetID, dormitoryID))
 }
 
+func (s *Service) CreateGroupDetails(ctx context.Context, req dto.CreateGroupRequest) (*dto.GroupDetails, error) {
+	input, err := s.normalizeGroupInput(ctx, req.Name, req.LeaderID, req.DormitoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	group := structure.NewGroup(input.name, input.leaderID, "", input.dormitoryID)
+	if err := s.groupRepo.Save(ctx, group); err != nil {
+		return nil, fmt.Errorf("create group: %w", err)
+	}
+
+	residentNames, err := s.dormitoryUserNames(ctx, input.dormitoryID)
+	if err != nil {
+		return nil, fmt.Errorf("load group leaders: %w", err)
+	}
+
+	return groupDetailsFromDomain(group, residentNames), nil
+}
+
 func (s *Service) UpdateGroup(ctx context.Context, id uuid.UUID, req dto.UpsertGroupRequest) error {
 	current, err := s.groupRepo.FindByID(ctx, id)
 	if err != nil {
@@ -396,6 +474,36 @@ func (s *Service) UpdateGroup(ctx context.Context, id uuid.UUID, req dto.UpsertG
 	return s.groupRepo.Save(ctx, updated)
 }
 
+func (s *Service) UpdateGroupDetails(ctx context.Context, id uuid.UUID, req dto.UpdateGroupRequest) (*dto.GroupDetails, error) {
+	current, err := s.groupRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load group: %w", err)
+	}
+	if current == nil {
+		return nil, nil
+	}
+	if req.DormitoryID != current.DormitoryID() {
+		return nil, fmt.Errorf("группа принадлежит другому общежитию")
+	}
+
+	input, err := s.normalizeGroupInput(ctx, req.Name, req.LeaderID, req.DormitoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	updated := structure.RestoreGroup(id, input.leaderID, input.name, current.SpreadsheetID(), current.DormitoryID(), current.NextDutyTeam())
+	if err := s.groupRepo.Save(ctx, updated); err != nil {
+		return nil, fmt.Errorf("update group: %w", err)
+	}
+
+	residentNames, err := s.dormitoryUserNames(ctx, current.DormitoryID())
+	if err != nil {
+		return nil, fmt.Errorf("load group leaders: %w", err)
+	}
+
+	return groupDetailsFromDomain(updated, residentNames), nil
+}
+
 func (s *Service) DeleteGroup(ctx context.Context, id uuid.UUID) error {
 	return s.groupRepo.Delete(ctx, id)
 }
@@ -409,6 +517,42 @@ func parseOptionalUUID(rawID string) (*uuid.UUID, error) {
 		return nil, fmt.Errorf("invalid user id")
 	}
 	return &id, nil
+}
+
+type normalizedGroupInput struct {
+	name        string
+	leaderID    *uuid.UUID
+	dormitoryID int64
+}
+
+func (s *Service) normalizeGroupInput(
+	ctx context.Context,
+	name string,
+	leaderID *string,
+	dormitoryID int64,
+) (*normalizedGroupInput, error) {
+	trimmedName := strings.TrimSpace(name)
+	if err := validateRequiredDormitoryField(trimmedName, "Введите название", 255, "Название не должно превышать 255 символов"); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.requireDormitory(ctx, dormitoryID); err != nil {
+		return nil, err
+	}
+
+	parsedLeaderID, err := parseOptionalStringUUIDPointer(leaderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireUserInDormitory(ctx, parsedLeaderID, dormitoryID); err != nil {
+		return nil, err
+	}
+
+	return &normalizedGroupInput{
+		name:        trimmedName,
+		leaderID:    parsedLeaderID,
+		dormitoryID: dormitoryID,
+	}, nil
 }
 
 func spreadsheetURL(spreadsheetID string) string {
@@ -610,5 +754,17 @@ func dormitoryDetailsFromDomain(dormitory *structure.Dormitory, names map[uuid.U
 		StreetName:  dormitory.StreetName(),
 		HouseNumber: dormitory.HouseNumber(),
 		Leader:      userSummaryFromMap(names, dormitory.LeaderID()),
+	}
+}
+
+func groupDetailsFromDomain(group *structure.Group, names map[uuid.UUID]string) *dto.GroupDetails {
+	if group == nil {
+		return nil
+	}
+
+	return &dto.GroupDetails{
+		ID:     group.ID().String(),
+		Name:   group.Name(),
+		Leader: userSummaryFromMap(names, group.LeaderID()),
 	}
 }
