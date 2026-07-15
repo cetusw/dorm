@@ -171,6 +171,9 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	groupAPIHandler := http.NewGroupAPIHandler(dormitoryService)
 	groupAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
+	teamAPIHandler := http.NewTeamAPIHandler(dormitoryService, teamService)
+	teamAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+
 	userAPIHandler := http.NewUserAPIHandler(userService, dormitoryService)
 	userAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 

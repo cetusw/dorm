@@ -6,8 +6,19 @@ import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
 import { GroupsPage } from '../pages/groups/GroupsPage'
 import { LoginPage } from '../pages/login/LoginPage'
 import { ResidentsPage } from '../pages/residents/ResidentsPage'
+import { GroupTeamsPage } from '../pages/teams/GroupTeamsPage'
+
+function matchGroupTeamsPath(pathname: string): string | null {
+    const match = pathname.match(/^\/app\/groups\/([^/]+)\/teams$/)
+    return match ? match[1] : null
+}
 
 function renderResidentPage(pathname: string) {
+    const teamGroupId = matchGroupTeamsPath(pathname)
+    if (teamGroupId) {
+        return <GroupTeamsPage groupId={teamGroupId} />
+    }
+
     if (pathname === '/app/dormitories') {
         return <DormitoriesPage />
     }

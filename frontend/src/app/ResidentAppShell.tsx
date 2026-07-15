@@ -37,6 +37,10 @@ function isCurrentPathActive(currentPath: string, href: string): boolean {
         return currentPath === '/app' || currentPath === '/app/tasks'
     }
 
+    if (href === '/app/groups') {
+        return currentPath === '/app/groups' || currentPath.startsWith('/app/groups/')
+    }
+
     return currentPath === href
 }
 

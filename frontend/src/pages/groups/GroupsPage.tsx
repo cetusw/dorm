@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { Alert, Button, Center, Loader } from '@mantine/core'
 
+import { navigateTo } from '../../app/navigation'
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import { useGroups } from '../../features/groups/model/useGroups'
 import type { GroupListItem } from '../../features/groups/model/types'
@@ -67,6 +68,7 @@ export function GroupsPage() {
         content = (
             <GroupsTable
                 groups={groups}
+                onOpen={(groupId) => navigateTo(`/app/groups/${groupId}/teams`)}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
             />

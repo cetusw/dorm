@@ -12,37 +12,36 @@ import {
     UnstyledButton,
 } from '@mantine/core'
 
-import type { GroupListItem } from '../model/types'
+import type { TeamListItem } from '../model/types'
 
 type SortField = 'name' | 'leaderName'
 type SortDirection = 'asc' | 'desc'
 
 type Props = {
-    groups: GroupListItem[]
-    onOpen: (groupId: string) => void
-    onEdit: (groupId: string) => void
-    onDelete: (group: GroupListItem) => void
+    teams: TeamListItem[]
+    onEdit: (teamId: string) => void
+    onDelete: (team: TeamListItem) => void
 }
 
 function normalize(value: string): string {
     return value.trim().toLowerCase()
 }
 
-export function GroupsTable({ groups, onOpen, onEdit, onDelete }: Props) {
+export function TeamsTable({ teams, onEdit, onDelete }: Props) {
     const [search, setSearch] = useState('')
     const [sortField, setSortField] = useState<SortField>('name')
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
     const [openedMenuId, setOpenedMenuId] = useState<string | null>(null)
 
-    const filteredGroups = useMemo(() => {
+    const filteredTeams = useMemo(() => {
         const query = normalize(search)
-        const visibleGroups = query === ''
-            ? groups
-            : groups.filter((group) =>
-                normalize(`${group.name} ${group.leader?.name ?? 'Не назначен'}`).includes(query),
+        const visibleTeams = query === ''
+            ? teams
+            : teams.filter((team) =>
+                normalize(`${team.name} ${team.leader?.name ?? 'Не назначен'}`).includes(query),
             )
 
-        return [...visibleGroups].sort((left, right) => {
+        return [...visibleTeams].sort((left, right) => {
             const leftValue = normalize(
                 sortField === 'leaderName' ? left.leader?.name ?? 'Не назначен' : left.name,
             )
@@ -53,7 +52,7 @@ export function GroupsTable({ groups, onOpen, onEdit, onDelete }: Props) {
 
             return sortDirection === 'asc' ? result : result * -1
         })
-    }, [groups, search, sortField, sortDirection])
+    }, [search, sortDirection, sortField, teams])
 
     function toggleSort(nextField: SortField) {
         if (sortField === nextField) {
@@ -102,58 +101,37 @@ export function GroupsTable({ groups, onOpen, onEdit, onDelete }: Props) {
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
-                        {filteredGroups.map((group) => {
-                            const menuOpened = openedMenuId === group.id
+                        {filteredTeams.map((team) => {
+                            const menuOpened = openedMenuId === team.id
 
                             return (
-                                <Table.Tr
-                                    key={group.id}
-                                    onClick={() => onOpen(group.id)}
-                                    style={{ cursor: 'pointer' }}
-                                >
+                                <Table.Tr key={team.id}>
                                     <Table.Td>
-                                        <Text fw={600}>{group.name}</Text>
+                                        <Text fw={600}>{team.name}</Text>
                                     </Table.Td>
                                     <Table.Td>
-                                        <Text c={group.leader ? undefined : 'dimmed'}>
-                                            {group.leader?.name ?? 'Не назначен'}
+                                        <Text c={team.leader ? undefined : 'dimmed'}>
+                                            {team.leader?.name ?? 'Не назначен'}
                                         </Text>
                                     </Table.Td>
                                     <Table.Td>
                                         <Group justify="flex-start">
                                             <Menu
                                                 opened={menuOpened}
-                                                onChange={(opened) => setOpenedMenuId(opened ? group.id : null)}
+                                                onChange={(opened) => setOpenedMenuId(opened ? team.id : null)}
                                                 withinPortal
                                                 position="bottom-end"
                                             >
                                                 <Menu.Target>
-                                                    <Button
-                                                        variant="subtle"
-                                                        px="sm"
-                                                        aria-label="Открыть действия"
-                                                        onClick={(event) => event.stopPropagation()}
-                                                    >
+                                                    <Button variant="subtle" px="sm" aria-label="Открыть действия">
                                                         {menuOpened ? '▴' : '▾'}
                                                     </Button>
                                                 </Menu.Target>
-
                                                 <Menu.Dropdown>
-                                                    <Menu.Item
-                                                        onClick={(event) => {
-                                                            event.stopPropagation()
-                                                            onEdit(group.id)
-                                                        }}
-                                                    >
+                                                    <Menu.Item onClick={() => onEdit(team.id)}>
                                                         Редактировать
                                                     </Menu.Item>
-                                                    <Menu.Item
-                                                        color="red"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation()
-                                                            onDelete(group)
-                                                        }}
-                                                    >
+                                                    <Menu.Item color="red" onClick={() => onDelete(team)}>
                                                         Удалить
                                                     </Menu.Item>
                                                 </Menu.Dropdown>
