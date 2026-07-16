@@ -39,7 +39,7 @@ export function CreateDutyWeekModal({
             return null
         }
 
-        return dayjs(startDate).add(7, 'day').format('YYYY-MM-DD')
+        return dayjs(startDate).add(6, 'day').format('YYYY-MM-DD')
     }, [startDate])
 
     return (

@@ -1,5 +1,5 @@
 :root {
-    --login-page-background-image: url('/src/assets/login.jpg');
+    --login-page-background-image: url('/src/assets/login-background.jpg');
 }
 
 .loginPage {
