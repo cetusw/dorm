@@ -50,7 +50,7 @@ func (FakeSpreadsheetClient) BatchUpdate(string, []*sheets.Request) error {
 func TestNewContainer(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.json")
-	credentialsPath := filepath.Join(tempDir, "credentials.json")
+	credentialsPath := filepath.Join(tempDir, "google-credentials.json")
 	configContent := []byte(`{
 		"weekStart": "0 9 * * 1",
 		"syncStart": "0 20 * * 0"

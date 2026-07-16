@@ -1,26 +1,25 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-SERVER_USER="ubuntu"
-SERVER_IP="185.65.201.42"
-SERVER_DIR="/home/ubuntu/dorm"
+SERVER_USER="${SERVER_USER:-ubuntu}"
+SERVER_IP="${SERVER_IP:-185.65.201.42}"
+SERVER_DIR="${SERVER_DIR:-/home/ubuntu/dorm}"
 
-IMAGE_NAME="dorm-app"
+IMAGE_NAME="dorm-app:latest"
 IMAGE_TAR="dorm-app.tar"
 
-REMOTE="$SERVER_USER@$SERVER_IP"
+REMOTE="${SERVER_USER}@${SERVER_IP}"
 
 COMPOSE_BASE="docker-compose.yml"
 COMPOSE_PROD="docker-compose.prod.yml"
-
-echo "Checking required local files..."
+COMPOSE_FILES="-f ${COMPOSE_BASE} -f ${COMPOSE_PROD}"
 
 required_paths=(
   "Dockerfile"
   "$COMPOSE_BASE"
   "$COMPOSE_PROD"
   ".env.prod"
-  "bin"
+  "secrets/google-credentials.json"
   "mysql"
 )
 
@@ -31,82 +30,99 @@ for path in "${required_paths[@]}"; do
   fi
 done
 
-echo "Preparing remote directory..."
-ssh "$REMOTE" "mkdir -p '$SERVER_DIR'"
+cleanup() {
+  rm -f "$IMAGE_TAR"
+}
 
-echo "Building Docker image..."
-docker build -t "$IMAGE_NAME" .
+trap cleanup EXIT
 
-echo "Saving Docker image to tar..."
+echo "Building image..."
+docker build --pull -t "$IMAGE_NAME" .
+
+echo "Saving image..."
 docker save "$IMAGE_NAME" -o "$IMAGE_TAR"
 
-echo "Copying deployment files..."
+echo "Preparing remote directory..."
+ssh "$REMOTE" "
+  mkdir -p '$SERVER_DIR/secrets'
+  chmod 700 '$SERVER_DIR/secrets'
+"
 
+echo "Copying deployment files..."
 scp "$IMAGE_TAR" "$REMOTE:$SERVER_DIR/"
 scp "$COMPOSE_BASE" "$REMOTE:$SERVER_DIR/"
 scp "$COMPOSE_PROD" "$REMOTE:$SERVER_DIR/"
 scp ".env.prod" "$REMOTE:$SERVER_DIR/.env"
+scp "secrets/google-credentials.json" \
+  "$REMOTE:$SERVER_DIR/secrets/google-credentials.json"
 
-rsync -av --delete "bin/" "$REMOTE:$SERVER_DIR/bin/"
 rsync -av --delete "mysql/" "$REMOTE:$SERVER_DIR/mysql/"
 
-echo "Removing local image tar..."
-rm "$IMAGE_TAR"
+ssh "$REMOTE" "
+  chmod 600 '$SERVER_DIR/.env'
+  chmod 600 '$SERVER_DIR/secrets/google-credentials.json'
+"
 
-echo "Deploying on remote server..."
-ssh "$REMOTE" << EOF
+ssh "$REMOTE" <<EOF
 set -euo pipefail
 
 cd "$SERVER_DIR"
 
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
 
-echo "Setting execution permissions for scripts..."
-chmod +x ./bin/* || true
-
-echo "Loading Docker image..."
+echo "Loading image..."
 docker load -i "$IMAGE_TAR"
-rm "$IMAGE_TAR"
-
-echo "Stopping old containers..."
-docker compose \$COMPOSE_FILES down
+rm -f "$IMAGE_TAR"
 
 echo "Starting database..."
 docker compose \$COMPOSE_FILES up -d db
 
-echo "Waiting for database health..."
-until [ "\$(docker inspect -f '{{.State.Health.Status}}' dorm-db)" = "healthy" ]; do
+echo "Waiting for database..."
+for attempt in \$(seq 1 60); do
+  status=\$(docker inspect \
+    --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+    dorm-db 2>/dev/null || true)
+
+  if [ "\$status" = "healthy" ]; then
+    break
+  fi
+
+  if [ "\$attempt" -eq 60 ]; then
+    docker compose \$COMPOSE_FILES logs --tail=200 db
+    exit 1
+  fi
+
   sleep 2
 done
 
 echo "Applying migrations..."
-
-MIGRATE_CONTAINER_ID=\$(docker compose \$COMPOSE_FILES run -d --no-deps migrate ./dorm-migrate up)
-
-docker wait "\$MIGRATE_CONTAINER_ID" >/dev/null
-
-echo "Migration logs:"
-docker logs "\$MIGRATE_CONTAINER_ID"
-
-MIGRATE_EXIT_CODE=\$(docker inspect "\$MIGRATE_CONTAINER_ID" --format='{{.State.ExitCode}}')
-docker rm "\$MIGRATE_CONTAINER_ID" >/dev/null
-
-if [ "\$MIGRATE_EXIT_CODE" -ne 0 ]; then
-  echo "Migration failed with exit code \$MIGRATE_EXIT_CODE"
-  exit "\$MIGRATE_EXIT_CODE"
-fi
+docker compose \$COMPOSE_FILES run --rm -T --no-deps \
+  migrate ./dorm-migrate up </dev/null
 
 echo "Starting application..."
-docker compose \$COMPOSE_FILES up -d --force-recreate app
+docker compose \$COMPOSE_FILES up -d \
+  --no-deps \
+  --force-recreate \
+  app
 
-echo "Deployment result:"
-docker compose \$COMPOSE_FILES ps -a
+echo "Checking application..."
+for attempt in \$(seq 1 30); do
+  if curl --fail --silent http://127.0.0.1:8080/app/ >/dev/null; then
+    break
+  fi
 
-echo "App logs:"
-docker compose \$COMPOSE_FILES logs --tail=100 app || true
+  if [ "\$attempt" -eq 30 ]; then
+    docker compose \$COMPOSE_FILES logs --tail=200 app
+    exit 1
+  fi
 
-echo "Cleaning unused Docker images..."
-docker image prune -f || true
+  sleep 2
+done
 
-echo "Deployment done."
+docker compose \$COMPOSE_FILES ps
+docker compose \$COMPOSE_FILES logs --tail=100 app
+
+docker image prune -f
+
+echo "Deployment completed successfully."
 EOF

@@ -18,5 +18,9 @@ frontend/pnpm-debug.log*
 .env.local
 .env.*.local
 
+# Secrets
+secrets/*
+!secrets/.gitkeep
+
 # IDE
 .idea/
