@@ -75,6 +75,10 @@ export function ResidentAppShell({
             label: 'Территории',
         },
         {
+            href: '/app/task-definitions',
+            label: 'Задачи',
+        },
+        {
             href: '/app/tasks',
             label: 'Дежурство',
         },

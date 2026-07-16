@@ -246,6 +246,83 @@ func (s *Service) GetAreaDetails(ctx context.Context, id int) (*dto.AreaDetails,
 	}, nil
 }
 
+func (s *Service) GetTasksResponse(ctx context.Context, dormitoryID int64) (dto.TaskListResponse, error) {
+	tasks, err := s.taskRepo.GetAllTaskDefinitions(ctx)
+	if err != nil {
+		return dto.TaskListResponse{}, fmt.Errorf("load tasks: %w", err)
+	}
+
+	areas, err := s.ListAreasByDormitory(ctx, dormitoryID)
+	if err != nil {
+		return dto.TaskListResponse{}, fmt.Errorf("load task areas: %w", err)
+	}
+
+	areaMap := make(map[int]*catalog.Area, len(areas))
+	for _, area := range areas {
+		areaMap[area.ID()] = area
+	}
+
+	items := make([]dto.TaskResponseItem, 0, len(tasks))
+	for _, task := range tasks {
+		area, ok := areaMap[task.AreaID()]
+		if !ok {
+			continue
+		}
+
+		items = append(items, dto.TaskResponseItem{
+			ID:        task.ID().String(),
+			Title:     task.Title(),
+			Cost:      task.Cost(),
+			Frequency: task.Frequency(),
+			Area: dto.AreaSummary{
+				ID:   area.ID(),
+				Name: area.Name(),
+			},
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Area.Name != items[j].Area.Name {
+			return items[i].Area.Name < items[j].Area.Name
+		}
+		return items[i].Title < items[j].Title
+	})
+
+	return dto.TaskListResponse{Tasks: items}, nil
+}
+
+func (s *Service) GetTaskDetails(ctx context.Context, dormitoryID int64, id uuid.UUID) (*dto.TaskDetails, error) {
+	task, err := s.taskRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load task: %w", err)
+	}
+	if task == nil {
+		return nil, nil
+	}
+
+	area, err := s.areaRepo.FindByID(ctx, task.AreaID())
+	if err != nil {
+		return nil, fmt.Errorf("load task area: %w", err)
+	}
+	if area == nil {
+		return nil, fmt.Errorf("территория не найдена")
+	}
+	if err := s.requireAreaInDormitory(ctx, area, dormitoryID); err != nil {
+		return nil, err
+	}
+
+	return &dto.TaskDetails{
+		ID:        task.ID().String(),
+		Title:     task.Title(),
+		Cost:      task.Cost(),
+		Frequency: task.Frequency(),
+		Area: dto.AreaSummary{
+			ID:   area.ID(),
+			Name: area.Name(),
+		},
+	}, nil
+}
+
 func (s *Service) CreateArea(ctx context.Context, dormitoryID int64, req dto.CreateAreaRequest) (*dto.AreaDetails, error) {
 	input, err := s.normalizeAreaInput(ctx, dormitoryID, req.Name, req.GroupID, req.Floor)
 	if err != nil {
@@ -258,6 +335,23 @@ func (s *Service) CreateArea(ctx context.Context, dormitoryID int64, req dto.Cre
 	}
 
 	return s.GetAreaDetails(ctx, area.ID())
+}
+
+func (s *Service) CreateTaskDetails(ctx context.Context, dormitoryID int64, req dto.CreateTaskRequest) (*dto.TaskDetails, error) {
+	input, err := s.normalizeTaskInput(ctx, dormitoryID, req.Title, req.Cost, req.Frequency, req.AreaID)
+	if err != nil {
+		return nil, err
+	}
+
+	task, err := catalog.NewTaskDefinition(input.areaID, input.title, input.cost, input.frequency)
+	if err != nil {
+		return nil, fmt.Errorf("create task: %w", err)
+	}
+	if err := s.taskRepo.Save(ctx, task); err != nil {
+		return nil, fmt.Errorf("create task: %w", err)
+	}
+
+	return s.GetTaskDetails(ctx, dormitoryID, task.ID())
 }
 
 func (s *Service) UpdateArea(ctx context.Context, dormitoryID int64, id int, req dto.UpdateAreaRequest) (*dto.AreaDetails, error) {
@@ -286,6 +380,39 @@ func (s *Service) UpdateArea(ctx context.Context, dormitoryID int64, id int, req
 	return s.GetAreaDetails(ctx, updated.ID())
 }
 
+func (s *Service) UpdateTaskDetails(ctx context.Context, dormitoryID int64, id uuid.UUID, req dto.UpdateTaskRequest) (*dto.TaskDetails, error) {
+	task, err := s.taskRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load task: %w", err)
+	}
+	if task == nil {
+		return nil, nil
+	}
+
+	currentArea, err := s.areaRepo.FindByID(ctx, task.AreaID())
+	if err != nil {
+		return nil, fmt.Errorf("load current task area: %w", err)
+	}
+	if currentArea == nil {
+		return nil, fmt.Errorf("текущая территория задачи не найдена")
+	}
+	if err := s.requireAreaInDormitory(ctx, currentArea, dormitoryID); err != nil {
+		return nil, err
+	}
+
+	input, err := s.normalizeTaskInput(ctx, dormitoryID, req.Title, req.Cost, req.Frequency, req.AreaID)
+	if err != nil {
+		return nil, err
+	}
+
+	updated := catalog.RestoreTaskDefinition(id, input.areaID, input.title, input.cost, input.frequency)
+	if err := s.taskRepo.Save(ctx, updated); err != nil {
+		return nil, fmt.Errorf("update task: %w", err)
+	}
+
+	return s.GetTaskDetails(ctx, dormitoryID, updated.ID())
+}
+
 func (s *Service) DeleteArea(ctx context.Context, dormitoryID int64, id int) error {
 	area, err := s.areaRepo.FindByID(ctx, id)
 	if err != nil {
@@ -301,6 +428,33 @@ func (s *Service) DeleteArea(ctx context.Context, dormitoryID int64, id int) err
 
 	if err := s.areaRepo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete area: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) DeleteTaskDetails(ctx context.Context, dormitoryID int64, id uuid.UUID) error {
+	task, err := s.taskRepo.FindByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("load task: %w", err)
+	}
+	if task == nil {
+		return nil
+	}
+
+	area, err := s.areaRepo.FindByID(ctx, task.AreaID())
+	if err != nil {
+		return fmt.Errorf("load task area: %w", err)
+	}
+	if area == nil {
+		return fmt.Errorf("территория не найдена")
+	}
+	if err := s.requireAreaInDormitory(ctx, area, dormitoryID); err != nil {
+		return err
+	}
+
+	if err := s.taskRepo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("delete task: %w", err)
 	}
 
 	return nil
@@ -471,6 +625,13 @@ type normalizedAreaInput struct {
 	floor   *int
 }
 
+type normalizedTaskInput struct {
+	title     string
+	cost      int
+	frequency int
+	areaID    int
+}
+
 func (i *normalizedAreaInput) floorValue() int {
 	if i.floor == nil {
 		return 0
@@ -515,6 +676,50 @@ func (s *Service) normalizeAreaInput(
 		name:    trimmedName,
 		groupID: parsedGroupID,
 		floor:   floor,
+	}, nil
+}
+
+func (s *Service) normalizeTaskInput(
+	ctx context.Context,
+	dormitoryID int64,
+	title string,
+	cost int,
+	frequency int,
+	areaID int,
+) (*normalizedTaskInput, error) {
+	trimmedTitle := strings.TrimSpace(title)
+	if trimmedTitle == "" {
+		return nil, fmt.Errorf("Введите название")
+	}
+	if utf8.RuneCountInString(trimmedTitle) > 255 {
+		return nil, fmt.Errorf("Название не должно превышать 255 символов")
+	}
+	if cost <= 0 {
+		return nil, fmt.Errorf("Стоимость должна быть больше нуля")
+	}
+	if frequency <= 0 {
+		return nil, fmt.Errorf("Частота должна быть больше нуля")
+	}
+	if areaID <= 0 {
+		return nil, fmt.Errorf("Выберите территорию")
+	}
+
+	area, err := s.areaRepo.FindByID(ctx, areaID)
+	if err != nil {
+		return nil, fmt.Errorf("load area: %w", err)
+	}
+	if area == nil {
+		return nil, fmt.Errorf("территория не найдена")
+	}
+	if err := s.requireAreaInDormitory(ctx, area, dormitoryID); err != nil {
+		return nil, err
+	}
+
+	return &normalizedTaskInput{
+		title:     trimmedTitle,
+		cost:      cost,
+		frequency: frequency,
+		areaID:    areaID,
 	}, nil
 }
 

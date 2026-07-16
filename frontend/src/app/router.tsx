@@ -7,6 +7,7 @@ import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
 import { GroupsPage } from '../pages/groups/GroupsPage'
 import { LoginPage } from '../pages/login/LoginPage'
 import { ResidentsPage } from '../pages/residents/ResidentsPage'
+import { TaskCatalogPage } from '../pages/task-catalog/TaskCatalogPage'
 import { GroupTeamsPage } from '../pages/teams/GroupTeamsPage'
 
 function matchGroupTeamsPath(pathname: string): string | null {
@@ -34,6 +35,10 @@ function renderResidentPage(pathname: string) {
 
     if (pathname === '/app/areas') {
         return <AreasPage />
+    }
+
+    if (pathname === '/app/task-definitions') {
+        return <TaskCatalogPage />
     }
 
     return <CurrentDutyPage />

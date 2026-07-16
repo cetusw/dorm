@@ -60,3 +60,42 @@ type UpdateAreaRequest struct {
 	GroupID *string `json:"group_id"`
 	Floor   *int    `json:"floor"`
 }
+
+type AreaSummary struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type TaskResponseItem struct {
+	ID        string      `json:"id"`
+	Title     string      `json:"title"`
+	Cost      int         `json:"cost"`
+	Frequency int         `json:"frequency"`
+	Area      AreaSummary `json:"area"`
+}
+
+type TaskListResponse struct {
+	Tasks []TaskResponseItem `json:"tasks"`
+}
+
+type TaskDetails struct {
+	ID        string      `json:"id"`
+	Title     string      `json:"title"`
+	Cost      int         `json:"cost"`
+	Frequency int         `json:"frequency"`
+	Area      AreaSummary `json:"area"`
+}
+
+type CreateTaskRequest struct {
+	Title     string `json:"title"`
+	Cost      int    `json:"cost"`
+	Frequency int    `json:"frequency"`
+	AreaID    int    `json:"area_id"`
+}
+
+type UpdateTaskRequest struct {
+	Title     string `json:"title"`
+	Cost      int    `json:"cost"`
+	Frequency int    `json:"frequency"`
+	AreaID    int    `json:"area_id"`
+}
