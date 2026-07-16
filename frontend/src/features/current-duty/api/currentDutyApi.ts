@@ -58,3 +58,21 @@ export async function openTask(taskId: string, groupId?: string): Promise<Reside
 export async function verifyTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {
     return requestDutyAction(taskId, 'verify', groupId)
 }
+
+export async function createDormitoryDutyWeek(
+    dormitoryId: string,
+    startDate: string,
+    endDate: string,
+): Promise<void> {
+    await apiRequest('/api/v1/resident/duties', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            dormitory_id: Number(dormitoryId),
+            start_date: startDate,
+            end_date: endDate,
+        }),
+    })
+}

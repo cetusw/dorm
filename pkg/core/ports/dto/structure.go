@@ -85,6 +85,12 @@ type UpdateGroupRequest struct {
 	DormitoryID int64   `json:"dormitory_id"`
 }
 
+type CreateDormitoryDutyWeekRequest struct {
+	DormitoryID int64  `json:"dormitory_id"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
+}
+
 type GroupListItem struct {
 	ID             uuid.UUID
 	Name           string

@@ -1,10 +1,15 @@
-import { Alert, Box, Center, Loader } from '@mantine/core'
+import { useState } from 'react'
 
+import { Alert, Box, Button, Center, Loader } from '@mantine/core'
+
+import type { CurrentUser } from '../../features/current-user/model/types'
 import {
     calculateDutyAnalytics,
     selectDutyViewOptions,
     selectTasksForActiveSelect,
 } from '../../features/current-duty/model/selectors'
+import { CreateDutyWeekModal } from '../../features/current-duty/ui/CreateDutyWeekModal'
+import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty'
 import { useReviewTasks } from '../../features/current-duty/model/useReviewTasks'
 import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
@@ -14,7 +19,11 @@ import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
 import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
 import { PageFrame } from '../../shared/ui/PageFrame'
 
-export function CurrentDutyPage() {
+type Props = {
+    currentUser: CurrentUser | null
+}
+
+export function CurrentDutyPage({ currentUser }: Props) {
     const {
         selectedGroupId,
         duty,
@@ -27,15 +36,28 @@ export function CurrentDutyPage() {
         handleComplete,
         handleOpen,
         handleVerify,
+        reloadCurrentDuty,
         visibleMineTaskIds,
         visibleFreeTaskIds,
     } = useCurrentDuty()
+    const selectedDormitoryId = useSelectedDormitoryId()
+    const [createModalOpened, setCreateModalOpened] = useState(false)
     const [activeSelect, setActiveSelect] = useStoredDutySelect(duty?.visible_tabs ?? [])
     const { reviewVisibleTaskIds, handleVerify: handleReviewVerify } = useReviewTasks({
         activeSelect,
         duty,
         onVerify: handleVerify,
     })
+
+    const titleActions = currentUser?.can_manage_dormitories ? (
+        <Button
+            radius="md"
+            onClick={() => setCreateModalOpened(true)}
+            disabled={!selectedDormitoryId}
+        >
+            + Новая дежурная неделя
+        </Button>
+    ) : undefined
 
     if (loading) {
         return (
@@ -95,8 +117,16 @@ export function CurrentDutyPage() {
 
     if (!duty.has_active_duty) {
         return (
-            <PageFrame title="Дежурство" error={error} controls={controls}>
+            <PageFrame title="Дежурство" titleActions={titleActions} error={error} controls={controls}>
                 <Alert color="gray">В выбранной группе сейчас нет активного дежурства.</Alert>
+                {selectedDormitoryId && (
+                    <CreateDutyWeekModal
+                        opened={createModalOpened}
+                        dormitoryId={selectedDormitoryId}
+                        onClose={() => setCreateModalOpened(false)}
+                        onCreated={reloadCurrentDuty}
+                    />
+                )}
             </PageFrame>
         )
     }
@@ -106,11 +136,20 @@ export function CurrentDutyPage() {
             <PageFrame
                 title="Дежурство"
                 subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
+                titleActions={titleActions}
                 error={error}
                 notice={duty.notice_message}
                 controls={controls}
             >
                 <Alert color="gray">На текущее дежурство не заведены задачи.</Alert>
+                {selectedDormitoryId && (
+                    <CreateDutyWeekModal
+                        opened={createModalOpened}
+                        dormitoryId={selectedDormitoryId}
+                        onClose={() => setCreateModalOpened(false)}
+                        onCreated={reloadCurrentDuty}
+                    />
+                )}
             </PageFrame>
         )
     }
@@ -119,6 +158,7 @@ export function CurrentDutyPage() {
         <PageFrame
             title="Дежурство"
             subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
+            titleActions={titleActions}
             error={error}
             notice={duty.notice_message}
             analytics={analyticsBlock}
@@ -137,6 +177,14 @@ export function CurrentDutyPage() {
                 onOpen={handleOpen}
                 onVerify={handleReviewVerify}
             />
+            {selectedDormitoryId && (
+                <CreateDutyWeekModal
+                    opened={createModalOpened}
+                    dormitoryId={selectedDormitoryId}
+                    onClose={() => setCreateModalOpened(false)}
+                    onCreated={reloadCurrentDuty}
+                />
+            )}
         </PageFrame>
     )
 }

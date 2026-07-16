@@ -162,7 +162,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		cleaningService,
 	)
 
-	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService)
+	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService, dormitoryService, cleaningService)
 	residentAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	dormitoryAPIHandler := http.NewDormitoryAPIHandler(dormitoryService)

@@ -128,6 +128,7 @@ export function useCurrentDuty() {
         handleComplete: (taskId: string) => runTaskAction(taskId, completeTask),
         handleOpen: (taskId: string) => runTaskAction(taskId, openTask),
         handleVerify: (taskId: string) => runTaskAction(taskId, verifyTask),
+        reloadCurrentDuty: () => reload(selectedGroupId ?? undefined),
         visibleMineTaskIds: visibleMineTaskIdsRef.current,
         visibleFreeTaskIds: visibleFreeTaskIdsRef.current,
     }

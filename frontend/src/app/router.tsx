@@ -15,7 +15,7 @@ function matchGroupTeamsPath(pathname: string): string | null {
     return match ? match[1] : null
 }
 
-function renderResidentPage(pathname: string) {
+function renderResidentPage(pathname: string, currentUser: ReturnType<typeof useCurrentUserState>['currentUser']) {
     const teamGroupId = matchGroupTeamsPath(pathname)
     if (teamGroupId) {
         return <GroupTeamsPage groupId={teamGroupId} />
@@ -41,7 +41,7 @@ function renderResidentPage(pathname: string) {
         return <TaskCatalogPage />
     }
 
-    return <CurrentDutyPage />
+    return <CurrentDutyPage currentUser={currentUser} />
 }
 
 export function AppRouter() {
@@ -61,7 +61,7 @@ export function AppRouter() {
             currentUserLoading={loading}
             onNavigate={navigateTo}
         >
-            {renderResidentPage(pathname)}
+            {renderResidentPage(pathname, currentUser)}
         </ResidentAppShell>
     )
 }
