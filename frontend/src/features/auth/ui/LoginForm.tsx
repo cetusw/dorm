@@ -50,7 +50,9 @@ export function LoginForm() {
                         const response = await loginResident(values.login, values.password)
                         window.location.assign(response.redirect_url)
                     } catch (error) {
-                        if (error instanceof ApiError) {
+                        if (error instanceof ApiError && error.status === 401) {
+                            setSubmitError('Логин или пароль введены некорректно')
+                        } else if (error instanceof ApiError) {
                             setSubmitError(error.message)
                         } else {
                             setSubmitError('Не удалось выполнить вход')

@@ -1,10 +1,16 @@
 import { ApiError } from './ApiError'
 
-export async function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
+type ApiRequestOptions = RequestInit & {
+    redirectOn401?: boolean
+}
+
+export async function apiRequest(path: string, options: ApiRequestOptions = {}): Promise<Response> {
+    const { redirectOn401 = true, ...requestInit } = options
+
     const response = await fetch(path, {
-        ...options,
+        ...requestInit,
         credentials: 'same-origin',
-        headers: options.headers,
+        headers: requestInit.headers,
     })
 
     if (response.ok) {
@@ -14,7 +20,7 @@ export async function apiRequest(path: string, options: RequestInit = {}): Promi
     const body = await response.json().catch(() => null)
     const message = body?.error ?? 'Ошибка запроса'
 
-    if (response.status === 401) {
+    if (response.status === 401 && redirectOn401) {
         window.location.assign('/app/login')
     }
 
