@@ -16,6 +16,12 @@ function matchGroupTeamsPath(pathname: string): string | null {
 }
 
 function renderResidentPage(pathname: string, currentUser: ReturnType<typeof useCurrentUserState>['currentUser']) {
+    const canManageDormitories = Boolean(currentUser?.can_manage_dormitories)
+
+    if (!canManageDormitories) {
+        return <CurrentDutyPage currentUser={currentUser} />
+    }
+
     const teamGroupId = matchGroupTeamsPath(pathname)
     if (teamGroupId) {
         return <GroupTeamsPage groupId={teamGroupId} />

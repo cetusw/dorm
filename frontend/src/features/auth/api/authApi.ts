@@ -15,3 +15,9 @@ export async function loginResident(login: string, password: string): Promise<Lo
 
     return response.json()
 }
+
+export async function logoutResident(): Promise<void> {
+    await apiRequest('/api/v1/auth/logout', {
+        method: 'POST',
+    })
+}

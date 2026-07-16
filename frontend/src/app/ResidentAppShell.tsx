@@ -15,6 +15,7 @@ import {
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 
+import { logoutResident } from '../features/auth/api/authApi'
 import type { CurrentUser } from '../features/current-user/model/types'
 import { useDormitorySelection } from '../features/dormitories/model/useDormitorySelection'
 
@@ -61,28 +62,35 @@ export function ResidentAppShell({
         setSelectedDormitoryId,
     } = useDormitorySelection(Boolean(currentUser?.can_manage_dormitories))
 
-    const navigationItems: NavigationItem[] = [
-        {
-            href: '/app/residents',
-            label: 'Жители',
-        },
-        {
-            href: '/app/groups',
-            label: 'Группы',
-        },
-        {
-            href: '/app/areas',
-            label: 'Территории',
-        },
-        {
-            href: '/app/task-definitions',
-            label: 'Задачи',
-        },
-        {
-            href: '/app/tasks',
-            label: 'Дежурство',
-        },
-    ]
+    const navigationItems: NavigationItem[] = currentUser?.can_manage_dormitories
+        ? [
+            {
+                href: '/app/residents',
+                label: 'Жители',
+            },
+            {
+                href: '/app/groups',
+                label: 'Группы',
+            },
+            {
+                href: '/app/areas',
+                label: 'Территории',
+            },
+            {
+                href: '/app/task-definitions',
+                label: 'Задачи',
+            },
+            {
+                href: '/app/tasks',
+                label: 'Дежурство',
+            },
+        ]
+        : [
+            {
+                href: '/app/tasks',
+                label: 'Дежурство',
+            },
+        ]
 
     const dormitoryOptions = dormitories.map((dormitory) => ({
         value: String(dormitory.id),
@@ -137,6 +145,14 @@ export function ResidentAppShell({
             </Button>
         </Stack>
     ) : null
+
+    async function handleLogout() {
+        try {
+            await logoutResident()
+        } finally {
+            window.location.assign('/app/login')
+        }
+    }
 
     return (
         <AppShell
@@ -202,17 +218,17 @@ export function ResidentAppShell({
             <AppShell.Header px={{ base: 'md', md: 'xl' }}>
                 <Group align="center" h="100%" justify="space-between" wrap="nowrap">
                     <Group align="center" wrap="nowrap" gap="md">
-                    <Burger
-                        opened={navbarOpened}
-                        onClick={toggleNavbar}
-                        hiddenFrom="sm"
-                        size="sm"
-                        aria-label="Открыть навигацию"
-                    />
+                        <Burger
+                            opened={navbarOpened}
+                            onClick={toggleNavbar}
+                            hiddenFrom="sm"
+                            size="sm"
+                            aria-label="Открыть навигацию"
+                        />
 
-                    <Title order={3}>
-                        Dorm
-                    </Title>
+                        <Title order={3}>
+                            Dorm
+                        </Title>
 
                         {desktopDormitoryControls && (
                             <Group align="center" gap="sm" wrap="nowrap" visibleFrom="sm">
@@ -220,6 +236,10 @@ export function ResidentAppShell({
                             </Group>
                         )}
                     </Group>
+
+                    <Button variant="default" onClick={() => void handleLogout()}>
+                        Выйти
+                    </Button>
                 </Group>
             </AppShell.Header>
 
