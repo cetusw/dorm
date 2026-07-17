@@ -44,6 +44,7 @@ export function DutyTaskSelects({
             {showGroupSelect && (
                 <Select
                     aria-label="Группа"
+                    autoComplete="off"
                     data={groups.map((group) => ({
                         value: group.id,
                         label: group.name,
@@ -65,6 +66,7 @@ export function DutyTaskSelects({
             {visibleSelectOptions.length > 0 && (
                 <Select
                     aria-label="Раздел задач"
+                    autoComplete="off"
                     data={visibleSelectOptions}
                     value={activeSelect}
                     onChange={(value) => {
