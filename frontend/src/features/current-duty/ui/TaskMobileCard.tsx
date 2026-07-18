@@ -25,7 +25,7 @@ function MobileTaskStatus({ task }: { task: ResidentDutyTask }) {
     const statusConfig: StatusConfig | null = (() => {
         if (task.status === 'assigned' && !task.is_mine) {
             return {
-                color: 'blue',
+                color: 'brand',
                 label: task.assignee_name || 'Задача в работе',
                 note: 'В работе',
             }
@@ -33,14 +33,14 @@ function MobileTaskStatus({ task }: { task: ResidentDutyTask }) {
 
         if (task.status === 'completed') {
             return {
-                color: 'yellow',
+                color: 'brand',
                 label: 'На проверке',
             }
         }
 
         if (task.status === 'verified') {
             return {
-                color: 'green',
+                color: 'brand',
                 label: 'Подтверждена',
             }
         }
@@ -116,7 +116,7 @@ function MobileTaskActions({
                 {task.can_complete && (
                     <Button
                         radius="md"
-                        color="green"
+                        color="brand"
                         loading={pending}
                         onClick={() => onComplete(task.id)}
                     >
@@ -133,7 +133,7 @@ function MobileTaskActions({
                 fullWidth
                 radius="md"
                 variant="light"
-                color="yellow"
+                color="brand"
                 loading={pending}
                 onClick={() => onOpen(task.id)}
             >
@@ -157,7 +157,7 @@ export function TaskMobileCard({
     onVerify,
 }: Props) {
     return (
-        <Paper withBorder radius="lg" p="md" bg="white">
+        <Paper withBorder radius="lg" p="md" bg="white" style={{ borderColor: 'var(--app-color-border)' }}>
             <Stack gap="sm">
                 <Stack gap={4}>
                     <Text fw={600} size="sm">

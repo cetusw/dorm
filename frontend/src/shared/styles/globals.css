@@ -1,3 +1,14 @@
+:root {
+    --app-color-primary: #0F766E;
+    --app-color-primary-hover: #115E59;
+    --app-color-primary-soft: #CCFBF1;
+    --app-color-bg: #F6F8F7;
+    --app-color-surface: #FFFFFF;
+    --app-color-border: #DDE4E2;
+    --app-color-text: #1F2927;
+    --app-color-text-muted: #66736F;
+}
+
 html,
 body,
 #root {
@@ -14,8 +25,8 @@ body {
         BlinkMacSystemFont,
         'Segoe UI',
         sans-serif;
-    background: #f5f7fb;
-    color: #0f172a;
+    background: var(--app-color-bg);
+    color: var(--app-color-text);
 }
 
 * {

@@ -50,7 +50,7 @@ export function TaskRowActions({
                     <Button
                         size="xs"
                         radius="md"
-                        color="green"
+                        color="brand"
                         loading={pending}
                         onClick={() => onVerify(task.id)}
                     >
@@ -63,7 +63,7 @@ export function TaskRowActions({
                         size="xs"
                         radius="md"
                         variant="light"
-                        color="blue"
+                        color="brand"
                         loading={pending}
                         onClick={() => onComplete(task.id)}
                     >
@@ -107,7 +107,7 @@ export function TaskRowActions({
                 <Button
                     size="xs"
                     radius="md"
-                    color="green"
+                    color="brand"
                     loading={pending}
                     onClick={() => onComplete(task.id)}
                 >
@@ -120,7 +120,7 @@ export function TaskRowActions({
                     size="xs"
                     radius="md"
                     variant="light"
-                    color="yellow"
+                    color="brand"
                     loading={pending}
                     onClick={() => onOpen(task.id)}
                 >

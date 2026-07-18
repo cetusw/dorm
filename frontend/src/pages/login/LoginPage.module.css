@@ -6,9 +6,9 @@
     min-height: 100vh;
     min-height: 100dvh;
 
-    background-color: #f3f4f6;
+    background-color: #f6f8f7;
     background-image:
-        linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)),
+        linear-gradient(rgba(246, 248, 247, 0.7), rgba(246, 248, 247, 0.7)),
         var(--login-page-background-image);
     background-position: center;
     background-repeat: no-repeat;

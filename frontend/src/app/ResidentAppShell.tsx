@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import {
     Alert,
     AppShell,
+    Box,
     Burger,
     Button,
     Center,
@@ -11,10 +12,10 @@ import {
     NavLink,
     Select,
     Stack,
-    Title,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 
+import logo from '../assets/logo.png'
 import { logoutResident } from '../features/auth/api/authApi'
 import type { CurrentUser } from '../features/current-user/model/types'
 import { useDormitorySelection } from '../features/dormitories/model/useDormitorySelection'
@@ -167,16 +168,16 @@ export function ResidentAppShell({
             padding={0}
             styles={{
                 main: {
-                    backgroundColor: '#f5f7fb',
+                    backgroundColor: 'var(--app-color-bg)',
                     minHeight: '100vh',
                 },
                 navbar: {
-                    backgroundColor: '#111827',
-                    borderRight: '1px solid #1f2937',
+                    backgroundColor: '#1F2927',
+                    borderRight: '1px solid #31403D',
                 },
                 header: {
-                    backgroundColor: '#ffffff',
-                    borderBottom: '1px solid #e5e7eb',
+                    backgroundColor: 'var(--app-color-surface)',
+                    borderBottom: '1px solid var(--app-color-border)',
                 },
             }}
         >
@@ -202,8 +203,11 @@ export function ResidentAppShell({
                                     color: '#f9fafb',
                                     borderRadius: 8,
                                     backgroundColor: isCurrentPathActive(currentPath, item.href)
-                                        ? '#1f2937'
+                                        ? 'rgba(204, 251, 241, 0.16)'
                                         : 'transparent',
+                                    border: isCurrentPathActive(currentPath, item.href)
+                                        ? '1px solid rgba(204, 251, 241, 0.28)'
+                                        : '1px solid transparent',
                                 },
                                 label: {
                                     color: '#f9fafb',
@@ -226,9 +230,14 @@ export function ResidentAppShell({
                             aria-label="Открыть навигацию"
                         />
 
-                        <Title order={3}>
-                            Dorm
-                        </Title>
+                        <Box
+                            component="img"
+                            src={logo}
+                            alt="Dorm"
+                            h={32}
+                            w="auto"
+                            style={{ display: 'block' }}
+                        />
 
                         {desktopDormitoryControls && (
                             <Group align="center" gap="sm" wrap="nowrap" visibleFrom="sm">

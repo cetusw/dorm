@@ -81,7 +81,7 @@ export function PageFrame({
                         <Stack
                             gap="lg"
                             py="sm"
-                            bg="#f5f7fb"
+                            bg="var(--app-color-bg)"
                         >
                             {analytics}
 
