@@ -113,10 +113,10 @@ func TestStartNewWeek_AppliesOverrideIncludeForTaskNotDue(t *testing.T) {
 	env.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
 
 	var savedDuties []*duty.Duty
-	env.dutyRepo.On("Save", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
+	env.dutyRepo.On("CreateWithTasks", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
 		savedDuties = append(savedDuties, d)
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
 	err := env.service.StartNewWeek(ctx)
 	assert.NoError(t, err)
@@ -146,10 +146,10 @@ func TestStartNewWeek_AppliesOverrideExcludeForTaskDue(t *testing.T) {
 	env.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
 
 	var savedDuties []*duty.Duty
-	env.dutyRepo.On("Save", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
+	env.dutyRepo.On("CreateWithTasks", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
 		savedDuties = append(savedDuties, d)
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
 	err := env.service.StartNewWeek(ctx)
 	assert.NoError(t, err)
@@ -165,7 +165,7 @@ func TestStartNewWeek_DoesNotClearOverridesWhenSaveFails(t *testing.T) {
 	env := newTestEnv()
 	setupCommonExpectations(ctx, env, data)
 	env.dutyRepo.On("CountDistinctStartDates", ctx).Return(0, nil).Once()
-	env.dutyRepo.On("Save", ctx, mock.Anything).Return(errors.New("save failed")).Once()
+	env.dutyRepo.On("CreateWithTasks", ctx, mock.Anything, mock.Anything).Return(errors.New("save failed")).Once()
 
 	err := env.service.StartNewWeek(ctx)
 	assert.Error(t, err)
@@ -181,10 +181,10 @@ func runWeekTest(t *testing.T, f *testFixtures, weekNum int, assertions func(dBo
 	env.dutyRepo.On("CountDistinctStartDates", ctx).Return(weekNum, nil).Once()
 
 	var savedDuties []*duty.Duty
-	env.dutyRepo.On("Save", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
+	env.dutyRepo.On("CreateWithTasks", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
 		savedDuties = append(savedDuties, d)
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
 	err := env.service.StartNewWeek(ctx)
 	assert.NoError(t, err)
@@ -233,7 +233,7 @@ func newTestEnv() *testEnv {
 		areaRepo:     new(MockAreaRepo),
 		eventBus:     new(MockEventBus),
 	}
-	e.service = NewCleaningService(nil, e.teamRepo, e.groupRepo, e.dutyRepo, e.catRepo, e.overrideRepo, e.areaRepo, e.eventBus)
+	e.service = NewCleaningService(nil, e.teamRepo, e.groupRepo, e.dutyRepo, nil, e.catRepo, e.overrideRepo, e.areaRepo, e.eventBus)
 	return e
 }
 

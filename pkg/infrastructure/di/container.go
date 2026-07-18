@@ -78,6 +78,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	teamRepo := repository.NewTeamRepository(db)
 	groupRepo := repository.NewGroupRepository(db)
 	dutyRepo := repository.NewDutyRepository(db)
+	dutyTaskRepo := repository.NewDutyTaskRepository(db)
 	areaRepo := repository.NewAreaRepository(db)
 	taskRepo := repository.NewTaskRepository(db)
 	taskOverrideRepo := repository.NewDutyTaskOverrideRepository(db)
@@ -88,6 +89,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		teamRepo,
 		groupRepo,
 		dutyRepo,
+		dutyTaskRepo,
 		taskRepo,
 		taskOverrideRepo,
 		areaRepo,

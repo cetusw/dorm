@@ -18,18 +18,21 @@ type Service struct {
 	userRepo     user.Repository
 	teamRepo     structure.TeamRepository
 	groupRepo    structure.GroupRepository
-	dutyRepo     duty.Repository
+	dutyRepo     duty.DutyRepository
+	dutyTaskRepo duty.DutyTaskRepository
 	taskRepo     catalog.TaskDefinitionRepository
 	overrideRepo catalog.DutyTaskOverrideRepository
 	areaRepo     catalog.AreaRepository
 	eventBus     ports.EventBus
+	now          func() time.Time
 }
 
 func NewCleaningService(
 	userRepo user.Repository,
 	teamRepo structure.TeamRepository,
 	groupRepo structure.GroupRepository,
-	dutyRepo duty.Repository,
+	dutyRepo duty.DutyRepository,
+	dutyTaskRepo duty.DutyTaskRepository,
 	taskRepo catalog.TaskDefinitionRepository,
 	overrideRepo catalog.DutyTaskOverrideRepository,
 	areaRepo catalog.AreaRepository,
@@ -40,161 +43,287 @@ func NewCleaningService(
 		teamRepo:     teamRepo,
 		groupRepo:    groupRepo,
 		dutyRepo:     dutyRepo,
+		dutyTaskRepo: dutyTaskRepo,
 		taskRepo:     taskRepo,
 		overrideRepo: overrideRepo,
 		areaRepo:     areaRepo,
 		eventBus:     eventBus,
+		now:          time.Now,
 	}
 }
 
-func (s *Service) AssignTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
-	u, err := s.userRepo.FindByID(ctx, userID)
+func (s *Service) AssignTask(ctx context.Context, taskID, userID uuid.UUID) error {
+	data, err := s.loadTaskActionContext(ctx, taskID, userID)
 	if err != nil {
-		return fmt.Errorf("user not found: %w", err)
-	}
-	if u.TeamID() == nil {
-		return fmt.Errorf("user is not in a team")
-	}
-
-	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
-	if err != nil {
-		return fmt.Errorf("failed to find active duty: %w", err)
-	}
-	if d == nil {
-		return fmt.Errorf("no active duty for this team")
-	}
-
-	if err := d.AssignTask(taskID, u.ID()); err != nil {
 		return err
 	}
-
-	if err := s.dutyRepo.Save(ctx, d); err != nil {
-		return fmt.Errorf("failed to save duty: %w", err)
+	if err := s.canAssignTask(data); err != nil {
+		return err
 	}
+	return s.applyTaskAssignment(ctx, data)
+}
 
-	_ = s.eventBus.Publish(ctx, events.TopicTaskAssigned, events.TaskAssignedEvent{
-		TaskID:     taskID,
-		AssigneeID: &userID,
-	})
+func (s *Service) CompleteTask(ctx context.Context, taskID, userID uuid.UUID) error {
+	data, err := s.loadTaskActionContext(ctx, taskID, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.canCompleteTask(data); err != nil {
+		return err
+	}
+	return s.applyTaskCompletion(ctx, data)
+}
 
+func (s *Service) UnassignTask(ctx context.Context, taskID, userID uuid.UUID) error {
+	data, err := s.loadTaskActionContext(ctx, taskID, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.canUnassignTask(data); err != nil {
+		return err
+	}
+	return s.applyTaskUnassignment(ctx, data)
+}
+
+func (s *Service) OpenTask(ctx context.Context, taskID, userID uuid.UUID) error {
+	return s.CancelCompletion(ctx, taskID, userID)
+}
+
+func (s *Service) CancelCompletion(ctx context.Context, taskID, userID uuid.UUID) error {
+	data, err := s.loadTaskActionContext(ctx, taskID, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.canCancelCompletion(data); err != nil {
+		return err
+	}
+	return s.applyCompletionCancellation(ctx, data)
+}
+
+func (s *Service) VerifyTask(ctx context.Context, taskID, userID uuid.UUID) error {
+	data, err := s.loadTaskActionContext(ctx, taskID, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.canVerifyTask(ctx, data); err != nil {
+		return err
+	}
+	return s.applyTaskVerification(ctx, data)
+}
+
+func (s *Service) ReopenTask(ctx context.Context, taskID, userID uuid.UUID) error {
+	data, err := s.loadTaskActionContext(ctx, taskID, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.canReopenTask(ctx, data); err != nil {
+		return err
+	}
+	return s.applyTaskReopen(ctx, data)
+}
+
+type taskActionContext struct {
+	user *user.User
+	task *duty.DutyTask
+	duty *duty.Duty
+	now  time.Time
+}
+
+func (s *Service) loadTaskActionContext(
+	ctx context.Context,
+	taskID uuid.UUID,
+	userID uuid.UUID,
+) (*taskActionContext, error) {
+	actor, err := s.loadTaskActor(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	task, err := s.loadDutyTask(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	currentDuty, err := s.loadDuty(ctx, task.DutyID())
+	if err != nil {
+		return nil, err
+	}
+	return &taskActionContext{user: actor, task: task, duty: currentDuty, now: s.currentTime()}, nil
+}
+
+func (s *Service) loadTaskActor(ctx context.Context, userID uuid.UUID) (*user.User, error) {
+	actor, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("load user: %w", err)
+	}
+	if actor == nil {
+		return nil, fmt.Errorf("user not found")
+	}
+	return actor, nil
+}
+
+func (s *Service) loadDutyTask(ctx context.Context, taskID uuid.UUID) (*duty.DutyTask, error) {
+	task, err := s.dutyTaskRepo.FindByID(ctx, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("load duty task: %w", err)
+	}
+	return task, nil
+}
+
+func (s *Service) loadDuty(ctx context.Context, dutyID uuid.UUID) (*duty.Duty, error) {
+	currentDuty, err := s.dutyRepo.FindByID(ctx, dutyID)
+	if err != nil {
+		return nil, fmt.Errorf("load duty: %w", err)
+	}
+	if currentDuty == nil {
+		return nil, fmt.Errorf("duty not found")
+	}
+	return currentDuty, nil
+}
+
+func (s *Service) canAssignTask(data *taskActionContext) error {
+	if err := s.requireActiveTeamDuty(data); err != nil {
+		return err
+	}
+	return data.task.CanAssign(data.user.ID())
+}
+
+func (s *Service) canUnassignTask(data *taskActionContext) error {
+	if err := s.requireActiveTeamDuty(data); err != nil {
+		return err
+	}
+	return data.task.CanUnassign(data.user.ID())
+}
+
+func (s *Service) canCompleteTask(data *taskActionContext) error {
+	if err := s.requireActiveTeamDuty(data); err != nil {
+		return err
+	}
+	return data.task.CanComplete(data.user.ID())
+}
+
+func (s *Service) canCancelCompletion(data *taskActionContext) error {
+	if err := s.requireActiveTeamDuty(data); err != nil {
+		return err
+	}
+	return data.task.CanCancelCompletion(data.user.ID())
+}
+
+func (s *Service) canVerifyTask(ctx context.Context, data *taskActionContext) error {
+	if err := s.requireTaskReviewer(ctx, data); err != nil {
+		return err
+	}
+	return data.task.CanVerify(data.user.ID())
+}
+
+func (s *Service) canReopenTask(ctx context.Context, data *taskActionContext) error {
+	if err := s.requireTaskReviewer(ctx, data); err != nil {
+		return err
+	}
+	return data.task.CanReopen(data.user.ID())
+}
+
+func (s *Service) requireActiveTeamDuty(data *taskActionContext) error {
+	if data.user.TeamID() == nil {
+		return duty.ErrTaskAccessDenied
+	}
+	if !data.duty.BelongsToTeam(*data.user.TeamID()) {
+		return duty.ErrTaskAccessDenied
+	}
+	if !data.duty.IsActiveAt(data.now) {
+		return fmt.Errorf("duty is not active")
+	}
 	return nil
 }
 
-func (s *Service) CompleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
-	u, err := s.userRepo.FindByID(ctx, userID)
+func (s *Service) requireTaskReviewer(ctx context.Context, data *taskActionContext) error {
+	if err := s.requireActiveTeamDuty(data); err != nil {
+		return err
+	}
+	team, err := s.teamRepo.FindByID(ctx, data.duty.TeamID())
 	if err != nil {
-		return err
+		return fmt.Errorf("load duty team: %w", err)
 	}
-	if u.TeamID() == nil {
-		return fmt.Errorf("user not in team")
+	if team == nil || team.LeaderID() == nil || *team.LeaderID() != data.user.ID() {
+		return duty.ErrTaskAccessDenied
 	}
+	return nil
+}
 
-	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
-	if err != nil || d == nil {
-		return fmt.Errorf("duty not found")
+func (s *Service) applyTaskAssignment(ctx context.Context, data *taskActionContext) error {
+	err := s.dutyTaskRepo.Assign(ctx, data.task.ID(), data.user.ID(), data.now)
+	if err != nil {
+		return fmt.Errorf("assign duty task: %w", err)
 	}
+	userID := data.user.ID()
+	s.publishTaskAssigned(ctx, data.task.ID(), &userID)
+	return nil
+}
 
-	if err := d.CompleteTask(taskID); err != nil {
-		return err
+func (s *Service) applyTaskUnassignment(ctx context.Context, data *taskActionContext) error {
+	err := s.dutyTaskRepo.Unassign(ctx, data.task.ID(), data.user.ID())
+	if err != nil {
+		return fmt.Errorf("unassign duty task: %w", err)
 	}
+	s.publishTaskAssigned(ctx, data.task.ID(), nil)
+	return nil
+}
 
-	if err := s.dutyRepo.Save(ctx, d); err != nil {
-		return err
+func (s *Service) applyTaskCompletion(ctx context.Context, data *taskActionContext) error {
+	err := s.dutyTaskRepo.Complete(ctx, data.task.ID(), data.user.ID(), data.now)
+	if err != nil {
+		return fmt.Errorf("complete duty task: %w", err)
 	}
-
 	_ = s.eventBus.Publish(ctx, events.TopicTaskCompleted, events.TaskCompletedEvent{
-		TaskID: taskID,
-		UserID: userID,
-		Time:   time.Now(),
+		TaskID: data.task.ID(),
+		UserID: data.user.ID(),
+		Time:   data.now,
 	})
-
 	return nil
 }
 
-func (s *Service) UnassignTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
-	u, err := s.userRepo.FindByID(ctx, userID)
+func (s *Service) applyCompletionCancellation(ctx context.Context, data *taskActionContext) error {
+	err := s.dutyTaskRepo.CancelCompletion(ctx, data.task.ID(), data.user.ID())
 	if err != nil {
-		return fmt.Errorf("user not found: %w", err)
+		return fmt.Errorf("cancel duty task completion: %w", err)
 	}
-	if u.TeamID() == nil {
-		return fmt.Errorf("user is not in a team")
-	}
+	s.publishTaskUncompleted(ctx, data)
+	return nil
+}
 
-	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
+func (s *Service) applyTaskVerification(ctx context.Context, data *taskActionContext) error {
+	err := s.dutyTaskRepo.Verify(ctx, data.task.ID(), data.user.ID(), data.now)
 	if err != nil {
-		return fmt.Errorf("failed to find active duty: %w", err)
+		return fmt.Errorf("verify duty task: %w", err)
 	}
-	if d == nil {
-		return fmt.Errorf("no active duty for this team")
-	}
+	return nil
+}
 
-	if err := d.UnassignTask(taskID); err != nil {
-		return err
+func (s *Service) applyTaskReopen(ctx context.Context, data *taskActionContext) error {
+	err := s.dutyTaskRepo.Reopen(ctx, data.task.ID(), data.user.ID())
+	if err != nil {
+		return fmt.Errorf("reopen duty task: %w", err)
 	}
+	s.publishTaskUncompleted(ctx, data)
+	return nil
+}
 
-	if err := s.dutyRepo.Save(ctx, d); err != nil {
-		return fmt.Errorf("failed to save duty: %w", err)
-	}
-
+func (s *Service) publishTaskAssigned(ctx context.Context, taskID uuid.UUID, assigneeID *uuid.UUID) {
 	_ = s.eventBus.Publish(ctx, events.TopicTaskAssigned, events.TaskAssignedEvent{
 		TaskID:     taskID,
-		AssigneeID: nil,
+		AssigneeID: assigneeID,
 	})
-	return nil
 }
 
-func (s *Service) OpenTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
-	u, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-	if u.TeamID() == nil {
-		return fmt.Errorf("user not in team")
-	}
-
-	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
-	if err != nil || d == nil {
-		return fmt.Errorf("duty not found")
-	}
-
-	if err := d.OpenTask(taskID); err != nil {
-		return err
-	}
-
-	if err := s.dutyRepo.Save(ctx, d); err != nil {
-		return err
-	}
-
+func (s *Service) publishTaskUncompleted(ctx context.Context, data *taskActionContext) {
 	_ = s.eventBus.Publish(ctx, events.TopicTaskUncompleted, events.TaskUncompletedEvent{
-		TaskID: taskID,
-		UserID: userID,
-		Time:   time.Now(),
+		TaskID: data.task.ID(),
+		UserID: data.user.ID(),
+		Time:   data.now,
 	})
-
-	return nil
 }
 
-func (s *Service) VerifyTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
-	u, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		return err
+func (s *Service) currentTime() time.Time {
+	if s.now == nil {
+		return time.Now()
 	}
-	if u.TeamID() == nil {
-		return fmt.Errorf("user not in team")
-	}
-
-	d, err := s.dutyRepo.FindCurrentByTeamID(ctx, *u.TeamID())
-	if err != nil || d == nil {
-		return fmt.Errorf("duty not found")
-	}
-
-	if err := d.VerifyTask(taskID); err != nil {
-		return err
-	}
-
-	if err := s.dutyRepo.Save(ctx, d); err != nil {
-		return err
-	}
-
-	return nil
+	return s.now()
 }

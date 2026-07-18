@@ -14,7 +14,9 @@ type CleaningUseCase interface {
 	UnassignTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	CompleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	OpenTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
+	CancelCompletion(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	VerifyTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
+	ReopenTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	StartNewWeek(ctx context.Context) error
 	StartNewDutiesForDormitory(ctx context.Context, dormitoryID int64, startDate, endDate time.Time) error
 

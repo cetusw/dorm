@@ -48,7 +48,7 @@ type Service struct {
 	teamRepo   structure.TeamRepository
 	groupRepo  structure.GroupRepository
 	dormRepo   structure.DormitoryRepository
-	dutyRepo   dutydomain.Repository
+	dutyRepo   dutydomain.DutyRepository
 	taskRepo   catalog.TaskDefinitionRepository
 	areaRepo   catalog.AreaRepository
 	cleaningUC ports.CleaningUseCase
@@ -60,7 +60,7 @@ func NewResidentDutyService(
 	teamRepo structure.TeamRepository,
 	groupRepo structure.GroupRepository,
 	dormRepo structure.DormitoryRepository,
-	dutyRepo dutydomain.Repository,
+	dutyRepo dutydomain.DutyRepository,
 	taskRepo catalog.TaskDefinitionRepository,
 	areaRepo catalog.AreaRepository,
 	cleaningUC ports.CleaningUseCase,
@@ -132,6 +132,10 @@ func (s *Service) OpenTask(ctx context.Context, userID uuid.UUID, taskID uuid.UU
 
 func (s *Service) VerifyTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
 	return s.cleaningUC.VerifyTask(ctx, taskID, userID)
+}
+
+func (s *Service) ReopenTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+	return s.cleaningUC.ReopenTask(ctx, taskID, userID)
 }
 
 func (s *Service) loadCurrentDutyContext(

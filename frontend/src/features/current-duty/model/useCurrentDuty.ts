@@ -5,6 +5,7 @@ import {
     completeTask,
     getCurrentDuty,
     openTask,
+    reopenTask,
     returnTask,
     takeTask,
     verifyTask,
@@ -87,6 +88,10 @@ export function useCurrentDuty() {
             })
             return true
         } catch (currentError) {
+            if (currentError instanceof ApiError && currentError.status === 409) {
+                await reload(selectedGroupId ?? undefined)
+            }
+
             setError(toErrorMessage(currentError))
             return false
         } finally {
@@ -127,6 +132,7 @@ export function useCurrentDuty() {
         handleReturn,
         handleComplete: (taskId: string) => runTaskAction(taskId, completeTask),
         handleOpen: (taskId: string) => runTaskAction(taskId, openTask),
+        handleReopen: (taskId: string) => runTaskAction(taskId, reopenTask),
         handleVerify: (taskId: string) => runTaskAction(taskId, verifyTask),
         reloadCurrentDuty: () => reload(selectedGroupId ?? undefined),
         visibleMineTaskIds: visibleMineTaskIdsRef.current,

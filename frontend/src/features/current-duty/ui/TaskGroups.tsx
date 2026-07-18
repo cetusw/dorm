@@ -17,6 +17,7 @@ type Props = {
     onReturn: (taskId: string) => void | Promise<unknown>
     onComplete: (taskId: string) => void | Promise<unknown>
     onOpen: (taskId: string) => void | Promise<unknown>
+    onReopen?: (taskId: string) => void | Promise<unknown>
     onVerify?: (taskId: string) => void | Promise<unknown>
 }
 
@@ -31,6 +32,7 @@ export function TaskGroups({
     onReturn,
     onComplete,
     onOpen,
+    onReopen,
     onVerify,
 }: Props) {
     const groups = groupTasksByArea(tasks)
@@ -53,6 +55,7 @@ export function TaskGroups({
                         onReturn={onReturn}
                         onComplete={onComplete}
                         onOpen={onOpen}
+                        onReopen={onReopen}
                         onVerify={onVerify}
                     />
                 ))}
@@ -71,6 +74,7 @@ export function TaskGroups({
                         onReturn={onReturn}
                         onComplete={onComplete}
                         onOpen={onOpen}
+                        onReopen={onReopen}
                         onVerify={onVerify}
                     />
                 ))}

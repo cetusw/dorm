@@ -330,7 +330,7 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 	}
 
 	for _, d := range c.dutiesList {
-		if err := s.dutyRepo.Save(ctx, d); err != nil {
+		if err := s.dutyRepo.CreateWithTasks(ctx, d, d.Tasks()); err != nil {
 			return fmt.Errorf("save duty %s: %w", d.ID(), err)
 		}
 	}

@@ -7,9 +7,10 @@ type Props = {
     activeSelect: DutyTaskSelect
     duty: ResidentCurrentDuty | null
     onVerify: (taskId: string) => Promise<boolean>
+    onReopen: (taskId: string) => Promise<boolean>
 }
 
-export function useReviewTasks({ activeSelect, duty, onVerify }: Props) {
+export function useReviewTasks({ activeSelect, duty, onVerify, onReopen }: Props) {
     const [reviewVisibleTaskIds, setReviewVisibleTaskIds] = useState<string[]>([])
 
     useEffect(() => {
@@ -21,7 +22,15 @@ export function useReviewTasks({ activeSelect, duty, onVerify }: Props) {
     }, [activeSelect, duty])
 
     async function handleVerify(taskId: string) {
-        const success = await onVerify(taskId)
+        return runReviewAction(taskId, onVerify)
+    }
+
+    async function handleReopen(taskId: string) {
+        return runReviewAction(taskId, onReopen)
+    }
+
+    async function runReviewAction(taskId: string, action: (currentTaskId: string) => Promise<boolean>) {
+        const success = await action(taskId)
         if (!success) {
             return false
         }
@@ -32,6 +41,7 @@ export function useReviewTasks({ activeSelect, duty, onVerify }: Props) {
 
     return {
         reviewVisibleTaskIds,
+        handleReopen,
         handleVerify,
     }
 }

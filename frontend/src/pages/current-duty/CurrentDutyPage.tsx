@@ -35,6 +35,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
         handleReturn,
         handleComplete,
         handleOpen,
+        handleReopen,
         handleVerify,
         reloadCurrentDuty,
         visibleMineTaskIds,
@@ -43,9 +44,10 @@ export function CurrentDutyPage({ currentUser }: Props) {
     const selectedDormitoryId = useSelectedDormitoryId()
     const [createModalOpened, setCreateModalOpened] = useState(false)
     const [activeSelect, setActiveSelect] = useStoredDutySelect(duty?.visible_tabs ?? [])
-    const { reviewVisibleTaskIds, handleVerify: handleReviewVerify } = useReviewTasks({
+    const { reviewVisibleTaskIds, handleReopen: handleReviewOpen, handleVerify: handleReviewVerify } = useReviewTasks({
         activeSelect,
         duty,
+        onReopen: handleReopen,
         onVerify: handleVerify,
     })
 
@@ -175,6 +177,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
                 onReturn={handleReturn}
                 onComplete={handleComplete}
                 onOpen={handleOpen}
+                onReopen={handleReviewOpen}
                 onVerify={handleReviewVerify}
             />
             {selectedDormitoryId && (

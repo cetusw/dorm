@@ -20,13 +20,37 @@ func NewDutyRepository(db *sql.DB) *DutyRepository {
 	return &DutyRepository{db: db}
 }
 
-func (r *DutyRepository) Save(ctx context.Context, d *duty.Duty) error {
+func (r *DutyRepository) CreateWithTasks(
+	ctx context.Context,
+	currentDuty *duty.Duty,
+	tasks []*duty.DutyTask,
+) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("begin duty transaction: %w", err)
+	}
+
+	if err := r.createDutyData(ctx, tx, currentDuty, tasks); err != nil {
+		_ = tx.Rollback()
 		return err
 	}
-	defer tx.Rollback()
 
+	return commitDutyTransaction(tx)
+}
+
+func (r *DutyRepository) createDutyData(
+	ctx context.Context,
+	tx *sql.Tx,
+	currentDuty *duty.Duty,
+	tasks []*duty.DutyTask,
+) error {
+	if err := insertDuty(ctx, tx, currentDuty); err != nil {
+		return err
+	}
+	return insertDutyTasks(ctx, tx, currentDuty.ID(), tasks)
+}
+
+func insertDuty(ctx context.Context, tx *sql.Tx, d *duty.Duty) error {
 	const dutyQuery = `
 		INSERT INTO duty (id, team_id, start_date, end_date)
 		VALUES (?, ?, ?, ?)
@@ -35,51 +59,96 @@ func (r *DutyRepository) Save(ctx context.Context, d *duty.Duty) error {
 			start_date = VALUES(start_date),
 			end_date = VALUES(end_date)
 	`
-	dIDBytes, _ := d.ID().MarshalBinary()
-	tIDBytes, _ := d.TeamID().MarshalBinary()
+	dIDBytes, err := marshalUUID(d.ID(), "duty id")
+	if err != nil {
+		return err
+	}
+	tIDBytes, err := marshalUUID(d.TeamID(), "team id")
+	if err != nil {
+		return err
+	}
 
 	_, err = tx.ExecContext(ctx, dutyQuery, dIDBytes, tIDBytes, d.Start(), d.End())
 	if err != nil {
 		return fmt.Errorf("failed to save duty root: %w", err)
 	}
+	return nil
+}
 
+func insertDutyTasks(
+	ctx context.Context,
+	tx *sql.Tx,
+	dutyID uuid.UUID,
+	tasks []*duty.DutyTask,
+) error {
 	const taskQuery = `
-		INSERT INTO duty_task (id, duty_id, task_id, assignee_id, completion_date, verification_date)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO duty_task (
+			id, duty_id, task_id, assignee_id, reviewer_id,
+			assignment_date, completion_date, verification_date
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 			assignee_id = VALUES(assignee_id),
+			reviewer_id = VALUES(reviewer_id),
+			assignment_date = VALUES(assignment_date),
 			completion_date = VALUES(completion_date),
 			verification_date = VALUES(verification_date)
 	`
 
-	for _, task := range d.Tasks() {
-		dtIDBytes, _ := task.ID().MarshalBinary()
-		defIDBytes, _ := task.TaskDefID().MarshalBinary()
-
-		var assignee interface{}
-		if task.AssigneeID() != nil {
-			assignee, _ = task.AssigneeID().MarshalBinary()
-		}
-
-		var completion sql.NullTime
-		if task.CompletionDate() != nil {
-			completion.Valid = true
-			completion.Time = *task.CompletionDate()
-		}
-
-		var verification sql.NullTime
-		if task.VerificationDate() != nil {
-			verification.Valid = true
-			verification.Time = *task.VerificationDate()
-		}
-
-		_, err = tx.ExecContext(ctx, taskQuery, dtIDBytes, dIDBytes, defIDBytes, assignee, completion, verification)
-		if err != nil {
-			return fmt.Errorf("failed to save duty task %s: %w", task.ID(), err)
+	dIDBytes, err := marshalUUID(dutyID, "duty id")
+	if err != nil {
+		return err
+	}
+	for _, task := range tasks {
+		if err := insertDutyTask(ctx, tx, taskQuery, dIDBytes, task); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
-	return tx.Commit()
+func insertDutyTask(ctx context.Context, tx *sql.Tx, query string, dutyID []byte, task *duty.DutyTask) error {
+	taskID, taskDefID, err := marshalDutyTaskInsertIDs(task)
+	if err != nil {
+		return err
+	}
+	assigneeID, reviewerID, err := nullableDutyTaskUserIDs(task)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, query, taskID, dutyID, taskDefID,
+		assigneeID, reviewerID,
+		nullTime(task.AssignmentDate()), nullTime(task.CompletionDate()),
+		nullTime(task.VerificationDate()))
+	if err != nil {
+		return fmt.Errorf("failed to save duty task %s: %w", task.ID(), err)
+	}
+	return nil
+}
+
+func marshalDutyTaskInsertIDs(task *duty.DutyTask) ([]byte, []byte, error) {
+	taskID, err := marshalUUID(task.ID(), "duty task id")
+	if err != nil {
+		return nil, nil, err
+	}
+	taskDefID, err := marshalUUID(task.TaskDefID(), "task definition id")
+	return taskID, taskDefID, err
+}
+
+func nullableDutyTaskUserIDs(task *duty.DutyTask) (any, any, error) {
+	assigneeID, err := nullableUUIDBytes(task.AssigneeID(), "assignee id")
+	if err != nil {
+		return nil, nil, err
+	}
+	reviewerID, err := nullableUUIDBytes(task.ReviewerID(), "reviewer id")
+	return assigneeID, reviewerID, err
+}
+
+func commitDutyTransaction(tx *sql.Tx) error {
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit duty transaction: %w", err)
+	}
+	return nil
 }
 
 func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
@@ -340,7 +409,8 @@ func (r *DutyRepository) FindAllLatest(ctx context.Context) ([]*duty.Duty, error
 
 func (r *DutyRepository) findTasksByDutyID(ctx context.Context, dutyID uuid.UUID) ([]*duty.DutyTask, error) {
 	const query = `
-		SELECT id, task_id, assignee_id, completion_date, verification_date
+		SELECT id, duty_id, task_id, assignee_id, reviewer_id,
+			assignment_date, completion_date, verification_date
 		FROM duty_task
 		WHERE duty_id = ?
 	`
@@ -353,33 +423,11 @@ func (r *DutyRepository) findTasksByDutyID(ctx context.Context, dutyID uuid.UUID
 
 	var tasks []*duty.DutyTask
 	for rows.Next() {
-		var dtID, defID, assignID []byte
-		var compDate, verDate sql.NullTime
-
-		if err := rows.Scan(&dtID, &defID, &assignID, &compDate, &verDate); err != nil {
+		task, err := scanDutyTask(rows)
+		if err != nil {
 			return nil, err
 		}
-
-		id, _ := uuid.FromBytes(dtID)
-		taskDefID, _ := uuid.FromBytes(defID)
-
-		var assigneeUUID *uuid.UUID
-		if len(assignID) > 0 {
-			u, _ := uuid.FromBytes(assignID)
-			assigneeUUID = &u
-		}
-
-		var completion *time.Time
-		if compDate.Valid {
-			completion = &compDate.Time
-		}
-
-		var verification *time.Time
-		if verDate.Valid {
-			verification = &verDate.Time
-		}
-
-		tasks = append(tasks, duty.RestoreDutyTask(id, taskDefID, assigneeUUID, completion, verification))
+		tasks = append(tasks, task)
 	}
 	return tasks, nil
 }

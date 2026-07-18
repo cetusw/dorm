@@ -21,83 +21,42 @@ func TestNewDuty(t *testing.T) {
 	assert.Empty(t, d.Tasks())
 }
 
-func TestDuty_TaskLifecycle(t *testing.T) {
+func TestDuty_AddTask(t *testing.T) {
 	d := NewDuty(uuid.New(), time.Now(), time.Now().Add(24*time.Hour))
 	taskID := uuid.New()
 	taskDefID := uuid.New()
-	userID := uuid.New()
-	otherTaskID := uuid.New()
 
 	d.AddTask(taskID, taskDefID)
 
 	tasks := d.Tasks()
 	assert.Len(t, tasks, 1)
 	assert.Equal(t, taskID, tasks[0].ID())
+	assert.Equal(t, d.ID(), tasks[0].DutyID())
 	assert.Equal(t, taskDefID, tasks[0].TaskDefID())
 	assert.Nil(t, tasks[0].AssigneeID())
 	assert.Nil(t, tasks[0].CompletionDate())
-
-	err := d.AssignTask(otherTaskID, userID)
-	assert.ErrorIs(t, err, ErrTaskNotFound)
-
-	err = d.AssignTask(taskID, userID)
-	assert.NoError(t, err)
-
-	tasks = d.Tasks()
-	assert.Equal(t, &userID, tasks[0].AssigneeID())
-
-	err = d.CompleteTask(otherTaskID)
-	assert.ErrorIs(t, err, ErrTaskNotFound)
-
-	err = d.CompleteTask(taskID)
-	assert.NoError(t, err)
-
-	tasks = d.Tasks()
-	assert.NotNil(t, tasks[0].CompletionDate())
-	assert.WithinDuration(t, time.Now(), *tasks[0].CompletionDate(), time.Second)
 }
 
-func TestDuty_CompleteUnassignedTask(t *testing.T) {
-	d := NewDuty(uuid.New(), time.Now(), time.Now())
-	taskID := uuid.New()
-	d.AddTask(taskID, uuid.New())
+func TestDutyTask_CanCompleteUnassignedTask(t *testing.T) {
+	task := RestoreDutyTask(RestoreDutyTaskParams{ID: uuid.New()})
 
-	err := d.CompleteTask(taskID)
+	err := task.CanComplete(uuid.New())
+
 	assert.ErrorIs(t, err, ErrTaskNotAssigned)
 }
 
-func TestDuty_UnassignTask(t *testing.T) {
-	d := NewDuty(uuid.New(), time.Now(), time.Now())
-	taskID := uuid.New()
+func TestDutyTask_CanCancelCompletion(t *testing.T) {
 	userID := uuid.New()
+	completedAt := time.Now()
+	task := RestoreDutyTask(RestoreDutyTaskParams{
+		ID:             uuid.New(),
+		AssigneeID:     &userID,
+		CompletionDate: &completedAt,
+	})
 
-	d.AddTask(taskID, uuid.New())
-	_ = d.AssignTask(taskID, userID)
-	_ = d.CompleteTask(taskID)
+	err := task.CanCancelCompletion(userID)
 
-	err := d.UnassignTask(taskID)
 	assert.NoError(t, err)
-
-	tasks := d.Tasks()
-	assert.Nil(t, tasks[0].AssigneeID())
-	assert.Nil(t, tasks[0].CompletionDate())
-}
-
-func TestDuty_OpenTask(t *testing.T) {
-	d := NewDuty(uuid.New(), time.Now(), time.Now())
-	taskID := uuid.New()
-	userID := uuid.New()
-
-	d.AddTask(taskID, uuid.New())
-	_ = d.AssignTask(taskID, userID)
-	_ = d.CompleteTask(taskID)
-
-	err := d.OpenTask(taskID)
-	assert.NoError(t, err)
-
-	tasks := d.Tasks()
-	assert.Equal(t, &userID, tasks[0].AssigneeID())
-	assert.Nil(t, tasks[0].CompletionDate())
 }
 
 func TestRestoreDuty(t *testing.T) {
@@ -106,7 +65,9 @@ func TestRestoreDuty(t *testing.T) {
 	taskID := uuid.New()
 
 	tasks := []*DutyTask{
-		RestoreDutyTask(taskID, uuid.New(), nil, nil, nil),
+		RestoreDutyTask(RestoreDutyTaskParams{
+			ID: taskID, DutyID: id, TaskDefID: uuid.New(),
+		}),
 	}
 
 	d := RestoreDuty(id, teamID, time.Now(), time.Now(), tasks)

@@ -1,8 +1,10 @@
 package http
 
 import (
+	"dorm/pkg/core/domain/duty"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
+	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -37,6 +39,7 @@ func (h *ResidentAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) 
 	api.Post("/tasks/:taskId/complete", h.HandleCompleteTask)
 	api.Post("/tasks/:taskId/open", h.HandleOpenTask)
 	api.Post("/tasks/:taskId/verify", h.HandleVerifyTask)
+	api.Post("/tasks/:taskId/reopen", h.HandleReopenTask)
 }
 
 func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
@@ -96,7 +99,7 @@ func (h *ResidentAPIHandler) HandleTakeTask(c *fiber.Ctx) error {
 	}
 
 	if err := h.residentDutyUC.TakeTask(c.Context(), userID, taskID); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+		return h.respondResidentTaskError(c, err)
 	}
 
 	return h.respondWithCurrentDuty(c, userID)
@@ -109,7 +112,7 @@ func (h *ResidentAPIHandler) HandleReturnTask(c *fiber.Ctx) error {
 	}
 
 	if err := h.residentDutyUC.ReturnTask(c.Context(), userID, taskID); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+		return h.respondResidentTaskError(c, err)
 	}
 
 	return h.respondWithCurrentDuty(c, userID)
@@ -122,7 +125,7 @@ func (h *ResidentAPIHandler) HandleCompleteTask(c *fiber.Ctx) error {
 	}
 
 	if err := h.residentDutyUC.CompleteTask(c.Context(), userID, taskID); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+		return h.respondResidentTaskError(c, err)
 	}
 
 	return h.respondWithCurrentDuty(c, userID)
@@ -135,7 +138,7 @@ func (h *ResidentAPIHandler) HandleOpenTask(c *fiber.Ctx) error {
 	}
 
 	if err := h.residentDutyUC.OpenTask(c.Context(), userID, taskID); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+		return h.respondResidentTaskError(c, err)
 	}
 
 	return h.respondWithCurrentDuty(c, userID)
@@ -148,7 +151,20 @@ func (h *ResidentAPIHandler) HandleVerifyTask(c *fiber.Ctx) error {
 	}
 
 	if err := h.residentDutyUC.VerifyTask(c.Context(), userID, taskID); err != nil {
+		return h.respondResidentTaskError(c, err)
+	}
+
+	return h.respondWithCurrentDuty(c, userID)
+}
+
+func (h *ResidentAPIHandler) HandleReopenTask(c *fiber.Ctx) error {
+	userID, taskID, err := parseResidentTaskAction(c)
+	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	if err := h.residentDutyUC.ReopenTask(c.Context(), userID, taskID); err != nil {
+		return h.respondResidentTaskError(c, err)
 	}
 
 	return h.respondWithCurrentDuty(c, userID)
@@ -171,6 +187,21 @@ func parseResidentTaskAction(c *fiber.Ctx) (uuid.UUID, uuid.UUID, error) {
 func errorResponse(message string) fiber.Map {
 	return fiber.Map{
 		"error": message,
+	}
+}
+
+func (h *ResidentAPIHandler) respondResidentTaskError(c *fiber.Ctx, err error) error {
+	switch {
+	case errors.Is(err, duty.ErrTaskAssigned):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("эту задачу уже взял другой пользователь"))
+	case errors.Is(err, duty.ErrTaskStateConflict):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("состояние задачи уже изменилось, обновите список"))
+	case errors.Is(err, duty.ErrTaskNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(errorResponse("задача не найдена"))
+	case errors.Is(err, duty.ErrTaskAccessDenied):
+		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
+	default:
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 }
 

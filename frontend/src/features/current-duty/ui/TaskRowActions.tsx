@@ -13,6 +13,7 @@ type Props = {
     onReturn: (taskId: string) => void | Promise<unknown>
     onComplete: (taskId: string) => void | Promise<unknown>
     onOpen: (taskId: string) => void | Promise<unknown>
+    onReopen?: (taskId: string) => void | Promise<unknown>
     onVerify?: (taskId: string) => void | Promise<unknown>
 }
 
@@ -24,6 +25,7 @@ export function TaskRowActions({
                                    onReturn,
                                    onComplete,
                                    onOpen,
+                                   onReopen,
                                    onVerify,
                                }: Props) {
     const hasDefaultActions =
@@ -38,7 +40,7 @@ export function TaskRowActions({
                         radius="md"
                         variant="default"
                         loading={pending}
-                        onClick={() => onOpen(task.id)}
+                        onClick={() => (onReopen ?? onOpen)(task.id)}
                     >
                         Отменить
                     </Button>

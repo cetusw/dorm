@@ -67,8 +67,13 @@ func containsOverride(overrides []*catalog.DutyTaskOverride, taskID uuid.UUID, i
 
 type dutyRepoMock struct{ mock.Mock }
 
-func (m *dutyRepoMock) Save(ctx context.Context, duty *dutydomain.Duty) error { return nil }
-func (m *dutyRepoMock) FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*dutydomain.Duty, error) {
+func (m *dutyRepoMock) CreateWithTasks(_ context.Context, _ *dutydomain.Duty, _ []*dutydomain.DutyTask) error {
+	return nil
+}
+func (m *dutyRepoMock) FindCurrentByTeamID(_ context.Context, _ uuid.UUID) (*dutydomain.Duty, error) {
+	return nil, nil
+}
+func (m *dutyRepoMock) FindActiveByTeamID(_ context.Context, _ uuid.UUID, _ time.Time) (*dutydomain.Duty, error) {
 	return nil, nil
 }
 func (m *dutyRepoMock) FindByID(ctx context.Context, id uuid.UUID) (*dutydomain.Duty, error) {
@@ -162,6 +167,9 @@ type userRepoStub struct{}
 func (userRepoStub) Save(ctx context.Context, u *user.User) error                   { return nil }
 func (userRepoStub) FindAll(ctx context.Context) ([]*user.User, error)              { return nil, nil }
 func (userRepoStub) FindByID(ctx context.Context, id uuid.UUID) (*user.User, error) { return nil, nil }
+func (userRepoStub) FindByLogin(ctx context.Context, login string) (*user.User, error) {
+	return nil, nil
+}
 func (userRepoStub) FindByTelegramID(ctx context.Context, id int64) (*user.User, error) {
 	return nil, nil
 }

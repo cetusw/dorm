@@ -17,7 +17,7 @@ import (
 )
 
 type Service struct {
-	dutyRepo     dutydomain.Repository
+	dutyRepo     dutydomain.DutyRepository
 	teamRepo     structure.TeamRepository
 	groupRepo    structure.GroupRepository
 	dormRepo     structure.DormitoryRepository
@@ -28,7 +28,7 @@ type Service struct {
 }
 
 func NewDutyService(
-	dutyRepo dutydomain.Repository,
+	dutyRepo dutydomain.DutyRepository,
 	teamRepo structure.TeamRepository,
 	groupRepo structure.GroupRepository,
 	dormRepo structure.DormitoryRepository,

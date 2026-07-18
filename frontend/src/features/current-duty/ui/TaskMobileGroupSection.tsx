@@ -13,6 +13,7 @@ type Props = {
     onReturn: (taskId: string) => void | Promise<unknown>
     onComplete: (taskId: string) => void | Promise<unknown>
     onOpen: (taskId: string) => void | Promise<unknown>
+    onReopen?: (taskId: string) => void | Promise<unknown>
     onVerify?: (taskId: string) => void | Promise<unknown>
 }
 
@@ -24,6 +25,7 @@ export function TaskMobileGroupSection({
     onReturn,
     onComplete,
     onOpen,
+    onReopen,
     onVerify,
 }: Props) {
     return (
@@ -46,6 +48,7 @@ export function TaskMobileGroupSection({
                                 onReturn={onReturn}
                                 onComplete={onComplete}
                                 onOpen={onOpen}
+                                onReopen={onReopen}
                                 onVerify={onVerify}
                             />
                         ))}
