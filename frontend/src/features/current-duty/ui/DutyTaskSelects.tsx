@@ -19,6 +19,7 @@ const selectOptions: Array<{
     {label: 'Мои задачи', value: 'mine'},
     {label: 'Свободные задачи', value: 'free'},
     {label: 'Все задачи', value: 'all'},
+    {label: 'Команда', value: 'team'},
     {label: 'Задачи на проверку', value: 'review'},
 ]
 

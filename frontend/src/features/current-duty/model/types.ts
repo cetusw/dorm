@@ -1,6 +1,6 @@
 export type DutyTaskStatus = 'free' | 'assigned' | 'completed' | 'verified'
 
-export type DutyTaskSelect = 'mine' | 'free' | 'all' | 'review'
+export type DutyTaskSelect = 'mine' | 'free' | 'all' | 'team' | 'review'
 
 export type ResidentDutyTask = {
     id: string
@@ -25,6 +25,11 @@ export type ResidentDutyGroupOption = {
     name: string
 }
 
+export type ResidentDutyTeamMember = {
+    id: string
+    name: string
+}
+
 export type ResidentCurrentDuty = {
     selected_group_id: string
     has_active_duty: boolean
@@ -41,5 +46,6 @@ export type ResidentCurrentDuty = {
     end_date: string
     cost_per_resident_goal: number
     my_taken_cost_sum: number
+    team_members: ResidentDutyTeamMember[]
     tasks: ResidentDutyTask[]
 }

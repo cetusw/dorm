@@ -41,6 +41,7 @@ type currentDutyLookups struct {
 	taskDefinitions map[uuid.UUID]*catalog.TaskDefinition
 	areas           map[int]*catalog.Area
 	userNames       map[uuid.UUID]string
+	teamMembers     []dto.ResidentDutyTeamMember
 }
 
 type Service struct {
@@ -90,12 +91,12 @@ func (s *Service) GetCurrentDuty(
 
 	if currentDuty.duty == nil || currentDuty.dutyTeam == nil {
 		view := resolveResidentDutyView(currentDuty)
-		return buildResidentCurrentDutyResponse(currentDuty, view, nil, 0), nil
+		return buildResidentCurrentDutyResponse(currentDuty, view, nil, nil, 0), nil
 	}
 
 	view := resolveResidentDutyView(currentDuty)
 	if !view.canViewTasks {
-		return buildResidentCurrentDutyResponse(currentDuty, view, nil, 0), nil
+		return buildResidentCurrentDutyResponse(currentDuty, view, nil, nil, 0), nil
 	}
 
 	lookups, err := s.loadCurrentDutyLookups(ctx, currentDuty.dutyTeam.ID())
@@ -110,6 +111,7 @@ func (s *Service) GetCurrentDuty(
 		currentDuty,
 		view,
 		tasks,
+		lookups.teamMembers,
 		len(lookups.userNames),
 	), nil
 }
@@ -320,6 +322,7 @@ func (s *Service) loadCurrentDutyLookups(
 		taskDefinitions: taskDefinitions,
 		areas:           areas,
 		userNames:       userNames,
+		teamMembers:     teamMembersFromNames(userNames),
 	}, nil
 }
 
@@ -425,6 +428,7 @@ func buildResidentCurrentDutyResponse(
 	currentDuty *currentDutyContext,
 	view residentDutyView,
 	tasks []dto.ResidentDutyTask,
+	teamMembers []dto.ResidentDutyTeamMember,
 	residentCount int,
 ) *dto.ResidentCurrentDutyResponse {
 	response := &dto.ResidentCurrentDutyResponse{
@@ -436,6 +440,7 @@ func buildResidentCurrentDutyResponse(
 		ShowGroupSelect: view.showGroupSelect,
 		VisibleTabs:     view.visibleTabs,
 		NoticeMessage:   view.noticeMessage,
+		TeamMembers:     teamMembers,
 		Tasks:           tasks,
 	}
 
@@ -459,6 +464,7 @@ func buildResidentCurrentDutyResponse(
 		EndDate:             currentDuty.duty.End().Format("2006-01-02"),
 		CostPerResidentGoal: calculateCostPerResidentGoal(tasks, residentCount),
 		MyTakenCostSum:      countMyTakenCost(tasks),
+		TeamMembers:         response.TeamMembers,
 		Tasks:               response.Tasks,
 	}
 }
@@ -526,6 +532,22 @@ func (s *Service) userNamesByID(
 	return result, nil
 }
 
+func teamMembersFromNames(userNames map[uuid.UUID]string) []dto.ResidentDutyTeamMember {
+	members := make([]dto.ResidentDutyTeamMember, 0, len(userNames))
+	for userID, name := range userNames {
+		members = append(members, dto.ResidentDutyTeamMember{
+			ID:   userID.String(),
+			Name: name,
+		})
+	}
+
+	sort.Slice(members, func(i, j int) bool {
+		return members[i].Name < members[j].Name
+	})
+
+	return members
+}
+
 func resolveTaskStatus(task *dutydomain.DutyTask) string {
 	if task.VerificationDate() != nil {
 		return dto.ResidentDutyTaskStatusVerified
@@ -589,7 +611,7 @@ func resolveResidentDutyView(currentDuty *currentDutyContext) residentDutyView {
 		readOnly := true
 
 		if isOnDutyTeam {
-			visibleTabs = []string{"all", "mine"}
+			visibleTabs = []string{"all", "mine", "team"}
 			canManageTasks = true
 			readOnly = false
 
@@ -597,6 +619,8 @@ func resolveResidentDutyView(currentDuty *currentDutyContext) residentDutyView {
 				visibleTabs = append(visibleTabs, "review")
 				canVerifyTasks = true
 			}
+		} else if currentDuty.duty != nil && currentDuty.dutyTeam != nil {
+			visibleTabs = []string{"all", "team"}
 		}
 
 		return residentDutyView{
@@ -611,7 +635,7 @@ func resolveResidentDutyView(currentDuty *currentDutyContext) residentDutyView {
 	}
 
 	if isOnDutyTeam {
-		tabs := []string{"all", "mine"}
+		tabs := []string{"all", "mine", "team"}
 		if isTeamLeader {
 			tabs = append(tabs, "review")
 		}
@@ -624,8 +648,14 @@ func resolveResidentDutyView(currentDuty *currentDutyContext) residentDutyView {
 		}
 	}
 
+	visibleTabs := []string{}
+	if currentDuty.duty != nil && currentDuty.dutyTeam != nil {
+		visibleTabs = []string{"all", "team"}
+	}
+
 	return residentDutyView{
 		readOnly:      true,
+		visibleTabs:   visibleTabs,
 		canViewTasks:  currentDuty.duty != nil && currentDuty.dutyTeam != nil,
 		noticeMessage: observerNoticeMessage(currentDuty, false),
 	}

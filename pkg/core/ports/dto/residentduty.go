@@ -23,10 +23,16 @@ type ResidentCurrentDutyResponse struct {
 	EndDate             string                    `json:"end_date"`
 	CostPerResidentGoal int                       `json:"cost_per_resident_goal"`
 	MyTakenCostSum      int                       `json:"my_taken_cost_sum"`
+	TeamMembers         []ResidentDutyTeamMember  `json:"team_members"`
 	Tasks               []ResidentDutyTask        `json:"tasks"`
 }
 
 type ResidentDutyGroupOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type ResidentDutyTeamMember struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }

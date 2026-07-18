@@ -6,6 +6,7 @@ function normalizeCurrentDuty(duty: ResidentCurrentDuty): ResidentCurrentDuty {
         ...duty,
         visible_tabs: Array.isArray(duty.visible_tabs) ? duty.visible_tabs : [],
         groups: Array.isArray(duty.groups) ? duty.groups : [],
+        team_members: Array.isArray(duty.team_members) ? duty.team_members : [],
         tasks: Array.isArray(duty.tasks) ? duty.tasks : [],
     }
 }

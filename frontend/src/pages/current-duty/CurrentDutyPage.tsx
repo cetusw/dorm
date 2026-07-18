@@ -5,6 +5,7 @@ import { Alert, Box, Button, Center, Loader } from '@mantine/core'
 import type { CurrentUser } from '../../features/current-user/model/types'
 import {
     calculateDutyAnalytics,
+    selectTeamMemberTaskGroups,
     selectDutyViewOptions,
     selectTasksForActiveSelect,
 } from '../../features/current-duty/model/selectors'
@@ -16,6 +17,7 @@ import { useStoredDutySelect } from '../../features/current-duty/model/useStored
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
 import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
+import { TeamMemberTaskGroups } from '../../features/current-duty/ui/TeamMemberTaskGroups'
 import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
 import { PageFrame } from '../../shared/ui/PageFrame'
 
@@ -95,6 +97,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
         visibleFreeTaskIds,
         visibleMineTaskIds,
     })
+    const teamTaskGroups = selectTeamMemberTaskGroups(duty)
     const analytics = calculateDutyAnalytics(duty.tasks)
 
     const controls = viewOptions.showControls ? (
@@ -166,20 +169,24 @@ export function CurrentDutyPage({ currentUser }: Props) {
             analytics={analyticsBlock}
             controls={controls}
         >
-            <TaskGroups
-                isReadOnly={viewOptions.isReadOnly}
-                actionMode={viewOptions.actionMode}
-                pendingTaskId={pendingTaskId}
-                tasks={displayedTasks}
-                emptyMessage={viewOptions.emptyMessage}
-                showAssigneeColumn={viewOptions.showAssigneeColumn}
-                onTake={handleTake}
-                onReturn={handleReturn}
-                onComplete={handleComplete}
-                onOpen={handleOpen}
-                onReopen={handleReviewOpen}
-                onVerify={handleReviewVerify}
-            />
+            {activeSelect === 'team' ? (
+                <TeamMemberTaskGroups groups={teamTaskGroups} />
+            ) : (
+                <TaskGroups
+                    isReadOnly={viewOptions.isReadOnly}
+                    actionMode={viewOptions.actionMode}
+                    pendingTaskId={pendingTaskId}
+                    tasks={displayedTasks}
+                    emptyMessage={viewOptions.emptyMessage}
+                    showAssigneeColumn={viewOptions.showAssigneeColumn}
+                    onTake={handleTake}
+                    onReturn={handleReturn}
+                    onComplete={handleComplete}
+                    onOpen={handleOpen}
+                    onReopen={handleReviewOpen}
+                    onVerify={handleReviewVerify}
+                />
+            )}
             {selectedDormitoryId && (
                 <CreateDutyWeekModal
                     opened={createModalOpened}

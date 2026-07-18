@@ -1,5 +1,10 @@
 import type { TaskRowActionMode } from '../ui/TaskRowActions'
-import type { ResidentCurrentDuty, ResidentDutyTask, DutyTaskSelect } from './types'
+import type {
+    ResidentCurrentDuty,
+    ResidentDutyTask,
+    DutyTaskSelect,
+    ResidentDutyTeamMember,
+} from './types'
 import {
     countTasksCompletedByMe,
     countTasksTakenByMe,
@@ -38,6 +43,13 @@ export type DutyViewOptions = {
     showAnalytics: boolean
     showAssigneeColumn: boolean
     showControls: boolean
+}
+
+export type TeamMemberTaskGroup = {
+    member: ResidentDutyTeamMember
+    progress: MemberDutyProgressModel
+    tasks: ResidentDutyTask[]
+    tooltipLines: string[]
 }
 
 type SelectTasksForActiveSelectParams = {
@@ -288,10 +300,53 @@ export function selectTasksForActiveSelect({
             return duty.tasks.filter((task) => visibleMineTaskIds.includes(task.id))
         case 'free':
             return duty.tasks.filter((task) => visibleFreeTaskIds.includes(task.id))
+        case 'team':
+            return duty.tasks
         case 'review':
             return duty.tasks.filter((task) => reviewVisibleTaskIds.includes(task.id))
         case 'all':
         default:
             return duty.tasks
     }
+}
+
+function calculateAnalyticsForMember(tasks: ResidentDutyTask[], memberId: string): DutyAnalytics {
+    const memberTasks = tasks.filter((task) => task.assignee_id === memberId)
+    const completedTasks = memberTasks.filter(
+        (task) => task.status === 'completed' || task.status === 'verified',
+    )
+    const verifiedTasks = memberTasks.filter((task) => task.status === 'verified')
+
+    return {
+        myVerifiedTasksCount: verifiedTasks.length,
+        totalTasksCount: 0,
+        totalTakenTasksCount: 0,
+        totalCompletedTasksCount: 0,
+        totalVerifiedTasksCount: 0,
+        takenCostSum: memberTasks.reduce((sum, task) => sum + task.cost, 0),
+        completedCostSum: completedTasks.reduce((sum, task) => sum + task.cost, 0),
+        verifiedCostSum: verifiedTasks.reduce((sum, task) => sum + task.cost, 0),
+        takenTasksCount: memberTasks.length,
+        completedTasksCount: completedTasks.length,
+    }
+}
+
+export function selectTeamMemberTaskGroups(
+    duty: ResidentCurrentDuty,
+): TeamMemberTaskGroup[] {
+    return duty.team_members.map((member) => {
+        const tasks = duty.tasks.filter((task) => task.assignee_id === member.id)
+        const analytics = calculateAnalyticsForMember(duty.tasks, member.id)
+
+        return {
+            member,
+            progress: buildMemberDutyProgressModel(analytics, duty.cost_per_resident_goal),
+            tasks,
+            tooltipLines: [
+                `Взято ${analytics.takenCostSum} из ${duty.cost_per_resident_goal} баллов`,
+                `Выполнено ${analytics.completedTasksCount} из ${analytics.takenTasksCount} задач`,
+                `Проверено ${analytics.myVerifiedTasksCount} из ${analytics.takenTasksCount} задач`,
+            ],
+        }
+    })
 }
