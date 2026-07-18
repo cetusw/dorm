@@ -123,3 +123,15 @@ export function sumCostTakenByMe(tasks: ResidentDutyTask[]): number {
         .filter((task) => task.is_mine)
         .reduce((sum, task) => sum + task.cost, 0)
 }
+
+export function sumCostCompletedByMe(tasks: ResidentDutyTask[]): number {
+    return tasks
+        .filter((task) => task.is_mine && (task.status === 'completed' || task.status === 'verified'))
+        .reduce((sum, task) => sum + task.cost, 0)
+}
+
+export function sumCostVerifiedByMe(tasks: ResidentDutyTask[]): number {
+    return tasks
+        .filter((task) => task.is_mine && task.status === 'verified')
+        .reduce((sum, task) => sum + task.cost, 0)
+}

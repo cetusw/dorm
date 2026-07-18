@@ -3,7 +3,9 @@ import type { ResidentCurrentDuty, ResidentDutyTask, DutyTaskSelect } from './ty
 import {
     countTasksCompletedByMe,
     countTasksTakenByMe,
+    sumCostCompletedByMe,
     sumCostTakenByMe,
+    sumCostVerifiedByMe,
 } from './utils'
 
 export type DutyAnalytics = {
@@ -13,8 +15,20 @@ export type DutyAnalytics = {
     totalCompletedTasksCount: number
     totalVerifiedTasksCount: number
     takenCostSum: number
+    completedCostSum: number
+    verifiedCostSum: number
     takenTasksCount: number
     completedTasksCount: number
+}
+
+export type MemberDutyProgressSection = {
+    color: string
+    value: number
+}
+
+export type MemberDutyProgressModel = {
+    title: string
+    sections: MemberDutyProgressSection[]
 }
 
 export type DutyViewOptions = {
@@ -44,8 +58,195 @@ export function calculateDutyAnalytics(tasks: ResidentDutyTask[]): DutyAnalytics
         ).length,
         totalVerifiedTasksCount: tasks.filter((task) => task.status === 'verified').length,
         takenCostSum: sumCostTakenByMe(tasks),
+        completedCostSum: sumCostCompletedByMe(tasks),
+        verifiedCostSum: sumCostVerifiedByMe(tasks),
         takenTasksCount: countTasksTakenByMe(tasks),
         completedTasksCount: countTasksCompletedByMe(tasks),
+    }
+}
+
+function clampSectionValue(value: number): number {
+    return Math.max(0, value)
+}
+
+function buildSections(values: MemberDutyProgressSection[]): MemberDutyProgressSection[] {
+    return values.filter((section) => section.value > 0)
+}
+
+export function buildMemberDutyProgressModel(
+    analytics: DutyAnalytics,
+    targetCost: number,
+): MemberDutyProgressModel {
+    const safeTargetCost = Math.max(targetCost, 0)
+    const verifiedTasksCount = analytics.myVerifiedTasksCount
+    const hasNoTakenTasks = analytics.takenTasksCount === 0
+
+    if (hasNoTakenTasks) {
+        return {
+            title: `Взято 0 из ${safeTargetCost} баллов`,
+            sections: [
+                {
+                    color: 'var(--app-color-analytics-empty)',
+                    value: Math.max(safeTargetCost, 1),
+                },
+            ],
+        }
+    }
+
+    if (analytics.takenCostSum < safeTargetCost) {
+        const verifiedValue = Math.min(analytics.verifiedCostSum, safeTargetCost)
+        const completedValue = Math.min(analytics.completedCostSum, safeTargetCost)
+        const takenValue = Math.min(analytics.takenCostSum, safeTargetCost)
+
+        return {
+            title: `Взято ${analytics.takenCostSum} из ${safeTargetCost} баллов`,
+            sections: buildSections([
+                {
+                    color: 'var(--app-color-analytics-verified)',
+                    value: clampSectionValue(verifiedValue),
+                },
+                {
+                    color: 'var(--app-color-analytics-completed)',
+                    value: clampSectionValue(completedValue - verifiedValue),
+                },
+                {
+                    color: 'var(--app-color-analytics-taken)',
+                    value: clampSectionValue(takenValue - completedValue),
+                },
+                {
+                    color: 'var(--app-color-analytics-empty)',
+                    value: clampSectionValue(safeTargetCost - takenValue),
+                },
+            ]),
+        }
+    }
+
+    if (analytics.completedTasksCount < analytics.takenTasksCount) {
+        return {
+            title: `Выполнено ${analytics.completedTasksCount} из ${analytics.takenTasksCount} задач`,
+            sections: buildSections([
+                {
+                    color: 'var(--app-color-analytics-verified)',
+                    value: clampSectionValue(verifiedTasksCount),
+                },
+                {
+                    color: 'var(--app-color-analytics-completed)',
+                    value: clampSectionValue(analytics.completedTasksCount - verifiedTasksCount),
+                },
+                {
+                    color: 'var(--app-color-analytics-taken)',
+                    value: clampSectionValue(analytics.takenTasksCount - analytics.completedTasksCount),
+                },
+            ]),
+        }
+    }
+
+    if (verifiedTasksCount < analytics.takenTasksCount) {
+        return {
+            title: `Проверено ${verifiedTasksCount} из ${analytics.takenTasksCount} задач`,
+            sections: buildSections([
+                {
+                    color: 'var(--app-color-analytics-verified)',
+                    value: clampSectionValue(verifiedTasksCount),
+                },
+                {
+                    color: 'var(--app-color-analytics-completed)',
+                    value: clampSectionValue(analytics.takenTasksCount - verifiedTasksCount),
+                },
+            ]),
+        }
+    }
+
+    return {
+        title: 'Все задачи выполнены и проверены!',
+        sections: [
+            {
+                color: 'var(--app-color-analytics-verified)',
+                value: Math.max(analytics.takenTasksCount, 1),
+            },
+        ],
+    }
+}
+
+export function buildReadonlyDutyProgressModel(
+    analytics: DutyAnalytics,
+): MemberDutyProgressModel {
+    const totalTasksCount = Math.max(analytics.totalTasksCount, 0)
+
+    if (analytics.totalTakenTasksCount < totalTasksCount) {
+        return {
+            title: `Взято ${analytics.totalTakenTasksCount} из ${totalTasksCount} задач`,
+            sections: buildSections([
+                {
+                    color: 'var(--app-color-analytics-verified)',
+                    value: clampSectionValue(analytics.totalVerifiedTasksCount),
+                },
+                {
+                    color: 'var(--app-color-analytics-completed)',
+                    value: clampSectionValue(
+                        analytics.totalCompletedTasksCount - analytics.totalVerifiedTasksCount,
+                    ),
+                },
+                {
+                    color: 'var(--app-color-analytics-taken)',
+                    value: clampSectionValue(
+                        analytics.totalTakenTasksCount - analytics.totalCompletedTasksCount,
+                    ),
+                },
+                {
+                    color: 'var(--app-color-analytics-empty)',
+                    value: clampSectionValue(totalTasksCount - analytics.totalTakenTasksCount),
+                },
+            ]),
+        }
+    }
+
+    if (analytics.totalCompletedTasksCount < totalTasksCount) {
+        return {
+            title: `Выполнено ${analytics.totalCompletedTasksCount} из ${totalTasksCount} задач`,
+            sections: buildSections([
+                {
+                    color: 'var(--app-color-analytics-verified)',
+                    value: clampSectionValue(analytics.totalVerifiedTasksCount),
+                },
+                {
+                    color: 'var(--app-color-analytics-completed)',
+                    value: clampSectionValue(
+                        analytics.totalCompletedTasksCount - analytics.totalVerifiedTasksCount,
+                    ),
+                },
+                {
+                    color: 'var(--app-color-analytics-taken)',
+                    value: clampSectionValue(totalTasksCount - analytics.totalCompletedTasksCount),
+                },
+            ]),
+        }
+    }
+
+    if (analytics.totalVerifiedTasksCount < totalTasksCount) {
+        return {
+            title: `Проверено ${analytics.totalVerifiedTasksCount} из ${totalTasksCount} задач`,
+            sections: buildSections([
+                {
+                    color: 'var(--app-color-analytics-verified)',
+                    value: clampSectionValue(analytics.totalVerifiedTasksCount),
+                },
+                {
+                    color: 'var(--app-color-analytics-completed)',
+                    value: clampSectionValue(totalTasksCount - analytics.totalVerifiedTasksCount),
+                },
+            ]),
+        }
+    }
+
+    return {
+        title: 'Все задачи проверены!',
+        sections: [
+            {
+                color: 'var(--app-color-analytics-verified)',
+                value: Math.max(totalTasksCount, 1),
+            },
+        ],
     }
 }
 
