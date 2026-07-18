@@ -15,7 +15,7 @@ import {
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 
-import logo from '../assets/logo.png'
+import logo from '../assets/logo.svg'
 import { logoutResident } from '../features/auth/api/authApi'
 import type { CurrentUser } from '../features/current-user/model/types'
 import { useDormitorySelection } from '../features/dormitories/model/useDormitorySelection'
