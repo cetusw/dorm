@@ -17,6 +17,7 @@ import { useDisclosure } from '@mantine/hooks'
 
 const MOBILE_BREAKPOINT = 48 * 16
 const HEADER_HEIGHT = 60
+const SCROLL_DELTA_THRESHOLD = 8
 
 import logo from '../assets/logo.svg'
 import { logoutResident } from '../features/auth/api/authApi'
@@ -188,11 +189,38 @@ export function ResidentAppShell({
                 return
             }
 
-            const currentScrollY = window.scrollY
-            const scrollingDown = currentScrollY > previousScrollY
-            const shouldHide = scrollingDown && currentScrollY > HEADER_HEIGHT
+            const maxScrollY = Math.max(
+                0,
+                document.documentElement.scrollHeight - window.innerHeight,
+            )
+            const currentScrollY = Math.min(
+                maxScrollY,
+                Math.max(0, window.scrollY),
+            )
 
-            setIsMobileHeaderHidden(shouldHide)
+            if (currentScrollY <= 0) {
+                setIsMobileHeaderHidden(false)
+                previousScrollY = currentScrollY
+                return
+            }
+
+            if (currentScrollY >= maxScrollY - 1) {
+                previousScrollY = currentScrollY
+                return
+            }
+
+            const scrollDelta = currentScrollY - previousScrollY
+
+            if (Math.abs(scrollDelta) < SCROLL_DELTA_THRESHOLD) {
+                return
+            }
+
+            if (scrollDelta > 0 && currentScrollY > HEADER_HEIGHT) {
+                setIsMobileHeaderHidden(true)
+            } else if (scrollDelta < 0) {
+                setIsMobileHeaderHidden(false)
+            }
+
             previousScrollY = currentScrollY
         }
 

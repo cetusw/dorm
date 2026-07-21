@@ -1,6 +1,7 @@
-import type {ReactNode} from 'react'
+import type { ReactNode } from 'react'
 
-import {Alert, Box, Group, Stack, Title} from '@mantine/core'
+import { Alert, Box, Group, Stack, Title } from '@mantine/core'
+import { useStickyControlsVisibility } from './useStickyControlsVisibility'
 
 type Props = {
     title: string
@@ -14,17 +15,21 @@ type Props = {
 }
 
 export function PageFrame({
-                              title,
-                              subtitle,
-                              titleActions,
-                              error,
-                              notice,
-                              controls,
-                              analytics,
-                              children,
-                          }: Props) {
+    title,
+    subtitle,
+    titleActions,
+    error,
+    notice,
+    controls,
+    analytics,
+    children,
+}: Props) {
+    const areStickyControlsVisible = useStickyControlsVisibility({
+        enabled: Boolean(controls),
+    })
+
     return (
-        <Box px={{base: 'md', md: 'xl'}} py="xl">
+        <Box px={{ base: 'md', md: 'xl' }} py="xl">
             <Stack gap="lg" maw={1240} mx="auto">
                 {error && (
                     <Alert color="red" title="Ошибка">
@@ -55,8 +60,8 @@ export function PageFrame({
 
                                 <Box
                                     component="span"
-                                    display={{base: 'block', sm: 'inline'}}
-                                    mt={{base: 4, sm: 0}}
+                                    display={{ base: 'block', sm: 'inline' }}
+                                    mt={{ base: 4, sm: 0 }}
                                     style={{
                                         whiteSpace: 'nowrap',
                                     }}
@@ -85,8 +90,7 @@ export function PageFrame({
                             bg="var(--app-color-bg)"
                         >
                             {analytics}
-
-                            {controls}
+                            {areStickyControlsVisible ? controls : null}
                         </Stack>
                     </Box>
                 )}
