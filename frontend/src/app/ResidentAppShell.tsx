@@ -98,6 +98,25 @@ export function ResidentAppShell({
         label: dormitory.name,
     }))
 
+    function getNavigationItemStyles(active: boolean) {
+        return {
+            root: {
+                color: '#f9fafb',
+                borderRadius: 8,
+                backgroundColor: active
+                    ? 'rgba(204, 251, 241, 0.16)'
+                    : 'transparent',
+                border: active
+                    ? '1px solid rgba(204, 251, 241, 0.28)'
+                    : '1px solid transparent',
+            },
+            label: {
+                color: '#f9fafb',
+                fontWeight: 500,
+            },
+        }
+    }
+
     const desktopDormitoryControls = currentUser?.can_manage_dormitories ? (
         <Group align="center" gap="sm" wrap="nowrap">
             <Select
@@ -182,40 +201,35 @@ export function ResidentAppShell({
             }}
         >
             <AppShell.Navbar p="md">
-                <Stack gap="md">
-                    {mobileDormitoryControls && (
-                        <Stack gap="sm" hiddenFrom="sm">
-                            {mobileDormitoryControls}
-                        </Stack>
-                    )}
+                <Stack justify="space-between" h="100%">
+                    <Stack gap="md">
+                        {mobileDormitoryControls && (
+                            <Stack gap="sm" hiddenFrom="sm">
+                                {mobileDormitoryControls}
+                            </Stack>
+                        )}
 
-                    {navigationItems.map((item) => (
-                        <NavLink
-                            key={item.href}
-                            active={isCurrentPathActive(currentPath, item.href)}
-                            label={item.label}
-                            onClick={() => {
-                                closeNavbar()
-                                onNavigate(item.href)
-                            }}
-                            styles={{
-                                root: {
-                                    color: '#f9fafb',
-                                    borderRadius: 8,
-                                    backgroundColor: isCurrentPathActive(currentPath, item.href)
-                                        ? 'rgba(204, 251, 241, 0.16)'
-                                        : 'transparent',
-                                    border: isCurrentPathActive(currentPath, item.href)
-                                        ? '1px solid rgba(204, 251, 241, 0.28)'
-                                        : '1px solid transparent',
-                                },
-                                label: {
-                                    color: '#f9fafb',
-                                    fontWeight: 500,
-                                },
-                            }}
-                        />
-                    ))}
+                        {navigationItems.map((item) => (
+                            <NavLink
+                                key={item.href}
+                                active={isCurrentPathActive(currentPath, item.href)}
+                                label={item.label}
+                                onClick={() => {
+                                    closeNavbar()
+                                    onNavigate(item.href)
+                                }}
+                                styles={getNavigationItemStyles(
+                                    isCurrentPathActive(currentPath, item.href),
+                                )}
+                            />
+                        ))}
+                    </Stack>
+
+                    <NavLink
+                        label="Выйти"
+                        onClick={() => void handleLogout()}
+                        styles={getNavigationItemStyles(false)}
+                    />
                 </Stack>
             </AppShell.Navbar>
 
@@ -245,10 +259,6 @@ export function ResidentAppShell({
                             </Group>
                         )}
                     </Group>
-
-                    <Button variant="default" onClick={() => void handleLogout()}>
-                        Выйти
-                    </Button>
                 </Group>
             </AppShell.Header>
 
