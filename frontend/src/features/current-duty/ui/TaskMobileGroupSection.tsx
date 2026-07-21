@@ -20,6 +20,7 @@ type Props = {
 export function TaskMobileGroupSection({
     actionMode = 'default',
     group,
+    isReadOnly = false,
     pendingTaskId,
     onTake,
     onReturn,
@@ -41,6 +42,7 @@ export function TaskMobileGroupSection({
                         {group.tasks.map((task) => (
                             <TaskMobileCard
                                 key={task.id}
+                                isReadOnly={isReadOnly}
                                 mode={actionMode}
                                 pending={pendingTaskId === task.id}
                                 task={task}

@@ -39,6 +39,7 @@ type ResidentDutyTeamMember struct {
 
 type ResidentDutyTask struct {
 	ID           string  `json:"id"`
+	AreaID       int     `json:"area_id"`
 	AreaName     string  `json:"area_name"`
 	AreaFloor    int     `json:"area_floor"`
 	Title        string  `json:"title"`

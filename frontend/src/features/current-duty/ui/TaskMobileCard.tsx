@@ -4,6 +4,7 @@ import type { ResidentDutyTask } from '../model/types'
 import { TaskRowActions, type TaskRowActionMode } from './TaskRowActions'
 
 type Props = {
+    isReadOnly?: boolean
     mode?: TaskRowActionMode
     pending: boolean
     task: ResidentDutyTask
@@ -146,6 +147,7 @@ function MobileTaskActions({
 }
 
 export function TaskMobileCard({
+    isReadOnly = false,
     mode = 'default',
     pending,
     task,
@@ -170,7 +172,9 @@ export function TaskMobileCard({
                     </Group>
                 </Stack>
 
-                {mode === 'default' ? (
+                {isReadOnly ? (
+                    <MobileTaskStatus task={task} />
+                ) : mode === 'default' ? (
                     <MobileTaskActions
                         pending={pending}
                         task={task}

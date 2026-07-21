@@ -390,6 +390,7 @@ func buildResidentDutyTask(
 
 	return dto.ResidentDutyTask{
 		ID:            dutyTask.ID().String(),
+		AreaID:        area.ID(),
 		AreaName:      area.Name(),
 		AreaFloor:     area.Floor(),
 		Title:         taskDefinition.Title(),
