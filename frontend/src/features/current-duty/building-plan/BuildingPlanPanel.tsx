@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Box, Stack } from '@mantine/core'
 
@@ -39,6 +39,12 @@ export function BuildingPlanPanel({
     const [selectedArea, setSelectedArea] = useState<PlanAreaShape | null>(null)
     const summaries = useMemo(() => buildAreaTaskSummaries(tasks), [tasks])
     const selectedAreaTasks = selectedArea ? summaries.get(selectedArea.areaId)?.tasks ?? [] : []
+
+    useEffect(() => {
+        if (selectedArea && !summaries.has(selectedArea.areaId)) {
+            setSelectedArea(null)
+        }
+    }, [selectedArea, summaries])
 
     function handleClose() {
         setSelectedArea(null)

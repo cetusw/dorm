@@ -218,7 +218,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
                         floorPlan={selectedFloorPlan}
                         isReadOnly={viewOptions.isReadOnly}
                         pendingTaskId={pendingTaskId}
-                        tasks={displayedTasks}
+                        tasks={duty.tasks}
                         onTake={handleTake}
                         onReturn={handleReturn}
                         onComplete={handleComplete}

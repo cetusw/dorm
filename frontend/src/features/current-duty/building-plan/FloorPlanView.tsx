@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { Popover, Stack, Text } from '@mantine/core'
 
-import type { AreaTaskSummary } from './planState'
+import { areaStyles, type AreaTaskSummary } from './planState'
 import type { FloorPlan, PlanAreaShape, PlanShape, ShapeGeometry } from './types'
 import classes from './FloorPlanView.module.css'
 
@@ -58,7 +58,16 @@ function AreaStatsPopover({ summary }: { summary: AreaTaskSummary }) {
     const taken = counters.assigned + counters.completed + counters.verified + counters.revision
     const done = counters.completed + counters.verified
     const firstTask = summary.tasks[0]
-    const title = firstTask ? `${firstTask.area_floor} этаж · ${firstTask.area_name}` : 'Территория'
+    const title = firstTask ? `${firstTask.area_floor} этаж . ${firstTask.area_name}` : 'Территория'
+
+    if (summary.state === 'no-free') {
+        return (
+            <Stack gap={4}>
+                <Text size="sm" fw={700}>{title}</Text>
+                <Text size="sm">Нет свободных задач</Text>
+            </Stack>
+        )
+    }
 
     return (
         <Stack gap={4}>
@@ -88,21 +97,23 @@ export function FloorPlanView({ plan, selectedAreaId, summaries, onAreaClick }: 
 
                 {plan.definition.areas.map((area) => {
                     const summary = summaries.get(area.areaId)
-                    const isInteractive = summary !== undefined
+                    const state = summary?.state ?? 'other-group'
+                    const style = areaStyles[state]
+                    const isClickable = summary !== undefined
                     const selected = area.id === selectedAreaId
                     const shapeCommonProps = {
-                        fill: '#CCFBF1',
-                        stroke: '#14B8A6',
+                        fill: style.fill,
+                        stroke: style.stroke,
                         strokeWidth: selected ? 4 : 1,
                         className: [
                             classes.area,
-                            isInteractive ? classes.interactive : classes.inactive,
+                            isClickable ? classes.interactive : classes.inactive,
                             selected ? classes.selected : '',
                         ].join(' '),
-                        onMouseEnter: isInteractive ? () => setHoveredAreaId(area.id) : undefined,
-                        onMouseLeave: isInteractive ? () => setHoveredAreaId(null) : undefined,
+                        onMouseEnter: () => setHoveredAreaId(area.id),
+                        onMouseLeave: () => setHoveredAreaId(null),
                         onClick: () => {
-                            if (isInteractive) {
+                            if (isClickable) {
                                 onAreaClick(area)
                             }
                         },
@@ -110,9 +121,22 @@ export function FloorPlanView({ plan, selectedAreaId, summaries, onAreaClick }: 
 
                     if (!summary) {
                         return (
-                            <g key={area.id}>
-                                <AreaShape area={area} shapeProps={shapeCommonProps} />
-                            </g>
+                            <Popover
+                                key={area.id}
+                                opened={hoveredAreaId === area.id}
+                                position="top"
+                                withArrow
+                                shadow="md"
+                            >
+                                <Popover.Target>
+                                    <g>
+                                        <AreaShape area={area} shapeProps={shapeCommonProps} />
+                                    </g>
+                                </Popover.Target>
+                                <Popover.Dropdown>
+                                    <Text size="sm">За эту территорию отвечает другая группа</Text>
+                                </Popover.Dropdown>
+                            </Popover>
                         )
                     }
 
