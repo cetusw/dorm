@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import {
     Alert,
@@ -14,6 +14,9 @@ import {
     Stack,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
+
+const MOBILE_BREAKPOINT = 48 * 16
+const HEADER_HEIGHT = 60
 
 import logo from '../assets/logo.svg'
 import { logoutResident } from '../features/auth/api/authApi'
@@ -56,6 +59,7 @@ export function ResidentAppShell({
 }: Props) {
     const [navbarOpened, { toggle: toggleNavbar, close: closeNavbar }] =
         useDisclosure(false)
+    const [isMobileHeaderHidden, setIsMobileHeaderHidden] = useState(false)
     const {
         dormitories,
         loading: dormitoriesLoading,
@@ -174,6 +178,34 @@ export function ResidentAppShell({
         }
     }
 
+    useEffect(() => {
+        let previousScrollY = window.scrollY
+
+        function syncMobileHeader() {
+            if (window.innerWidth >= MOBILE_BREAKPOINT) {
+                setIsMobileHeaderHidden(false)
+                previousScrollY = window.scrollY
+                return
+            }
+
+            const currentScrollY = window.scrollY
+            const scrollingDown = currentScrollY > previousScrollY
+            const shouldHide = scrollingDown && currentScrollY > HEADER_HEIGHT
+
+            setIsMobileHeaderHidden(shouldHide)
+            previousScrollY = currentScrollY
+        }
+
+        syncMobileHeader()
+        window.addEventListener('scroll', syncMobileHeader, { passive: true })
+        window.addEventListener('resize', syncMobileHeader)
+
+        return () => {
+            window.removeEventListener('scroll', syncMobileHeader)
+            window.removeEventListener('resize', syncMobileHeader)
+        }
+    }, [])
+
     return (
         <AppShell
             navbar={{
@@ -189,6 +221,8 @@ export function ResidentAppShell({
                 main: {
                     backgroundColor: 'var(--app-color-bg)',
                     minHeight: '100vh',
+                    '--app-shell-header-offset':
+                        isMobileHeaderHidden ? '0px' : `${HEADER_HEIGHT}px`,
                 },
                 navbar: {
                     backgroundColor: '#1F2927',
@@ -197,6 +231,10 @@ export function ResidentAppShell({
                 header: {
                     backgroundColor: 'var(--app-color-surface)',
                     borderBottom: '1px solid var(--app-color-border)',
+                    transition: 'transform 160ms ease',
+                    transform: isMobileHeaderHidden
+                        ? 'translateY(-100%)'
+                        : 'translateY(0)',
                 },
             }}
         >

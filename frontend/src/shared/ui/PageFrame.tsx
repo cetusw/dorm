@@ -73,9 +73,10 @@ export function PageFrame({
                 {(analytics || controls) && (
                     <Box
                         pos="sticky"
-                        top={60}
+                        top="var(--app-shell-header-offset, 0px)"
                         style={{
                             zIndex: 10,
+                            transition: 'top 160ms ease',
                         }}
                     >
                         <Stack
