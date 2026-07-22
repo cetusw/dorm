@@ -54,17 +54,17 @@ function AreaShape({ area, shapeProps }: { area: PlanAreaShape; shapeProps: Area
 }
 
 function AreaStatsPopover({ summary }: { summary: AreaTaskSummary }) {
-    const { counters } = summary
+    const { counters, emptyMessage, hasVisibleTasks } = summary
     const taken = counters.assigned + counters.completed + counters.verified + counters.revision
     const done = counters.completed + counters.verified
     const firstTask = summary.tasks[0]
     const title = firstTask ? `${firstTask.area_floor} этаж . ${firstTask.area_name}` : 'Территория'
 
-    if (summary.state === 'no-free') {
+    if (!hasVisibleTasks) {
         return (
             <Stack gap={4}>
                 <Text size="sm" fw={700}>{title}</Text>
-                <Text size="sm">Нет свободных задач</Text>
+                <Text size="sm">{emptyMessage}</Text>
             </Stack>
         )
     }
@@ -97,9 +97,9 @@ export function FloorPlanView({ plan, selectedAreaId, summaries, onAreaClick }: 
 
                 {plan.definition.areas.map((area) => {
                     const summary = summaries.get(area.areaId)
-                    const state = summary?.state ?? 'other-group'
+                    const state = summary?.state ?? 'muted'
                     const style = areaStyles[state]
-                    const isClickable = summary !== undefined
+                    const isClickable = summary?.hasVisibleTasks ?? false
                     const selected = area.id === selectedAreaId
                     const shapeCommonProps = {
                         fill: style.fill,

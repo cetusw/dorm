@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Box, Stack } from '@mantine/core'
 
-import type { ResidentDutyTask } from '../model/types'
+import type { DutyTaskSelect, ResidentDutyTask } from '../model/types'
 import type { TaskRowActionMode } from '../ui/TaskRowActions'
 import { BuildingPlanDrawer } from './BuildingPlanDrawer'
 import { FloorPlanView } from './FloorPlanView'
@@ -10,7 +10,9 @@ import { buildAreaTaskSummaries } from './planState'
 import type { FloorPlan, PlanAreaShape } from './types'
 
 type Props = {
+    activeSelect: DutyTaskSelect
     actionMode: TaskRowActionMode
+    allTasks: ResidentDutyTask[]
     floorPlan: FloorPlan
     isReadOnly?: boolean
     pendingTaskId: string | null
@@ -24,7 +26,9 @@ type Props = {
 }
 
 export function BuildingPlanPanel({
+    activeSelect,
     actionMode,
+    allTasks,
     floorPlan,
     isReadOnly = false,
     pendingTaskId,
@@ -37,11 +41,14 @@ export function BuildingPlanPanel({
     onVerify,
 }: Props) {
     const [selectedArea, setSelectedArea] = useState<PlanAreaShape | null>(null)
-    const summaries = useMemo(() => buildAreaTaskSummaries(tasks), [tasks])
-    const selectedAreaTasks = selectedArea ? summaries.get(selectedArea.areaId)?.tasks ?? [] : []
+    const summaries = useMemo(
+        () => buildAreaTaskSummaries(allTasks, tasks, activeSelect),
+        [activeSelect, allTasks, tasks],
+    )
+    const selectedAreaTasks = selectedArea ? summaries.get(selectedArea.areaId)?.visibleTasks ?? [] : []
 
     useEffect(() => {
-        if (selectedArea && !summaries.has(selectedArea.areaId)) {
+        if (selectedArea && (summaries.get(selectedArea.areaId)?.visibleTasks.length ?? 0) === 0) {
             setSelectedArea(null)
         }
     }, [selectedArea, summaries])

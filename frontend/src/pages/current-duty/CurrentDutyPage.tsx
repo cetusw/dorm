@@ -13,7 +13,6 @@ import {
 import { CreateDutyWeekModal } from '../../features/current-duty/ui/CreateDutyWeekModal'
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty'
-import { useReviewTasks } from '../../features/current-duty/model/useReviewTasks'
 import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
@@ -49,16 +48,10 @@ export function CurrentDutyPage({ currentUser }: Props) {
     } = useCurrentDuty()
     const selectedDormitoryId = useSelectedDormitoryId()
     const [createModalOpened, setCreateModalOpened] = useState(false)
-    const [showBuildingPlan, setShowBuildingPlan] = useState(false)
+    const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState(floorPlans[0].id)
     const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
     const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
-    const { reviewVisibleTaskIds, handleReopen: handleReviewOpen, handleVerify: handleReviewVerify } = useReviewTasks({
-        activeSelect,
-        duty,
-        onReopen: handleReopen,
-        onVerify: handleVerify,
-    })
 
     const titleActions = currentUser?.can_manage_dormitories ? (
         <Button
@@ -100,7 +93,6 @@ export function CurrentDutyPage({ currentUser }: Props) {
     const displayedTasks = selectTasksForActiveSelect({
         activeSelect,
         duty,
-        reviewVisibleTaskIds,
         visibleFreeTaskIds,
         visibleMineTaskIds,
     })
@@ -118,7 +110,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
             visibleSelects={visibleTabs}
             rightSection={activeSelect === 'team' ? undefined : (
                 <SegmentedControl
-                    value={showBuildingPlan ? 'plan' : 'list'}
+                    value={displayMode}
                     data={[
                         { label: 'Список', value: 'list' },
                         { label: 'План', value: 'plan' },
@@ -128,23 +120,17 @@ export function CurrentDutyPage({ currentUser }: Props) {
                         root: segmentedControlClasses.root,
                         label: segmentedControlClasses.label,
                     }}
-                    onChange={(value) => setShowBuildingPlan(value === 'plan')}
+                    onChange={(value) => setDisplayMode(value as 'list' | 'plan')}
                 />
             )}
-            onGroupChange={(groupId) => {
-                setShowBuildingPlan(false)
-                selectGroup(groupId)
-            }}
-            onChange={(value) => {
-                setShowBuildingPlan(false)
-                setActiveSelect(value)
-            }}
+            onGroupChange={selectGroup}
+            onChange={setActiveSelect}
         />
     ) : null
 
     const buildingPlanControls = activeSelect === 'team' ? null : (
         <Box>
-            {showBuildingPlan && (
+            {displayMode === 'plan' && (
                 <Group justify="flex-end">
                     <SegmentedControl
                         value={selectedFloorPlanId}
@@ -228,21 +214,23 @@ export function CurrentDutyPage({ currentUser }: Props) {
             notice={duty.notice_message}
             controls={controls}
         >
-            {showBuildingPlan && activeSelect !== 'team' ? (
+            {displayMode === 'plan' && activeSelect !== 'team' ? (
                 <>
                     <BuildingPlanPanel
                         key={selectedFloorPlan.id}
+                        activeSelect={activeSelect}
                         actionMode={viewOptions.actionMode}
+                        allTasks={duty.tasks}
                         floorPlan={selectedFloorPlan}
                         isReadOnly={viewOptions.isReadOnly}
                         pendingTaskId={pendingTaskId}
-                        tasks={duty.tasks}
+                        tasks={displayedTasks}
                         onTake={handleTake}
                         onReturn={handleReturn}
                         onComplete={handleComplete}
                         onOpen={handleOpen}
-                        onReopen={handleReviewOpen}
-                        onVerify={handleReviewVerify}
+                        onReopen={handleReopen}
+                        onVerify={handleVerify}
                     />
                     <Box hiddenFrom="md">
                         <TaskGroups
@@ -256,8 +244,8 @@ export function CurrentDutyPage({ currentUser }: Props) {
                             onReturn={handleReturn}
                             onComplete={handleComplete}
                             onOpen={handleOpen}
-                            onReopen={handleReviewOpen}
-                            onVerify={handleReviewVerify}
+                            onReopen={handleReopen}
+                            onVerify={handleVerify}
                         />
                     </Box>
                 </>
@@ -275,8 +263,8 @@ export function CurrentDutyPage({ currentUser }: Props) {
                     onReturn={handleReturn}
                     onComplete={handleComplete}
                     onOpen={handleOpen}
-                    onReopen={handleReviewOpen}
-                    onVerify={handleReviewVerify}
+                    onReopen={handleReopen}
+                    onVerify={handleVerify}
                 />
             )}
             {selectedDormitoryId && (

@@ -55,7 +55,6 @@ export type TeamMemberTaskGroup = {
 type SelectTasksForActiveSelectParams = {
     activeSelect: DutyTaskSelect
     duty: ResidentCurrentDuty
-    reviewVisibleTaskIds: string[]
     visibleFreeTaskIds: string[]
     visibleMineTaskIds: string[]
 }
@@ -271,7 +270,7 @@ export function selectDutyViewOptions(
 
     return {
         actionMode: activeSelect === 'review' ? 'review' : 'default',
-        emptyMessage: activeSelect === 'review' ? 'Нет задач на проверке' : 'В этом разделе нет задач.',
+        emptyMessage: activeSelect === 'review' ? 'В этой группе нет задач.' : 'В этом разделе нет задач.',
         isReadOnly,
         showAnalytics: !isReadOnly && visibleTabs.length > 0,
         showAssigneeColumn: isReadOnly || activeSelect === 'all' || activeSelect === 'review',
@@ -310,16 +309,9 @@ export function selectVisibleDutyTabs(duty: ResidentCurrentDuty): DutyTaskSelect
     return visibleTabs
 }
 
-export function selectReviewVisibleTaskIds(tasks: ResidentDutyTask[]): string[] {
-    return tasks
-        .filter((task) => task.status === 'completed')
-        .map((task) => task.id)
-}
-
 export function selectTasksForActiveSelect({
     activeSelect,
     duty,
-    reviewVisibleTaskIds,
     visibleFreeTaskIds,
     visibleMineTaskIds,
 }: SelectTasksForActiveSelectParams): ResidentDutyTask[] {
@@ -335,7 +327,7 @@ export function selectTasksForActiveSelect({
         case 'team':
             return duty.tasks
         case 'review':
-            return duty.tasks.filter((task) => reviewVisibleTaskIds.includes(task.id))
+            return duty.tasks
         case 'all':
         default:
             return duty.tasks

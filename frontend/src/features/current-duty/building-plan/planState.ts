@@ -1,4 +1,4 @@
-import type { ResidentDutyTask } from '../model/types'
+import type { DutyTaskSelect, ResidentDutyTask } from '../model/types'
 
 export type AreaTaskCounters = {
     total: number
@@ -16,19 +16,17 @@ export type AreaUserCounters = {
     verified: number
 }
 
-export type AreaPresentationState =
-    | 'other-group'
-    | 'no-free'
-    | 'has-free'
-    | 'mine-assigned'
-    | 'mine-completed'
-    | 'mine-verified'
+export type AreaPresentationState = 'muted' | 'info' | 'success' | 'warning' | 'danger'
 
 export type AreaTaskSummary = {
     counters: AreaTaskCounters
+    visibleCounters: AreaTaskCounters
     userCounters: AreaUserCounters
     state: AreaPresentationState
     tasks: ResidentDutyTask[]
+    visibleTasks: ResidentDutyTask[]
+    hasVisibleTasks: boolean
+    emptyMessage: string
 }
 
 export type AreaStyle = {
@@ -37,55 +35,80 @@ export type AreaStyle = {
 }
 
 export const areaStyles: Record<AreaPresentationState, AreaStyle> = {
-    'other-group': {
+    muted: {
         fill: '#F0FDFA',
         stroke: '#99F6E4',
     },
-    'no-free': {
-        fill: '#F0FDFA',
-        stroke: '#99F6E4',
-    },
-    'has-free': {
-        fill: '#CCFBF1',
-        stroke: '#14B8A6',
-    },
-    'mine-assigned': {
-        fill: '#FEF3C7',
-        stroke: '#92400E',
-    },
-    'mine-completed': {
+    info: {
         fill: '#E0F2FE',
         stroke: '#0369A1',
     },
-    'mine-verified': {
+    success: {
         fill: '#DCFCE7',
         stroke: '#166534',
     },
+    warning: {
+        fill: '#FEF3C7',
+        stroke: '#92400E',
+    },
+    danger: {
+        fill: '#FEE2E2',
+        stroke: '#991B1B',
+    },
 }
 
-export function buildAreaTaskSummaries(tasks: ResidentDutyTask[]): Map<string, AreaTaskSummary> {
-    const groups = new Map<string, ResidentDutyTask[]>()
+export function buildAreaTaskSummaries(
+    allTasks: ResidentDutyTask[],
+    visibleTasks: ResidentDutyTask[],
+    activeSelect: DutyTaskSelect,
+): Map<string, AreaTaskSummary> {
+    const groupedAllTasks = new Map<string, ResidentDutyTask[]>()
+    const groupedVisibleTasks = new Map<string, ResidentDutyTask[]>()
 
-    tasks.forEach((task) => {
+    for (const task of allTasks) {
         const areaId = String(task.area_id)
-        groups.set(areaId, [...(groups.get(areaId) ?? []), task])
-    })
+        groupedAllTasks.set(areaId, [...(groupedAllTasks.get(areaId) ?? []), task])
+    }
+
+    for (const task of visibleTasks) {
+        const areaId = String(task.area_id)
+        groupedVisibleTasks.set(areaId, [...(groupedVisibleTasks.get(areaId) ?? []), task])
+    }
 
     const summaries = new Map<string, AreaTaskSummary>()
 
-    groups.forEach((areaTasks, areaId) => {
+    for (const [areaId, areaTasks] of groupedAllTasks.entries()) {
+        const areaVisibleTasks = groupedVisibleTasks.get(areaId) ?? []
         const counters = countAreaTasks(areaTasks)
-        const userCounters = countUserTasks(areaTasks)
+        const visibleCounters = countAreaTasks(areaVisibleTasks)
+        const userCounters = countUserTasks(areaVisibleTasks)
 
         summaries.set(areaId, {
             counters,
+            visibleCounters,
             userCounters,
-            state: resolveAreaPresentationState(counters, userCounters),
+            state: resolveAreaPresentationState(activeSelect, counters, visibleCounters, userCounters),
             tasks: areaTasks,
+            visibleTasks: areaVisibleTasks,
+            hasVisibleTasks: areaVisibleTasks.length > 0,
+            emptyMessage: getAreaEmptyMessage(activeSelect),
         })
-    })
+    }
 
     return summaries
+}
+
+export function getAreaEmptyMessage(activeSelect: DutyTaskSelect): string {
+    switch (activeSelect) {
+        case 'mine':
+            return 'В этой территории нет ваших задач'
+        case 'free':
+            return 'В этой территории нет свободных задач'
+        case 'all':
+        case 'review':
+        default:
+            return 'За эту территорию отвечает другая группа'
+    }
 }
 
 export function countAreaTasks(tasks: ResidentDutyTask[]): AreaTaskCounters {
@@ -113,24 +136,40 @@ export function countUserTasks(tasks: ResidentDutyTask[]): AreaUserCounters {
 }
 
 export function resolveAreaPresentationState(
+    activeSelect: DutyTaskSelect,
     counters: AreaTaskCounters,
+    visibleCounters: AreaTaskCounters,
     userCounters: AreaUserCounters,
 ): AreaPresentationState {
-    if (userCounters.taken > 0 && userCounters.verified === userCounters.taken) {
-        return 'mine-verified'
+    if (visibleCounters.total === 0) {
+        return 'muted'
     }
 
-    if (userCounters.taken > 0 && userCounters.completedOrVerified === userCounters.taken) {
-        return 'mine-completed'
-    }
+    switch (activeSelect) {
+        case 'mine':
+            if (userCounters.taken > 0 && userCounters.completedOrVerified === userCounters.taken) {
+                return 'success'
+            }
 
-    if (userCounters.taken > 0) {
-        return 'mine-assigned'
-    }
+            return 'info'
+        case 'free':
+            return 'info'
+        case 'review':
+            if (counters.verified === counters.total) {
+                return 'success'
+            }
 
-    if (counters.free > 0) {
-        return 'has-free'
-    }
+            if (counters.free > 0 || counters.assigned > 0 || counters.revision > 0) {
+                return 'danger'
+            }
 
-    return 'no-free'
+            if (counters.completed > 0) {
+                return 'warning'
+            }
+
+            return 'muted'
+        case 'all':
+        default:
+            return 'info'
+    }
 }

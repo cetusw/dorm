@@ -24,7 +24,7 @@ const selectOptions: Array<{
     {label: 'Свободные задачи', value: 'free'},
     {label: 'Все задачи', value: 'all'},
     {label: 'Команда', value: 'team'},
-    {label: 'Задачи на проверку', value: 'review'},
+    {label: 'Общий прогресс', value: 'review'},
 ]
 
 export function DutyTaskSelects({
