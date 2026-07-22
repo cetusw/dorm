@@ -1,0 +1,8 @@
+.root {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.label {
+  padding: 5px 20px;
+}

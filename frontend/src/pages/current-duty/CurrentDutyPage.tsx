@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Alert, Box, Button, Center, Checkbox, Group, Loader, SegmentedControl, Stack } from '@mantine/core'
+import { Alert, Box, Button, Center, Group, Loader, SegmentedControl, Stack } from '@mantine/core'
 
 import type { CurrentUser } from '../../features/current-user/model/types'
 import {
@@ -22,6 +22,7 @@ import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
 import { BuildingPlanPanel } from '../../features/current-duty/building-plan/BuildingPlanPanel'
 import { floorPlans } from '../../features/current-duty/building-plan/plans'
 import { PageFrame } from '../../shared/ui/PageFrame'
+import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 
 type Props = {
     currentUser: CurrentUser | null
@@ -113,6 +114,20 @@ export function CurrentDutyPage({ currentUser }: Props) {
             selectedGroupId={selectedGroupId ?? duty.selected_group_id}
             showGroupSelect={duty.show_group_select}
             visibleSelects={duty.visible_tabs}
+            rightSection={activeSelect === 'team' ? undefined : (
+                <SegmentedControl
+                    value={showBuildingPlan ? 'plan' : 'list'}
+                    data={[
+                        { label: 'Список', value: 'list' },
+                        { label: 'План', value: 'plan' },
+                    ]}
+                    classNames={{
+                        root: segmentedControlClasses.root,
+                        label: segmentedControlClasses.label,
+                    }}
+                    onChange={(value) => setShowBuildingPlan(value === 'plan')}
+                />
+            )}
             onGroupChange={(groupId) => {
                 setShowBuildingPlan(false)
                 selectGroup(groupId)
@@ -125,33 +140,25 @@ export function CurrentDutyPage({ currentUser }: Props) {
     ) : null
 
     const buildingPlanControls = activeSelect === 'team' ? null : (
-        <Box visibleFrom="md">
-            <Group justify="space-between" align="center" gap="md">
-                <Checkbox
-                    checked={showBuildingPlan}
-                    label="Показать план здания"
-                    onChange={(event) => setShowBuildingPlan(event.currentTarget.checked)}
-                />
-                {showBuildingPlan && (
+        <Box>
+            {showBuildingPlan && (
+                <Group justify="flex-end">
                     <SegmentedControl
                         value={selectedFloorPlanId}
                         data={floorPlans.map((plan) => ({
                             value: plan.id,
                             label: plan.name,
                         }))}
+                        classNames={{
+                            root: segmentedControlClasses.root,
+                            label: segmentedControlClasses.label,
+                        }}
                         onChange={setSelectedFloorPlanId}
                     />
-                )}
-            </Group>
+                </Group>
+            )}
         </Box>
     )
-
-    const controls = dutyControls || buildingPlanControls ? (
-        <Stack gap="md">
-            {dutyControls}
-            {buildingPlanControls}
-        </Stack>
-    ) : undefined
 
     const analyticsBlock = viewOptions.showAnalytics || viewOptions.isReadOnly ? (
         <CurrentDutyAnalytics
@@ -159,6 +166,14 @@ export function CurrentDutyPage({ currentUser }: Props) {
             isReadOnly={viewOptions.isReadOnly}
             targetValue={duty.cost_per_resident_goal}
         />
+    ) : undefined
+
+    const controls = analyticsBlock || dutyControls || buildingPlanControls ? (
+        <Stack gap="md">
+            {analyticsBlock}
+            {dutyControls}
+            {buildingPlanControls}
+        </Stack>
     ) : undefined
 
     if (!duty.has_active_duty) {
@@ -207,7 +222,6 @@ export function CurrentDutyPage({ currentUser }: Props) {
             titleActions={titleActions}
             error={error}
             notice={duty.notice_message}
-            analytics={analyticsBlock}
             controls={controls}
         >
             {showBuildingPlan && activeSelect !== 'team' ? (

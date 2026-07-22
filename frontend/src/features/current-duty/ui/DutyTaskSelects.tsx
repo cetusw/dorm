@@ -1,6 +1,9 @@
-import {Group, Select} from '@mantine/core'
+import type { ReactNode } from 'react'
+
+import { Box, Group, SegmentedControl, Select, Stack } from '@mantine/core'
 
 import type {DutyTaskSelect, ResidentDutyGroupOption,} from '../model/types'
+import classes from './SegmentedControl.module.css'
 
 type Props = {
     activeSelect: DutyTaskSelect
@@ -8,6 +11,7 @@ type Props = {
     selectedGroupId: string
     showGroupSelect?: boolean
     visibleSelects: DutyTaskSelect[]
+    rightSection?: ReactNode
     onGroupChange: (groupId: string) => void
     onChange: (select: DutyTaskSelect) => void
 }
@@ -24,24 +28,21 @@ const selectOptions: Array<{
 ]
 
 export function DutyTaskSelects({
-                                    activeSelect,
-                                    groups,
-                                    selectedGroupId,
-                                    showGroupSelect = true,
-                                    visibleSelects,
-                                    onGroupChange,
-                                    onChange,
-                                }: Props) {
+    activeSelect,
+    groups,
+    selectedGroupId,
+    showGroupSelect = true,
+    visibleSelects,
+    rightSection,
+    onGroupChange,
+    onChange,
+}: Props) {
     const visibleSelectOptions = selectOptions.filter((selectOption) =>
         visibleSelects.includes(selectOption.value),
     )
 
     return (
-        <Group
-            gap="sm"
-            wrap="nowrap"
-            align="flex-end"
-        >
+        <Stack gap="sm">
             {showGroupSelect && (
                 <Select
                     aria-label="Группа"
@@ -57,31 +58,30 @@ export function DutyTaskSelects({
                         }
                     }}
                     allowDeselect={false}
-                    style={{
-                        flex: 1,
-                        minWidth: 0,
-                    }}
+                    style={{ width: '100%' }}
                 />
             )}
 
-            {visibleSelectOptions.length > 0 && (
-                <Select
-                    aria-label="Раздел задач"
-                    autoComplete="off"
-                    data={visibleSelectOptions}
-                    value={activeSelect}
-                    onChange={(value) => {
-                        if (value) {
-                            onChange(value as DutyTaskSelect)
-                        }
-                    }}
-                    allowDeselect={false}
-                    style={{
-                        flex: 1,
-                        minWidth: 0,
-                    }}
-                />
+            {(visibleSelectOptions.length > 0 || rightSection) && (
+                <Group align="center" justify="space-between" gap="sm" wrap="wrap">
+                    {visibleSelectOptions.length > 0 && (
+                        <Box style={{ minWidth: 0, maxWidth: '100%' }}>
+                            <SegmentedControl
+                                aria-label="Раздел задач"
+                                data={visibleSelectOptions}
+                                value={activeSelect}
+                                classNames={{
+                                    root: classes.root,
+                                    label: classes.label,
+                                }}
+                                onChange={(value) => onChange(value as DutyTaskSelect)}
+                            />
+                        </Box>
+                    )}
+
+                    {rightSection}
+                </Group>
             )}
-        </Group>
+        </Stack>
     )
 }
