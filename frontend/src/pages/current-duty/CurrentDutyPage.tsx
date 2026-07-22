@@ -1,8 +1,9 @@
 import { useState } from 'react'
 
-import { Alert, Box, Button, Center, Group, Loader, SegmentedControl, Select, Stack } from '@mantine/core'
+import { Alert, Box, Button, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
 import type { CurrentUser } from '../../features/current-user/model/types'
+import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 import {
     calculateDutyAnalytics,
     selectVisibleDutyTabs,
@@ -28,6 +29,41 @@ type Props = {
     currentUser: CurrentUser | null
 }
 
+type PlanLegendItem = {
+    color: string
+    label: string
+    stroke: string
+}
+
+function getPlanLegendItems(activeSelect: DutyTaskSelect): PlanLegendItem[] {
+    switch (activeSelect) {
+        case 'mine':
+            return [
+                { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
+                { label: 'Ваши задачи', color: '#E0F2FE', stroke: '#0369A1' },
+                { label: 'Все задачи выполнены', color: '#DCFCE7', stroke: '#166534' },
+            ]
+        case 'free':
+            return [
+                { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
+                { label: 'Свободные задачи', color: '#E0F2FE', stroke: '#0369A1' },
+            ]
+        case 'review':
+            return [
+                { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
+                { label: 'На проверке', color: '#FEF3C7', stroke: '#92400E' },
+                { label: 'Выполнены и проверены', color: '#DCFCE7', stroke: '#166534' },
+                { label: 'Задачи не взяты или не выполнены', color: '#FEE2E2', stroke: '#991B1B' },
+            ]
+        case 'all':
+        default:
+            return [
+                { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
+                { label: 'Есть задачи', color: '#E0F2FE', stroke: '#0369A1' },
+            ]
+    }
+}
+
 export function CurrentDutyPage({ currentUser }: Props) {
     const {
         selectedGroupId,
@@ -50,6 +86,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
     const [createModalOpened, setCreateModalOpened] = useState(false)
     const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState(floorPlans[0].id)
+    const [legendOpened, setLegendOpened] = useState(false)
     const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
     const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
 
@@ -96,6 +133,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
         visibleFreeTaskIds,
         visibleMineTaskIds,
     })
+    const planLegendItems = getPlanLegendItems(activeSelect)
     const teamTaskGroups = selectTeamMemberTaskGroups(duty)
     const analytics = calculateDutyAnalytics(duty.tasks)
 
@@ -131,7 +169,48 @@ export function CurrentDutyPage({ currentUser }: Props) {
     const buildingPlanControls = activeSelect === 'team' ? null : (
         <Box>
             {displayMode === 'plan' && (
-                <Group justify="flex-end">
+                <Group justify="space-between" align="center" gap="md" wrap="wrap">
+                    <Popover
+                        opened={legendOpened}
+                        position="bottom-start"
+                        withArrow
+                        shadow="md"
+                    >
+                        <Popover.Target>
+                            <Text
+                                span
+                                c="dimmed"
+                                style={{ cursor: 'default' }}
+                                onMouseEnter={() => setLegendOpened(true)}
+                                onMouseLeave={() => setLegendOpened(false)}
+                            >
+                                ⓘ Обозначения
+                            </Text>
+                        </Popover.Target>
+                        <Popover.Dropdown
+                            onMouseEnter={() => setLegendOpened(true)}
+                            onMouseLeave={() => setLegendOpened(false)}
+                        >
+                            <Stack gap="xs">
+                                {planLegendItems.map((item) => (
+                                    <Group key={item.label} gap="xs" wrap="nowrap">
+                                        <Box
+                                            style={{
+                                                width: 10,
+                                                height: 10,
+                                                minWidth: 10,
+                                                borderRadius: '50%',
+                                                backgroundColor: item.color,
+                                                border: `1px solid ${item.stroke}`,
+                                            }}
+                                        />
+                                        <Text size="sm">{item.label}</Text>
+                                    </Group>
+                                ))}
+                            </Stack>
+                        </Popover.Dropdown>
+                    </Popover>
+
                     <Select
                         aria-label="Этаж"
                         value={selectedFloorPlanId}
