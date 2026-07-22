@@ -279,8 +279,21 @@ export function selectDutyViewOptions(
 }
 
 export function selectVisibleDutyTabs(duty: ResidentCurrentDuty): DutyTaskSelect[] {
-    if (duty.read_only || duty.visible_tabs.length === 0) {
+    if (duty.visible_tabs.length === 0) {
         return duty.visible_tabs
+    }
+
+    if (duty.read_only) {
+        const visibleTabs: DutyTaskSelect[] = []
+
+        for (const tab of duty.visible_tabs) {
+            const normalizedTab = tab === 'all' ? 'review' : tab
+            if (!visibleTabs.includes(normalizedTab)) {
+                visibleTabs.push(normalizedTab)
+            }
+        }
+
+        return visibleTabs
     }
 
     const hasMineTasks = duty.tasks.some((task) => task.is_mine)
