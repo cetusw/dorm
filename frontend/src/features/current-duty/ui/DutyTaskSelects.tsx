@@ -63,14 +63,18 @@ export function DutyTaskSelects({
             )}
 
             {(visibleSelectOptions.length > 0 || rightSection) && (
-                <Group align="center" justify="space-between" gap="sm" wrap="wrap">
+                <Group align="center" justify="space-between" gap="sm" wrap="nowrap">
                     {visibleSelectOptions.length > 0 && (
-                        <Box style={{ minWidth: 0, maxWidth: '100%' }}>
+                        <Box
+                            className={classes.scrollArea}
+                            style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                        >
                             <SegmentedControl
                                 aria-label="Раздел задач"
                                 data={visibleSelectOptions}
                                 value={activeSelect}
                                 classNames={{
+                                    control: classes.control,
                                     root: classes.root,
                                     label: classes.label,
                                 }}
@@ -79,7 +83,11 @@ export function DutyTaskSelects({
                         </Box>
                     )}
 
-                    {rightSection}
+                    {rightSection && (
+                        <Box visibleFrom="md" style={{ flexShrink: 0 }}>
+                            {rightSection}
+                        </Box>
+                    )}
                 </Group>
             )}
         </Stack>

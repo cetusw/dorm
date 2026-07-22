@@ -5,6 +5,7 @@ import { Alert, Box, Button, Center, Group, Loader, SegmentedControl, Stack } fr
 import type { CurrentUser } from '../../features/current-user/model/types'
 import {
     calculateDutyAnalytics,
+    selectVisibleDutyTabs,
     selectTeamMemberTaskGroups,
     selectDutyViewOptions,
     selectTasksForActiveSelect,
@@ -50,7 +51,8 @@ export function CurrentDutyPage({ currentUser }: Props) {
     const [createModalOpened, setCreateModalOpened] = useState(false)
     const [showBuildingPlan, setShowBuildingPlan] = useState(false)
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState(floorPlans[0].id)
-    const [activeSelect, setActiveSelect] = useStoredDutySelect(duty?.visible_tabs ?? [])
+    const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
+    const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
     const { reviewVisibleTaskIds, handleReopen: handleReviewOpen, handleVerify: handleReviewVerify } = useReviewTasks({
         activeSelect,
         duty,
@@ -94,7 +96,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
         )
     }
 
-    const viewOptions = selectDutyViewOptions(duty, activeSelect)
+    const viewOptions = selectDutyViewOptions(duty, activeSelect, visibleTabs)
     const displayedTasks = selectTasksForActiveSelect({
         activeSelect,
         duty,
@@ -113,7 +115,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
             groups={duty.groups}
             selectedGroupId={selectedGroupId ?? duty.selected_group_id}
             showGroupSelect={duty.show_group_select}
-            visibleSelects={duty.visible_tabs}
+            visibleSelects={visibleTabs}
             rightSection={activeSelect === 'team' ? undefined : (
                 <SegmentedControl
                     value={showBuildingPlan ? 'plan' : 'list'}
@@ -122,6 +124,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
                         { label: 'План', value: 'plan' },
                     ]}
                     classNames={{
+                        control: segmentedControlClasses.control,
                         root: segmentedControlClasses.root,
                         label: segmentedControlClasses.label,
                     }}
@@ -150,6 +153,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
                             label: plan.name,
                         }))}
                         classNames={{
+                            control: segmentedControlClasses.control,
                             root: segmentedControlClasses.root,
                             label: segmentedControlClasses.label,
                         }}

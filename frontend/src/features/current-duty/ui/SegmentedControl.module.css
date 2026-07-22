@@ -1,8 +1,26 @@
-.root {
-  width: fit-content;
+.scrollArea {
+  display: block;
+  width: 100%;
   max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.scrollArea::-webkit-scrollbar {
+  display: none;
+}
+
+.root {
+  width: max-content;
+  min-width: max-content;
+}
+
+.control {
+  flex: 0 0 auto;
+  border-inline-start: none;
 }
 
 .label {
+  white-space: nowrap;
   padding: 5px 20px;
 }

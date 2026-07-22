@@ -265,6 +265,7 @@ export function buildReadonlyDutyProgressModel(
 export function selectDutyViewOptions(
     duty: ResidentCurrentDuty,
     activeSelect: DutyTaskSelect,
+    visibleTabs: DutyTaskSelect[] = duty.visible_tabs,
 ): DutyViewOptions {
     const isReadOnly = duty.read_only
 
@@ -272,10 +273,41 @@ export function selectDutyViewOptions(
         actionMode: activeSelect === 'review' ? 'review' : 'default',
         emptyMessage: activeSelect === 'review' ? 'Нет задач на проверке' : 'В этом разделе нет задач.',
         isReadOnly,
-        showAnalytics: !isReadOnly && duty.visible_tabs.length > 0,
+        showAnalytics: !isReadOnly && visibleTabs.length > 0,
         showAssigneeColumn: isReadOnly || activeSelect === 'all' || activeSelect === 'review',
-        showControls: duty.show_group_select || duty.visible_tabs.length > 0,
+        showControls: duty.show_group_select || visibleTabs.length > 0,
     }
+}
+
+export function selectVisibleDutyTabs(duty: ResidentCurrentDuty): DutyTaskSelect[] {
+    if (duty.read_only || duty.visible_tabs.length === 0) {
+        return duty.visible_tabs
+    }
+
+    const hasMineTasks = duty.tasks.some((task) => task.is_mine)
+    const hasFreeTasks = duty.tasks.some((task) => !task.assignee_id)
+    const filteredTabs = duty.visible_tabs.filter((tab) => tab !== 'mine')
+    const visibleTabs: DutyTaskSelect[] = []
+
+    if (hasMineTasks) {
+        visibleTabs.push('mine')
+    }
+
+    if (hasFreeTasks) {
+        visibleTabs.push('free')
+    }
+
+    for (const tab of filteredTabs) {
+        if (tab === 'free') {
+            continue
+        }
+
+        if (!visibleTabs.includes(tab)) {
+            visibleTabs.push(tab)
+        }
+    }
+
+    return visibleTabs
 }
 
 export function selectReviewVisibleTaskIds(tasks: ResidentDutyTask[]): string[] {
