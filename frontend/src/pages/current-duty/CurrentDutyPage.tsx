@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Alert, Box, Button, Center, Group, Loader, SegmentedControl, Stack } from '@mantine/core'
+import { Alert, Box, Button, Center, Group, Loader, SegmentedControl, Select, Stack } from '@mantine/core'
 
 import type { CurrentUser } from '../../features/current-user/model/types'
 import {
@@ -132,18 +132,20 @@ export function CurrentDutyPage({ currentUser }: Props) {
         <Box>
             {displayMode === 'plan' && (
                 <Group justify="flex-end">
-                    <SegmentedControl
+                    <Select
+                        aria-label="Этаж"
                         value={selectedFloorPlanId}
                         data={floorPlans.map((plan) => ({
                             value: plan.id,
                             label: plan.name,
                         }))}
-                        classNames={{
-                            control: segmentedControlClasses.control,
-                            root: segmentedControlClasses.root,
-                            label: segmentedControlClasses.label,
+                        allowDeselect={false}
+                        w={220}
+                        onChange={(value) => {
+                            if (value) {
+                                setSelectedFloorPlanId(value)
+                            }
                         }}
-                        onChange={setSelectedFloorPlanId}
                     />
                 </Group>
             )}
