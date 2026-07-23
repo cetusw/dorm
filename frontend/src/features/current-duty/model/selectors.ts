@@ -41,7 +41,6 @@ export type DutyViewOptions = {
     emptyMessage: string
     isReadOnly: boolean
     showAnalytics: boolean
-    showAssigneeColumn: boolean
     showControls: boolean
 }
 
@@ -273,7 +272,6 @@ export function selectDutyViewOptions(
         emptyMessage: activeSelect === 'review' ? 'В этой группе нет задач.' : 'В этом разделе нет задач.',
         isReadOnly,
         showAnalytics: !isReadOnly && visibleTabs.length > 0,
-        showAssigneeColumn: isReadOnly || activeSelect === 'all' || activeSelect === 'review',
         showControls: duty.show_group_select || visibleTabs.length > 0,
     }
 }

@@ -343,7 +343,6 @@ export function CurrentDutyPage({ currentUser }: Props) {
                             pendingTaskId={pendingTaskId}
                             tasks={displayedTasks}
                             emptyMessage={viewOptions.emptyMessage}
-                            showAssigneeColumn={viewOptions.showAssigneeColumn}
                             onTake={handleTake}
                             onReturn={handleReturn}
                             onComplete={handleComplete}
@@ -362,7 +361,6 @@ export function CurrentDutyPage({ currentUser }: Props) {
                     pendingTaskId={pendingTaskId}
                     tasks={displayedTasks}
                     emptyMessage={viewOptions.emptyMessage}
-                    showAssigneeColumn={viewOptions.showAssigneeColumn}
                     onTake={handleTake}
                     onReturn={handleReturn}
                     onComplete={handleComplete}

@@ -33,7 +33,7 @@ export function TeamMemberTaskList({ tasks }: Props) {
                         </Tooltip>
                         <Tooltip label="Статус">
                             <div>
-                                <TaskStatusBadge status={task.status} />
+                                <TaskStatusBadge task={task} justify="flex-start" />
                             </div>
                         </Tooltip>
                     </Stack>
@@ -63,7 +63,7 @@ export function TeamMemberTaskList({ tasks }: Props) {
                                 <Table.Td w="22%">
                                     <Tooltip label="Статус">
                                         <div>
-                                            <TaskStatusBadge status={task.status} />
+                                            <TaskStatusBadge task={task} justify="flex-start" />
                                         </div>
                                     </Tooltip>
                                 </Table.Td>

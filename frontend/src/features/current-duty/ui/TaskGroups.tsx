@@ -12,7 +12,6 @@ type Props = {
     pendingTaskId: string | null
     tasks: ResidentDutyTask[]
     emptyMessage?: string
-    showAssigneeColumn?: boolean
     onTake: (taskId: string) => void | Promise<unknown>
     onReturn: (taskId: string) => void | Promise<unknown>
     onComplete: (taskId: string) => void | Promise<unknown>
@@ -27,7 +26,6 @@ export function TaskGroups({
     pendingTaskId,
     tasks,
     emptyMessage = 'В этом разделе нет задач.',
-    showAssigneeColumn = true,
     onTake,
     onReturn,
     onComplete,
@@ -69,7 +67,6 @@ export function TaskGroups({
                         key={group.key}
                         group={group}
                         pendingTaskId={pendingTaskId}
-                        showAssigneeColumn={showAssigneeColumn}
                         onTake={onTake}
                         onReturn={onReturn}
                         onComplete={onComplete}

@@ -1,7 +1,6 @@
-import {Button, Group} from '@mantine/core'
+import { Button, Group } from '@mantine/core'
 
-import type {ResidentDutyTask} from '../model/types'
-import {TaskStatusBadge} from './TaskStatusBadge'
+import type { ResidentDutyTask } from '../model/types'
 
 export type TaskRowActionMode = 'default' | 'review'
 
@@ -18,115 +17,89 @@ type Props = {
 }
 
 export function TaskRowActions({
-                                   mode = 'default',
-                                   pending,
-                                   task,
-                                   onTake,
-                                   onReturn,
-                                   onComplete,
-                                   onOpen,
-                                   onReopen,
-                                   onVerify,
-                               }: Props) {
-    const hasDefaultActions =
-        task.can_take || task.can_return || task.can_complete || task.can_open
-
-    if (mode === 'review') {
-        return (
-            <Group gap="xs" wrap="nowrap" justify="flex-end">
-                {task.status === 'completed' && task.can_review_open && (
+    mode = 'default',
+    pending,
+    task,
+    onTake,
+    onReturn,
+    onComplete,
+    onOpen,
+    onReopen,
+    onVerify,
+}: Props) {
+    if (mode === 'review' && task.status === 'completed' && task.can_verify && onVerify) {
+        if (task.can_review_open && onReopen) {
+            return (
+                <Group grow>
                     <Button
-                        size="xs"
                         radius="md"
                         variant="default"
                         loading={pending}
-                        onClick={() => (onReopen ?? onOpen)(task.id)}
+                        styles={{
+                            root: {
+                                backgroundColor: '#FEE2E2',
+                                borderColor: '#991B1B',
+                                color: 'var(--app-color-text)',
+                                fontWeight: 500,
+                            },
+                        }}
+                        onClick={() => onReopen(task.id)}
                     >
-                        Отменить
+                        Переоткрыть
                     </Button>
-                )}
-
-                {task.status === 'completed' && task.can_verify && onVerify && (
-                    <Button
-                        size="xs"
-                        radius="md"
-                        color="brand"
-                        loading={pending}
-                        onClick={() => onVerify(task.id)}
-                    >
+                    <Button fullWidth radius="md" variant="default" loading={pending} onClick={() => onVerify(task.id)}>
                         Подтвердить
                     </Button>
-                )}
+                </Group>
+            )
+        }
 
-                {task.status === 'assigned' && (
-                    <Button
-                        size="xs"
-                        radius="md"
-                        variant="light"
-                        color="brand"
-                        loading={pending}
-                        onClick={() => onComplete(task.id)}
-                    >
-                        Вернуть на проверку
+        return (
+            <Button fullWidth radius="md" variant="default" loading={pending} onClick={() => onVerify(task.id)}>
+                Подтвердить
+            </Button>
+        )
+    }
+
+    if (task.can_take) {
+        return (
+            <Button fullWidth radius="md" loading={pending} onClick={() => onTake(task.id)}>
+                Взять
+            </Button>
+        )
+    }
+
+    if (task.can_return || task.can_complete) {
+        return (
+            <Group grow>
+                {task.can_return && (
+                    <Button radius="md" variant="default" loading={pending} onClick={() => onReturn(task.id)}>
+                        Вернуть
+                    </Button>
+                )}
+                {task.can_complete && (
+                    <Button radius="md" color="brand" loading={pending} onClick={() => onComplete(task.id)}>
+                        Выполнить
                     </Button>
                 )}
             </Group>
         )
     }
 
-    if (!hasDefaultActions) {
-        return <TaskStatusBadge status={task.status}/>
+    if (task.can_open) {
+        return (
+            <Button
+                fullWidth
+                radius="md"
+                variant="light"
+                color="brand"
+                loading={pending}
+                onClick={() => onOpen(task.id)}
+            >
+                Отменить выполнение
+            </Button>
+        )
     }
 
-    return (
-        <Group gap="xs" wrap="wrap" justify="flex-end">
-            {task.can_take && (
-                <Button
-                    size="xs"
-                    radius="md"
-                    loading={pending}
-                    onClick={() => onTake(task.id)}
-                >
-                    Взять
-                </Button>
-            )}
-
-            {task.can_return && (
-                <Button
-                    size="xs"
-                    radius="md"
-                    variant="default"
-                    loading={pending}
-                    onClick={() => onReturn(task.id)}
-                >
-                    Вернуть
-                </Button>
-            )}
-
-            {task.can_complete && (
-                <Button
-                    size="xs"
-                    radius="md"
-                    color="brand"
-                    loading={pending}
-                    onClick={() => onComplete(task.id)}
-                >
-                    Выполнено
-                </Button>
-            )}
-
-            {task.can_open && (
-                <Button
-                    size="xs"
-                    radius="md"
-                    variant="light"
-                    color="brand"
-                    loading={pending}
-                    onClick={() => onOpen(task.id)}
-                >
-                    Отменить выполнение
-                </Button>
-            )}
-        </Group>
-    )
+    return null
 }
