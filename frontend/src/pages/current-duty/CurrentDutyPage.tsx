@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { Alert, Box, Button, Center, Loader } from '@mantine/core'
+import { Alert, Box, Button, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
 import type { CurrentUser } from '../../features/current-user/model/types'
+import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 import {
     calculateDutyAnalytics,
+    selectVisibleDutyTabs,
     selectTeamMemberTaskGroups,
     selectDutyViewOptions,
     selectTasksForActiveSelect,
@@ -12,17 +14,55 @@ import {
 import { CreateDutyWeekModal } from '../../features/current-duty/ui/CreateDutyWeekModal'
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty'
-import { useReviewTasks } from '../../features/current-duty/model/useReviewTasks'
 import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
 import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
 import { TeamMemberTaskGroups } from '../../features/current-duty/ui/TeamMemberTaskGroups'
 import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
+import { BuildingPlanPanel } from '../../features/current-duty/building-plan/BuildingPlanPanel'
+import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
+import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { PageFrame } from '../../shared/ui/PageFrame'
+import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 
 type Props = {
     currentUser: CurrentUser | null
+}
+
+type PlanLegendItem = {
+    color: string
+    label: string
+    stroke: string
+}
+
+function getPlanLegendItems(activeSelect: DutyTaskSelect): PlanLegendItem[] {
+    switch (activeSelect) {
+        case 'mine':
+            return [
+                { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
+                { label: 'Ваши задачи', color: '#E0F2FE', stroke: '#0369A1' },
+                { label: 'Все задачи выполнены', color: '#DCFCE7', stroke: '#166534' },
+            ]
+        case 'free':
+            return [
+                { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
+                { label: 'Свободные задачи', color: '#E0F2FE', stroke: '#0369A1' },
+            ]
+        case 'review':
+            return [
+                { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
+                { label: 'На проверке', color: '#FEF3C7', stroke: '#92400E' },
+                { label: 'Выполнены и проверены', color: '#DCFCE7', stroke: '#166534' },
+                { label: 'Задачи не взяты или не выполнены', color: '#FEE2E2', stroke: '#991B1B' },
+            ]
+        case 'all':
+        default:
+            return [
+                { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
+                { label: 'Есть задачи', color: '#E0F2FE', stroke: '#0369A1' },
+            ]
+    }
 }
 
 export function CurrentDutyPage({ currentUser }: Props) {
@@ -45,13 +85,26 @@ export function CurrentDutyPage({ currentUser }: Props) {
     } = useCurrentDuty()
     const selectedDormitoryId = useSelectedDormitoryId()
     const [createModalOpened, setCreateModalOpened] = useState(false)
-    const [activeSelect, setActiveSelect] = useStoredDutySelect(duty?.visible_tabs ?? [])
-    const { reviewVisibleTaskIds, handleReopen: handleReviewOpen, handleVerify: handleReviewVerify } = useReviewTasks({
-        activeSelect,
-        duty,
-        onReopen: handleReopen,
-        onVerify: handleVerify,
-    })
+    const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
+    const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
+    const [legendOpened, setLegendOpened] = useState(false)
+    const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
+    const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
+    const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
+
+    useEffect(() => {
+        if (availableFloorPlans.length === 0) {
+            if (selectedFloorPlanId !== '') {
+                setSelectedFloorPlanId('')
+            }
+
+            return
+        }
+
+        if (!availableFloorPlans.some((plan) => String(plan.floor) === selectedFloorPlanId)) {
+            setSelectedFloorPlanId(String(availableFloorPlans[0]?.floor ?? ''))
+        }
+    }, [availableFloorPlans, selectedFloorPlanId])
 
     const titleActions = currentUser?.can_manage_dormitories ? (
         <Button
@@ -89,28 +142,113 @@ export function CurrentDutyPage({ currentUser }: Props) {
         )
     }
 
-    const viewOptions = selectDutyViewOptions(duty, activeSelect)
+    const viewOptions = selectDutyViewOptions(duty, activeSelect, visibleTabs)
     const displayedTasks = selectTasksForActiveSelect({
         activeSelect,
         duty,
-        reviewVisibleTaskIds,
         visibleFreeTaskIds,
         visibleMineTaskIds,
     })
+    const planLegendItems = getPlanLegendItems(activeSelect)
     const teamTaskGroups = selectTeamMemberTaskGroups(duty)
     const analytics = calculateDutyAnalytics(duty.tasks)
 
-    const controls = viewOptions.showControls ? (
+    const selectedFloorPlan =
+        availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ??
+        availableFloorPlans[0] ??
+        null
+
+    const dutyControls = viewOptions.showControls ? (
         <DutyTaskSelects
             activeSelect={activeSelect}
             groups={duty.groups}
             selectedGroupId={selectedGroupId ?? duty.selected_group_id}
             showGroupSelect={duty.show_group_select}
-            visibleSelects={duty.visible_tabs}
+            visibleSelects={visibleTabs}
+            rightSection={activeSelect === 'team' ? undefined : (
+                <SegmentedControl
+                    value={displayMode}
+                    data={[
+                        { label: 'Список', value: 'list' },
+                        { label: 'План', value: 'plan' },
+                    ]}
+                    classNames={{
+                        control: segmentedControlClasses.control,
+                        root: segmentedControlClasses.root,
+                        label: segmentedControlClasses.label,
+                    }}
+                    onChange={(value) => setDisplayMode(value as 'list' | 'plan')}
+                />
+            )}
             onGroupChange={selectGroup}
             onChange={setActiveSelect}
         />
-    ) : undefined
+    ) : null
+
+    const buildingPlanControls = activeSelect === 'team' ? null : (
+        <Box>
+            {displayMode === 'plan' && (
+                <Group justify="space-between" align="center" gap="md" wrap="wrap">
+                    <Popover
+                        opened={legendOpened}
+                        position="bottom-start"
+                        withArrow
+                        shadow="md"
+                    >
+                        <Popover.Target>
+                            <Text
+                                span
+                                c="dimmed"
+                                style={{ cursor: 'default' }}
+                                onMouseEnter={() => setLegendOpened(true)}
+                                onMouseLeave={() => setLegendOpened(false)}
+                            >
+                                ⓘ Обозначения
+                            </Text>
+                        </Popover.Target>
+                        <Popover.Dropdown
+                            onMouseEnter={() => setLegendOpened(true)}
+                            onMouseLeave={() => setLegendOpened(false)}
+                        >
+                            <Stack gap="xs">
+                                {planLegendItems.map((item) => (
+                                    <Group key={item.label} gap="xs" wrap="nowrap">
+                                        <Box
+                                            style={{
+                                                width: 10,
+                                                height: 10,
+                                                minWidth: 10,
+                                                borderRadius: '50%',
+                                                backgroundColor: item.color,
+                                                border: `1px solid ${item.stroke}`,
+                                            }}
+                                        />
+                                        <Text size="sm">{item.label}</Text>
+                                    </Group>
+                                ))}
+                            </Stack>
+                        </Popover.Dropdown>
+                    </Popover>
+
+                    <Select
+                        aria-label="Этаж"
+                        value={selectedFloorPlanId}
+                        data={availableFloorPlans.map((plan) => ({
+                            value: String(plan.floor),
+                            label: getFloorLabel(plan.floor),
+                        }))}
+                        allowDeselect={false}
+                        w={220}
+                        onChange={(value) => {
+                            if (value) {
+                                setSelectedFloorPlanId(value)
+                            }
+                        }}
+                    />
+                </Group>
+            )}
+        </Box>
+    )
 
     const analyticsBlock = viewOptions.showAnalytics || viewOptions.isReadOnly ? (
         <CurrentDutyAnalytics
@@ -118,6 +256,14 @@ export function CurrentDutyPage({ currentUser }: Props) {
             isReadOnly={viewOptions.isReadOnly}
             targetValue={duty.cost_per_resident_goal}
         />
+    ) : undefined
+
+    const controls = analyticsBlock || dutyControls || buildingPlanControls ? (
+        <Stack gap="md">
+            {analyticsBlock}
+            {dutyControls}
+            {buildingPlanControls}
+        </Stack>
     ) : undefined
 
     if (!duty.has_active_duty) {
@@ -166,10 +312,48 @@ export function CurrentDutyPage({ currentUser }: Props) {
             titleActions={titleActions}
             error={error}
             notice={duty.notice_message}
-            analytics={analyticsBlock}
             controls={controls}
         >
-            {activeSelect === 'team' ? (
+            {displayMode === 'plan' && activeSelect !== 'team' ? (
+                <>
+                    {selectedFloorPlan ? (
+                        <BuildingPlanPanel
+                            key={selectedFloorPlan.floor}
+                            activeSelect={activeSelect}
+                            actionMode={viewOptions.actionMode}
+                            allTasks={duty.tasks}
+                            floorPlan={selectedFloorPlan}
+                            isReadOnly={viewOptions.isReadOnly}
+                            pendingTaskId={pendingTaskId}
+                            tasks={displayedTasks}
+                            onTake={handleTake}
+                            onReturn={handleReturn}
+                            onComplete={handleComplete}
+                            onOpen={handleOpen}
+                            onReopen={handleReopen}
+                            onVerify={handleVerify}
+                        />
+                    ) : (
+                        <Alert color="gray">Для выбранного общежития план здания не настроен.</Alert>
+                    )}
+                    <Box hiddenFrom="md">
+                        <TaskGroups
+                            isReadOnly={viewOptions.isReadOnly}
+                            actionMode={viewOptions.actionMode}
+                            pendingTaskId={pendingTaskId}
+                            tasks={displayedTasks}
+                            emptyMessage={viewOptions.emptyMessage}
+                            showAssigneeColumn={viewOptions.showAssigneeColumn}
+                            onTake={handleTake}
+                            onReturn={handleReturn}
+                            onComplete={handleComplete}
+                            onOpen={handleOpen}
+                            onReopen={handleReopen}
+                            onVerify={handleVerify}
+                        />
+                    </Box>
+                </>
+            ) : activeSelect === 'team' ? (
                 <TeamMemberTaskGroups groups={teamTaskGroups} />
             ) : (
                 <TaskGroups
@@ -183,8 +367,8 @@ export function CurrentDutyPage({ currentUser }: Props) {
                     onReturn={handleReturn}
                     onComplete={handleComplete}
                     onOpen={handleOpen}
-                    onReopen={handleReviewOpen}
-                    onVerify={handleReviewVerify}
+                    onReopen={handleReopen}
+                    onVerify={handleVerify}
                 />
             )}
             {selectedDormitoryId && (

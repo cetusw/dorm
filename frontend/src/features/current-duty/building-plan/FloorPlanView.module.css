@@ -1,0 +1,34 @@
+.frame {
+    border: 1px solid var(--app-color-bg);
+    border-radius: 8px;
+    background: var(--app-color-bg);
+    overflow: hidden;
+}
+
+.svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.area {
+    transition:
+        stroke-width 150ms ease,
+        filter 150ms ease;
+}
+
+.interactive {
+    cursor: pointer;
+}
+
+.interactive:hover {
+    filter: brightness(0.98);
+}
+
+.inactive {
+    cursor: default;
+}
+
+.selected {
+    filter: drop-shadow(0 0 7px rgba(15, 118, 110, 0.35));
+}

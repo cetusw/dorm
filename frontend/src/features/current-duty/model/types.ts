@@ -4,6 +4,7 @@ export type DutyTaskSelect = 'mine' | 'free' | 'all' | 'team' | 'review'
 
 export type ResidentDutyTask = {
     id: string
+    area_id: number
     area_name: string
     area_floor: number
     title: string
@@ -18,6 +19,7 @@ export type ResidentDutyTask = {
     can_open: boolean
     can_verify: boolean
     can_review_open: boolean
+    needs_revision?: boolean
 }
 
 export type ResidentDutyGroupOption = {
@@ -31,6 +33,7 @@ export type ResidentDutyTeamMember = {
 }
 
 export type ResidentCurrentDuty = {
+    dormitory_id: number
     selected_group_id: string
     has_active_duty: boolean
     can_manage_tasks: boolean

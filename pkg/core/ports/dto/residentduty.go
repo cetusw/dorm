@@ -8,6 +8,7 @@ const (
 )
 
 type ResidentCurrentDutyResponse struct {
+	DormitoryID         int64                     `json:"dormitory_id"`
 	SelectedGroupID     string                    `json:"selected_group_id"`
 	HasActiveDuty       bool                      `json:"has_active_duty"`
 	CanManageTasks      bool                      `json:"can_manage_tasks"`
@@ -39,6 +40,7 @@ type ResidentDutyTeamMember struct {
 
 type ResidentDutyTask struct {
 	ID           string  `json:"id"`
+	AreaID       int     `json:"area_id"`
 	AreaName     string  `json:"area_name"`
 	AreaFloor    int     `json:"area_floor"`
 	Title        string  `json:"title"`

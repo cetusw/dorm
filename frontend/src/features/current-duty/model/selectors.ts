@@ -55,7 +55,6 @@ export type TeamMemberTaskGroup = {
 type SelectTasksForActiveSelectParams = {
     activeSelect: DutyTaskSelect
     duty: ResidentCurrentDuty
-    reviewVisibleTaskIds: string[]
     visibleFreeTaskIds: string[]
     visibleMineTaskIds: string[]
 }
@@ -265,29 +264,67 @@ export function buildReadonlyDutyProgressModel(
 export function selectDutyViewOptions(
     duty: ResidentCurrentDuty,
     activeSelect: DutyTaskSelect,
+    visibleTabs: DutyTaskSelect[] = duty.visible_tabs,
 ): DutyViewOptions {
     const isReadOnly = duty.read_only
 
     return {
         actionMode: activeSelect === 'review' ? 'review' : 'default',
-        emptyMessage: activeSelect === 'review' ? 'Нет задач на проверке' : 'В этом разделе нет задач.',
+        emptyMessage: activeSelect === 'review' ? 'В этой группе нет задач.' : 'В этом разделе нет задач.',
         isReadOnly,
-        showAnalytics: !isReadOnly && duty.visible_tabs.length > 0,
+        showAnalytics: !isReadOnly && visibleTabs.length > 0,
         showAssigneeColumn: isReadOnly || activeSelect === 'all' || activeSelect === 'review',
-        showControls: duty.show_group_select || duty.visible_tabs.length > 0,
+        showControls: duty.show_group_select || visibleTabs.length > 0,
     }
 }
 
-export function selectReviewVisibleTaskIds(tasks: ResidentDutyTask[]): string[] {
-    return tasks
-        .filter((task) => task.status === 'completed')
-        .map((task) => task.id)
+export function selectVisibleDutyTabs(duty: ResidentCurrentDuty): DutyTaskSelect[] {
+    if (duty.visible_tabs.length === 0) {
+        return duty.visible_tabs
+    }
+
+    if (duty.read_only) {
+        const visibleTabs: DutyTaskSelect[] = []
+
+        for (const tab of duty.visible_tabs) {
+            const normalizedTab = tab === 'all' ? 'review' : tab
+            if (!visibleTabs.includes(normalizedTab)) {
+                visibleTabs.push(normalizedTab)
+            }
+        }
+
+        return visibleTabs
+    }
+
+    const hasMineTasks = duty.tasks.some((task) => task.is_mine)
+    const hasFreeTasks = duty.tasks.some((task) => !task.assignee_id)
+    const filteredTabs = duty.visible_tabs.filter((tab) => tab !== 'mine')
+    const visibleTabs: DutyTaskSelect[] = []
+
+    if (hasMineTasks) {
+        visibleTabs.push('mine')
+    }
+
+    if (hasFreeTasks) {
+        visibleTabs.push('free')
+    }
+
+    for (const tab of filteredTabs) {
+        if (tab === 'free') {
+            continue
+        }
+
+        if (!visibleTabs.includes(tab)) {
+            visibleTabs.push(tab)
+        }
+    }
+
+    return visibleTabs
 }
 
 export function selectTasksForActiveSelect({
     activeSelect,
     duty,
-    reviewVisibleTaskIds,
     visibleFreeTaskIds,
     visibleMineTaskIds,
 }: SelectTasksForActiveSelectParams): ResidentDutyTask[] {
@@ -303,7 +340,7 @@ export function selectTasksForActiveSelect({
         case 'team':
             return duty.tasks
         case 'review':
-            return duty.tasks.filter((task) => reviewVisibleTaskIds.includes(task.id))
+            return duty.tasks
         case 'all':
         default:
             return duty.tasks
