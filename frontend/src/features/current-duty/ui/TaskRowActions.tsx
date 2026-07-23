@@ -1,1 +1,1 @@
-export type TaskRowActionMode = 'default' | 'review'
+export type TaskRowActionMode = 'default' | 'verification'

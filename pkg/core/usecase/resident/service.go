@@ -228,12 +228,6 @@ func (s *Service) resolveResidentAffiliation(
 	}
 
 	for _, group := range groups {
-		if isGroupLeader(group, resident.ID()) {
-			return nil, group, nil
-		}
-	}
-
-	for _, group := range groups {
 		teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
 		if err != nil {
 			return nil, nil, fmt.Errorf("load group teams: %w", err)
@@ -242,6 +236,12 @@ func (s *Service) resolveResidentAffiliation(
 			if isTeamLeader(team, resident.ID()) {
 				return team, group, nil
 			}
+		}
+	}
+
+	for _, group := range groups {
+		if isGroupLeader(group, resident.ID()) {
+			return nil, group, nil
 		}
 	}
 
@@ -619,7 +619,7 @@ func resolveResidentDutyView(currentDuty *currentDutyContext) residentDutyView {
 			readOnly = false
 
 			if isTeamLeader {
-				visibleTabs = append(visibleTabs, "review")
+				visibleTabs = append(visibleTabs, "verification")
 				canVerifyTasks = true
 			}
 		} else if currentDuty.duty != nil && currentDuty.dutyTeam != nil {
@@ -640,7 +640,7 @@ func resolveResidentDutyView(currentDuty *currentDutyContext) residentDutyView {
 	if isOnDutyTeam {
 		tabs := []string{"all", "mine", "team"}
 		if isTeamLeader {
-			tabs = append(tabs, "review")
+			tabs = append(tabs, "verification")
 		}
 
 		return residentDutyView{

@@ -104,8 +104,9 @@ export function getAreaEmptyMessage(activeSelect: DutyTaskSelect): string {
             return 'В этой территории нет ваших задач'
         case 'free':
             return 'В этой территории нет свободных задач'
+        case 'verification':
+            return 'В этой территории нет задач на проверке'
         case 'all':
-        case 'review':
         default:
             return 'За эту территорию отвечает другая группа'
     }
@@ -154,7 +155,8 @@ export function resolveAreaPresentationState(
             return 'info'
         case 'free':
             return 'info'
-        case 'review':
+        case 'all':
+        case 'verification':
             if (counters.verified === counters.total) {
                 return 'success'
             }
@@ -168,8 +170,7 @@ export function resolveAreaPresentationState(
             }
 
             return 'muted'
-        case 'all':
         default:
-            return 'info'
+            return 'muted'
     }
 }

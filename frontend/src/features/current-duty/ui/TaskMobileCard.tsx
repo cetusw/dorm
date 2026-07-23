@@ -96,7 +96,7 @@ function getLeftSwipeAction(
         return null
     }
 
-    if (mode === 'review') {
+    if (mode === 'verification') {
         if (task.status === 'completed' && task.can_review_open && onReopen) {
             return {
                 kind: 'danger',
@@ -130,7 +130,7 @@ function getRightSwipeAction(
         return null
     }
 
-    if (mode === 'review') {
+    if (mode === 'verification') {
         if (task.status === 'completed' && task.can_verify && onVerify) {
             return {
                 kind: 'default',

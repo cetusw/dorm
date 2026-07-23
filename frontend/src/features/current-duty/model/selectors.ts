@@ -268,8 +268,10 @@ export function selectDutyViewOptions(
     const isReadOnly = duty.read_only
 
     return {
-        actionMode: activeSelect === 'review' ? 'review' : 'default',
-        emptyMessage: activeSelect === 'review' ? 'В этой группе нет задач.' : 'В этом разделе нет задач.',
+        actionMode: activeSelect === 'verification' ? 'verification' : 'default',
+        emptyMessage: activeSelect === 'verification'
+            ? 'В этом разделе нет задач на проверке.'
+            : 'В этом разделе нет задач.',
         isReadOnly,
         showAnalytics: !isReadOnly && visibleTabs.length > 0,
         showControls: duty.show_group_select || visibleTabs.length > 0,
@@ -285,9 +287,8 @@ export function selectVisibleDutyTabs(duty: ResidentCurrentDuty): DutyTaskSelect
         const visibleTabs: DutyTaskSelect[] = []
 
         for (const tab of duty.visible_tabs) {
-            const normalizedTab = tab === 'all' ? 'review' : tab
-            if (!visibleTabs.includes(normalizedTab)) {
-                visibleTabs.push(normalizedTab)
+            if (!visibleTabs.includes(tab)) {
+                visibleTabs.push(tab)
             }
         }
 
@@ -335,9 +336,9 @@ export function selectTasksForActiveSelect({
             return duty.tasks.filter((task) => visibleMineTaskIds.includes(task.id))
         case 'free':
             return duty.tasks.filter((task) => visibleFreeTaskIds.includes(task.id))
+        case 'verification':
+            return duty.tasks.filter((task) => task.status === 'completed')
         case 'team':
-            return duty.tasks
-        case 'review':
             return duty.tasks
         case 'all':
         default:

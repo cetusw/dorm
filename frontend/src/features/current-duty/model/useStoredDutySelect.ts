@@ -10,7 +10,7 @@ function readStoredSelect(): DutyTaskSelect {
     }
 
     const value = window.localStorage.getItem(ACTIVE_SELECT_STORAGE_KEY)
-    if (value === 'mine' || value === 'free' || value === 'all' || value === 'team' || value === 'review') {
+    if (value === 'mine' || value === 'free' || value === 'all' || value === 'verification' || value === 'team') {
         return value
     }
 

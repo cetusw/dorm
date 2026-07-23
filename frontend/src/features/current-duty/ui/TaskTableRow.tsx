@@ -34,7 +34,7 @@ function getHoverActions(
     onReopen: Props['onReopen'],
     onVerify: Props['onVerify'],
 ) : HoverAction[] {
-    if (mode === 'review' && task.status === 'completed' && task.can_verify && onVerify) {
+    if (mode === 'verification' && task.status === 'completed' && task.can_verify && onVerify) {
         const actions: HoverAction[] = []
 
         if (task.can_review_open && onReopen) {

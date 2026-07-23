@@ -1,6 +1,6 @@
 export type DutyTaskStatus = 'free' | 'assigned' | 'completed' | 'verified'
 
-export type DutyTaskSelect = 'mine' | 'free' | 'all' | 'team' | 'review'
+export type DutyTaskSelect = 'mine' | 'free' | 'all' | 'verification' | 'team'
 
 export type ResidentDutyTask = {
     id: string

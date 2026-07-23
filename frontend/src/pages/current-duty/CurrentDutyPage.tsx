@@ -49,19 +49,22 @@ function getPlanLegendItems(activeSelect: DutyTaskSelect): PlanLegendItem[] {
                 { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
                 { label: 'Свободные задачи', color: '#E0F2FE', stroke: '#0369A1' },
             ]
-        case 'review':
+        case 'all':
             return [
                 { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
                 { label: 'На проверке', color: '#FEF3C7', stroke: '#92400E' },
                 { label: 'Выполнены и проверены', color: '#DCFCE7', stroke: '#166534' },
                 { label: 'Задачи не взяты или не выполнены', color: '#FEE2E2', stroke: '#991B1B' },
             ]
-        case 'all':
-        default:
+        case 'verification':
             return [
                 { label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' },
-                { label: 'Есть задачи', color: '#E0F2FE', stroke: '#0369A1' },
+                { label: 'На проверке', color: '#FEF3C7', stroke: '#92400E' },
+                { label: 'Выполнены и проверены', color: '#DCFCE7', stroke: '#166534' },
+                { label: 'Задачи не взяты или не выполнены', color: '#FEE2E2', stroke: '#991B1B' },
             ]
+        default:
+            return [{ label: 'Нет задач', color: '#F0FDFA', stroke: '#99F6E4' }]
     }
 }
 
