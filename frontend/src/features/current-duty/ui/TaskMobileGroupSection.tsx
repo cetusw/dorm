@@ -1,10 +1,12 @@
-import { Accordion, Stack, Text } from '@mantine/core'
+import { Stack, Text } from '@mantine/core'
 
 import type { TaskAreaGroup } from '../model/utils'
 import { TaskMobileCard } from './TaskMobileCard'
 import type { TaskRowActionMode } from './TaskRowActions'
+import classes from './TaskMobileGroupSection.module.css'
 
 type Props = {
+    activeSwipeTaskId: string | null
     actionMode?: TaskRowActionMode
     group: TaskAreaGroup
     isReadOnly?: boolean
@@ -14,10 +16,12 @@ type Props = {
     onComplete: (taskId: string) => void | Promise<unknown>
     onOpen: (taskId: string) => void | Promise<unknown>
     onReopen?: (taskId: string) => void | Promise<unknown>
+    onSwipeActiveChange: (taskId: string | null) => void
     onVerify?: (taskId: string) => void | Promise<unknown>
 }
 
 export function TaskMobileGroupSection({
+    activeSwipeTaskId,
     actionMode = 'default',
     group,
     isReadOnly = false,
@@ -27,36 +31,34 @@ export function TaskMobileGroupSection({
     onComplete,
     onOpen,
     onReopen,
+    onSwipeActiveChange,
     onVerify,
 }: Props) {
     return (
-        <Accordion radius="lg" variant="contained">
-            <Accordion.Item value={group.key}>
-                <Accordion.Control px="md" py="sm">
-                    <Text fw={700} size="sm">
-                        {group.label}
-                    </Text>
-                </Accordion.Control>
-                <Accordion.Panel px="sm" pb="sm">
-                    <Stack gap="sm">
-                        {group.tasks.map((task) => (
-                            <TaskMobileCard
-                                key={task.id}
-                                isReadOnly={isReadOnly}
-                                mode={actionMode}
-                                pending={pendingTaskId === task.id}
-                                task={task}
-                                onTake={onTake}
-                                onReturn={onReturn}
-                                onComplete={onComplete}
-                                onOpen={onOpen}
-                                onReopen={onReopen}
-                                onVerify={onVerify}
-                            />
-                        ))}
-                    </Stack>
-                </Accordion.Panel>
-            </Accordion.Item>
-        </Accordion>
+        <div className={classes.group}>
+            <Text fw={700} size="lg" px="xs" pt="xs" pb={2}>
+                {group.label}
+            </Text>
+
+            <Stack gap={6}>
+                {group.tasks.map((task) => (
+                    <TaskMobileCard
+                        key={task.id}
+                        isReadOnly={isReadOnly}
+                        mode={actionMode}
+                        pending={pendingTaskId === task.id}
+                        task={task}
+                        activeSwipeTaskId={activeSwipeTaskId}
+                        onTake={onTake}
+                        onReturn={onReturn}
+                        onComplete={onComplete}
+                        onOpen={onOpen}
+                        onReopen={onReopen}
+                        onSwipeActiveChange={onSwipeActiveChange}
+                        onVerify={onVerify}
+                    />
+                ))}
+            </Stack>
+        </div>
     )
 }

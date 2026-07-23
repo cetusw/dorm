@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 import { Alert, Stack } from '@mantine/core'
 
 import type { ResidentDutyTask } from '../model/types'
@@ -34,6 +36,23 @@ export function TaskGroups({
     onVerify,
 }: Props) {
     const groups = groupTasksByArea(tasks)
+    const [activeMobileSwipeTaskId, setActiveMobileSwipeTaskId] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (!activeMobileSwipeTaskId) {
+            return
+        }
+
+        function handleScroll() {
+            setActiveMobileSwipeTaskId(null)
+        }
+
+        window.addEventListener('scroll', handleScroll, { passive: true })
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll)
+        }
+    }, [activeMobileSwipeTaskId])
 
     if (groups.length === 0) {
         return <Alert color="gray">{emptyMessage}</Alert>
@@ -48,6 +67,7 @@ export function TaskGroups({
                         isReadOnly={isReadOnly}
                         key={group.key}
                         group={group}
+                        activeSwipeTaskId={activeMobileSwipeTaskId}
                         pendingTaskId={pendingTaskId}
                         onTake={onTake}
                         onReturn={onReturn}
@@ -55,6 +75,7 @@ export function TaskGroups({
                         onOpen={onOpen}
                         onReopen={onReopen}
                         onVerify={onVerify}
+                        onSwipeActiveChange={setActiveMobileSwipeTaskId}
                     />
                 ))}
             </Stack>
