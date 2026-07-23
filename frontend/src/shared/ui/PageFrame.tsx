@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Alert, Box, Group, Stack, Title } from '@mantine/core'
-import { useStickyControlsVisibility } from './useStickyControlsVisibility'
+import {
+    MOBILE_BREAKPOINT_PX,
+    SCROLL_DELTA_THRESHOLD_PX,
+} from './mobileStickyThreshold'
 
 type Props = {
     title: string
@@ -24,9 +27,107 @@ export function PageFrame({
     analytics,
     children,
 }: Props) {
-    const areStickyControlsVisible = useStickyControlsVisibility({
-        enabled: Boolean(controls),
-    })
+    const controlsBlockRef = useRef<HTMLDivElement | null>(null)
+    const [isStickyCloneVisible, setIsStickyCloneVisible] = useState(false)
+    const [isScrollingUp, setIsScrollingUp] = useState(false)
+
+    useEffect(() => {
+        if (!analytics && !controls) {
+            setIsScrollingUp(false)
+            return
+        }
+
+        let previousScrollY = window.scrollY
+
+        function syncScrollDirection() {
+            if (window.innerWidth >= MOBILE_BREAKPOINT_PX) {
+                setIsScrollingUp(false)
+                previousScrollY = window.scrollY
+                return
+            }
+
+            const currentScrollY = Math.max(0, window.scrollY)
+            const scrollDelta = currentScrollY - previousScrollY
+
+            if (Math.abs(scrollDelta) < SCROLL_DELTA_THRESHOLD_PX) {
+                return
+            }
+
+            setIsScrollingUp(scrollDelta < 0)
+            previousScrollY = currentScrollY
+        }
+
+        syncScrollDirection()
+        window.addEventListener('scroll', syncScrollDirection, { passive: true })
+        window.addEventListener('resize', syncScrollDirection)
+
+        return () => {
+            window.removeEventListener('scroll', syncScrollDirection)
+            window.removeEventListener('resize', syncScrollDirection)
+        }
+    }, [analytics, controls])
+
+    useEffect(() => {
+        if (!analytics && !controls) {
+            setIsStickyCloneVisible(false)
+            return
+        }
+
+        function readHeaderOffset(): number {
+            const mainElement = document.querySelector('main')
+            if (!(mainElement instanceof HTMLElement)) {
+                return 0
+            }
+
+            const rawOffset = getComputedStyle(mainElement)
+                .getPropertyValue('--app-shell-header-offset')
+                .trim()
+            const parsedOffset = Number.parseFloat(rawOffset)
+
+            return Number.isFinite(parsedOffset) ? parsedOffset : 0
+        }
+
+        function syncStickyCloneVisibility() {
+            if (window.innerWidth >= MOBILE_BREAKPOINT_PX) {
+                setIsStickyCloneVisible(false)
+                return
+            }
+
+            const block = controlsBlockRef.current
+            if (!block) {
+                setIsStickyCloneVisible(false)
+                return
+            }
+
+            const headerOffset = readHeaderOffset()
+            const rect = block.getBoundingClientRect()
+            setIsStickyCloneVisible(rect.top < headerOffset)
+        }
+
+        syncStickyCloneVisibility()
+        window.addEventListener('scroll', syncStickyCloneVisibility, { passive: true })
+        window.addEventListener('resize', syncStickyCloneVisibility)
+
+        return () => {
+            window.removeEventListener('scroll', syncStickyCloneVisibility)
+            window.removeEventListener('resize', syncStickyCloneVisibility)
+        }
+    }, [analytics, controls])
+
+    function renderStickyContent() {
+        return (
+            <Stack
+                gap="lg"
+                py="sm"
+                bg="var(--app-color-bg)"
+            >
+                {analytics}
+                {controls}
+            </Stack>
+        )
+    }
+
+    const showStickyClone = isScrollingUp && isStickyCloneVisible
 
     return (
         <Box px={{ base: 'md', md: 'xl' }} py="xl">
@@ -75,27 +176,35 @@ export function PageFrame({
                     {titleActions}
                 </Group>
 
-                {(analytics || controls) && (
+                {showStickyClone && (
                     <Box
-                        pos="sticky"
+                        pos="fixed"
                         top="var(--app-shell-header-offset, 0px)"
                         style={{
                             zIndex: 10,
-                            transition: 'top 160ms ease',
+                            left: '50%',
+                            width: 'min(1240px, calc(100vw - 32px))',
+                            transform: 'translateX(-50%)',
+                            transition: 'top 160ms ease, opacity 160ms ease',
                         }}
                     >
-                        <Stack
-                            gap="lg"
-                            py="sm"
-                            bg="var(--app-color-bg)"
-                        >
-                            {analytics}
-                            {areStickyControlsVisible ? controls : null}
-                        </Stack>
+                        {renderStickyContent()}
                     </Box>
                 )}
 
-                {children}
+                {analytics || controls ? (
+                    <Stack gap={0}>
+                        <Box ref={controlsBlockRef}>
+                            {renderStickyContent()}
+                        </Box>
+
+                        <Box data-sticky-hide-start h={0} />
+
+                        {children}
+                    </Stack>
+                ) : (
+                    children
+                )}
             </Stack>
         </Box>
     )
