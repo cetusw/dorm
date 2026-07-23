@@ -30,6 +30,15 @@
     background: #ffffff;
 }
 
+.surface[data-layout='drawer'] {
+    grid-template-columns:
+        minmax(0, 1fr)
+        100px
+        72px
+        156px;
+    column-gap: 12px;
+}
+
 .checkboxSlot {
     position: absolute;
     left: 20px;
@@ -99,6 +108,16 @@
     white-space: nowrap;
 }
 
+.surface[data-layout='drawer'] .title {
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: unset;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+}
+
 .right {
     position: relative;
     display: flex;
@@ -107,6 +126,10 @@
     flex: 0 0 auto;
     min-width: var(--task-row-hover-action-width);
     min-height: 36px;
+}
+
+.surface[data-layout='drawer'] .right {
+    min-width: 156px;
 }
 
 .persistent {

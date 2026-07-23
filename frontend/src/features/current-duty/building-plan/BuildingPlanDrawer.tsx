@@ -51,6 +51,7 @@ export function BuildingPlanDrawer({
                                 <TaskTableRow
                                     key={task.id}
                                     isReadOnly={isReadOnly}
+                                    layout="drawer"
                                     mode={actionMode}
                                     pending={pendingTaskId === task.id}
                                     task={task}

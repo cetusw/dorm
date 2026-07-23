@@ -7,6 +7,7 @@ import classes from './TaskTableRow.module.css'
 
 type Props = {
     isReadOnly?: boolean
+    layout?: 'default' | 'drawer'
     mode?: TaskRowActionMode
     pending: boolean
     task: ResidentDutyTask
@@ -76,6 +77,7 @@ function getHoverActions(
 
 export function TaskTableRow({
     isReadOnly = false,
+    layout = 'default',
     mode = 'default',
     pending,
     task,
@@ -96,6 +98,7 @@ export function TaskTableRow({
                 <div
                     className={classes.surface}
                     data-has-checkbox={!isReadOnly && showCheckbox ? 'true' : 'false'}
+                    data-layout={layout}
                 >
                     <div className={classes.checkboxSlot}>
                         {!isReadOnly && showCheckbox && (
