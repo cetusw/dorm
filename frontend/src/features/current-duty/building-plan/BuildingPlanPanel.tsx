@@ -7,7 +7,7 @@ import type { TaskRowActionMode } from '../ui/TaskRowActions'
 import { BuildingPlanDrawer } from './BuildingPlanDrawer'
 import { FloorPlanView } from './FloorPlanView'
 import { buildAreaTaskSummaries } from './planState'
-import type { FloorPlan, PlanAreaShape } from './types'
+import type { FloorPlan } from './types'
 
 type Props = {
     activeSelect: DutyTaskSelect
@@ -40,21 +40,21 @@ export function BuildingPlanPanel({
     onReopen,
     onVerify,
 }: Props) {
-    const [selectedArea, setSelectedArea] = useState<PlanAreaShape | null>(null)
+    const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
     const summaries = useMemo(
         () => buildAreaTaskSummaries(allTasks, tasks, activeSelect),
         [activeSelect, allTasks, tasks],
     )
-    const selectedAreaTasks = selectedArea ? summaries.get(selectedArea.areaId)?.visibleTasks ?? [] : []
+    const selectedAreaTasks = selectedAreaId ? summaries.get(selectedAreaId)?.visibleTasks ?? [] : []
 
     useEffect(() => {
-        if (selectedArea && (summaries.get(selectedArea.areaId)?.visibleTasks.length ?? 0) === 0) {
-            setSelectedArea(null)
+        if (selectedAreaId && (summaries.get(selectedAreaId)?.visibleTasks.length ?? 0) === 0) {
+            setSelectedAreaId(null)
         }
-    }, [selectedArea, summaries])
+    }, [selectedAreaId, summaries])
 
     function handleClose() {
-        setSelectedArea(null)
+        setSelectedAreaId(null)
     }
 
     return (
@@ -62,18 +62,17 @@ export function BuildingPlanPanel({
             <Stack gap="md">
                 <FloorPlanView
                     plan={floorPlan}
-                    selectedAreaId={selectedArea?.id ?? null}
+                    selectedAreaId={selectedAreaId}
                     summaries={summaries}
-                    onAreaClick={setSelectedArea}
+                    onAreaClick={setSelectedAreaId}
                 />
             </Stack>
 
             <BuildingPlanDrawer
                 actionMode={actionMode}
-                area={selectedArea}
                 floorPlan={floorPlan}
                 isReadOnly={isReadOnly}
-                opened={selectedArea !== null}
+                opened={selectedAreaId !== null}
                 pendingTaskId={pendingTaskId}
                 tasks={selectedAreaTasks}
                 onClose={handleClose}

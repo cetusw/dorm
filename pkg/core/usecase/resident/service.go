@@ -433,6 +433,7 @@ func buildResidentCurrentDutyResponse(
 	residentCount int,
 ) *dto.ResidentCurrentDutyResponse {
 	response := &dto.ResidentCurrentDutyResponse{
+		DormitoryID:     currentDuty.selectedGroup.DormitoryID(),
 		SelectedGroupID: currentDuty.selectedGroup.ID().String(),
 		Groups:          buildResidentDutyGroupOptions(currentDuty.groups, view.showGroupSelect),
 		Group:           currentDuty.selectedGroup.Name(),
@@ -450,6 +451,7 @@ func buildResidentCurrentDutyResponse(
 	}
 
 	return &dto.ResidentCurrentDutyResponse{
+		DormitoryID:         response.DormitoryID,
 		SelectedGroupID:     response.SelectedGroupID,
 		HasActiveDuty:       true,
 		CanManageTasks:      response.CanManageTasks,

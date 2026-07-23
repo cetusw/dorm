@@ -33,6 +33,7 @@ export type ResidentDutyTeamMember = {
 }
 
 export type ResidentCurrentDuty = {
+    dormitory_id: number
     selected_group_id: string
     has_active_duty: boolean
     can_manage_tasks: boolean

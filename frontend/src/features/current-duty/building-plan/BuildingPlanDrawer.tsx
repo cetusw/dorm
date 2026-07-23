@@ -3,11 +3,11 @@ import { Alert, Drawer, ScrollArea, Table, Text, Tooltip } from '@mantine/core'
 import type { ResidentDutyTask } from '../model/types'
 import { TaskRowActions, type TaskRowActionMode } from '../ui/TaskRowActions'
 import { TaskStatusBadge } from '../ui/TaskStatusBadge'
-import type { FloorPlan, PlanAreaShape } from './types'
+import type { FloorPlan } from './types'
+import { getFloorLabel } from './utils'
 
 type Props = {
     actionMode: TaskRowActionMode
-    area: PlanAreaShape | null
     floorPlan: FloorPlan
     isReadOnly?: boolean
     opened: boolean
@@ -54,7 +54,6 @@ function renderAssignee(task: ResidentDutyTask) {
 
 export function BuildingPlanDrawer({
     actionMode,
-    area,
     floorPlan,
     isReadOnly = false,
     opened,
@@ -68,10 +67,10 @@ export function BuildingPlanDrawer({
     onReopen,
     onVerify,
 }: Props) {
-    const title = `${floorPlan.name} · ${tasks[0]?.area_name ?? 'Территория'}`
+    const title = `${getFloorLabel(floorPlan.floor)} · ${tasks[0]?.area_name ?? 'Территория'}`
 
     return (
-        <Drawer opened={opened} onClose={onClose} position="right" size={860} title={area ? title : 'Территория'}>
+        <Drawer opened={opened} onClose={onClose} position="right" size={860} title={opened ? title : 'Территория'}>
             {tasks.length === 0 ? (
                 <Alert color="gray">Для этой территории нет задач.</Alert>
             ) : (

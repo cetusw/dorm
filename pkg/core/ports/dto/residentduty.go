@@ -8,6 +8,7 @@ const (
 )
 
 type ResidentCurrentDutyResponse struct {
+	DormitoryID         int64                     `json:"dormitory_id"`
 	SelectedGroupID     string                    `json:"selected_group_id"`
 	HasActiveDuty       bool                      `json:"has_active_duty"`
 	CanManageTasks      bool                      `json:"can_manage_tasks"`

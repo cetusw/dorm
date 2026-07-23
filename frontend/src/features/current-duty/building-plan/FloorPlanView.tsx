@@ -1,56 +1,51 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { Popover, Stack, Text } from '@mantine/core'
 
 import { areaStyles, type AreaTaskSummary } from './planState'
-import type { FloorPlan, PlanAreaShape, PlanShape, ShapeGeometry } from './types'
+import { getFloorLabel } from './utils'
+import type { AreaShape, BackgroundShape, FloorPlan, Shape } from './types'
 import classes from './FloorPlanView.module.css'
 
 type Props = {
     plan: FloorPlan
     selectedAreaId: string | null
     summaries: Map<string, AreaTaskSummary>
-    onAreaClick: (area: PlanAreaShape) => void
+    onAreaClick: (areaId: string) => void
 }
 
-function isRectGeometry(geometry: ShapeGeometry): geometry is Extract<ShapeGeometry, { x: number }> {
-    return 'x' in geometry
+type ShapeProps = {
+    fill?: string
+    stroke?: string
+    strokeWidth?: number
+    className?: string
 }
 
-function isPathGeometry(geometry: ShapeGeometry): geometry is Extract<ShapeGeometry, { d: string }> {
-    return 'd' in geometry
-}
-
-function Shape({ shape }: { shape: PlanShape }) {
-    if (isRectGeometry(shape.geometry)) {
-        return <rect {...shape.geometry} fill={shape.fill} stroke={shape.stroke} />
-    }
-    if (isPathGeometry(shape.geometry)) {
-        return <path d={shape.geometry.d} fill={shape.fill} stroke={shape.stroke} />
-    }
-
-    return <polygon points={shape.geometry.points} fill={shape.fill} stroke={shape.stroke} />
-}
-
-type AreaShapeProps = {
-    fill: string
-    stroke: string
-    strokeWidth: number
-    className: string
-    onClick: () => void
-    onMouseEnter?: () => void
-    onMouseLeave?: () => void
-}
-
-function AreaShape({ area, shapeProps }: { area: PlanAreaShape; shapeProps: AreaShapeProps }) {
-    if (isRectGeometry(area.geometry)) {
-        return <rect {...area.geometry} {...shapeProps} />
-    }
-    if (isPathGeometry(area.geometry)) {
-        return <path d={area.geometry.d} {...shapeProps} />
+function renderShape(shape: Shape, shapeProps?: ShapeProps) {
+    switch (shape.type) {
+        case 'rect':
+            return <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx={shape.rx} {...shapeProps} />
+        case 'path':
+            return <path d={shape.d} {...shapeProps} />
     }
 
-    return <polygon points={area.geometry.points} {...shapeProps} />
+    return null
+}
+
+function renderBackgroundShape(shape: BackgroundShape, index: number) {
+    return (
+        <g key={`${shape.type}-${index}`}>
+            {renderShape(shape, {
+                fill: shape.fill,
+                stroke: shape.stroke,
+                strokeWidth: shape.strokeWidth,
+            })}
+        </g>
+    )
+}
+
+function renderAreaShape(shape: AreaShape, index: number, shapeProps: ShapeProps) {
+    return <g key={`${shape.areaId}-${index}`}>{renderShape(shape, shapeProps)}</g>
 }
 
 function AreaStatsPopover({ summary }: { summary: AreaTaskSummary }) {
@@ -63,7 +58,9 @@ function AreaStatsPopover({ summary }: { summary: AreaTaskSummary }) {
     if (!hasVisibleTasks) {
         return (
             <Stack gap={4}>
-                <Text size="sm" fw={700}>{title}</Text>
+                <Text size="sm" fw={700}>
+                    {title}
+                </Text>
                 <Text size="sm">{emptyMessage}</Text>
             </Stack>
         )
@@ -71,7 +68,9 @@ function AreaStatsPopover({ summary }: { summary: AreaTaskSummary }) {
 
     return (
         <Stack gap={4}>
-            <Text size="sm" fw={700}>{title}</Text>
+            <Text size="sm" fw={700}>
+                {title}
+            </Text>
             <Text size="sm">Взято {taken} из {counters.total} задач</Text>
             <Text size="sm">Выполнено {done} из {counters.total} задач</Text>
             <Text size="sm">Проверено {counters.verified} из {counters.total} задач</Text>
@@ -80,28 +79,34 @@ function AreaStatsPopover({ summary }: { summary: AreaTaskSummary }) {
 }
 
 export function FloorPlanView({ plan, selectedAreaId, summaries, onAreaClick }: Props) {
-    const { viewBox } = plan.definition
     const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
+    const areaGroups = useMemo(() => {
+        const groupedAreas = new Map<string, AreaShape[]>()
+
+        for (const area of plan.areas) {
+            groupedAreas.set(area.areaId, [...(groupedAreas.get(area.areaId) ?? []), area])
+        }
+
+        return Array.from(groupedAreas.entries()).map(([areaId, areas]) => ({ areaId, areas }))
+    }, [plan.areas])
 
     return (
         <div className={classes.frame}>
             <svg
                 className={classes.svg}
-                viewBox={`${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`}
+                viewBox={`${plan.viewBox.minX} ${plan.viewBox.minY} ${plan.viewBox.width} ${plan.viewBox.height}`}
                 role="img"
-                aria-label={plan.name}
+                aria-label={getFloorLabel(plan.floor)}
             >
-                {plan.definition.background.map((shape) => (
-                    <Shape key={shape.id} shape={shape} />
-                ))}
+                {plan.background.map((shape, index) => renderBackgroundShape(shape, index))}
 
-                {plan.definition.areas.map((area) => {
-                    const summary = summaries.get(area.areaId)
+                {areaGroups.map(({ areaId, areas }) => {
+                    const summary = summaries.get(areaId)
                     const state = summary?.state ?? 'muted'
                     const style = areaStyles[state]
                     const isClickable = summary?.hasVisibleTasks ?? false
-                    const selected = area.id === selectedAreaId
-                    const shapeCommonProps = {
+                    const selected = areaId === selectedAreaId
+                    const shapeProps: ShapeProps = {
                         fill: style.fill,
                         stroke: style.stroke,
                         strokeWidth: selected ? 4 : 1,
@@ -110,51 +115,37 @@ export function FloorPlanView({ plan, selectedAreaId, summaries, onAreaClick }: 
                             isClickable ? classes.interactive : classes.inactive,
                             selected ? classes.selected : '',
                         ].join(' '),
-                        onMouseEnter: () => setHoveredAreaId(area.id),
-                        onMouseLeave: () => setHoveredAreaId(null),
-                        onClick: () => {
-                            if (isClickable) {
-                                onAreaClick(area)
-                            }
-                        },
                     }
 
-                    if (!summary) {
-                        return (
-                            <Popover
-                                key={area.id}
-                                opened={hoveredAreaId === area.id}
-                                position="top"
-                                withArrow
-                                shadow="md"
-                            >
-                                <Popover.Target>
-                                    <g>
-                                        <AreaShape area={area} shapeProps={shapeCommonProps} />
-                                    </g>
-                                </Popover.Target>
-                                <Popover.Dropdown>
-                                    <Text size="sm">За эту территорию отвечает другая группа</Text>
-                                </Popover.Dropdown>
-                            </Popover>
-                        )
-                    }
+                    const target = (
+                        <g
+                            onMouseEnter={() => setHoveredAreaId(areaId)}
+                            onMouseLeave={() => setHoveredAreaId(null)}
+                            onClick={() => {
+                                if (isClickable) {
+                                    onAreaClick(areaId)
+                                }
+                            }}
+                        >
+                            {areas.map((shape, index) => renderAreaShape(shape, index, shapeProps))}
+                        </g>
+                    )
 
                     return (
                         <Popover
-                            key={area.id}
-                            opened={hoveredAreaId === area.id}
+                            key={areaId}
+                            opened={hoveredAreaId === areaId}
                             position="top"
                             withArrow
                             shadow="md"
                         >
-                            <Popover.Target>
-                                <g>
-                                    <AreaShape area={area} shapeProps={shapeCommonProps} />
-                                </g>
-                            </Popover.Target>
+                            <Popover.Target>{target}</Popover.Target>
                             <Popover.Dropdown>
-                                <AreaStatsPopover summary={summary} />
+                                {summary ? (
+                                    <AreaStatsPopover summary={summary} />
+                                ) : (
+                                    <Text size="sm">За эту территорию отвечает другая группа</Text>
+                                )}
                             </Popover.Dropdown>
                         </Popover>
                     )

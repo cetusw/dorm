@@ -1,53 +1,46 @@
-export type ShapeType = 'rect' | 'path' | 'polygon'
+export type ViewBox = {
+    minX: number
+    minY: number
+    width: number
+    height: number
+}
 
-export type ShapeGeometry =
-    | {
-          x: number
-          y: number
-          width: number
-          height: number
-          rx?: number
-      }
-    | {
-          d: string
-      }
-    | {
-          points: string
-      }
+export type RectShape = {
+    type: 'rect'
+    x: number
+    y: number
+    width: number
+    height: number
+    rx?: number
+}
 
-export type PlanShape = {
-    id: string
-    type: ShapeType
-    geometry: ShapeGeometry
+export type PathShape = {
+    type: 'path'
+    d: string
+}
+
+export type Shape = RectShape | PathShape
+
+export type BackgroundStyle = {
     fill?: string
     stroke?: string
+    strokeWidth?: number
 }
 
-export type PlanAreaShape = {
-    id: string
-    areaId: string
-    type: ShapeType
-    geometry: ShapeGeometry
-    label?: {
-        x: number
-        y: number
-    }
+export type BackgroundShape =
+    | (RectShape & BackgroundStyle)
+    | (PathShape & BackgroundStyle)
+
+export type AreaShape =
+    | (RectShape & { areaId: string })
+    | (PathShape & { areaId: string })
+
+export type FloorPlanGeometry = {
+    viewBox: ViewBox
+    background: BackgroundShape[]
+    areas: AreaShape[]
 }
 
-export type FloorPlanDefinition = {
-    viewBox: {
-        minX: number
-        minY: number
-        width: number
-        height: number
-    }
-    background: PlanShape[]
-    areas: PlanAreaShape[]
-}
-
-export type FloorPlan = {
-    id: string
+export type FloorPlan = FloorPlanGeometry & {
     floor: number
-    name: string
-    definition: FloorPlanDefinition
 }

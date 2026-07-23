@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Alert, Box, Button, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
@@ -21,7 +21,8 @@ import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
 import { TeamMemberTaskGroups } from '../../features/current-duty/ui/TeamMemberTaskGroups'
 import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
 import { BuildingPlanPanel } from '../../features/current-duty/building-plan/BuildingPlanPanel'
-import { floorPlans } from '../../features/current-duty/building-plan/plans'
+import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
+import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 
@@ -85,10 +86,25 @@ export function CurrentDutyPage({ currentUser }: Props) {
     const selectedDormitoryId = useSelectedDormitoryId()
     const [createModalOpened, setCreateModalOpened] = useState(false)
     const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
-    const [selectedFloorPlanId, setSelectedFloorPlanId] = useState(floorPlans[0].id)
+    const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
     const [legendOpened, setLegendOpened] = useState(false)
     const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
     const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
+    const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
+
+    useEffect(() => {
+        if (availableFloorPlans.length === 0) {
+            if (selectedFloorPlanId !== '') {
+                setSelectedFloorPlanId('')
+            }
+
+            return
+        }
+
+        if (!availableFloorPlans.some((plan) => String(plan.floor) === selectedFloorPlanId)) {
+            setSelectedFloorPlanId(String(availableFloorPlans[0]?.floor ?? ''))
+        }
+    }, [availableFloorPlans, selectedFloorPlanId])
 
     const titleActions = currentUser?.can_manage_dormitories ? (
         <Button
@@ -137,7 +153,10 @@ export function CurrentDutyPage({ currentUser }: Props) {
     const teamTaskGroups = selectTeamMemberTaskGroups(duty)
     const analytics = calculateDutyAnalytics(duty.tasks)
 
-    const selectedFloorPlan = floorPlans.find((plan) => plan.id === selectedFloorPlanId) ?? floorPlans[0]
+    const selectedFloorPlan =
+        availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ??
+        availableFloorPlans[0] ??
+        null
 
     const dutyControls = viewOptions.showControls ? (
         <DutyTaskSelects
@@ -214,9 +233,9 @@ export function CurrentDutyPage({ currentUser }: Props) {
                     <Select
                         aria-label="Этаж"
                         value={selectedFloorPlanId}
-                        data={floorPlans.map((plan) => ({
-                            value: plan.id,
-                            label: plan.name,
+                        data={availableFloorPlans.map((plan) => ({
+                            value: String(plan.floor),
+                            label: getFloorLabel(plan.floor),
                         }))}
                         allowDeselect={false}
                         w={220}
@@ -297,22 +316,26 @@ export function CurrentDutyPage({ currentUser }: Props) {
         >
             {displayMode === 'plan' && activeSelect !== 'team' ? (
                 <>
-                    <BuildingPlanPanel
-                        key={selectedFloorPlan.id}
-                        activeSelect={activeSelect}
-                        actionMode={viewOptions.actionMode}
-                        allTasks={duty.tasks}
-                        floorPlan={selectedFloorPlan}
-                        isReadOnly={viewOptions.isReadOnly}
-                        pendingTaskId={pendingTaskId}
-                        tasks={displayedTasks}
-                        onTake={handleTake}
-                        onReturn={handleReturn}
-                        onComplete={handleComplete}
-                        onOpen={handleOpen}
-                        onReopen={handleReopen}
-                        onVerify={handleVerify}
-                    />
+                    {selectedFloorPlan ? (
+                        <BuildingPlanPanel
+                            key={selectedFloorPlan.floor}
+                            activeSelect={activeSelect}
+                            actionMode={viewOptions.actionMode}
+                            allTasks={duty.tasks}
+                            floorPlan={selectedFloorPlan}
+                            isReadOnly={viewOptions.isReadOnly}
+                            pendingTaskId={pendingTaskId}
+                            tasks={displayedTasks}
+                            onTake={handleTake}
+                            onReturn={handleReturn}
+                            onComplete={handleComplete}
+                            onOpen={handleOpen}
+                            onReopen={handleReopen}
+                            onVerify={handleVerify}
+                        />
+                    ) : (
+                        <Alert color="gray">Для выбранного общежития план здания не настроен.</Alert>
+                    )}
                     <Box hiddenFrom="md">
                         <TaskGroups
                             isReadOnly={viewOptions.isReadOnly}
