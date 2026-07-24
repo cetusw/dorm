@@ -18,7 +18,7 @@ import (
 const (
 	currentUserIDLocalKey = "current_user_id"
 	residentSessionCookie = "resident_session"
-	residentSessionTTL    = 7 * 24 * time.Hour
+	residentSessionTTL    = 365 * 24 * time.Hour
 )
 
 func ResidentAuthMiddleware(secret string) fiber.Handler {
