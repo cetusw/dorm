@@ -9,10 +9,6 @@ export const buildingPlanSources = [
         source: 'assets/building-plans/first-floor.svg',
     },
     {
-        floor: 2,
-        source: 'assets/building-plans/second-floor.svg',
-    },
-    {
         floor: 3,
         source: 'assets/building-plans/third-floor.svg',
     },
