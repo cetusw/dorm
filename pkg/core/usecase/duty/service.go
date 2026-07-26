@@ -281,9 +281,7 @@ func (s *Service) UpdateGroupDutySettings(ctx context.Context, groupID uuid.UUID
 	if group == nil {
 		return fmt.Errorf("group not found")
 	}
-	if err := s.validateNextDutyTeam(ctx, groupID, nextDutyTeam); err != nil {
-		return err
-	}
+	_ = nextDutyTeam
 
 	groupTasks, err := s.taskRepo.FindByGroupID(ctx, groupID)
 	if err != nil {
@@ -299,11 +297,6 @@ func (s *Service) UpdateGroupDutySettings(ctx context.Context, groupID uuid.UUID
 		}
 	}
 	if err := s.saveTaskOverrides(ctx, groupTasks, includeTaskIDs, time.Now()); err != nil {
-		return err
-	}
-
-	group.SetNextDutyTeam(nextDutyTeam)
-	if err := s.groupRepo.Save(ctx, group); err != nil {
 		return err
 	}
 	return nil
@@ -367,22 +360,6 @@ func isTaskDueByLastCompletion(task *catalog.TaskDefinition, lastCompletedAt *ti
 	}
 	daysPassed := int(referenceDate.Sub(*lastCompletedAt).Hours() / 24)
 	return daysPassed >= task.Frequency()
-}
-
-func (s *Service) validateNextDutyTeam(ctx context.Context, groupID uuid.UUID, nextDutyTeam *int) error {
-	if nextDutyTeam == nil {
-		return nil
-	}
-	teams, err := s.teamRepo.FindByGroupID(ctx, groupID)
-	if err != nil {
-		return err
-	}
-	for _, team := range teams {
-		if team.Order() == *nextDutyTeam {
-			return nil
-		}
-	}
-	return fmt.Errorf("next duty team not found")
 }
 
 func (s *Service) structureContext(ctx context.Context, teamID uuid.UUID) (*structure.Team, *structure.Group, *structure.Dormitory, error) {

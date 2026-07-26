@@ -632,16 +632,12 @@ func (h *AdminHandler) HandleFutureDutyModal(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).SendString("Ошибка при получении команд")
 	}
-	nextDutyTeam := ""
-	if group.NextDutyTeam() != nil {
-		nextDutyTeam = strconv.Itoa(*group.NextDutyTeam())
-	}
 	return c.Render("partials/modal_future_duty", fiber.Map{
 		"Dormitory":    dormitory,
 		"Group":        group,
 		"Tasks":        tasks,
 		"Teams":        teams,
-		"NextDutyTeam": nextDutyTeam,
+		"NextDutyTeam": "",
 	})
 }
 
@@ -730,15 +726,11 @@ func (h *AdminHandler) HandleGetDutyGroups(c *fiber.Ctx) error {
 		if err != nil {
 			return c.Status(500).SendString("Ошибка при получении команд")
 		}
-		nextDutyTeam := ""
-		if group.NextDutyTeam() != nil {
-			nextDutyTeam = strconv.Itoa(*group.NextDutyTeam())
-		}
 		groupSettings = append(groupSettings, dutyGroupSettingsItem{
 			Group:        groupItem,
 			Tasks:        tasks,
 			Teams:        teams,
-			NextDutyTeam: nextDutyTeam,
+			NextDutyTeam: "",
 		})
 	}
 	return c.Render("duties_groups", fiber.Map{

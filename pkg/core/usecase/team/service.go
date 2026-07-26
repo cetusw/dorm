@@ -75,7 +75,7 @@ func (s *Service) GetTeamsListByGroup(ctx context.Context, groupID uuid.UUID) ([
 			ID:           team.ID(),
 			Name:         team.Name(),
 			Color:        team.Color(),
-			Order:        team.Order(),
+			Order:        team.RotationPosition(),
 			GroupID:      team.GroupID(),
 			GroupName:    group.Name(),
 			DormitoryID:  group.DormitoryID(),
@@ -141,7 +141,7 @@ func (s *Service) GetTeamByID(ctx context.Context, id uuid.UUID) (*dto.TeamListI
 		ID:       team.ID(),
 		Name:     team.Name(),
 		Color:    team.Color(),
-		Order:    team.Order(),
+		Order:    team.RotationPosition(),
 		GroupID:  team.GroupID(),
 		LeaderID: team.LeaderID(),
 	}
@@ -233,7 +233,7 @@ func (s *Service) CreateTeamInGroup(ctx context.Context, groupID uuid.UUID, req 
 
 	team := structure.NewTeam(req.Name, groupID, normalizeColor(req.Color), req.Order)
 	if leaderID != nil {
-		team = structure.RestoreTeam(team.ID(), team.Name(), team.GroupID(), leaderID, team.Color(), team.Order())
+		team = structure.RestoreTeam(team.ID(), team.Name(), team.GroupID(), leaderID, team.Color(), team.RotationPosition())
 	}
 	if err := s.teamRepo.Save(ctx, team); err != nil {
 		return err
@@ -277,7 +277,7 @@ func (s *Service) CreateResidentTeam(ctx context.Context, req dto.CreateResident
 
 	team := structure.NewTeam(name, groupID, "", order)
 	if leaderID != nil {
-		team = structure.RestoreTeam(team.ID(), team.Name(), team.GroupID(), leaderID, team.Color(), team.Order())
+		team = structure.RestoreTeam(team.ID(), team.Name(), team.GroupID(), leaderID, team.Color(), team.RotationPosition())
 	}
 	if err := s.teamRepo.Save(ctx, team); err != nil {
 		return nil, err
@@ -381,7 +381,7 @@ func (s *Service) UpdateResidentTeam(ctx context.Context, id uuid.UUID, req dto.
 		return nil, err
 	}
 
-	updated := structure.RestoreTeam(id, name, groupID, leaderID, current.Color(), current.Order())
+	updated := structure.RestoreTeam(id, name, groupID, leaderID, current.Color(), current.RotationPosition())
 	if err := s.teamRepo.Save(ctx, updated); err != nil {
 		return nil, err
 	}
@@ -587,8 +587,8 @@ func (s *Service) nextTeamOrder(ctx context.Context, groupID uuid.UUID) (int, er
 
 	maxOrder := 0
 	for _, team := range teams {
-		if team.Order() > maxOrder {
-			maxOrder = team.Order()
+		if team.RotationPosition() > maxOrder {
+			maxOrder = team.RotationPosition()
 		}
 	}
 

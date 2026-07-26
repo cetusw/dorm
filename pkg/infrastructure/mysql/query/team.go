@@ -20,10 +20,11 @@ func NewTeamQueryService(db *sql.DB) *TeamQueryService {
 
 func (q *TeamQueryService) FindTeamsByDormitoryID(ctx context.Context, dormID int64) ([]*structure.Team, error) {
 	const query = `
-		SELECT t.id, t.name, t.group_id, t.leader_id, t.color, t.team_order 
+		SELECT t.id, t.name, t.group_id, t.leader_id, t.color, t.rotation_position
 		FROM team t
 		JOIN ` + "`group` g" + ` ON t.group_id = g.id
 		WHERE g.dormitory_id = ?
+		ORDER BY t.rotation_position, t.name
 	`
 
 	rows, err := q.db.QueryContext(ctx, query, dormID)
@@ -37,9 +38,9 @@ func (q *TeamQueryService) FindTeamsByDormitoryID(ctx context.Context, dormID in
 		var tID, gID, lID []byte
 		var name string
 		var color sql.NullString
-		var order sql.NullInt64
+		var rotationPosition int
 
-		if err := rows.Scan(&tID, &name, &gID, &lID, &color, &order); err != nil {
+		if err := rows.Scan(&tID, &name, &gID, &lID, &color, &rotationPosition); err != nil {
 			return nil, fmt.Errorf("FindByGroupID scan error: %w", err)
 		}
 
@@ -50,7 +51,7 @@ func (q *TeamQueryService) FindTeamsByDormitoryID(ctx context.Context, dormID in
 			uid, _ := uuid.FromBytes(lID)
 			leaderID = &uid
 		}
-		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color.String, int(order.Int64)))
+		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color.String, rotationPosition))
 	}
 	return teams, nil
 }
@@ -61,7 +62,7 @@ func (q *TeamQueryService) GetTeamsDetailedList(ctx context.Context, dormID int6
 			t.id,
 			t.name,
 			t.color,
-			t.team_order,
+			t.rotation_position,
 			t.group_id,
 			g.name,
 			g.dormitory_id,
@@ -72,7 +73,8 @@ func (q *TeamQueryService) GetTeamsDetailedList(ctx context.Context, dormID int6
 		JOIN dormitory d ON g.dormitory_id = d.id
 		LEFT JOIN user u ON u.team_id = t.id AND u.deleted_at IS NULL
 		WHERE g.dormitory_id = ?
-		GROUP BY t.id, t.name, t.color, t.team_order, t.group_id, g.name, g.dormitory_id, d.name
+		GROUP BY t.id, t.name, t.color, t.rotation_position, t.group_id, g.name, g.dormitory_id, d.name
+		ORDER BY t.rotation_position, t.name
 	`
 
 	rows, err := q.db.QueryContext(ctx, query, dormID)
@@ -86,12 +88,12 @@ func (q *TeamQueryService) GetTeamsDetailedList(ctx context.Context, dormID int6
 		var item dto.TeamListItem
 		var teamIDBytes, groupIDBytes []byte
 		var color sql.NullString
-		var order sql.NullInt64
+		var rotationPosition int
 		if err := rows.Scan(
 			&teamIDBytes,
 			&item.Name,
 			&color,
-			&order,
+			&rotationPosition,
 			&groupIDBytes,
 			&item.GroupName,
 			&item.DormitoryID,
@@ -106,7 +108,7 @@ func (q *TeamQueryService) GetTeamsDetailedList(ctx context.Context, dormID int6
 		item.ID = teamID
 		item.GroupID = groupID
 		item.Color = color.String
-		item.Order = int(order.Int64)
+		item.Order = rotationPosition
 		teams = append(teams, item)
 	}
 	return teams, rows.Err()

@@ -32,7 +32,7 @@ func NewDutyViewModel(
 	return DutyViewModel{
 		TeamID:        team.ID(),
 		TeamName:      team.Name(),
-		TeamOrder:     team.Order(),
+		TeamOrder:     team.RotationPosition(),
 		TeamColor:     team.Color(),
 		SpreadsheetID: group.SpreadsheetID(),
 		DutyName:      formatDutyName(duty),

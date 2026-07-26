@@ -2,6 +2,7 @@ package cleaning
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -14,6 +15,11 @@ import (
 	"dorm/pkg/core/domain/events"
 	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/ports/dto"
+)
+
+var (
+	ErrGroupHasNoTeams      = errors.New("group has no teams")
+	ErrLastDutyTeamNotFound = errors.New("last duty team is not present in group rotation")
 )
 
 type distributingContext struct {
@@ -185,7 +191,21 @@ func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) 
 
 	skippedGroups := 0
 	for _, group := range c.groups {
-		nextTeam, err := s.determineNextTeam(ctx, group)
+		teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
+		if err != nil {
+			log.Printf("Skipping group %s: load teams: %v", group.Name(), err)
+			skippedGroups++
+			continue
+		}
+
+		lastDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, group.ID())
+		if err != nil {
+			log.Printf("Skipping group %s: load last duty: %v", group.Name(), err)
+			skippedGroups++
+			continue
+		}
+
+		nextTeam, err := determineNextTeam(teams, lastDuty)
 		if err != nil {
 			log.Printf("Skipping group %s: %v", group.Name(), err)
 			skippedGroups++
@@ -274,36 +294,27 @@ func (s *Service) assignBatchToDuty(ctx context.Context, d *duty.Duty, tasks []*
 	return nil
 }
 
-func (s *Service) determineNextTeam(ctx context.Context, group *structure.Group) (*structure.Team, error) {
-	teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
-	if err != nil {
-		return nil, err
-	}
+func determineNextTeam(teams []*structure.Team, lastDuty *duty.Duty) (*structure.Team, error) {
 	if len(teams) == 0 {
-		return nil, fmt.Errorf("no teams in group")
+		return nil, ErrGroupHasNoTeams
 	}
 
 	sort.Slice(teams, func(i, j int) bool {
-		return teams[i].Order() < teams[j].Order()
+		return teams[i].RotationPosition() < teams[j].RotationPosition()
 	})
 
-	dutyTeamIndex := 0
-	if group.NextDutyTeam() != nil {
-		for index, team := range teams {
-			if team.Order() == *group.NextDutyTeam() {
-				dutyTeamIndex = index
-				break
-			}
+	if lastDuty == nil {
+		return teams[0], nil
+	}
+
+	for index, team := range teams {
+		if team.ID() == lastDuty.TeamID() {
+			nextIndex := (index + 1) % len(teams)
+			return teams[nextIndex], nil
 		}
 	}
 
-	nextIndex := (dutyTeamIndex + 1) % len(teams)
-	nextOrder := teams[nextIndex].Order()
-	group.SetNextDutyTeam(&nextOrder)
-	if err := s.groupRepo.Save(ctx, group); err != nil {
-		return nil, fmt.Errorf("update next duty team: %w", err)
-	}
-	return teams[dutyTeamIndex], nil
+	return nil, ErrLastDutyTeamNotFound
 }
 
 func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition, referenceDate time.Time) (bool, error) {

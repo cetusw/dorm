@@ -470,7 +470,7 @@ func (s *Service) UpdateGroup(ctx context.Context, id uuid.UUID, req dto.UpsertG
 		return err
 	}
 
-	updated := structure.RestoreGroup(id, leaderID, req.Name, req.SpreadsheetID, current.DormitoryID(), current.NextDutyTeam())
+	updated := structure.RestoreGroup(id, leaderID, req.Name, req.SpreadsheetID, current.DormitoryID())
 	return s.groupRepo.Save(ctx, updated)
 }
 
@@ -491,7 +491,7 @@ func (s *Service) UpdateGroupDetails(ctx context.Context, id uuid.UUID, req dto.
 		return nil, err
 	}
 
-	updated := structure.RestoreGroup(id, input.leaderID, input.name, current.SpreadsheetID(), current.DormitoryID(), current.NextDutyTeam())
+	updated := structure.RestoreGroup(id, input.leaderID, input.name, current.SpreadsheetID(), current.DormitoryID())
 	if err := s.groupRepo.Save(ctx, updated); err != nil {
 		return nil, fmt.Errorf("update group: %w", err)
 	}

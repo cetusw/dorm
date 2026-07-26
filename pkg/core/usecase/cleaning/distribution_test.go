@@ -59,33 +59,25 @@ func TestStartNewWeek_DistributionByAreaScope(t *testing.T) {
 	})
 }
 
-func TestDetermineNextTeam_UsesGroupNextDutyTeam(t *testing.T) {
-	ctx := context.Background()
+func TestDetermineNextTeam_UsesLastDutyRotationPosition(t *testing.T) {
 	groupID := uuid.New()
 	firstTeamID := uuid.New()
 	secondTeamID := uuid.New()
-	env := newTestEnv()
-	group := structure.RestoreGroup(groupID, nil, "Boys", "s1", 1, nil)
 	teams := []*structure.Team{
 		structure.RestoreTeam(secondTeamID, "Second Team", groupID, nil, "pink", 20),
 		structure.RestoreTeam(firstTeamID, "First Team", groupID, nil, "blue", 10),
 	}
 
-	env.teamRepo.On("FindByGroupID", ctx, groupID).Return(teams, nil).Once()
-	selectedTeam, err := env.service.determineNextTeam(ctx, group)
+	selectedTeam, err := determineNextTeam(teams, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, firstTeamID, selectedTeam.ID())
-	assert.NotNil(t, group.NextDutyTeam())
-	assert.Equal(t, 20, *group.NextDutyTeam())
 
-	env.teamRepo.On("FindByGroupID", ctx, groupID).Return(teams, nil).Once()
-	selectedTeam, err = env.service.determineNextTeam(ctx, group)
+	lastDuty := duty.RestoreDuty(uuid.New(), firstTeamID, time.Now().Add(-24*time.Hour), time.Now(), nil)
+	selectedTeam, err = determineNextTeam(teams, lastDuty)
 
 	assert.NoError(t, err)
 	assert.Equal(t, secondTeamID, selectedTeam.ID())
-	assert.NotNil(t, group.NextDutyTeam())
-	assert.Equal(t, 10, *group.NextDutyTeam())
 }
 
 func TestStartNewWeek_AppliesOverrideIncludeForTaskNotDue(t *testing.T) {
@@ -98,6 +90,8 @@ func TestStartNewWeek_AppliesOverrideIncludeForTaskNotDue(t *testing.T) {
 	env.groupRepo.On("FindAll", ctx).Return(data.groups, nil)
 	env.teamRepo.On("FindByGroupID", ctx, data.groups[0].ID()).Return(data.teams1, nil)
 	env.teamRepo.On("FindByGroupID", ctx, data.groups[1].ID()).Return(data.teams2, nil)
+	env.dutyRepo.On("FindLatestByGroupID", ctx, data.groups[0].ID()).Return(nil, nil)
+	env.dutyRepo.On("FindLatestByGroupID", ctx, data.groups[1].ID()).Return(nil, nil)
 	env.areaRepo.On("GetAllAreas", ctx).Return(data.areas, nil)
 	env.catRepo.On("GetAllTaskDefinitions", ctx).Return(data.tasks, nil)
 	env.dutyRepo.On("CountDistinctStartDates", ctx).Return(0, nil).Once()
@@ -133,6 +127,8 @@ func TestStartNewWeek_AppliesOverrideExcludeForTaskDue(t *testing.T) {
 	env.groupRepo.On("FindAll", ctx).Return(data.groups, nil)
 	env.teamRepo.On("FindByGroupID", ctx, data.groups[0].ID()).Return(data.teams1, nil)
 	env.teamRepo.On("FindByGroupID", ctx, data.groups[1].ID()).Return(data.teams2, nil)
+	env.dutyRepo.On("FindLatestByGroupID", ctx, data.groups[0].ID()).Return(nil, nil)
+	env.dutyRepo.On("FindLatestByGroupID", ctx, data.groups[1].ID()).Return(nil, nil)
 	env.areaRepo.On("GetAllAreas", ctx).Return(data.areas, nil)
 	env.catRepo.On("GetAllTaskDefinitions", ctx).Return(data.tasks, nil)
 	env.dutyRepo.On("CountDistinctStartDates", ctx).Return(0, nil).Once()
@@ -213,8 +209,8 @@ func createFixtures() *testFixtures {
 		taskPrivate: taskPrivate,
 		taskPublic:  taskPublic,
 		groups: []*structure.Group{
-			structure.RestoreGroup(groupID1, nil, "Boys", "s1", 1, nil),
-			structure.RestoreGroup(groupID2, nil, "Girls", "s2", 1, nil),
+			structure.RestoreGroup(groupID1, nil, "Boys", "s1", 1),
+			structure.RestoreGroup(groupID2, nil, "Girls", "s2", 1),
 		},
 		teams1: []*structure.Team{structure.RestoreTeam(teamID1, "Boys Team", groupID1, nil, "blue", 1)},
 		teams2: []*structure.Team{structure.RestoreTeam(teamID2, "Girls Team", groupID2, nil, "pink", 2)},
@@ -241,6 +237,8 @@ func setupCommonExpectations(ctx context.Context, e *testEnv, f *testFixtures) {
 	e.groupRepo.On("FindAll", ctx).Return(f.groups, nil)
 	e.teamRepo.On("FindByGroupID", ctx, f.groups[0].ID()).Return(f.teams1, nil)
 	e.teamRepo.On("FindByGroupID", ctx, f.groups[1].ID()).Return(f.teams2, nil)
+	e.dutyRepo.On("FindLatestByGroupID", ctx, f.groups[0].ID()).Return(nil, nil)
+	e.dutyRepo.On("FindLatestByGroupID", ctx, f.groups[1].ID()).Return(nil, nil)
 	e.areaRepo.On("GetAllAreas", ctx).Return(f.areas, nil)
 	e.catRepo.On("GetAllTaskDefinitions", ctx).Return(f.tasks, nil)
 	e.overrideRepo.On("FindAll", ctx).Return([]*catalog.DutyTaskOverride{}, nil)

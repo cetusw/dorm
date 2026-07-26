@@ -47,6 +47,13 @@ func (m *MockDutyRepo) FindByGroupID(ctx context.Context, id uuid.UUID) ([]*duty
 	}
 	return args.Get(0).([]*duty.Duty), args.Error(1)
 }
+func (m *MockDutyRepo) FindLatestByGroupID(ctx context.Context, id uuid.UUID) (*duty.Duty, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*duty.Duty), args.Error(1)
+}
 func (m *MockDutyRepo) CountDistinctStartDates(ctx context.Context) (int, error) {
 	args := m.Called(ctx)
 	return args.Int(0), args.Error(1)
@@ -130,6 +137,9 @@ type MockCatalogRepo struct{ mock.Mock }
 func (m *MockCatalogRepo) GetAllTaskDefinitions(ctx context.Context) ([]*catalog.TaskDefinition, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]*catalog.TaskDefinition), args.Error(1)
+}
+func (m *MockCatalogRepo) FindLastCompletionDates(ctx context.Context, taskIDs []uuid.UUID) (map[uuid.UUID]*time.Time, error) {
+	return nil, nil
 }
 func (m *MockCatalogRepo) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*catalog.TaskDefinition, error) {
 	return nil, nil

@@ -328,6 +328,40 @@ func (r *DutyRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 	return result, rows.Err()
 }
 
+func (r *DutyRepository) FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*duty.Duty, error) {
+	const query = `
+		SELECT d.id, d.team_id, d.start_date, d.end_date
+		FROM duty d
+		JOIN team t ON t.id = d.team_id
+		WHERE t.group_id = ?
+		ORDER BY d.start_date DESC, d.end_date DESC, d.id DESC
+		LIMIT 1
+	`
+
+	groupIDBytes, _ := groupID.MarshalBinary()
+	row := r.db.QueryRowContext(ctx, query, groupIDBytes)
+
+	var dutyIDBytes, teamIDBytes []byte
+	var startDate, endDate time.Time
+
+	if err := row.Scan(&dutyIDBytes, &teamIDBytes, &startDate, &endDate); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find latest duty by group: %w", err)
+	}
+
+	dutyID, _ := uuid.FromBytes(dutyIDBytes)
+	teamID, _ := uuid.FromBytes(teamIDBytes)
+
+	tasks, err := r.findTasksByDutyID(ctx, dutyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return duty.RestoreDuty(dutyID, teamID, startDate, endDate, tasks), nil
+}
+
 func (r *DutyRepository) CountDistinctStartDates(ctx context.Context) (int, error) {
 	const query = `SELECT COUNT(DISTINCT start_date) FROM duty`
 
