@@ -154,13 +154,14 @@ export function CurrentDutyPage({ currentUser }: Props) {
         null
 
     const canCreateDuty = Boolean(currentUser?.can_manage_dormitories || duty.can_manage_duty_settings)
+    const createDutyDormitoryId = selectedDormitoryId ?? String(duty.dormitory_id)
 
     const createDutyButton = canCreateDuty ? (
         <Button
             radius="md"
             leftSection={<PlusIcon size={18} />}
+            h={42}
             onClick={() => setCreateModalOpened(true)}
-            disabled={!selectedDormitoryId}
         >
             Новое дежурство
         </Button>
@@ -299,14 +300,12 @@ export function CurrentDutyPage({ currentUser }: Props) {
         return (
             <PageFrame title="Дежурство" titleActions={titleActions} error={error} controls={controls}>
                 <Alert color="gray">В выбранной группе сейчас нет активного дежурства.</Alert>
-                {selectedDormitoryId && (
-                    <CreateDutyWeekModal
-                        opened={createModalOpened}
-                        dormitoryId={selectedDormitoryId}
-                        onClose={() => setCreateModalOpened(false)}
-                        onCreated={reloadCurrentDuty}
-                    />
-                )}
+                <CreateDutyWeekModal
+                    opened={createModalOpened}
+                    dormitoryId={createDutyDormitoryId}
+                    onClose={() => setCreateModalOpened(false)}
+                    onCreated={reloadCurrentDuty}
+                />
             </PageFrame>
         )
     }
@@ -322,14 +321,12 @@ export function CurrentDutyPage({ currentUser }: Props) {
                 controls={controls}
             >
                 <Alert color="gray">На текущее дежурство не заведены задачи.</Alert>
-                {selectedDormitoryId && (
-                    <CreateDutyWeekModal
-                        opened={createModalOpened}
-                        dormitoryId={selectedDormitoryId}
-                        onClose={() => setCreateModalOpened(false)}
-                        onCreated={reloadCurrentDuty}
-                    />
-                )}
+                <CreateDutyWeekModal
+                    opened={createModalOpened}
+                    dormitoryId={createDutyDormitoryId}
+                    onClose={() => setCreateModalOpened(false)}
+                    onCreated={reloadCurrentDuty}
+                />
             </PageFrame>
         )
     }
@@ -398,14 +395,12 @@ export function CurrentDutyPage({ currentUser }: Props) {
                     onVerify={handleVerify}
                 />
             )}
-            {selectedDormitoryId && (
-                <CreateDutyWeekModal
-                    opened={createModalOpened}
-                    dormitoryId={selectedDormitoryId}
-                    onClose={() => setCreateModalOpened(false)}
-                    onCreated={reloadCurrentDuty}
-                />
-            )}
+            <CreateDutyWeekModal
+                opened={createModalOpened}
+                dormitoryId={createDutyDormitoryId}
+                onClose={() => setCreateModalOpened(false)}
+                onCreated={reloadCurrentDuty}
+            />
         </PageFrame>
     )
 }
