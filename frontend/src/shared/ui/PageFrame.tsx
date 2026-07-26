@@ -7,6 +7,7 @@ import {
 } from './mobileStickyThreshold'
 
 type Props = {
+    topContent?: ReactNode
     title: string
     subtitle?: string
     titleActions?: ReactNode
@@ -18,6 +19,7 @@ type Props = {
 }
 
 export function PageFrame({
+    topContent,
     title,
     subtitle,
     titleActions,
@@ -143,6 +145,8 @@ export function PageFrame({
                         {notice}
                     </Alert>
                 )}
+
+                {topContent}
 
                 <Group justify="space-between" align="flex-start" gap="md" wrap="wrap">
                     <Title order={1}>

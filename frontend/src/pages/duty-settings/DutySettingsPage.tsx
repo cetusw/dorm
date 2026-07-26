@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
+import { CaretLeftIcon } from '@phosphor-icons/react'
 import { Alert, Box, Center, Group, Loader, SegmentedControl, Select, Stack } from '@mantine/core'
 
 import { deleteDutySettingsArea, deleteDutySettingsTask } from '../../features/duty-settings/api/dutySettingsApi'
@@ -23,6 +24,7 @@ import {
     updateDutySettingsArea,
     updateDutySettingsTask,
 } from '../../features/duty-settings/api/dutySettingsApi'
+import { navigateTo } from '../../app/navigation'
 
 type Props = {
     groupId: string
@@ -244,7 +246,33 @@ export function DutySettingsPage({ groupId }: Props) {
     }
 
     return (
-        <PageFrame title="Настройки дежурства" controls={controls}>
+        <PageFrame
+            topContent={(
+                <button
+                    type="button"
+                    onClick={() => navigateTo('/app')}
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        width: 'fit-content',
+                        padding: 0,
+                        border: 0,
+                        background: 'transparent',
+                        color: 'var(--mantine-color-gray-7)',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        lineHeight: 1.5,
+                        fontWeight: 500,
+                    }}
+                >
+                    <CaretLeftIcon size={20} />
+                    <span>Дежурство</span>
+                </button>
+            )}
+            title="Настройки дежурства"
+            controls={controls}
+        >
             {content}
 
             {data && (
