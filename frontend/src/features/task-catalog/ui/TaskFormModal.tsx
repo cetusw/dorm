@@ -14,6 +14,7 @@ import {
 } from '../api/taskCatalogApi'
 import type {
     CreateTaskRequest,
+    TaskDetails,
     TaskFormValues,
     UpdateTaskRequest,
 } from '../model/types'
@@ -24,6 +25,12 @@ type Props = {
     mode: 'create' | 'edit'
     taskId: string | null
     dormitoryId: string
+    initialAreaId?: string | null
+    hideAreaField?: boolean
+    loadAreas?: () => Promise<{ areas: AreaListItem[] }>
+    loadTask?: (taskId: string) => Promise<TaskDetails>
+    createTaskRequest?: (request: CreateTaskRequest) => Promise<TaskDetails>
+    updateTaskRequest?: (taskId: string, request: UpdateTaskRequest) => Promise<TaskDetails>
     onClose: () => void
     onSaved: () => Promise<void> | void
 }
@@ -49,6 +56,12 @@ export function TaskFormModal({
     mode,
     taskId,
     dormitoryId,
+    initialAreaId = null,
+    hideAreaField = false,
+    loadAreas,
+    loadTask,
+    createTaskRequest,
+    updateTaskRequest,
     onClose,
     onSaved,
 }: Props) {
@@ -87,9 +100,9 @@ export function TaskFormModal({
 
             try {
                 const [{ areas: loadedAreas }, task] = await Promise.all([
-                    getAreas(dormitoryId),
+                    (loadAreas ?? (() => getAreas(dormitoryId)))(),
                     mode === 'edit' && taskId !== null
-                        ? getTaskDefinition(dormitoryId, taskId)
+                        ? (loadTask ?? ((targetTaskId) => getTaskDefinition(dormitoryId, targetTaskId)))(taskId)
                         : Promise.resolve(null),
                 ])
 
@@ -104,9 +117,12 @@ export function TaskFormModal({
                         title: task.title,
                         cost: String(task.cost),
                         frequency: String(task.frequency),
-                        areaId: String(task.area.id),
+                        areaId: initialAreaId ?? String(task.area.id),
                     }
-                    : initialValues
+                    : {
+                        ...initialValues,
+                        areaId: initialAreaId,
+                    }
 
                 form.setValues(values)
                 form.resetDirty(values)
@@ -133,13 +149,13 @@ export function TaskFormModal({
         return () => {
             active = false
         }
-    }, [dormitoryId, mode, opened, taskId])
+    }, [dormitoryId, initialAreaId, loadAreas, loadTask, mode, opened, taskId])
 
     const areaOptions = useMemo(
         () =>
             areas.map((area) => ({
                 value: String(area.id),
-                label: area.group ? `${area.name} (${area.group.name})` : area.name,
+                label: area.floor == null ? `Без этажа. ${area.name}` : `${area.floor} этаж. ${area.name}`,
             })),
         [areas],
     )
@@ -161,9 +177,18 @@ export function TaskFormModal({
 
                 try {
                     if (mode === 'create') {
-                        await createTaskDefinition(dormitoryId, toRequest(values))
+                        await (createTaskRequest ?? ((request) => createTaskDefinition(dormitoryId, request)))(toRequest({
+                            ...values,
+                            areaId: hideAreaField ? (initialAreaId ?? values.areaId) : values.areaId,
+                        }))
                     } else if (taskId !== null) {
-                        await updateTaskDefinition(dormitoryId, taskId, toRequest(values))
+                        await (updateTaskRequest ?? ((targetTaskId, request) => updateTaskDefinition(dormitoryId, targetTaskId, request)))(
+                            taskId,
+                            toRequest({
+                                ...values,
+                                areaId: values.areaId,
+                            }),
+                        )
                     }
 
                     await onSaved()
@@ -206,17 +231,19 @@ export function TaskFormModal({
                 {...form.getInputProps('frequency')}
             />
 
-            <Select
-                label="Территория"
-                placeholder="Выберите территорию"
-                searchable
-                withAsterisk
-                data={areaOptions}
-                nothingFoundMessage="Территория не найдена"
-                value={form.values.areaId}
-                onChange={(value) => form.setFieldValue('areaId', value)}
-                error={form.errors.areaId}
-            />
+            {!hideAreaField && (
+                <Select
+                    label="Территория"
+                    placeholder="Выберите территорию"
+                    searchable
+                    withAsterisk
+                    data={areaOptions}
+                    nothingFoundMessage="Территория не найдена"
+                    value={form.values.areaId}
+                    onChange={(value) => form.setFieldValue('areaId', value)}
+                    error={form.errors.areaId}
+                />
+            )}
         </EntityFormModal>
     )
 }

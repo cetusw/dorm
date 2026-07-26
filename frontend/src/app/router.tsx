@@ -3,6 +3,7 @@ import { ResidentAppShell } from './ResidentAppShell'
 import { AreasPage } from '../pages/areas/AreasPage'
 import { useCurrentUserState } from '../features/current-user/model/useCurrentUser'
 import { CurrentDutyPage } from '../pages/current-duty/CurrentDutyPage'
+import { DutySettingsPage } from '../pages/duty-settings/DutySettingsPage'
 import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
 import { GroupsPage } from '../pages/groups/GroupsPage'
 import { LoginPage } from '../pages/login/LoginPage'
@@ -15,8 +16,18 @@ function matchGroupTeamsPath(pathname: string): string | null {
     return match ? match[1] : null
 }
 
+function matchDutySettingsPath(pathname: string): string | null {
+    const match = pathname.match(/^\/app\/groups\/([^/]+)\/duty-settings$/)
+    return match ? match[1] : null
+}
+
 function renderResidentPage(pathname: string, currentUser: ReturnType<typeof useCurrentUserState>['currentUser']) {
     const canManageDormitories = Boolean(currentUser?.can_manage_dormitories)
+    const dutySettingsGroupId = matchDutySettingsPath(pathname)
+
+    if (dutySettingsGroupId) {
+        return <DutySettingsPage groupId={dutySettingsGroupId} />
+    }
 
     if (!canManageDormitories) {
         return <CurrentDutyPage currentUser={currentUser} />

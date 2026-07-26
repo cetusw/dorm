@@ -5,6 +5,7 @@ import (
 	"dorm/pkg/adapters/http"
 	"dorm/pkg/core/usecase/dormitory"
 	dutyuc "dorm/pkg/core/usecase/duty"
+	dutysettingsuc "dorm/pkg/core/usecase/dutysettings"
 	residentusecase "dorm/pkg/core/usecase/resident"
 	"dorm/pkg/core/usecase/team"
 	"dorm/pkg/infrastructure/mysql/query"
@@ -111,6 +112,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
 	dutyService := dutyuc.NewDutyService(dutyRepo, teamRepo, groupRepo, dormitoryRepo, taskRepo, taskOverrideRepo, areaRepo, userRepo)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo, groupRepo)
+	dutySettingsService := dutysettingsuc.NewDutySettingsService(groupRepo, areaRepo, taskRepo)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
 	//if err != nil {
@@ -170,7 +172,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	dormitoryAPIHandler := http.NewDormitoryAPIHandler(dormitoryService)
 	dormitoryAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
-	groupAPIHandler := http.NewGroupAPIHandler(dormitoryService)
+	groupAPIHandler := http.NewGroupAPIHandler(dormitoryService, dutySettingsService)
 	groupAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	teamAPIHandler := http.NewTeamAPIHandler(dormitoryService, teamService)

@@ -6,6 +6,7 @@ type Props = {
     opened: boolean
     task: TaskListItem | null
     dormitoryId: string
+    deleteTaskRequest?: (taskId: string) => Promise<void>
     onClose: () => void
     onDeleted: () => Promise<void> | void
 }
@@ -14,6 +15,7 @@ export function DeleteTaskModal({
     opened,
     task,
     dormitoryId,
+    deleteTaskRequest,
     onClose,
     onDeleted,
 }: Props) {
@@ -30,7 +32,7 @@ export function DeleteTaskModal({
                     return
                 }
 
-                await deleteTaskDefinition(dormitoryId, task.id)
+                await (deleteTaskRequest ?? ((taskId) => deleteTaskDefinition(dormitoryId, taskId)))(task.id)
                 await onDeleted()
             }}
             errorMessage="Не удалось удалить задачу"

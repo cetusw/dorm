@@ -4,6 +4,7 @@ import type { ResidentCurrentDuty } from '../model/types'
 function normalizeCurrentDuty(duty: ResidentCurrentDuty): ResidentCurrentDuty {
     return {
         ...duty,
+        can_manage_duty_settings: Boolean(duty.can_manage_duty_settings),
         visible_tabs: Array.isArray(duty.visible_tabs) ? duty.visible_tabs : [],
         groups: Array.isArray(duty.groups) ? duty.groups : [],
         team_members: Array.isArray(duty.team_members) ? duty.team_members : [],

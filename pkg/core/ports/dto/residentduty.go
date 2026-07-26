@@ -8,24 +8,25 @@ const (
 )
 
 type ResidentCurrentDutyResponse struct {
-	DormitoryID         int64                     `json:"dormitory_id"`
-	SelectedGroupID     string                    `json:"selected_group_id"`
-	HasActiveDuty       bool                      `json:"has_active_duty"`
-	CanManageTasks      bool                      `json:"can_manage_tasks"`
-	ReadOnly            bool                      `json:"read_only"`
-	ShowGroupSelect     bool                      `json:"show_group_select"`
-	VisibleTabs         []string                  `json:"visible_tabs"`
-	NoticeMessage       string                    `json:"notice_message"`
-	Groups              []ResidentDutyGroupOption `json:"groups"`
-	DutyID              string                    `json:"duty_id"`
-	Group               string                    `json:"group"`
-	Team                string                    `json:"team"`
-	StartDate           string                    `json:"start_date"`
-	EndDate             string                    `json:"end_date"`
-	CostPerResidentGoal int                       `json:"cost_per_resident_goal"`
-	MyTakenCostSum      int                       `json:"my_taken_cost_sum"`
-	TeamMembers         []ResidentDutyTeamMember  `json:"team_members"`
-	Tasks               []ResidentDutyTask        `json:"tasks"`
+	DormitoryID           int64                     `json:"dormitory_id"`
+	SelectedGroupID       string                    `json:"selected_group_id"`
+	HasActiveDuty         bool                      `json:"has_active_duty"`
+	CanManageTasks        bool                      `json:"can_manage_tasks"`
+	CanManageDutySettings bool                      `json:"can_manage_duty_settings"`
+	ReadOnly              bool                      `json:"read_only"`
+	ShowGroupSelect       bool                      `json:"show_group_select"`
+	VisibleTabs           []string                  `json:"visible_tabs"`
+	NoticeMessage         string                    `json:"notice_message"`
+	Groups                []ResidentDutyGroupOption `json:"groups"`
+	DutyID                string                    `json:"duty_id"`
+	Group                 string                    `json:"group"`
+	Team                  string                    `json:"team"`
+	StartDate             string                    `json:"start_date"`
+	EndDate               string                    `json:"end_date"`
+	CostPerResidentGoal   int                       `json:"cost_per_resident_goal"`
+	MyTakenCostSum        int                       `json:"my_taken_cost_sum"`
+	TeamMembers           []ResidentDutyTeamMember  `json:"team_members"`
+	Tasks                 []ResidentDutyTask        `json:"tasks"`
 }
 
 type ResidentDutyGroupOption struct {

@@ -6,11 +6,12 @@ type Props = {
     opened: boolean
     area: AreaListItem | null
     dormitoryId: string
+    deleteAreaRequest?: (areaId: number) => Promise<void>
     onClose: () => void
     onDeleted: () => Promise<void> | void
 }
 
-export function DeleteAreaModal({ opened, area, dormitoryId, onClose, onDeleted }: Props) {
+export function DeleteAreaModal({ opened, area, dormitoryId, deleteAreaRequest, onClose, onDeleted }: Props) {
     return (
         <EntityDeleteModal
             opened={opened}
@@ -24,7 +25,7 @@ export function DeleteAreaModal({ opened, area, dormitoryId, onClose, onDeleted 
                     return
                 }
 
-                await deleteArea(dormitoryId, area.id)
+                await (deleteAreaRequest ?? ((areaId) => deleteArea(dormitoryId, areaId)))(area.id)
                 await onDeleted()
             }}
         />

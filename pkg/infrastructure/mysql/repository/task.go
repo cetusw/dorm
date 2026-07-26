@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -97,6 +99,56 @@ func (r *TaskRepository) FindByID(ctx context.Context, id uuid.UUID) (*catalog.T
 		return nil, fmt.Errorf("TaskRepository.FindByID: parse task id: %w", err)
 	}
 	return catalog.RestoreTaskDefinition(uid, areaID, title, cost, frequency), nil
+}
+
+func (r *TaskRepository) FindLastCompletionDates(ctx context.Context, taskIDs []uuid.UUID) (map[uuid.UUID]*time.Time, error) {
+	result := make(map[uuid.UUID]*time.Time, len(taskIDs))
+	if len(taskIDs) == 0 {
+		return result, nil
+	}
+
+	placeholders := make([]string, 0, len(taskIDs))
+	args := make([]interface{}, 0, len(taskIDs))
+	for _, taskID := range taskIDs {
+		taskIDBytes, err := taskID.MarshalBinary()
+		if err != nil {
+			return nil, fmt.Errorf("TaskRepository.FindLastCompletionDates: marshal task id: %w", err)
+		}
+		placeholders = append(placeholders, "?")
+		args = append(args, taskIDBytes)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT dt.task_id, MAX(dt.completion_date)
+		FROM duty_task dt
+		WHERE dt.completion_date IS NOT NULL
+		  AND dt.task_id IN (%s)
+		GROUP BY dt.task_id
+	`, strings.Join(placeholders, ", "))
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("TaskRepository.FindLastCompletionDates: query: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var taskIDBytes []byte
+		var completedAt time.Time
+		if err := rows.Scan(&taskIDBytes, &completedAt); err != nil {
+			return nil, fmt.Errorf("TaskRepository.FindLastCompletionDates: scan: %w", err)
+		}
+
+		taskID, err := uuid.FromBytes(taskIDBytes)
+		if err != nil {
+			return nil, fmt.Errorf("TaskRepository.FindLastCompletionDates: parse task id: %w", err)
+		}
+
+		completedAtCopy := completedAt
+		result[taskID] = &completedAtCopy
+	}
+
+	return result, rows.Err()
 }
 
 func (r *TaskRepository) Save(ctx context.Context, task *catalog.TaskDefinition) error {

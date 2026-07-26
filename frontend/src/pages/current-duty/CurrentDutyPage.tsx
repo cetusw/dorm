@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { Alert, Box, Button, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import { GearIcon, PlusIcon } from '@phosphor-icons/react'
+import { ActionIcon, Alert, Box, Button, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text, Tooltip } from '@mantine/core'
 
 import type { CurrentUser } from '../../features/current-user/model/types'
 import type { DutyTaskSelect } from '../../features/current-duty/model/types'
@@ -25,6 +26,7 @@ import { floorPlans } from '../../features/current-duty/building-plan/generated/
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
+import { navigateTo } from '../../app/navigation'
 
 type Props = {
     currentUser: CurrentUser | null
@@ -109,16 +111,6 @@ export function CurrentDutyPage({ currentUser }: Props) {
         }
     }, [availableFloorPlans, selectedFloorPlanId])
 
-    const titleActions = currentUser?.can_manage_dormitories ? (
-        <Button
-            radius="md"
-            onClick={() => setCreateModalOpened(true)}
-            disabled={!selectedDormitoryId}
-        >
-            + Новая дежурная неделя
-        </Button>
-    ) : undefined
-
     if (loading) {
         return (
             <Center py="xl">
@@ -160,6 +152,40 @@ export function CurrentDutyPage({ currentUser }: Props) {
         availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ??
         availableFloorPlans[0] ??
         null
+
+    const canCreateDuty = Boolean(currentUser?.can_manage_dormitories || duty.can_manage_duty_settings)
+
+    const createDutyButton = canCreateDuty ? (
+        <Button
+            radius="md"
+            leftSection={<PlusIcon size={18} />}
+            onClick={() => setCreateModalOpened(true)}
+            disabled={!selectedDormitoryId}
+        >
+            Новое дежурство
+        </Button>
+    ) : null
+
+    const dutySettingsButton = duty.can_manage_duty_settings ? (
+        <Tooltip label="Настройки дежурства">
+            <ActionIcon
+                variant="default"
+                size={44}
+                radius="md"
+                aria-label="Настройки дежурства"
+                onClick={() => navigateTo(`/app/groups/${duty.selected_group_id}/duty-settings`)}
+            >
+                <GearIcon size={20} />
+            </ActionIcon>
+        </Tooltip>
+    ) : null
+
+    const titleActions = createDutyButton || dutySettingsButton ? (
+        <Group gap="sm" wrap="nowrap" align="center">
+            {createDutyButton}
+            {dutySettingsButton}
+        </Group>
+    ) : undefined
 
     const dutyControls = viewOptions.showControls ? (
         <DutyTaskSelects

@@ -30,7 +30,8 @@ func (r *AreaRepository) GetAllAreas(ctx context.Context) ([]*catalog.Area, erro
 
 	var areas []*catalog.Area
 	for rows.Next() {
-		var id, floor int
+		var id int
+		var floor sql.NullInt64
 		var name string
 		var groupIDBytes []byte
 
@@ -45,7 +46,12 @@ func (r *AreaRepository) GetAllAreas(ctx context.Context) ([]*catalog.Area, erro
 			groupID = &tempID
 		}
 
-		areas = append(areas, catalog.RestoreArea(id, name, floor, groupID))
+		floorValue := 0
+		if floor.Valid {
+			floorValue = int(floor.Int64)
+		}
+
+		areas = append(areas, catalog.RestoreArea(id, name, floorValue, groupID))
 	}
 	return areas, nil
 }

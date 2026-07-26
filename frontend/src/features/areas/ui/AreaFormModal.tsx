@@ -9,6 +9,7 @@ import { ApiError } from '../../../shared/api/ApiError'
 import { EntityFormModal } from '../../../shared/ui/EntityFormModal'
 import { createArea, getArea, updateArea } from '../api/areasApi'
 import type {
+    AreaDetails,
     AreaFormValues,
     CreateAreaRequest,
     UpdateAreaRequest,
@@ -20,6 +21,13 @@ type Props = {
     mode: 'create' | 'edit'
     areaId: number | null
     dormitoryId: string
+    fixedGroupId?: string | null
+    hideGroupField?: boolean
+    requireFloor?: boolean
+    loadGroups?: () => Promise<{ groups: GroupListItem[] }>
+    loadArea?: (areaId: number) => Promise<AreaDetails>
+    createAreaRequest?: (request: CreateAreaRequest) => Promise<AreaDetails>
+    updateAreaRequest?: (areaId: number, request: UpdateAreaRequest) => Promise<AreaDetails>
     onClose: () => void
     onSaved: () => Promise<void> | void
 }
@@ -52,6 +60,13 @@ export function AreaFormModal({
     mode,
     areaId,
     dormitoryId,
+    fixedGroupId = null,
+    hideGroupField = false,
+    requireFloor = false,
+    loadGroups,
+    loadArea,
+    createAreaRequest,
+    updateAreaRequest,
     onClose,
     onSaved,
 }: Props) {
@@ -65,7 +80,18 @@ export function AreaFormModal({
         initialValues,
         validate: {
             name: areaFormValidation.name,
-            floor: areaFormValidation.floor,
+            floor: (value) => {
+                const baseError = areaFormValidation.floor(value)
+                if (baseError) {
+                    return baseError
+                }
+
+                if (requireFloor && value.trim().length === 0) {
+                    return 'Введите этаж'
+                }
+
+                return null
+            },
         },
     })
 
@@ -88,9 +114,9 @@ export function AreaFormModal({
 
             try {
                 const [{ groups: loadedGroups }, area] = await Promise.all([
-                    getGroups(dormitoryId),
+                    (loadGroups ?? (() => getGroups(dormitoryId)))(),
                     mode === 'edit' && areaId !== null
-                        ? getArea(areaId)
+                        ? (loadArea ?? getArea)(areaId)
                         : Promise.resolve(null),
                 ])
 
@@ -103,10 +129,13 @@ export function AreaFormModal({
                 const values: AreaFormValues = area
                     ? {
                         name: area.name,
-                        groupId: area.group?.id ?? null,
+                        groupId: fixedGroupId ?? area.group?.id ?? null,
                         floor: area.floor == null ? '' : String(area.floor),
                     }
-                    : initialValues
+                    : {
+                        ...initialValues,
+                        groupId: fixedGroupId,
+                    }
 
                 form.setValues(values)
                 form.resetDirty(values)
@@ -133,7 +162,7 @@ export function AreaFormModal({
         return () => {
             active = false
         }
-    }, [areaId, dormitoryId, mode, opened])
+    }, [areaId, dormitoryId, fixedGroupId, loadArea, loadGroups, mode, opened])
 
     const groupOptions = useMemo(
         () =>
@@ -161,9 +190,18 @@ export function AreaFormModal({
 
                 try {
                     if (mode === 'create') {
-                        await createArea(dormitoryId, toCreateRequest(values))
+                        await (createAreaRequest ?? ((request) => createArea(dormitoryId, request)))(toCreateRequest({
+                            ...values,
+                            groupId: fixedGroupId ?? values.groupId,
+                        }))
                     } else if (areaId !== null) {
-                        await updateArea(dormitoryId, areaId, toUpdateRequest(values))
+                        await (updateAreaRequest ?? ((targetAreaId, request) => updateArea(dormitoryId, targetAreaId, request)))(
+                            areaId,
+                            toUpdateRequest({
+                                ...values,
+                                groupId: fixedGroupId ?? values.groupId,
+                            }),
+                        )
                     }
 
                     await onSaved()
@@ -188,20 +226,23 @@ export function AreaFormModal({
                 {...form.getInputProps('name')}
             />
 
-            <Select
-                label="Группа"
-                placeholder="Выберите группу"
-                searchable
-                clearable
-                data={groupOptions}
-                nothingFoundMessage="Группа не найдена"
-                value={form.values.groupId}
-                onChange={(value) => form.setFieldValue('groupId', value)}
-            />
+            {!hideGroupField && (
+                <Select
+                    label="Группа"
+                    placeholder="Выберите группу"
+                    searchable
+                    clearable
+                    data={groupOptions}
+                    nothingFoundMessage="Группа не найдена"
+                    value={form.values.groupId}
+                    onChange={(value) => form.setFieldValue('groupId', value)}
+                />
+            )}
 
             <TextInput
                 label="Этаж"
                 placeholder="Этаж"
+                withAsterisk={requireFloor}
                 inputMode="numeric"
                 key={form.key('floor')}
                 {...form.getInputProps('floor')}

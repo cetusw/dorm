@@ -37,6 +37,7 @@ export type ResidentCurrentDuty = {
     selected_group_id: string
     has_active_duty: boolean
     can_manage_tasks: boolean
+    can_manage_duty_settings: boolean
     read_only: boolean
     show_group_select: boolean
     visible_tabs: DutyTaskSelect[]

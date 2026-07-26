@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -45,6 +46,7 @@ type TaskDefinitionRepository interface {
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*TaskDefinition, error)
 	FindCommon(ctx context.Context) ([]*TaskDefinition, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*TaskDefinition, error)
+	FindLastCompletionDates(ctx context.Context, taskIDs []uuid.UUID) (map[uuid.UUID]*time.Time, error)
 	Save(ctx context.Context, task *TaskDefinition) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
