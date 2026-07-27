@@ -64,9 +64,13 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
                 </div>
 
                 <div className={classes.dateCell}>
-                    <Tooltip label="Дата последнего выполнения">
-                        <Text fw={500}>{formatLastCompletedAt(task.last_completed_at)}</Text>
-                    </Tooltip>
+                    {task.frequency === 0 ? (
+                        <SettingsBadge>Одноразовая задача</SettingsBadge>
+                    ) : (
+                        <Tooltip label="Дата последнего выполнения">
+                            <Text fw={500}>{formatLastCompletedAt(task.last_completed_at)}</Text>
+                        </Tooltip>
+                    )}
                 </div>
 
                 <div className={classes.assigneeCell}>
