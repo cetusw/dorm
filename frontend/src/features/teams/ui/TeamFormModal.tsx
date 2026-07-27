@@ -13,8 +13,10 @@ import {
 } from '../api/teamsApi'
 import type {
     CreateTeamRequest,
+    TeamDetails,
     TeamFormValues,
     TeamMemberOption,
+    TeamMemberOptionsResponse,
     UpdateTeamRequest,
 } from '../model/types'
 import { teamFormValidation } from '../model/validation'
@@ -27,6 +29,10 @@ type Props = {
     groupId: string
     onClose: () => void
     onSaved: () => Promise<void> | void
+    loadTeamRequest?: (teamId: string) => Promise<TeamDetails>
+    loadTeamMemberOptionsRequest?: (groupId: string, teamId?: string | null) => Promise<TeamMemberOptionsResponse>
+    createTeamRequest?: (request: CreateTeamRequest) => Promise<TeamDetails>
+    updateTeamRequest?: (teamId: string, request: UpdateTeamRequest) => Promise<TeamDetails>
 }
 
 const initialValues: TeamFormValues = {
@@ -63,6 +69,10 @@ export function TeamFormModal({
     groupId,
     onClose,
     onSaved,
+    loadTeamRequest = getTeam,
+    loadTeamMemberOptionsRequest = getTeamMemberOptions,
+    createTeamRequest = createTeam,
+    updateTeamRequest = updateTeam,
 }: Props) {
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
@@ -97,9 +107,9 @@ export function TeamFormModal({
 
             try {
                 const [{ members: loadedMembers }, team] = await Promise.all([
-                    getTeamMemberOptions(groupId, teamId),
+                    loadTeamMemberOptionsRequest(groupId, teamId),
                     mode === 'edit' && teamId !== null
-                        ? getTeam(teamId)
+                        ? loadTeamRequest(teamId)
                         : Promise.resolve(null),
                 ])
 
@@ -191,9 +201,9 @@ export function TeamFormModal({
 
                 try {
                     if (mode === 'create') {
-                        await createTeam(toCreateRequest(normalizedValues, groupId))
+                        await createTeamRequest(toCreateRequest(normalizedValues, groupId))
                     } else if (teamId !== null) {
-                        await updateTeam(teamId, toUpdateRequest(normalizedValues, groupId))
+                        await updateTeamRequest(teamId, toUpdateRequest(normalizedValues, groupId))
                     }
 
                     await onSaved()

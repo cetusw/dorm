@@ -8,6 +8,7 @@ export type TeamListItem = {
     name: string
     leader: TeamLeader | null
     members_count: number
+    rotation_position?: number
 }
 
 export type TeamListResponse = {

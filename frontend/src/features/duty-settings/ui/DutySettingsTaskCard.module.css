@@ -1,21 +1,18 @@
-.card {
+:global(:root) {
     --duty-settings-score-column-width: 110px;
     --duty-settings-date-column-width: 120px;
-    border: 1px solid var(--mantine-color-gray-3);
-    border-radius: 16px;
-    background: var(--mantine-color-white);
-    transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
-.card:hover,
-.card:focus-within {
-    border-color: var(--mantine-color-gray-4);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+.cardRoot + .cardRoot {
+    margin-top: 6px;
 }
 
 .actions {
     opacity: 1;
     transition: opacity 140ms ease;
+    display: flex;
+    justify-content: flex-end;
+    width: 40px;
 }
 
 .content {
@@ -24,9 +21,10 @@
         minmax(0, 1fr)
         var(--duty-settings-score-column-width)
         var(--duty-settings-date-column-width)
-        auto;
+        40px;
     align-items: center;
     column-gap: 16px;
+    min-height: 40px;
 }
 
 .titleCell,
@@ -47,24 +45,14 @@
         opacity: 0;
     }
 
-    .card:hover .actions,
-    .card:focus-within .actions {
+    .cardRoot:hover .actions,
+    .cardRoot:focus-within .actions,
+    .cardRoot[data-menu-open='true'] .actions {
         opacity: 1;
     }
 }
 
-.pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: max-content;
-    border-radius: 4px;
-    background: var(--mantine-color-gray-1);
-    padding: 2px 10px;
-    line-height: 20px;
-}
-
 .iconButton {
-    width: 25px;
-    height: 25px;
+    width: 40px;
+    height: 40px;
 }

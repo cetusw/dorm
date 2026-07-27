@@ -1,0 +1,74 @@
+.content {
+    display: grid;
+    grid-template-columns: 40px 56px minmax(180px, 260px) 132px 112px 1fr 40px;
+    align-items: center;
+    column-gap: 16px;
+    min-height: 32px;
+}
+
+.handleCell,
+.positionCell,
+.leaderCell,
+.membersCell,
+.statusCell,
+.actionsCell {
+    min-width: 0;
+}
+
+.handleButton,
+.actionButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--mantine-color-gray-6);
+    transition: color 140ms ease, background-color 140ms ease;
+}
+
+.handleButton {
+    cursor: grab;
+    touch-action: none;
+}
+
+.handleButton[data-dragging='true'] {
+    cursor: grabbing;
+}
+
+.actionButton {
+    cursor: pointer;
+}
+
+.handleButton:hover,
+.handleButton:focus-visible,
+.actionButton:hover,
+.actionButton:focus-visible {
+    color: var(--app-color-text);
+    background: var(--mantine-color-gray-0);
+}
+
+.leaderText {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .content {
+        grid-template-columns: 40px 48px minmax(0, 1fr) 40px;
+        row-gap: 8px;
+    }
+
+    .membersCell {
+        grid-column: 2 / 4;
+    }
+
+    .statusCell {
+        grid-column: 2 / 4;
+    }
+}

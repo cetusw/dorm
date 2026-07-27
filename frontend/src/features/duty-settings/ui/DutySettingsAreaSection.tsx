@@ -71,7 +71,7 @@ export function DutySettingsAreaSection({
             {area.tasks.length === 0 ? (
                 <Alert color="gray">В этой территории пока нет задач.</Alert>
             ) : (
-                <Stack gap="sm">
+                <Stack gap={0}>
                     {area.tasks.map((task) => (
                         <DutySettingsTaskCard
                             key={task.id}

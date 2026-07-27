@@ -118,6 +118,46 @@ func (r *TeamRepository) Save(ctx context.Context, team *structure.Team) error {
 	return nil
 }
 
+func (r *TeamRepository) UpdateRotationPositions(ctx context.Context, groupID uuid.UUID, orderedTeamIDs []uuid.UUID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("TeamRepository.UpdateRotationPositions begin: %w", err)
+	}
+
+	groupIDBytes, _ := groupID.MarshalBinary()
+	shiftValue := len(orderedTeamIDs)
+
+	if _, err := tx.ExecContext(
+		ctx,
+		`UPDATE team SET rotation_position = rotation_position + ? WHERE group_id = ?`,
+		shiftValue,
+		groupIDBytes,
+	); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("TeamRepository.UpdateRotationPositions shift: %w", err)
+	}
+
+	for index, teamID := range orderedTeamIDs {
+		teamIDBytes, _ := teamID.MarshalBinary()
+		if _, err := tx.ExecContext(
+			ctx,
+			`UPDATE team SET rotation_position = ? WHERE id = ? AND group_id = ?`,
+			index+1,
+			teamIDBytes,
+			groupIDBytes,
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("TeamRepository.UpdateRotationPositions apply: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("TeamRepository.UpdateRotationPositions commit: %w", err)
+	}
+
+	return nil
+}
+
 func (r *TeamRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	const query = `DELETE FROM team WHERE id = ?`
 	idBytes, _ := id.MarshalBinary()

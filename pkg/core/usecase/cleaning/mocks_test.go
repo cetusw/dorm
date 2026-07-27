@@ -129,6 +129,9 @@ func (m *MockTeamRepo) FindByGroupID(ctx context.Context, id uuid.UUID) ([]*stru
 func (m *MockTeamRepo) FindByID(ctx context.Context, id uuid.UUID) (*structure.Team, error) {
 	return nil, nil
 }
+func (m *MockTeamRepo) UpdateRotationPositions(ctx context.Context, groupID uuid.UUID, orderedTeamIDs []uuid.UUID) error {
+	return nil
+}
 func (m *MockTeamRepo) Save(ctx context.Context, team *structure.Team) error { return nil }
 func (m *MockTeamRepo) Delete(ctx context.Context, id uuid.UUID) error       { return nil }
 

@@ -1,8 +1,12 @@
-import { PencilIcon, TrashIcon } from '@phosphor-icons/react'
-import { ActionIcon, Box, Group, Paper, Text, Tooltip } from '@mantine/core'
+import { useState } from 'react'
+
+import { DotsThreeVerticalIcon, PencilIcon, TrashIcon } from '@phosphor-icons/react'
+import { ActionIcon, Menu, Text, Tooltip } from '@mantine/core'
 
 import type { DutySettingsTask } from '../model/types'
 import { formatLastCompletedAt } from '../model/utils'
+import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
+import { SettingsCardSurface } from '../../../shared/ui/SettingsCardSurface'
 import classes from './DutySettingsTaskCard.module.css'
 
 type Props = {
@@ -12,17 +16,17 @@ type Props = {
 }
 
 export function DutySettingsTaskCard({ task, onEdit, onDelete }: Props) {
+    const [menuOpened, setMenuOpened] = useState(false)
+
     return (
-        <Paper withBorder p="md" className={classes.card}>
+        <SettingsCardSurface className={classes.cardRoot} menuOpen={menuOpened}>
             <div className={classes.content}>
                 <div className={classes.titleCell}>
                     <Text fw={500} className={classes.title}>{task.title}</Text>
                 </div>
 
                 <div className={classes.scoreCell}>
-                    <Box className={classes.pill}>
-                        <Text size="sm">{task.cost} баллов</Text>
-                    </Box>
+                    <SettingsBadge>{task.cost} баллов</SettingsBadge>
                 </div>
 
                 <div className={classes.dateCell}>
@@ -31,32 +35,29 @@ export function DutySettingsTaskCard({ task, onEdit, onDelete }: Props) {
                     </Tooltip>
                 </div>
 
-                <Group gap={4} wrap="nowrap" className={classes.actions} justify="flex-end">
-                        <Tooltip label="Редактировать задачу">
+                <div className={classes.actions}>
+                    <Menu opened={menuOpened} onChange={setMenuOpened} withinPortal position="bottom-end">
+                        <Menu.Target>
                             <ActionIcon
                                 variant="subtle"
                                 color="gray"
-                                aria-label="Редактировать задачу"
+                                aria-label="Действия с задачей"
                                 className={classes.iconButton}
-                                onClick={() => onEdit(task.id)}
                             >
-                                <PencilIcon size={25} />
+                                <DotsThreeVerticalIcon size={25} />
                             </ActionIcon>
-                        </Tooltip>
-
-                        <Tooltip label="Удалить задачу">
-                            <ActionIcon
-                                variant="subtle"
-                                color="red"
-                                aria-label="Удалить задачу"
-                                className={classes.iconButton}
-                                onClick={() => onDelete(task.id)}
-                            >
-                                <TrashIcon size={25} />
-                            </ActionIcon>
-                        </Tooltip>
-                </Group>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                            <Menu.Item leftSection={<PencilIcon size={25} />} onClick={() => onEdit(task.id)}>
+                                Редактировать
+                            </Menu.Item>
+                            <Menu.Item color="red" leftSection={<TrashIcon size={25} />} onClick={() => onDelete(task.id)}>
+                                Удалить
+                            </Menu.Item>
+                        </Menu.Dropdown>
+                    </Menu>
+                </div>
             </div>
-        </Paper>
+        </SettingsCardSurface>
     )
 }

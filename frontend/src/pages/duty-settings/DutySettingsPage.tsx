@@ -10,6 +10,7 @@ import { toAreaListItem, toTaskListItem } from '../../features/duty-settings/mod
 import { DutySettingsAreaDrawer } from '../../features/duty-settings/ui/DutySettingsAreaDrawer'
 import { DutySettingsAreaList } from '../../features/duty-settings/ui/DutySettingsAreaList'
 import { DutySettingsPlanPanel } from '../../features/duty-settings/ui/DutySettingsPlanPanel'
+import { DutySettingsTeamsTab } from '../../widgets/duty-settings-teams/ui/DutySettingsTeamsTab'
 import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { AreaFormModal } from '../../features/areas/ui/AreaFormModal'
@@ -36,6 +37,7 @@ export function DutySettingsPage({ groupId }: Props) {
         error,
         forbidden,
         loading,
+        reload,
         appendArea,
         replaceArea,
         removeArea,
@@ -203,6 +205,15 @@ export function DutySettingsPage({ groupId }: Props) {
         content = <Alert color="red">{error}</Alert>
     } else if (!data) {
         content = <Alert color="gray">Не удалось загрузить настройки дежурства.</Alert>
+    } else if (mainTab === 'teams') {
+        content = (
+            <DutySettingsTeamsTab
+                groupId={groupId}
+                teams={data.teams}
+                activeDutyTeamId={data.active_duty_team_id}
+                onReload={() => reload({ silent: true })}
+            />
+        )
     } else if (mainTab !== 'tasks') {
         content = <Box h={120} />
     } else if (viewMode === 'plan' && selectedFloorPlan) {

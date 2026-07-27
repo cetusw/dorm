@@ -112,7 +112,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
 	dutyService := dutyuc.NewDutyService(dutyRepo, teamRepo, groupRepo, dormitoryRepo, taskRepo, taskOverrideRepo, areaRepo, userRepo)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo, groupRepo)
-	dutySettingsService := dutysettingsuc.NewDutySettingsService(groupRepo, areaRepo, taskRepo)
+	dutySettingsService := dutysettingsuc.NewDutySettingsService(groupRepo, teamRepo, areaRepo, taskRepo, dutyRepo, userRepo)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
 	//if err != nil {

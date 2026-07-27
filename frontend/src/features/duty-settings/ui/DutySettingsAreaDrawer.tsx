@@ -48,7 +48,7 @@ export function DutySettingsAreaDrawer({
                 </Stack>
             ) : (
                 <ScrollArea>
-                    <Stack gap="sm" pb={4}>
+                    <Stack gap={0} pb={4}>
                         {area.tasks.map((task) => (
                             <DutySettingsTaskCard
                                 key={task.id}

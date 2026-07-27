@@ -60,6 +60,7 @@ func (t *Team) RotationPosition() int { return t.rotationPosition }
 type TeamRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Team, error)
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*Team, error)
+	UpdateRotationPositions(ctx context.Context, groupID uuid.UUID, orderedTeamIDs []uuid.UUID) error
 	Save(ctx context.Context, team *Team) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }

@@ -7,9 +7,10 @@ type Props = {
     team: TeamListItem | null
     onClose: () => void
     onDeleted: () => Promise<void> | void
+    deleteTeamRequest?: (teamId: string) => Promise<void>
 }
 
-export function DeleteTeamModal({ opened, team, onClose, onDeleted }: Props) {
+export function DeleteTeamModal({ opened, team, onClose, onDeleted, deleteTeamRequest = deleteTeam }: Props) {
     return (
         <EntityDeleteModal
             opened={opened}
@@ -23,7 +24,7 @@ export function DeleteTeamModal({ opened, team, onClose, onDeleted }: Props) {
                     return
                 }
 
-                await deleteTeam(team.id)
+                await deleteTeamRequest(team.id)
                 await onDeleted()
             }}
         />

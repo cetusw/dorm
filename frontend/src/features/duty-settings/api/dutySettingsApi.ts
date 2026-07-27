@@ -1,6 +1,12 @@
 import { apiRequest } from '../../../shared/api/apiClient'
 import type { AreaDetails, CreateAreaRequest, UpdateAreaRequest } from '../../areas/model/types'
 import type { CreateTaskRequest, TaskDetails, UpdateTaskRequest } from '../../task-catalog/model/types'
+import type {
+    CreateTeamRequest,
+    TeamDetails,
+    TeamMemberOptionsResponse,
+    UpdateTeamRequest,
+} from '../../teams/model/types'
 import type { DutySettingsResponse } from '../model/types'
 
 function normalizeDutySettingsResponse(response: DutySettingsResponse): DutySettingsResponse {
@@ -18,6 +24,21 @@ function normalizeDutySettingsResponse(response: DutySettingsResponse): DutySett
                     : [],
             }))
             : [],
+        teams: Array.isArray(response.teams)
+            ? response.teams.map((team) => ({
+                id: String(team.id ?? ''),
+                name: String(team.name ?? ''),
+                rotation_position: Number(team.rotation_position ?? 0),
+                leader: team.leader && typeof team.leader === 'object'
+                    ? {
+                        id: String((team.leader as Record<string, unknown>).id ?? ''),
+                        name: String((team.leader as Record<string, unknown>).name ?? ''),
+                    }
+                    : null,
+                members_count: Number(team.members_count ?? 0),
+            }))
+            : [],
+        active_duty_team_id: response.active_duty_team_id ?? null,
     }
 }
 
@@ -49,6 +70,30 @@ function normalizeTaskDetails(task: Record<string, unknown>): TaskDetails {
             id: Number(area.id ?? 0),
             name: String(area.name ?? ''),
         },
+    }
+}
+
+function normalizeTeamDetails(team: Record<string, unknown>): TeamDetails {
+    return {
+        id: String(team.id ?? ''),
+        name: String(team.name ?? ''),
+        group_id: String(team.group_id ?? ''),
+        group_name: String(team.group_name ?? ''),
+        leader: team.leader && typeof team.leader === 'object'
+            ? {
+                id: String((team.leader as Record<string, unknown>).id ?? ''),
+                name: String((team.leader as Record<string, unknown>).name ?? ''),
+            }
+            : null,
+        member_ids: Array.isArray(team.member_ids)
+            ? team.member_ids.map((memberId) => String(memberId))
+            : [],
+    }
+}
+
+function normalizeTeamMemberOptionsResponse(response: TeamMemberOptionsResponse): TeamMemberOptionsResponse {
+    return {
+        members: Array.isArray(response.members) ? response.members : [],
     }
 }
 
@@ -129,5 +174,64 @@ export async function updateDutySettingsTask(
 export async function deleteDutySettingsTask(groupId: string, taskId: string): Promise<void> {
     await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/tasks/${taskId}`, {
         method: 'DELETE',
+    })
+}
+
+export async function getDutySettingsTeam(groupId: string, teamId: string): Promise<TeamDetails> {
+    const response = await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}`)
+    return normalizeTeamDetails(await response.json())
+}
+
+export async function getDutySettingsTeamMemberOptions(
+    groupId: string,
+    teamId?: string | null,
+): Promise<TeamMemberOptionsResponse> {
+    const params = new URLSearchParams()
+    if (teamId) {
+        params.set('team_id', teamId)
+    }
+
+    const suffix = params.toString().length > 0 ? `?${params.toString()}` : ''
+    const response = await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/members${suffix}`)
+    return normalizeTeamMemberOptionsResponse(await response.json())
+}
+
+export async function createDutySettingsTeam(groupId: string, request: CreateTeamRequest): Promise<TeamDetails> {
+    const response = await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+    })
+
+    return normalizeTeamDetails(await response.json())
+}
+
+export async function updateDutySettingsTeam(groupId: string, teamId: string, request: UpdateTeamRequest): Promise<TeamDetails> {
+    const response = await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+    })
+
+    return normalizeTeamDetails(await response.json())
+}
+
+export async function deleteDutySettingsTeam(groupId: string, teamId: string): Promise<void> {
+    await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}`, {
+        method: 'DELETE',
+    })
+}
+
+export async function reorderDutySettingsTeams(groupId: string, teamIds: string[]): Promise<void> {
+    await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/reorder`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ team_ids: teamIds }),
     })
 }

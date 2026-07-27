@@ -117,6 +117,9 @@ func (teamRepoStub) FindByGroupID(ctx context.Context, id uuid.UUID) ([]*structu
 func (teamRepoStub) FindByID(ctx context.Context, id uuid.UUID) (*structure.Team, error) {
 	return nil, nil
 }
+func (teamRepoStub) UpdateRotationPositions(ctx context.Context, groupID uuid.UUID, orderedTeamIDs []uuid.UUID) error {
+	return nil
+}
 func (teamRepoStub) Save(ctx context.Context, team *structure.Team) error { return nil }
 func (teamRepoStub) Delete(ctx context.Context, id uuid.UUID) error       { return nil }
 
