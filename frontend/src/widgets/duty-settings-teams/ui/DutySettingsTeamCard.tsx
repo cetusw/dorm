@@ -5,13 +5,13 @@ import { useSortable } from '@dnd-kit/sortable'
 import {
     DotsSixVerticalIcon,
     DotsThreeVerticalIcon,
-    PencilIcon,
     TrashIcon,
     UsersThreeIcon,
 } from '@phosphor-icons/react'
 import { ActionIcon, Menu, Text } from '@mantine/core'
 
 import type { DutySettingsTeam } from '../../../features/duty-settings/model/types'
+import { formatDutySettingsLeaderName } from '../../../features/duty-settings/model/utils'
 import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
 import { SettingsCardSurface } from '../../../shared/ui/SettingsCardSurface'
 import classes from './DutySettingsTeamCard.module.css'
@@ -20,7 +20,7 @@ type Props = {
     team: DutySettingsTeam
     isDutyTeam: boolean
     disabled?: boolean
-    onEdit: (teamId: string) => void
+    onOpenMembers: (team: DutySettingsTeam) => void
     onDelete: (team: DutySettingsTeam) => void
 }
 
@@ -37,7 +37,7 @@ function formatMembersCount(count: number): string {
     return `${count} участников`
 }
 
-export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onEdit, onDelete }: Props) {
+export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpenMembers, onDelete }: Props) {
     const [menuOpened, setMenuOpened] = useState(false)
     const {
         attributes,
@@ -60,7 +60,7 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onEdi
             data-dragging={isDragging ? 'true' : undefined}
         >
             <SettingsCardSurface dragging={isDragging} menuOpen={menuOpened}>
-                <div className={classes.content}>
+                <div className={classes.content} onClick={() => onOpenMembers(team)}>
                     <div className={classes.handleCell}>
                         <button
                             ref={setActivatorNodeRef}
@@ -69,6 +69,7 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onEdi
                             aria-label="Изменить порядок команды"
                             data-dragging={isDragging ? 'true' : undefined}
                             disabled={disabled}
+                            onClick={(event) => event.stopPropagation()}
                             {...attributes}
                             {...listeners}
                         >
@@ -82,7 +83,7 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onEdi
 
                     <div className={classes.leaderCell}>
                         <Text fw={500} className={classes.leaderText} c={team.leader ? undefined : 'dimmed'}>
-                            {team.leader?.name ?? 'Не назначен'}
+                            {formatDutySettingsLeaderName(team.leader)}
                         </Text>
                     </div>
 
@@ -110,16 +111,14 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onEdi
                                     aria-label="Действия с командой"
                                     className={classes.actionButton}
                                     onPointerDown={(event) => event.stopPropagation()}
+                                    onClick={(event) => event.stopPropagation()}
                                 >
                                     <DotsThreeVerticalIcon size={25} />
                                 </ActionIcon>
                             </Menu.Target>
                             <Menu.Dropdown>
-                                <Menu.Item leftSection={<UsersThreeIcon size={25} />} onClick={() => setMenuOpened(false)}>
+                                <Menu.Item leftSection={<UsersThreeIcon size={25} />} onClick={() => onOpenMembers(team)}>
                                     Участники
-                                </Menu.Item>
-                                <Menu.Item leftSection={<PencilIcon size={25} />} onClick={() => onEdit(team.id)}>
-                                    Редактировать
                                 </Menu.Item>
                                 <Menu.Item color="red" leftSection={<TrashIcon size={25} />} onClick={() => onDelete(team)}>
                                     Удалить

@@ -11,7 +11,12 @@ import (
 type DutySettingsUseCase interface {
 	GetDutySettings(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID) (*dto.DutySettingsResponse, error)
 	GetTeamDetails(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID) (*dto.TeamDetails, error)
+	GetTeamMembers(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID) (*dto.DutySettingsTeamMembersResponse, error)
+	SearchTeamMembers(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, query string) (*dto.DutySettingsTeamSearchResponse, error)
 	GetTeamMemberOptions(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID *uuid.UUID) (dto.TeamMemberOptionsResponse, error)
+	AddTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error
+	AssignTeamLeader(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error
+	RemoveTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error
 	CreateTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, req dto.CreateResidentTeamRequest) (*dto.TeamDetails, error)
 	UpdateTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, req dto.UpdateResidentTeamRequest) (*dto.TeamDetails, error)
 	DeleteTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID) error

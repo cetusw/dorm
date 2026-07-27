@@ -165,6 +165,121 @@ func (s *Service) GetTeamDetails(ctx context.Context, currentUserID uuid.UUID, g
 	}, nil
 }
 
+func (s *Service) GetTeamMembers(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID) (*dto.DutySettingsTeamMembersResponse, error) {
+	group, team, err := s.requireManagedGroupTeam(ctx, currentUserID, groupID, teamID)
+	if err != nil {
+		return nil, err
+	}
+
+	residents, err := s.userRepo.FindByDormitoryID(ctx, group.DormitoryID())
+	if err != nil {
+		return nil, fmt.Errorf("load residents: %w", err)
+	}
+	residentNames := userNames(residents)
+
+	members, err := s.userRepo.FindByTeamID(ctx, team.ID())
+	if err != nil {
+		return nil, fmt.Errorf("load team members: %w", err)
+	}
+
+	sort.Slice(members, func(i, j int) bool {
+		leftIsLeader := team.LeaderID() != nil && *team.LeaderID() == members[i].ID()
+		rightIsLeader := team.LeaderID() != nil && *team.LeaderID() == members[j].ID()
+		if leftIsLeader != rightIsLeader {
+			return leftIsLeader
+		}
+		return compareUsersByName(members[i], members[j])
+	})
+
+	responseMembers := make([]dto.DutySettingsTeamMember, 0, len(members))
+	for _, member := range members {
+		responseMembers = append(responseMembers, dto.DutySettingsTeamMember{
+			ID:       member.ID().String(),
+			Name:     fullUserName(member),
+			IsLeader: team.LeaderID() != nil && *team.LeaderID() == member.ID(),
+		})
+	}
+
+	return &dto.DutySettingsTeamMembersResponse{
+		TeamName: team.Name(),
+		Leader:   userSummaryFromMap(residentNames, team.LeaderID()),
+		Members:  responseMembers,
+	}, nil
+}
+
+func (s *Service) SearchTeamMembers(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, query string) (*dto.DutySettingsTeamSearchResponse, error) {
+	group, team, err := s.requireManagedGroupTeam(ctx, currentUserID, groupID, teamID)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedQuery := strings.ToLower(strings.TrimSpace(query))
+	if normalizedQuery == "" {
+		return &dto.DutySettingsTeamSearchResponse{Users: []dto.DutySettingsTeamSearchItem{}}, nil
+	}
+
+	users, err := s.userRepo.FindByDormitoryID(ctx, group.DormitoryID())
+	if err != nil {
+		return nil, fmt.Errorf("load residents: %w", err)
+	}
+
+	teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
+	if err != nil {
+		return nil, fmt.Errorf("load teams: %w", err)
+	}
+
+	teamsByID := make(map[uuid.UUID]*structure.Team, len(teams))
+	leaderNames := make(map[uuid.UUID]string, len(users))
+	for _, resident := range users {
+		leaderNames[resident.ID()] = fullUserName(resident)
+	}
+	for _, candidate := range teams {
+		teamsByID[candidate.ID()] = candidate
+	}
+
+	responseItems := make([]dto.DutySettingsTeamSearchItem, 0)
+	for _, resident := range users {
+		if resident.TeamID() != nil && *resident.TeamID() == team.ID() {
+			continue
+		}
+
+		if resident.TeamID() != nil {
+			if _, ok := teamsByID[*resident.TeamID()]; !ok {
+				continue
+			}
+		}
+
+		searchableName := strings.ToLower(strings.Join([]string{
+			resident.LastName(),
+			resident.FirstName(),
+			stringValue(resident.MiddleName()),
+		}, " "))
+		if !strings.Contains(searchableName, normalizedQuery) {
+			continue
+		}
+
+		var currentTeamID *string
+		var currentTeamLeader *dto.UserSummary
+		if resident.TeamID() != nil {
+			currentTeamID = optionalUUIDString(resident.TeamID())
+			currentTeamLeader = userSummaryFromMap(leaderNames, teamsByID[*resident.TeamID()].LeaderID())
+		}
+
+		responseItems = append(responseItems, dto.DutySettingsTeamSearchItem{
+			ID:                resident.ID().String(),
+			Name:              fullUserName(resident),
+			CurrentTeamID:     currentTeamID,
+			CurrentTeamLeader: currentTeamLeader,
+		})
+	}
+
+	sort.Slice(responseItems, func(i, j int) bool {
+		return strings.ToLower(responseItems[i].Name) < strings.ToLower(responseItems[j].Name)
+	})
+
+	return &dto.DutySettingsTeamSearchResponse{Users: responseItems}, nil
+}
+
 func (s *Service) GetTeamMemberOptions(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID *uuid.UUID) (dto.TeamMemberOptionsResponse, error) {
 	group, err := s.requireManagedGroup(ctx, currentUserID, groupID)
 	if err != nil {
@@ -200,6 +315,95 @@ func (s *Service) GetTeamMemberOptions(ctx context.Context, currentUserID uuid.U
 	}
 
 	return dto.TeamMemberOptionsResponse{Members: responseItems}, nil
+}
+
+func (s *Service) AddTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error {
+	group, team, err := s.requireManagedGroupTeam(ctx, currentUserID, groupID, teamID)
+	if err != nil {
+		return err
+	}
+
+	resident, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("load resident: %w", err)
+	}
+	if resident == nil {
+		return fmt.Errorf("житель не найден")
+	}
+	if resident.DormitoryID() == nil || *resident.DormitoryID() != group.DormitoryID() {
+		return fmt.Errorf("житель не найден")
+	}
+	if resident.TeamID() != nil && *resident.TeamID() == team.ID() {
+		return nil
+	}
+
+	if resident.TeamID() != nil {
+		sourceTeam, err := s.teamRepo.FindByID(ctx, *resident.TeamID())
+		if err != nil {
+			return fmt.Errorf("load source team: %w", err)
+		}
+		if sourceTeam == nil || sourceTeam.GroupID() != group.ID() {
+			return fmt.Errorf("житель уже состоит в другой команде")
+		}
+		if sourceTeam.LeaderID() != nil && *sourceTeam.LeaderID() == resident.ID() {
+			return fmt.Errorf("Сначала назначьте другого участника главой команды")
+		}
+	}
+
+	if err := s.userRepo.MoveUserToTeam(ctx, resident.ID(), &teamID); err != nil {
+		return fmt.Errorf("move team member: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) AssignTeamLeader(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error {
+	group, team, err := s.requireManagedGroupTeam(ctx, currentUserID, groupID, teamID)
+	if err != nil {
+		return err
+	}
+
+	resident, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("load resident: %w", err)
+	}
+	if resident == nil || resident.DormitoryID() == nil || *resident.DormitoryID() != group.DormitoryID() {
+		return fmt.Errorf("житель не найден")
+	}
+	if resident.TeamID() == nil || *resident.TeamID() != team.ID() {
+		return fmt.Errorf("житель не состоит в этой команде")
+	}
+
+	updated := structure.RestoreTeam(team.ID(), team.Name(), team.GroupID(), &userID, team.Color(), team.RotationPosition())
+	if err := s.teamRepo.Save(ctx, updated); err != nil {
+		return fmt.Errorf("assign team leader: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) RemoveTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error {
+	_, team, err := s.requireManagedGroupTeam(ctx, currentUserID, groupID, teamID)
+	if err != nil {
+		return err
+	}
+
+	resident, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("load resident: %w", err)
+	}
+	if resident == nil || resident.TeamID() == nil || *resident.TeamID() != team.ID() {
+		return fmt.Errorf("житель не состоит в этой команде")
+	}
+	if team.LeaderID() != nil && *team.LeaderID() == resident.ID() {
+		return fmt.Errorf("Сначала назначьте другого участника главой команды")
+	}
+
+	if err := s.userRepo.MoveUserToTeam(ctx, resident.ID(), nil); err != nil {
+		return fmt.Errorf("remove team member: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) CreateTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, req dto.CreateResidentTeamRequest) (*dto.TeamDetails, error) {
@@ -624,9 +828,39 @@ func userSummaryFromMap(names map[uuid.UUID]string, leaderID *uuid.UUID) *dto.Us
 func userNames(users []*user.User) map[uuid.UUID]string {
 	names := make(map[uuid.UUID]string, len(users))
 	for _, resident := range users {
-		names[resident.ID()] = strings.TrimSpace(fmt.Sprintf("%s %s", resident.LastName(), resident.FirstName()))
+		names[resident.ID()] = fullUserName(resident)
 	}
 	return names
+}
+
+func fullUserName(resident *user.User) string {
+	parts := []string{
+		strings.TrimSpace(resident.LastName()),
+		strings.TrimSpace(resident.FirstName()),
+		strings.TrimSpace(stringValue(resident.MiddleName())),
+	}
+
+	filtered := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part != "" {
+			filtered = append(filtered, part)
+		}
+	}
+
+	return strings.TrimSpace(strings.Join(filtered, " "))
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func compareUsersByName(left *user.User, right *user.User) bool {
+	leftKey := strings.ToLower(fullUserName(left))
+	rightKey := strings.ToLower(fullUserName(right))
+	return leftKey < rightKey
 }
 
 func (s *Service) nextTeamOrder(ctx context.Context, groupID uuid.UUID) (int, error) {

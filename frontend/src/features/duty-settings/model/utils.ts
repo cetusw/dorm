@@ -1,6 +1,6 @@
 import type { AreaListItem } from '../../areas/model/types'
 import type { TaskListItem } from '../../task-catalog/model/types'
-import type { DutySettingsArea, DutySettingsTask } from './types'
+import type { DutySettingsArea, DutySettingsTask, DutySettingsTeamLeader } from './types'
 
 export function formatDutySettingsFloorLabel(floor: number | null): string {
     return floor == null ? 'Без этажа' : `${floor} этаж`
@@ -12,6 +12,10 @@ export function formatDutySettingsAreaTitle(area: DutySettingsArea): string {
 
 export function formatDutySettingsAreaOption(area: Pick<DutySettingsArea, 'floor' | 'name'>): string {
     return `${formatDutySettingsFloorLabel(area.floor)}. ${area.name}`
+}
+
+export function formatDutySettingsLeaderName(leader: DutySettingsTeamLeader | null): string {
+    return leader?.name ?? 'Без главы'
 }
 
 export function formatLastCompletedAt(value: string | null): string {

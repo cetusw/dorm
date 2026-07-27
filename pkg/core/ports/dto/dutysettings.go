@@ -24,6 +24,37 @@ type DutySettingsTeam struct {
 	MembersCount     int          `json:"members_count"`
 }
 
+type DutySettingsTeamMember struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	IsLeader bool   `json:"is_leader"`
+}
+
+type DutySettingsTeamMembersResponse struct {
+	TeamName string                   `json:"team_name"`
+	Leader   *UserSummary             `json:"leader"`
+	Members  []DutySettingsTeamMember `json:"members"`
+}
+
+type DutySettingsTeamSearchItem struct {
+	ID                string       `json:"id"`
+	Name              string       `json:"name"`
+	CurrentTeamID     *string      `json:"current_team_id"`
+	CurrentTeamLeader *UserSummary `json:"current_team_leader"`
+}
+
+type DutySettingsTeamSearchResponse struct {
+	Users []DutySettingsTeamSearchItem `json:"users"`
+}
+
+type DutySettingsTeamMemberRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type DutySettingsTeamLeaderRequest struct {
+	UserID string `json:"user_id"`
+}
+
 type DutySettingsArea struct {
 	ID    int                `json:"id"`
 	Name  string             `json:"name"`

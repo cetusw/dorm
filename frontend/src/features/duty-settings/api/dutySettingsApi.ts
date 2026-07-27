@@ -7,7 +7,11 @@ import type {
     TeamMemberOptionsResponse,
     UpdateTeamRequest,
 } from '../../teams/model/types'
-import type { DutySettingsResponse } from '../model/types'
+import type {
+    DutySettingsResponse,
+    DutySettingsTeamMembersResponse,
+    DutySettingsTeamSearchResponse,
+} from '../model/types'
 
 function normalizeDutySettingsResponse(response: DutySettingsResponse): DutySettingsResponse {
     return {
@@ -97,6 +101,51 @@ function normalizeTeamMemberOptionsResponse(response: TeamMemberOptionsResponse)
     }
 }
 
+function normalizeDutySettingsTeamMembersResponse(response: Record<string, unknown>): DutySettingsTeamMembersResponse {
+    return {
+        team_name: String(response.team_name ?? ''),
+        leader: response.leader && typeof response.leader === 'object'
+            ? {
+                id: String((response.leader as Record<string, unknown>).id ?? ''),
+                name: String((response.leader as Record<string, unknown>).name ?? ''),
+            }
+            : null,
+        members: Array.isArray(response.members)
+            ? response.members.map((member) => {
+                const normalized = member as Record<string, unknown>
+                return {
+                    id: String(normalized.id ?? ''),
+                    name: String(normalized.name ?? ''),
+                    is_leader: Boolean(normalized.is_leader),
+                }
+            })
+            : [],
+    }
+}
+
+function normalizeDutySettingsTeamSearchResponse(response: Record<string, unknown>): DutySettingsTeamSearchResponse {
+    return {
+        users: Array.isArray(response.users)
+            ? response.users.map((user) => {
+                const normalized = user as Record<string, unknown>
+                const currentTeamLeader = normalized.current_team_leader && typeof normalized.current_team_leader === 'object'
+                    ? {
+                        id: String((normalized.current_team_leader as Record<string, unknown>).id ?? ''),
+                        name: String((normalized.current_team_leader as Record<string, unknown>).name ?? ''),
+                    }
+                    : null
+
+                return {
+                    id: String(normalized.id ?? ''),
+                    name: String(normalized.name ?? ''),
+                    current_team_id: normalized.current_team_id == null ? null : String(normalized.current_team_id),
+                    current_team_leader: currentTeamLeader,
+                }
+            })
+            : [],
+    }
+}
+
 export async function getDutySettings(groupId: string): Promise<DutySettingsResponse> {
     const response = await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings`)
     return normalizeDutySettingsResponse(await response.json())
@@ -182,6 +231,25 @@ export async function getDutySettingsTeam(groupId: string, teamId: string): Prom
     return normalizeTeamDetails(await response.json())
 }
 
+export async function getDutySettingsTeamMembers(groupId: string, teamId: string): Promise<DutySettingsTeamMembersResponse> {
+    const response = await apiRequest(
+        `/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}/members`,
+    )
+    return normalizeDutySettingsTeamMembersResponse(await response.json())
+}
+
+export async function searchDutySettingsTeamMembers(
+    groupId: string,
+    teamId: string,
+    query: string,
+): Promise<DutySettingsTeamSearchResponse> {
+    const params = new URLSearchParams({ q: query })
+    const response = await apiRequest(
+        `/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}/member-search?${params.toString()}`,
+    )
+    return normalizeDutySettingsTeamSearchResponse(await response.json())
+}
+
 export async function getDutySettingsTeamMemberOptions(
     groupId: string,
     teamId?: string | null,
@@ -206,6 +274,35 @@ export async function createDutySettingsTeam(groupId: string, request: CreateTea
     })
 
     return normalizeTeamDetails(await response.json())
+}
+
+export async function addDutySettingsTeamMember(groupId: string, teamId: string, userId: string): Promise<void> {
+    await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}/members`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId }),
+    })
+}
+
+export async function assignDutySettingsTeamLeader(groupId: string, teamId: string, userId: string): Promise<void> {
+    await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}/leader`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId }),
+    })
+}
+
+export async function removeDutySettingsTeamMember(groupId: string, teamId: string, userId: string): Promise<void> {
+    await apiRequest(
+        `/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
+        {
+            method: 'DELETE',
+        },
+    )
 }
 
 export async function updateDutySettingsTeam(groupId: string, teamId: string, request: UpdateTeamRequest): Promise<TeamDetails> {

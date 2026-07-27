@@ -19,6 +19,7 @@ import { DeleteTeamModal } from '../../../features/teams/ui/DeleteTeamModal'
 import { TeamFormModal } from '../../../features/teams/ui/TeamFormModal'
 import { SettingsAddAction } from '../../../shared/ui/SettingsAddAction'
 import { DutySettingsTeamCard } from './DutySettingsTeamCard'
+import { DutySettingsTeamMembersDrawer } from './DutySettingsTeamMembersDrawer'
 
 type Props = {
     groupId: string
@@ -53,12 +54,21 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
     const [savingOrder, setSavingOrder] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [formOpened, setFormOpened] = useState(false)
-    const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
     const [deletingTeam, setDeletingTeam] = useState<DutySettingsTeam | null>(null)
+    const [selectedTeam, setSelectedTeam] = useState<DutySettingsTeam | null>(null)
 
     useEffect(() => {
         setOrderedTeams(sortTeams(teams))
     }, [teams])
+
+    useEffect(() => {
+        if (!selectedTeam) {
+            return
+        }
+
+        const nextSelectedTeam = teams.find((team) => team.id === selectedTeam.id) ?? null
+        setSelectedTeam(nextSelectedTeam)
+    }, [selectedTeam, teams])
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -74,12 +84,6 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
     const orderedIds = useMemo(() => orderedTeams.map((team) => team.id), [orderedTeams])
 
     function handleCreate() {
-        setEditingTeamId(null)
-        setFormOpened(true)
-    }
-
-    function handleEdit(teamId: string) {
-        setEditingTeamId(teamId)
         setFormOpened(true)
     }
 
@@ -128,7 +132,7 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
                                     team={team}
                                     isDutyTeam={activeDutyTeamId === team.id}
                                     disabled={savingOrder}
-                                    onEdit={handleEdit}
+                                    onOpenMembers={setSelectedTeam}
                                     onDelete={setDeletingTeam}
                                 />
                             ))}
@@ -143,8 +147,8 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
 
             <TeamFormModal
                 opened={formOpened}
-                mode={editingTeamId === null ? 'create' : 'edit'}
-                teamId={editingTeamId}
+                mode="create"
+                teamId={null}
                 groupId={groupId}
                 loadTeamRequest={(teamId) => getDutySettingsTeam(groupId, teamId)}
                 loadTeamMemberOptionsRequest={(currentGroupId, teamId) => getDutySettingsTeamMemberOptions(currentGroupId, teamId)}
@@ -152,7 +156,6 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
                 updateTeamRequest={(teamId, request) => updateDutySettingsTeam(groupId, teamId, request)}
                 onClose={() => {
                     setFormOpened(false)
-                    setEditingTeamId(null)
                 }}
                 onSaved={onReload}
             />
@@ -166,6 +169,14 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
                     setDeletingTeam(null)
                     await onReload()
                 }}
+            />
+
+            <DutySettingsTeamMembersDrawer
+                opened={selectedTeam !== null}
+                team={selectedTeam}
+                groupId={groupId}
+                onClose={() => setSelectedTeam(null)}
+                onUpdated={onReload}
             />
         </Stack>
     )

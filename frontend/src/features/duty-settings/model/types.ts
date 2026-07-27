@@ -11,6 +11,29 @@ export type DutySettingsTeamLeader = {
     name: string
 }
 
+export type DutySettingsTeamMember = {
+    id: string
+    name: string
+    is_leader: boolean
+}
+
+export type DutySettingsTeamMembersResponse = {
+    team_name: string
+    leader: DutySettingsTeamLeader | null
+    members: DutySettingsTeamMember[]
+}
+
+export type DutySettingsTeamSearchItem = {
+    id: string
+    name: string
+    current_team_id: string | null
+    current_team_leader: DutySettingsTeamLeader | null
+}
+
+export type DutySettingsTeamSearchResponse = {
+    users: DutySettingsTeamSearchItem[]
+}
+
 export type DutySettingsTeam = {
     id: string
     name: string

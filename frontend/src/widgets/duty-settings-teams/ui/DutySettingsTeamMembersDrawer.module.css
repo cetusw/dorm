@@ -1,0 +1,60 @@
+.searchInput {
+    min-height: 48px;
+    padding-left: 45px;
+}
+
+.searchSection {
+    width: 48px;
+    justify-content: flex-start;
+    padding-left: 14px;
+}
+
+.searchHint {
+    color: #991B1B;
+}
+
+.memberCard {
+    width: 100%;
+}
+
+.memberContent {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content 40px;
+    align-items: center;
+    column-gap: 16px;
+    min-height: 40px;
+}
+
+.memberNameCell,
+.memberBadgeCell,
+.memberActionsCell {
+    min-width: 0;
+}
+
+.memberName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.memberActionsCell {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.actionButton {
+    width: 40px;
+    height: 40px;
+}
+
+@media (max-width: 768px) {
+    .memberContent {
+        grid-template-columns: minmax(0, 1fr) 40px;
+        row-gap: 8px;
+    }
+
+    .memberBadgeCell {
+        grid-column: 1 / 2;
+    }
+}
