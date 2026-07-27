@@ -47,6 +47,26 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
     const badgeTask = useMemo(() => toResidentDutyTask(task), [task])
     const canExclude = task.is_included && (task.status === 'free' || task.status === 'assigned' || task.status === '')
     const shouldShowStatus = task.is_included && (task.status === 'completed' || task.status === 'verified')
+    const shouldShowAssignee = task.is_included && Boolean(task.assignee_name)
+    const gridTemplateColumns = useMemo(() => {
+        const columns = [
+            'minmax(0, 1fr)',
+            'var(--duty-settings-score-column-width)',
+            'var(--duty-settings-date-column-width)',
+        ]
+
+        if (shouldShowAssignee) {
+            columns.push('minmax(0, var(--duty-settings-assignee-column-width))')
+        }
+
+        if (shouldShowStatus) {
+            columns.push('minmax(0, var(--duty-settings-status-column-width))')
+        }
+
+        columns.push('40px')
+
+        return columns.join(' ')
+    }, [shouldShowAssignee, shouldShowStatus])
 
     return (
         <SettingsCardSurface
@@ -54,9 +74,11 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
             menuOpen={menuOpened}
             muted={!task.is_included}
         >
-            <div className={classes.content}>
+            <div className={classes.content} style={{ gridTemplateColumns }}>
                 <div className={classes.titleCell}>
-                    <Text fw={500} className={classes.title}>{task.title}</Text>
+                    <Tooltip label={task.title}>
+                        <Text fw={500} className={classes.title}>{task.title}</Text>
+                    </Tooltip>
                 </div>
 
                 <div className={classes.scoreCell}>
@@ -65,7 +87,7 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
 
                 <div className={classes.dateCell}>
                     {task.frequency === 0 ? (
-                        <SettingsBadge>Одноразовая задача</SettingsBadge>
+                        <SettingsBadge>Одноразовая</SettingsBadge>
                     ) : (
                         <Tooltip label="Дата последнего выполнения">
                             <Text fw={500}>{formatLastCompletedAt(task.last_completed_at)}</Text>
@@ -73,15 +95,17 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
                     )}
                 </div>
 
-                <div className={classes.assigneeCell}>
-                    {task.is_included && task.assignee_name ? (
+                {shouldShowAssignee ? (
+                    <div className={classes.assigneeCell}>
                         <Text fw={500} className={classes.assigneeText}>{task.assignee_name}</Text>
-                    ) : null}
-                </div>
+                    </div>
+                ) : null}
 
-                <div className={classes.statusCell}>
-                    {shouldShowStatus ? <TaskStatusBadge task={badgeTask} justify="flex-start" /> : null}
-                </div>
+                {shouldShowStatus ? (
+                    <div className={classes.statusCell}>
+                        <TaskStatusBadge task={badgeTask} justify="flex-start" />
+                    </div>
+                ) : null}
 
                 <div className={classes.actions}>
                     <Menu opened={menuOpened} onChange={setMenuOpened} withinPortal position="bottom-end">

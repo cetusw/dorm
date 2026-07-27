@@ -1,8 +1,8 @@
 :global(:root) {
     --duty-settings-score-column-width: 110px;
     --duty-settings-date-column-width: 140px;
-    --duty-settings-assignee-column-width: 220px;
-    --duty-settings-status-column-width: 140px;
+    --duty-settings-assignee-column-width: 180px;
+    --duty-settings-status-column-width: 100px;
 }
 
 .cardRoot + .cardRoot {
@@ -11,13 +11,6 @@
 
 .content {
     display: grid;
-    grid-template-columns:
-        minmax(0, 1fr)
-        var(--duty-settings-score-column-width)
-        var(--duty-settings-date-column-width)
-        var(--duty-settings-assignee-column-width)
-        var(--duty-settings-status-column-width)
-        40px;
     align-items: center;
     column-gap: 16px;
     min-height: 40px;
@@ -62,24 +55,4 @@
 .iconButton {
     width: 40px;
     height: 40px;
-}
-
-@media (max-width: 768px) {
-    .content {
-        grid-template-columns: minmax(0, 1fr) 40px;
-        row-gap: 8px;
-        align-items: start;
-    }
-
-    .scoreCell,
-    .dateCell,
-    .assigneeCell,
-    .statusCell {
-        grid-column: 1 / 2;
-    }
-
-    .actions {
-        grid-column: 2 / 3;
-        grid-row: 1 / 2;
-    }
 }

@@ -85,3 +85,5 @@ export type DutySettingsResponse = {
 }
 
 export type DutySettingsMainTab = 'tasks' | 'teams' | 'next-duty'
+
+export type DutySettingsViewMode = 'list' | 'plan'

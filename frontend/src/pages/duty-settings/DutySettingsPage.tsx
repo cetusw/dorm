@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { CaretLeftIcon } from '@phosphor-icons/react'
-import { Alert, Box, Center, Loader, SegmentedControl, Stack } from '@mantine/core'
+import { Alert, Box, Center, Group, Loader, SegmentedControl, Select, Stack } from '@mantine/core'
 
 import {
     createDutySettingsTask,
@@ -11,11 +11,15 @@ import {
     updateDutySettingsTask,
 } from '../../features/duty-settings/api/dutySettingsApi'
 import { useDutySettings } from '../../features/duty-settings/model/useDutySettings'
-import type { DutySettingsMainTab } from '../../features/duty-settings/model/types'
+import type { DutySettingsMainTab, DutySettingsViewMode } from '../../features/duty-settings/model/types'
+import { DutySettingsAreaDrawer } from '../../features/duty-settings/ui/DutySettingsAreaDrawer'
 import { DutySettingsAreaList } from '../../features/duty-settings/ui/DutySettingsAreaList'
 import { DutySettingsCreateTaskModal } from '../../features/duty-settings/ui/DutySettingsCreateTaskModal'
+import { DutySettingsPlanPanel } from '../../features/duty-settings/ui/DutySettingsPlanPanel'
 import { DutySettingsTaskSummary } from '../../features/duty-settings/ui/DutySettingsTaskSummary'
 import { DutySettingsTeamsTab } from '../../widgets/duty-settings-teams/ui/DutySettingsTeamsTab'
+import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
+import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { TaskFormModal } from '../../features/task-catalog/ui/TaskFormModal'
 import { ConfirmActionModal } from '../../shared/ui/ConfirmActionModal'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
@@ -29,9 +33,13 @@ type Props = {
 export function DutySettingsPage({ groupId }: Props) {
     const { data, error, forbidden, loading, reload } = useDutySettings(groupId)
     const [mainTab, setMainTab] = useState<DutySettingsMainTab>('tasks')
+    const [viewMode, setViewMode] = useState<DutySettingsViewMode>('list')
+    const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
+    const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
     const [taskAreaId, setTaskAreaId] = useState<number | null>(null)
     const [excludingTaskId, setExcludingTaskId] = useState<string | null>(null)
+    const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
 
     const excludingTask = useMemo(() => {
         if (!data || !excludingTaskId) {
@@ -47,6 +55,21 @@ export function DutySettingsPage({ groupId }: Props) {
 
         return null
     }, [data, excludingTaskId])
+    const selectedArea = data?.areas.find((area) => String(area.id) === selectedAreaId) ?? null
+    const selectedFloorPlan = availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ?? null
+
+    useEffect(() => {
+        if (availableFloorPlans.length === 0) {
+            if (selectedFloorPlanId !== '') {
+                setSelectedFloorPlanId('')
+            }
+            return
+        }
+
+        if (!availableFloorPlans.some((plan) => String(plan.floor) === selectedFloorPlanId)) {
+            setSelectedFloorPlanId(String(availableFloorPlans[0]?.floor ?? ''))
+        }
+    }, [availableFloorPlans, selectedFloorPlanId])
 
     function handleCreateTask(areaId: number) {
         setTaskAreaId(areaId)
@@ -70,6 +93,10 @@ export function DutySettingsPage({ groupId }: Props) {
     function handleCloseTaskModal() {
         setTaskAreaId(null)
         setEditingTaskId(null)
+    }
+
+    function handleOpenArea(areaId: string) {
+        setSelectedAreaId(areaId)
     }
 
     let content = null
@@ -100,19 +127,30 @@ export function DutySettingsPage({ groupId }: Props) {
     } else if (data.task_editor_state !== 'active' || !data.active_duty) {
         content = <Alert color="gray">{data.task_editor_alert}</Alert>
     } else {
+        const floorAreas = selectedFloorPlan ? data.areas.filter((area) => area.floor === selectedFloorPlan.floor) : []
+
         content = (
             <Stack gap="xl">
                 <DutySettingsTaskSummary summary={data.active_duty.summary} />
-                <DutySettingsAreaList
-                    areas={data.areas}
-                    onCreateTask={handleCreateTask}
-                    onEditTask={handleEditTask}
-                    onIncludeTask={async (taskId) => {
-                        await includeDutySettingsTask(groupId, taskId)
-                        await reload({ silent: true })
-                    }}
-                    onExcludeTask={(taskId) => setExcludingTaskId(taskId)}
-                />
+                {viewMode === 'plan' && selectedFloorPlan ? (
+                    <DutySettingsPlanPanel
+                        areas={floorAreas}
+                        floorPlan={selectedFloorPlan}
+                        selectedAreaId={selectedAreaId}
+                        onAreaClick={handleOpenArea}
+                    />
+                ) : (
+                    <DutySettingsAreaList
+                        areas={data.areas}
+                        onCreateTask={handleCreateTask}
+                        onEditTask={handleEditTask}
+                        onIncludeTask={async (taskId) => {
+                            await includeDutySettingsTask(groupId, taskId)
+                            await reload({ silent: true })
+                        }}
+                        onExcludeTask={(taskId) => setExcludingTaskId(taskId)}
+                    />
+                )}
             </Stack>
         )
     }
@@ -144,20 +182,60 @@ export function DutySettingsPage({ groupId }: Props) {
             )}
             title="Настройки дежурства"
             controls={(
-                <SegmentedControl
-                    value={mainTab}
-                    data={[
-                        { label: 'Задачи', value: 'tasks' },
-                        { label: 'Команды', value: 'teams' },
-                        { label: 'Следующее дежурство', value: 'next-duty' },
-                    ]}
-                    classNames={{
-                        control: segmentedControlClasses.control,
-                        root: segmentedControlClasses.root,
-                        label: segmentedControlClasses.label,
-                    }}
-                    onChange={(value) => setMainTab(value as DutySettingsMainTab)}
-                />
+                <Stack gap="md">
+                    <Group justify="space-between" align="center" gap="md" wrap="wrap">
+                        <SegmentedControl
+                            value={mainTab}
+                            data={[
+                                { label: 'Задачи', value: 'tasks' },
+                                { label: 'Команды', value: 'teams' },
+                                { label: 'Следующее дежурство', value: 'next-duty' },
+                            ]}
+                            classNames={{
+                                control: segmentedControlClasses.control,
+                                root: segmentedControlClasses.root,
+                                label: segmentedControlClasses.label,
+                            }}
+                            onChange={(value) => setMainTab(value as DutySettingsMainTab)}
+                        />
+
+                        {mainTab === 'tasks' ? (
+                            <SegmentedControl
+                                value={viewMode}
+                                data={[
+                                    { label: 'Список', value: 'list' },
+                                    { label: 'План', value: 'plan' },
+                                ]}
+                                classNames={{
+                                    control: segmentedControlClasses.control,
+                                    root: segmentedControlClasses.root,
+                                    label: segmentedControlClasses.label,
+                                }}
+                                onChange={(value) => setViewMode(value as DutySettingsViewMode)}
+                            />
+                        ) : null}
+                    </Group>
+
+                    {mainTab === 'tasks' && viewMode === 'plan' ? (
+                        <Group justify="flex-end">
+                            <Select
+                                aria-label="Этаж"
+                                value={selectedFloorPlanId}
+                                data={availableFloorPlans.map((plan) => ({
+                                    value: String(plan.floor),
+                                    label: getFloorLabel(plan.floor),
+                                }))}
+                                allowDeselect={false}
+                                w={220}
+                                onChange={(value) => {
+                                    if (value) {
+                                        setSelectedFloorPlanId(value)
+                                    }
+                                }}
+                            />
+                        </Group>
+                    ) : null}
+                </Stack>
             )}
         >
             {content}
@@ -237,6 +315,19 @@ export function DutySettingsPage({ groupId }: Props) {
                             await reload({ silent: true })
                         }}
                         errorMessage="Не удалось исключить задачу из дежурства"
+                    />
+
+                    <DutySettingsAreaDrawer
+                        area={selectedArea}
+                        opened={selectedArea !== null}
+                        onClose={() => setSelectedAreaId(null)}
+                        onCreateTask={handleCreateTask}
+                        onEditTask={handleEditTask}
+                        onIncludeTask={async (taskId) => {
+                            await includeDutySettingsTask(groupId, taskId)
+                            await reload({ silent: true })
+                        }}
+                        onExcludeTask={(taskId) => setExcludingTaskId(taskId)}
                     />
                 </>
             ) : null}
