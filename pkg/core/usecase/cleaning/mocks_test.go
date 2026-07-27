@@ -86,6 +86,12 @@ func (m *MockDutyTaskRepo) FindByDutyID(ctx context.Context, id uuid.UUID) ([]*d
 	args := m.Called(ctx, id)
 	return args.Get(0).([]*duty.DutyTask), args.Error(1)
 }
+func (m *MockDutyTaskRepo) Create(ctx context.Context, task *duty.DutyTask) error {
+	return m.Called(ctx, task).Error(0)
+}
+func (m *MockDutyTaskRepo) DeletePending(ctx context.Context, taskID uuid.UUID) error {
+	return m.Called(ctx, taskID).Error(0)
+}
 func (m *MockDutyTaskRepo) Assign(ctx context.Context, taskID, assigneeID uuid.UUID, assignedAt time.Time) error {
 	return m.Called(ctx, taskID, assigneeID, assignedAt).Error(0)
 }

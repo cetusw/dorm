@@ -5,10 +5,23 @@
     transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
+.card[data-muted='true'] {
+    border-color: #DDE2E0;
+    background: #F1F3F2;
+    color: #66706C;
+}
+
 .card:hover,
 .card:focus-within,
 .card[data-dragging='true'],
 .card[data-menu-open='true'] {
     border-color: var(--mantine-color-gray-4);
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.card[data-muted='true']:hover,
+.card[data-muted='true']:focus-within,
+.card[data-muted='true'][data-menu-open='true'] {
+    border-color: #C9D0CD;
+    background: #ECEFED;
 }

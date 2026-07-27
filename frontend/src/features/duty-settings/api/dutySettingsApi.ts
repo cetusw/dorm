@@ -17,16 +17,19 @@ function normalizeDutySettingsResponse(response: DutySettingsResponse): DutySett
     return {
         group: response.group,
         areas: Array.isArray(response.areas)
-            ? response.areas.map((area) => ({
-                ...area,
-                floor: area.floor == null ? null : Number(area.floor),
-                tasks: Array.isArray(area.tasks)
-                    ? area.tasks.map((task) => ({
-                        ...task,
-                        last_completed_at: task.last_completed_at ?? null,
+                    ? response.areas.map((area) => ({
+                        ...area,
+                        floor: area.floor == null ? null : Number(area.floor),
+                        tasks: Array.isArray(area.tasks)
+                            ? area.tasks.map((task) => ({
+                                ...task,
+                                last_completed_at: task.last_completed_at ?? null,
+                                is_included: Boolean(task.is_included),
+                                assignee_name: task.assignee_name ?? null,
+                                status: typeof task.status === 'string' ? task.status : '',
+                            }))
+                            : [],
                     }))
-                    : [],
-            }))
             : [],
         teams: Array.isArray(response.teams)
             ? response.teams.map((team) => ({
@@ -43,6 +46,27 @@ function normalizeDutySettingsResponse(response: DutySettingsResponse): DutySett
             }))
             : [],
         active_duty_team_id: response.active_duty_team_id ?? null,
+        task_editor_state: response.task_editor_state === 'active'
+            || response.task_editor_state === 'no_duties'
+            || response.task_editor_state === 'no_active_duty'
+            ? response.task_editor_state
+            : 'no_active_duty',
+        task_editor_alert: String(response.task_editor_alert ?? ''),
+        active_duty: response.active_duty && typeof response.active_duty === 'object'
+            ? {
+                id: String((response.active_duty as Record<string, unknown>).id ?? ''),
+                team_id: String((response.active_duty as Record<string, unknown>).team_id ?? ''),
+                team_name: String((response.active_duty as Record<string, unknown>).team_name ?? ''),
+                start_date: String((response.active_duty as Record<string, unknown>).start_date ?? ''),
+                end_date: String((response.active_duty as Record<string, unknown>).end_date ?? ''),
+                summary: {
+                    task_count: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.task_count) ?? 0),
+                    total_cost: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.total_cost) ?? 0),
+                    cost_per_member: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.cost_per_member) ?? 0),
+                    team_member_count: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.team_member_count) ?? 0),
+                },
+            }
+            : null,
     }
 }
 
@@ -222,6 +246,18 @@ export async function updateDutySettingsTask(
 
 export async function deleteDutySettingsTask(groupId: string, taskId: string): Promise<void> {
     await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/tasks/${taskId}`, {
+        method: 'DELETE',
+    })
+}
+
+export async function includeDutySettingsTask(groupId: string, taskId: string): Promise<void> {
+    await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/tasks/${taskId}/include`, {
+        method: 'POST',
+    })
+}
+
+export async function excludeDutySettingsTask(groupId: string, taskId: string): Promise<void> {
+    await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/tasks/${taskId}/include`, {
         method: 'DELETE',
     })
 }

@@ -14,6 +14,25 @@ type DutySettingsTask struct {
 	Cost            int        `json:"cost"`
 	Frequency       int        `json:"frequency"`
 	LastCompletedAt *time.Time `json:"last_completed_at"`
+	IsIncluded      bool       `json:"is_included"`
+	AssigneeName    *string    `json:"assignee_name"`
+	Status          string     `json:"status"`
+}
+
+type DutySettingsTaskSummary struct {
+	TaskCount       int `json:"task_count"`
+	TotalCost       int `json:"total_cost"`
+	CostPerMember   int `json:"cost_per_member"`
+	TeamMemberCount int `json:"team_member_count"`
+}
+
+type DutySettingsActiveDuty struct {
+	ID        string                  `json:"id"`
+	TeamID    string                  `json:"team_id"`
+	TeamName  string                  `json:"team_name"`
+	StartDate string                  `json:"start_date"`
+	EndDate   string                  `json:"end_date"`
+	Summary   DutySettingsTaskSummary `json:"summary"`
 }
 
 type DutySettingsTeam struct {
@@ -63,10 +82,13 @@ type DutySettingsArea struct {
 }
 
 type DutySettingsResponse struct {
-	Group            DutySettingsGroup  `json:"group"`
-	Areas            []DutySettingsArea `json:"areas"`
-	Teams            []DutySettingsTeam `json:"teams"`
-	ActiveDutyTeamID *string            `json:"active_duty_team_id"`
+	Group            DutySettingsGroup       `json:"group"`
+	Areas            []DutySettingsArea      `json:"areas"`
+	Teams            []DutySettingsTeam      `json:"teams"`
+	ActiveDutyTeamID *string                 `json:"active_duty_team_id"`
+	TaskEditorState  string                  `json:"task_editor_state"`
+	TaskEditorAlert  string                  `json:"task_editor_alert"`
+	ActiveDuty       *DutySettingsActiveDuty `json:"active_duty"`
 }
 
 type ReorderDutySettingsTeamsRequest struct {

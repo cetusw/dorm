@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,6 +45,61 @@ func (r *DutyTaskRepository) FindByID(ctx context.Context, id uuid.UUID) (*duty.
 
 func (r *DutyTaskRepository) FindByDutyID(ctx context.Context, dutyID uuid.UUID) ([]*duty.DutyTask, error) {
 	return findDutyTasksByDutyID(ctx, r.db, dutyID)
+}
+
+func (r *DutyTaskRepository) Create(ctx context.Context, task *duty.DutyTask) error {
+	const query = `
+		INSERT INTO duty_task (
+			id, duty_id, task_id, assignee_id, reviewer_id,
+			assignment_date, completion_date, verification_date
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	taskID, taskDefID, err := marshalDutyTaskInsertIDs(task)
+	if err != nil {
+		return err
+	}
+
+	dutyID, err := marshalUUID(task.DutyID(), "duty id")
+	if err != nil {
+		return err
+	}
+
+	assigneeID, reviewerID, err := nullableDutyTaskUserIDs(task)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.ExecContext(
+		ctx,
+		query,
+		taskID,
+		dutyID,
+		taskDefID,
+		assigneeID,
+		reviewerID,
+		nullTime(task.AssignmentDate()),
+		nullTime(task.CompletionDate()),
+		nullTime(task.VerificationDate()),
+	)
+	if err != nil {
+		if isDuplicateDutyTaskError(err) {
+			return duty.ErrTaskAlreadyIncluded
+		}
+		return fmt.Errorf("create duty task: %w", err)
+	}
+
+	return nil
+}
+
+func (r *DutyTaskRepository) DeletePending(ctx context.Context, taskID uuid.UUID) error {
+	const query = `
+		DELETE FROM duty_task
+		WHERE id = ? AND completion_date IS NULL
+	`
+
+	return r.executeTransition(ctx, query, duty.ErrTaskStateConflict, taskID)
 }
 
 func (r *DutyTaskRepository) Assign(ctx context.Context, taskID, assigneeID uuid.UUID, assignedAt time.Time) error {
@@ -158,4 +214,8 @@ func mapDutyTaskReadError(err error) error {
 		return duty.ErrTaskNotFound
 	}
 	return fmt.Errorf("find duty task: %w", err)
+}
+
+func isDuplicateDutyTaskError(err error) bool {
+	return strings.Contains(strings.ToLower(err.Error()), "duplicate")
 }

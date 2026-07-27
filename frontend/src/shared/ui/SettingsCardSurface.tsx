@@ -9,9 +9,10 @@ type Props = {
     className?: string
     dragging?: boolean
     menuOpen?: boolean
+    muted?: boolean
 }
 
-export function SettingsCardSurface({ children, className, dragging = false, menuOpen = false }: Props) {
+export function SettingsCardSurface({ children, className, dragging = false, menuOpen = false, muted = false }: Props) {
     return (
         <Paper
             withBorder
@@ -19,6 +20,7 @@ export function SettingsCardSurface({ children, className, dragging = false, men
             className={[classes.card, className].filter(Boolean).join(' ')}
             data-dragging={dragging ? 'true' : undefined}
             data-menu-open={menuOpen ? 'true' : undefined}
+            data-muted={muted ? 'true' : undefined}
         >
             {children}
         </Paper>

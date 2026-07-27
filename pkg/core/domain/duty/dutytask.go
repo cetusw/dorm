@@ -51,6 +51,14 @@ func RestoreDutyTask(params RestoreDutyTaskParams) *DutyTask {
 	}
 }
 
+func NewDutyTask(dutyID, taskDefID uuid.UUID) *DutyTask {
+	return &DutyTask{
+		id:        uuid.New(),
+		dutyID:    dutyID,
+		taskDefID: taskDefID,
+	}
+}
+
 func (t *DutyTask) ID() uuid.UUID        { return t.id }
 func (t *DutyTask) DutyID() uuid.UUID    { return t.dutyID }
 func (t *DutyTask) TaskDefID() uuid.UUID { return t.taskDefID }
@@ -179,6 +187,8 @@ func copyTime(value *time.Time) *time.Time {
 type DutyTaskRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*DutyTask, error)
 	FindByDutyID(ctx context.Context, dutyID uuid.UUID) ([]*DutyTask, error)
+	Create(ctx context.Context, task *DutyTask) error
+	DeletePending(ctx context.Context, taskID uuid.UUID) error
 	Assign(ctx context.Context, taskID uuid.UUID, assigneeID uuid.UUID, assignedAt time.Time) error
 	Unassign(ctx context.Context, taskID uuid.UUID, assigneeID uuid.UUID) error
 	Complete(ctx context.Context, taskID uuid.UUID, assigneeID uuid.UUID, completedAt time.Time) error

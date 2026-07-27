@@ -4,6 +4,25 @@ export type DutySettingsTask = {
     cost: number
     frequency: number
     last_completed_at: string | null
+    is_included: boolean
+    assignee_name: string | null
+    status: 'free' | 'assigned' | 'completed' | 'verified' | ''
+}
+
+export type DutySettingsTaskSummary = {
+    task_count: number
+    total_cost: number
+    cost_per_member: number
+    team_member_count: number
+}
+
+export type DutySettingsActiveDuty = {
+    id: string
+    team_id: string
+    team_name: string
+    start_date: string
+    end_date: string
+    summary: DutySettingsTaskSummary
 }
 
 export type DutySettingsTeamLeader = {
@@ -60,8 +79,9 @@ export type DutySettingsResponse = {
     areas: DutySettingsArea[]
     teams: DutySettingsTeam[]
     active_duty_team_id: string | null
+    task_editor_state: 'active' | 'no_duties' | 'no_active_duty'
+    task_editor_alert: string
+    active_duty: DutySettingsActiveDuty | null
 }
 
 export type DutySettingsMainTab = 'tasks' | 'teams' | 'next-duty'
-
-export type DutySettingsViewMode = 'list' | 'plan'

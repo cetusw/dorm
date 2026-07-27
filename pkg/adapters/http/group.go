@@ -46,6 +46,8 @@ func (h *GroupAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api.Post("/:id/duty-settings/areas/:areaId/tasks", h.HandleCreateDutySettingsTask)
 	api.Put("/:id/duty-settings/tasks/:taskId", h.HandleUpdateDutySettingsTask)
 	api.Delete("/:id/duty-settings/tasks/:taskId", h.HandleDeleteDutySettingsTask)
+	api.Post("/:id/duty-settings/tasks/:taskId/include", h.HandleIncludeDutySettingsTask)
+	api.Delete("/:id/duty-settings/tasks/:taskId/include", h.HandleExcludeDutySettingsTask)
 	api.Post("", h.HandleCreateGroup)
 	api.Put("/:id", h.HandleUpdateGroup)
 	api.Delete("/:id", h.HandleDeleteGroup)
@@ -559,6 +561,42 @@ func (h *GroupAPIHandler) HandleDeleteDutySettingsTask(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+func (h *GroupAPIHandler) HandleIncludeDutySettingsTask(c *fiber.Ctx) error {
+	userID, groupID, err := h.parseDutySettingsAccess(c)
+	if err != nil {
+		return err
+	}
+
+	taskID, err := uuid.Parse(c.Params("taskId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор задачи"))
+	}
+
+	if err := h.dutySettingsUC.IncludeTaskInActiveDuty(c.Context(), userID, groupID, taskID); err != nil {
+		return h.respondDutySettingsError(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *GroupAPIHandler) HandleExcludeDutySettingsTask(c *fiber.Ctx) error {
+	userID, groupID, err := h.parseDutySettingsAccess(c)
+	if err != nil {
+		return err
+	}
+
+	taskID, err := uuid.Parse(c.Params("taskId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор задачи"))
+	}
+
+	if err := h.dutySettingsUC.ExcludeTaskFromActiveDuty(c.Context(), userID, groupID, taskID); err != nil {
+		return h.respondDutySettingsError(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 func (h *GroupAPIHandler) parseDutySettingsAccess(c *fiber.Ctx) (uuid.UUID, uuid.UUID, error) {
 	userID, err := currentUserID(c)
 	if err != nil {
@@ -583,6 +621,10 @@ func (h *GroupAPIHandler) respondDutySettingsError(c *fiber.Ctx, err error) erro
 		return c.Status(fiber.StatusNotFound).JSON(errorResponse(err.Error()))
 	case err.Error() == "задача не найдена":
 		return c.Status(fiber.StatusNotFound).JSON(errorResponse(err.Error()))
+	case err.Error() == "В вашей группе пока нет дежурств":
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	case err.Error() == "В группе нет активного дежурства":
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	default:
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}

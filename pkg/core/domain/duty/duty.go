@@ -10,6 +10,7 @@ import (
 
 var (
 	ErrTaskNotFound           = errors.New("duty task not found")
+	ErrTaskAlreadyIncluded    = errors.New("duty task already included")
 	ErrTaskAssigned           = errors.New("duty task already assigned")
 	ErrTaskNotAssigned        = errors.New("duty task not assigned")
 	ErrTaskOwnedByAnotherUser = errors.New("duty task belongs to another user")

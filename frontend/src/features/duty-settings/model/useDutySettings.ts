@@ -21,6 +21,9 @@ function sortAreas(areas: DutySettingsArea[]): DutySettingsArea[] {
 
 function sortTasks(tasks: DutySettingsTask[]): DutySettingsTask[] {
     return [...tasks].sort((left, right) => {
+        if (left.is_included !== right.is_included) {
+            return left.is_included ? -1 : 1
+        }
         if (left.cost !== right.cost) {
             return right.cost - left.cost
         }
@@ -51,7 +54,13 @@ export function useDutySettings(groupId: string) {
 
         try {
             const response = await getDutySettings(groupId)
-            setData(response)
+            setData({
+                ...response,
+                areas: sortAreas(response.areas.map((area) => ({
+                    ...area,
+                    tasks: sortTasks(area.tasks),
+                }))),
+            })
         } catch (error) {
             if (error instanceof ApiError && error.status === 403) {
                 setForbidden(true)
@@ -130,6 +139,28 @@ export function useDutySettings(groupId: string) {
                 }
             })
         }, []),
+        replaceTask: useCallback((taskId: string, updatedTask: DutySettingsTask, nextAreaId: number) => {
+            setData((current) => {
+                if (!current) {
+                    return current
+                }
+
+                return {
+                    ...current,
+                    areas: sortAreas(current.areas.map((area) => {
+                        const nextTasks = area.tasks.filter((task) => task.id !== taskId)
+                        if (area.id !== nextAreaId) {
+                            return { ...area, tasks: sortTasks(nextTasks) }
+                        }
+
+                        return {
+                            ...area,
+                            tasks: sortTasks([...nextTasks, updatedTask]),
+                        }
+                    }).filter((area) => area.tasks.length > 0)),
+                }
+            })
+        }, []),
         updateTask: useCallback((taskId: string, updatedTask: DutySettingsTask, nextAreaId: number) => {
             setData((current) => {
                 if (!current) {
@@ -148,7 +179,7 @@ export function useDutySettings(groupId: string) {
                             ...area,
                             tasks: sortTasks([...area.tasks, updatedTask]),
                         }
-                        : area),
+                        : area).filter((area) => area.tasks.length > 0),
                 }
             })
         }, []),
