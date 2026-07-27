@@ -108,7 +108,7 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
             setSaving(false)
             setError(null)
         }
-    }, [form, opened])
+    }, [opened])
 
     return (
         <Modal
