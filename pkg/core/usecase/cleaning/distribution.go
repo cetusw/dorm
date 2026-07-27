@@ -318,6 +318,14 @@ func determineNextTeam(teams []*structure.Team, lastDuty *duty.Duty) (*structure
 }
 
 func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition, referenceDate time.Time) (bool, error) {
+	if def.Frequency() == 0 {
+		lastDuty, err := s.dutyRepo.FindLastByTaskDefID(ctx, def.ID())
+		if err != nil {
+			return false, err
+		}
+		return lastDuty == nil, nil
+	}
+
 	if def.Frequency() <= 1 {
 		return true, nil
 	}

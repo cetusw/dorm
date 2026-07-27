@@ -352,6 +352,9 @@ func (s *Service) saveTaskOverrides(ctx context.Context, tasks []*catalog.TaskDe
 }
 
 func isTaskDueByLastCompletion(task *catalog.TaskDefinition, lastCompletedAt *time.Time, referenceDate time.Time) bool {
+	if task.Frequency() == 0 {
+		return lastCompletedAt == nil
+	}
 	if task.Frequency() <= 1 {
 		return true
 	}

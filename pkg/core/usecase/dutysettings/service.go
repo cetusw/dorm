@@ -553,12 +553,12 @@ func (s *Service) DeleteArea(ctx context.Context, currentUserID uuid.UUID, group
 }
 
 func (s *Service) CreateTask(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, areaID int, req dto.CreateTaskRequest) (*dto.TaskDetails, error) {
-	group, area, activeDuty, err := s.requireManagedGroupAreaWithActiveDuty(ctx, currentUserID, groupID, areaID)
+	group, area, err := s.requireManagedGroupArea(ctx, currentUserID, groupID, areaID)
 	if err != nil {
 		return nil, err
 	}
 
-	normalized, err := normalizeTaskInput(req.Title, req.Cost, req.Frequency)
+	normalized, err := normalizeCreateTaskInput(req)
 	if err != nil {
 		return nil, err
 	}
@@ -570,8 +570,16 @@ func (s *Service) CreateTask(ctx context.Context, currentUserID uuid.UUID, group
 	if err := s.taskRepo.Save(ctx, task); err != nil {
 		return nil, fmt.Errorf("create task: %w", err)
 	}
-	if err := s.dutyTaskRepo.Create(ctx, duty.NewDutyTask(activeDuty.ID(), task.ID())); err != nil {
-		return nil, fmt.Errorf("include task in active duty: %w", err)
+
+	if normalized.includeInCurrentDuty {
+		activeDuty, err := s.requireActiveLatestDuty(ctx, group.ID())
+		if err != nil {
+			return nil, err
+		}
+
+		if err := s.dutyTaskRepo.Create(ctx, duty.NewDutyTask(activeDuty.ID(), task.ID())); err != nil {
+			return nil, fmt.Errorf("include task in active duty: %w", err)
+		}
 	}
 
 	return buildTaskDetails(task, group, area), nil
@@ -1302,9 +1310,10 @@ func normalizeAreaInput(name string, floor *int) (*normalizedAreaInput, error) {
 }
 
 type normalizedTaskInput struct {
-	title     string
-	cost      int
-	frequency int
+	title                string
+	cost                 int
+	frequency            int
+	includeInCurrentDuty bool
 }
 
 func normalizeTaskInput(title string, cost int, frequency int) (*normalizedTaskInput, error) {
@@ -1318,8 +1327,8 @@ func normalizeTaskInput(title string, cost int, frequency int) (*normalizedTaskI
 	if cost <= 0 {
 		return nil, fmt.Errorf("Стоимость должна быть больше нуля")
 	}
-	if frequency <= 0 {
-		return nil, fmt.Errorf("Частота должна быть больше нуля")
+	if frequency < 0 {
+		return nil, fmt.Errorf("Частота не может быть отрицательной")
 	}
 
 	return &normalizedTaskInput{
@@ -1327,6 +1336,23 @@ func normalizeTaskInput(title string, cost int, frequency int) (*normalizedTaskI
 		cost:      cost,
 		frequency: frequency,
 	}, nil
+}
+
+func normalizeCreateTaskInput(req dto.CreateTaskRequest) (*normalizedTaskInput, error) {
+	frequency := req.Frequency
+	includeInCurrentDuty := req.IncludeInCurrentDuty
+	if req.OneTime {
+		frequency = 0
+		includeInCurrentDuty = true
+	}
+
+	normalized, err := normalizeTaskInput(req.Title, req.Cost, frequency)
+	if err != nil {
+		return nil, err
+	}
+	normalized.includeInCurrentDuty = includeInCurrentDuty
+
+	return normalized, nil
 }
 
 func requireAreaInGroup(area *catalog.Area, groupID uuid.UUID) error {

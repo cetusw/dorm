@@ -87,10 +87,12 @@ type TaskDetails struct {
 }
 
 type CreateTaskRequest struct {
-	Title     string `json:"title"`
-	Cost      int    `json:"cost"`
-	Frequency int    `json:"frequency"`
-	AreaID    int    `json:"area_id"`
+	Title                string `json:"title"`
+	Cost                 int    `json:"cost"`
+	Frequency            int    `json:"frequency"`
+	AreaID               int    `json:"area_id"`
+	OneTime              bool   `json:"one_time"`
+	IncludeInCurrentDuty bool   `json:"include_in_current_duty"`
 }
 
 type UpdateTaskRequest struct {

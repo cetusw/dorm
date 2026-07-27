@@ -1,0 +1,84 @@
+.header {
+    padding: 30px 40px 0;
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.body {
+    padding: 25px 40px 30px;
+}
+
+.content {
+    padding: 0;
+}
+
+.input {
+    height: 40px;
+    min-height: 40px;
+    border-radius: 12px;
+    font-size: 1rem;
+}
+
+.inputField {
+    height: 100%;
+    font-size: 1rem;
+}
+
+.checkboxRoot {
+    align-items: center;
+    min-height: 24px;
+}
+
+.checkboxBody {
+    align-items: center;
+}
+
+.checkboxIcon {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    border-radius: 6px;
+}
+
+.checkboxIcon :global(svg) {
+    display: block;
+    width: 14px;
+    height: 14px;
+}
+
+.checkboxLabel {
+    padding-inline-start: 15px;
+    font-size: 1rem;
+    line-height: 24px;
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    color: var(--app-color-text);
+}
+
+.actions {
+    margin-top: 15px;
+}
+
+.cancelButton,
+.submitButton {
+    width: 135px;
+    min-width: 135px;
+    height: 40px;
+    border-radius: 14px;
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 0 16px;
+}
+
+.submitButton {
+    background: #197c74;
+}
+
+.submitButton:hover {
+    background: #166d66;
+}

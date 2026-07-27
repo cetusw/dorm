@@ -35,6 +35,8 @@ export type CreateTaskRequest = {
     cost: number
     frequency: number
     area_id: number
+    one_time?: boolean
+    include_in_current_duty?: boolean
 }
 
 export type UpdateTaskRequest = CreateTaskRequest

@@ -13,6 +13,7 @@ import {
 import { useDutySettings } from '../../features/duty-settings/model/useDutySettings'
 import type { DutySettingsMainTab } from '../../features/duty-settings/model/types'
 import { DutySettingsAreaList } from '../../features/duty-settings/ui/DutySettingsAreaList'
+import { DutySettingsCreateTaskModal } from '../../features/duty-settings/ui/DutySettingsCreateTaskModal'
 import { DutySettingsTaskSummary } from '../../features/duty-settings/ui/DutySettingsTaskSummary'
 import { DutySettingsTeamsTab } from '../../widgets/duty-settings-teams/ui/DutySettingsTeamsTab'
 import { TaskFormModal } from '../../features/task-catalog/ui/TaskFormModal'
@@ -163,13 +164,22 @@ export function DutySettingsPage({ groupId }: Props) {
 
             {data ? (
                 <>
+                    <DutySettingsCreateTaskModal
+                        opened={taskAreaId !== null && editingTaskId === null}
+                        onClose={handleCloseTaskModal}
+                        onCreate={async (request) => {
+                            await createDutySettingsTask(groupId, Number(taskAreaId), request)
+                            await reload({ silent: true })
+                        }}
+                    />
+
                     <TaskFormModal
-                        opened={taskAreaId !== null}
-                        mode={editingTaskId === null ? 'create' : 'edit'}
+                        opened={editingTaskId !== null}
+                        mode="edit"
                         taskId={editingTaskId}
                         dormitoryId={String(data.group.dormitory_id)}
                         initialAreaId={taskAreaId == null ? null : String(taskAreaId)}
-                        hideAreaField={editingTaskId === null}
+                        hideAreaField={false}
                         loadAreas={async () => ({
                             areas: data.areas.map((area) => ({
                                 id: area.id,
@@ -200,11 +210,6 @@ export function DutySettingsPage({ groupId }: Props) {
                             }
 
                             throw new Error('Не удалось загрузить данные задачи')
-                        }}
-                        createTaskRequest={async (request) => {
-                            const created = await createDutySettingsTask(groupId, Number(taskAreaId), request)
-                            await reload({ silent: true })
-                            return created
                         }}
                         updateTaskRequest={async (taskId, request) => {
                             const updated = await updateDutySettingsTask(groupId, taskId, request)
