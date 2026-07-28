@@ -6,6 +6,7 @@ import (
 	"dorm/pkg/core/usecase/dormitory"
 	dutyuc "dorm/pkg/core/usecase/duty"
 	dutysettingsuc "dorm/pkg/core/usecase/dutysettings"
+	notificationuc "dorm/pkg/core/usecase/notification"
 	residentusecase "dorm/pkg/core/usecase/resident"
 	"dorm/pkg/core/usecase/team"
 	"dorm/pkg/infrastructure/mysql/query"
@@ -84,6 +85,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	taskRepo := repository.NewTaskRepository(db)
 	taskOverrideRepo := repository.NewDutyTaskOverrideRepository(db)
 	dormitoryRepo := repository.NewDormitoryRepository(db)
+	pushSubscriptionRepo := repository.NewPushSubscriptionRepository(db)
 
 	cleaningService := cleaning.NewCleaningService(
 		userRepo,
@@ -113,6 +115,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	dutyService := dutyuc.NewDutyService(dutyRepo, teamRepo, groupRepo, dormitoryRepo, taskRepo, taskOverrideRepo, areaRepo, userRepo)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo, groupRepo)
 	dutySettingsService := dutysettingsuc.NewDutySettingsService(groupRepo, teamRepo, areaRepo, taskRepo, dutyRepo, dutyTaskRepo, userRepo)
+	notificationService := notificationuc.NewNotificationService(pushSubscriptionRepo)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
 	//if err != nil {
@@ -155,7 +158,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	residentAuthHandler := http.NewResidentAuthHandler(userService, cfg.AuthSecret)
 	residentAuthHandler.RegisterRoutes(app)
 
-	notificationAPIHandler := http.NewNotificationAPIHandler(cfg.WebPush)
+	notificationAPIHandler := http.NewNotificationAPIHandler(cfg.WebPush, notificationService)
 	notificationAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	residentDutyService := residentusecase.NewResidentDutyService(

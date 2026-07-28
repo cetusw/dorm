@@ -8,6 +8,7 @@ import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
 import { GroupsPage } from '../pages/groups/GroupsPage'
 import { LoginPage } from '../pages/login/LoginPage'
 import { ResidentsPage } from '../pages/residents/ResidentsPage'
+import { SettingsPage } from '../pages/settings/SettingsPage'
 import { TaskCatalogPage } from '../pages/task-catalog/TaskCatalogPage'
 import { GroupTeamsPage } from '../pages/teams/GroupTeamsPage'
 
@@ -27,6 +28,10 @@ function renderResidentPage(pathname: string, currentUser: ReturnType<typeof use
 
     if (dutySettingsGroupId) {
         return <DutySettingsPage groupId={dutySettingsGroupId} />
+    }
+
+    if (pathname === '/app/settings') {
+        return <SettingsPage />
     }
 
     if (!canManageDormitories) {

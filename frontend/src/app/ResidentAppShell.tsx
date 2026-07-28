@@ -88,11 +88,19 @@ export function ResidentAppShell({
                 href: '/app/tasks',
                 label: 'Дежурство',
             },
+            {
+                href: '/app/settings',
+                label: 'Настройки',
+            },
         ]
         : [
             {
                 href: '/app/tasks',
                 label: 'Дежурство',
+            },
+            {
+                href: '/app/settings',
+                label: 'Настройки',
             },
         ]
 
