@@ -11,6 +11,13 @@
 
 .content {
     display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        var(--duty-settings-score-column-width)
+        var(--duty-settings-date-column-width)
+        var(--duty-settings-assignee-column-width)
+        var(--duty-settings-status-column-width)
+        40px;
     align-items: center;
     column-gap: 16px;
     min-height: 40px;

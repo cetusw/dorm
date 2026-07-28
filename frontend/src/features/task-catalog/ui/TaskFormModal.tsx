@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { Select, TextInput } from '@mantine/core'
+import { NumberInput, Select, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 import { getAreas } from '../../areas/api/areasApi'
 import type { AreaListItem } from '../../areas/model/types'
 import { ApiError } from '../../../shared/api/ApiError'
 import { EntityFormModal } from '../../../shared/ui/EntityFormModal'
+import modalClasses from '../../../shared/ui/SettingsModal.module.css'
 import {
     createTaskDefinition,
     getTaskDefinition,
@@ -23,6 +24,7 @@ import { taskFormValidation } from '../model/validation'
 type Props = {
     opened: boolean
     mode: 'create' | 'edit'
+    appearance?: 'default' | 'settings'
     taskId: string | null
     dormitoryId: string
     initialAreaId?: string | null
@@ -54,6 +56,7 @@ function toRequest(values: TaskFormValues): CreateTaskRequest | UpdateTaskReques
 export function TaskFormModal({
     opened,
     mode,
+    appearance = 'default',
     taskId,
     dormitoryId,
     initialAreaId = null,
@@ -161,16 +164,27 @@ export function TaskFormModal({
     )
 
     const title = mode === 'create' ? 'Создание задачи' : 'Редактирование задачи'
+    const isSettingsAppearance = appearance === 'settings'
 
     return (
         <EntityFormModal
             opened={opened}
             onClose={onClose}
-            title={title}
+            title={isSettingsAppearance ? <span className={modalClasses.title}>{title}</span> : title}
             loading={loading}
             saving={saving}
             error={submitError}
-            size={640}
+            size={isSettingsAppearance ? 680 : 640}
+            withCloseButton={!isSettingsAppearance}
+            modalClassNames={isSettingsAppearance ? {
+                header: modalClasses.header,
+                body: modalClasses.body,
+                content: modalClasses.content,
+            } : undefined}
+            contentGap={isSettingsAppearance ? '15' : 'md'}
+            actionsClassName={isSettingsAppearance ? modalClasses.actions : undefined}
+            cancelButtonClassName={isSettingsAppearance ? modalClasses.cancelButton : undefined}
+            submitButtonClassName={isSettingsAppearance ? [modalClasses.submitButton, modalClasses.accentButton].join(' ') : undefined}
             onSubmit={form.onSubmit(async (values) => {
                 setSubmitError(null)
                 setSaving(true)
@@ -205,40 +219,60 @@ export function TaskFormModal({
             })}
         >
             <TextInput
-                label="Название"
-                placeholder="Название"
-                withAsterisk
+                label={isSettingsAppearance ? undefined : 'Название'}
+                placeholder={isSettingsAppearance ? 'Название задачи*' : 'Название'}
+                withAsterisk={!isSettingsAppearance}
                 maxLength={255}
+                classNames={isSettingsAppearance ? {
+                    input: modalClasses.input,
+                } : undefined}
                 key={form.key('title')}
                 {...form.getInputProps('title')}
             />
 
-            <TextInput
-                label="Стоимость"
-                placeholder="Стоимость"
-                withAsterisk
-                inputMode="numeric"
-                key={form.key('cost')}
-                {...form.getInputProps('cost')}
+            <NumberInput
+                label={isSettingsAppearance ? undefined : 'Стоимость'}
+                placeholder={isSettingsAppearance ? 'Стоимость*' : 'Стоимость'}
+                withAsterisk={!isSettingsAppearance}
+                allowDecimal={false}
+                allowNegative={false}
+                hideControls
+                clampBehavior="strict"
+                classNames={isSettingsAppearance ? {
+                    input: modalClasses.input,
+                } : undefined}
+                value={form.values.cost}
+                error={form.errors.cost}
+                onChange={(value) => form.setFieldValue('cost', value === '' ? '' : String(value))}
             />
 
-            <TextInput
-                label="Частота"
-                placeholder="Частота"
-                withAsterisk
-                inputMode="numeric"
-                key={form.key('frequency')}
-                {...form.getInputProps('frequency')}
+            <NumberInput
+                label={isSettingsAppearance ? undefined : 'Частота'}
+                placeholder={isSettingsAppearance ? 'Частота*' : 'Частота'}
+                withAsterisk={!isSettingsAppearance}
+                allowDecimal={false}
+                allowNegative={false}
+                hideControls
+                clampBehavior="strict"
+                classNames={isSettingsAppearance ? {
+                    input: modalClasses.input,
+                } : undefined}
+                value={form.values.frequency}
+                error={form.errors.frequency}
+                onChange={(value) => form.setFieldValue('frequency', value === '' ? '' : String(value))}
             />
 
             {!hideAreaField && (
                 <Select
-                    label="Территория"
-                    placeholder="Выберите территорию"
+                    label={isSettingsAppearance ? undefined : 'Территория'}
+                    placeholder={isSettingsAppearance ? 'Территория*' : 'Выберите территорию'}
                     searchable
-                    withAsterisk
+                    withAsterisk={!isSettingsAppearance}
                     data={areaOptions}
                     nothingFoundMessage="Территория не найдена"
+                    classNames={isSettingsAppearance ? {
+                        input: modalClasses.input,
+                    } : undefined}
                     value={form.values.areaId}
                     onChange={(value) => form.setFieldValue('areaId', value)}
                     error={form.errors.areaId}

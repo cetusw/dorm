@@ -117,10 +117,23 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpe
                                 </ActionIcon>
                             </Menu.Target>
                             <Menu.Dropdown>
-                                <Menu.Item leftSection={<UsersThreeIcon size={25} />} onClick={() => onOpenMembers(team)}>
+                                <Menu.Item
+                                    leftSection={<UsersThreeIcon size={25} />}
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        onOpenMembers(team)
+                                    }}
+                                >
                                     Участники
                                 </Menu.Item>
-                                <Menu.Item color="red" leftSection={<TrashIcon size={25} />} onClick={() => onDelete(team)}>
+                                <Menu.Item
+                                    color="red"
+                                    leftSection={<TrashIcon size={25} />}
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        onDelete(team)
+                                    }}
+                                >
                                     Удалить
                                 </Menu.Item>
                             </Menu.Dropdown>

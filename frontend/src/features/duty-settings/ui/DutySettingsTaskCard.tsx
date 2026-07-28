@@ -48,25 +48,6 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
     const canExclude = task.is_included && (task.status === 'free' || task.status === 'assigned' || task.status === '')
     const shouldShowStatus = task.is_included && (task.status === 'completed' || task.status === 'verified')
     const shouldShowAssignee = task.is_included && Boolean(task.assignee_name)
-    const gridTemplateColumns = useMemo(() => {
-        const columns = [
-            'minmax(0, 1fr)',
-            'var(--duty-settings-score-column-width)',
-            'var(--duty-settings-date-column-width)',
-        ]
-
-        if (shouldShowAssignee) {
-            columns.push('minmax(0, var(--duty-settings-assignee-column-width))')
-        }
-
-        if (shouldShowStatus) {
-            columns.push('minmax(0, var(--duty-settings-status-column-width))')
-        }
-
-        columns.push('40px')
-
-        return columns.join(' ')
-    }, [shouldShowAssignee, shouldShowStatus])
 
     return (
         <SettingsCardSurface
@@ -74,7 +55,7 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
             menuOpen={menuOpened}
             muted={!task.is_included}
         >
-            <div className={classes.content} style={{ gridTemplateColumns }}>
+            <div className={classes.content}>
                 <div className={classes.titleCell}>
                     <Tooltip label={task.title}>
                         <Text fw={500} className={classes.title}>{task.title}</Text>
@@ -95,17 +76,17 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
                     )}
                 </div>
 
-                {shouldShowAssignee ? (
-                    <div className={classes.assigneeCell}>
+                <div className={classes.assigneeCell}>
+                    {shouldShowAssignee ? (
                         <Text fw={500} className={classes.assigneeText}>{task.assignee_name}</Text>
-                    </div>
-                ) : null}
+                    ) : null}
+                </div>
 
-                {shouldShowStatus ? (
-                    <div className={classes.statusCell}>
+                <div className={classes.statusCell}>
+                    {shouldShowStatus ? (
                         <TaskStatusBadge task={badgeTask} justify="flex-start" />
-                    </div>
-                ) : null}
+                    ) : null}
+                </div>
 
                 <div className={classes.actions}>
                     <Menu opened={menuOpened} onChange={setMenuOpened} withinPortal position="bottom-end">

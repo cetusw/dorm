@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Alert, Button, Group, Modal, Stack, Text } from '@mantine/core'
 
 import { ApiError } from '../api/ApiError'
+import classes from './SettingsModal.module.css'
 
 type Props = {
     opened: boolean
@@ -39,15 +40,15 @@ export function EntityDeleteModal({
         <Modal
             opened={opened}
             onClose={onClose}
-            title={title}
+            title={<span className={classes.title}>{title}</span>}
+            withCloseButton={false}
             centered
             radius="xl"
             size={520}
-            styles={{
-                title: {
-                    fontSize: '1.4rem',
-                    fontWeight: 700,
-                },
+            classNames={{
+                header: classes.header,
+                body: classes.body,
+                content: classes.content,
             }}
         >
             <Stack gap="lg">
@@ -55,18 +56,19 @@ export function EntityDeleteModal({
                     <Alert color="red">{error}</Alert>
                 )}
 
-                <Text size="md">
+                <Text className={classes.description}>
                     Вы уверены, что хотите удалить {entityLabel}
                     {entityName ? ` «${entityName}»` : ''}?
                 </Text>
 
-                <Group justify="flex-end">
-                    <Button variant="default" onClick={onClose}>
+                <Group justify="flex-end" gap="15" className={classes.actions}>
+                    <Button variant="default" onClick={onClose} className={classes.cancelButton}>
                         Отменить
                     </Button>
                     <Button
                         color="red"
                         loading={deleting}
+                        className={classes.submitButton}
                         onClick={async () => {
                             setDeleting(true)
                             setError(null)

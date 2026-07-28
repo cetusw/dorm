@@ -57,6 +57,7 @@ export function DutySettingsPage({ groupId }: Props) {
     }, [data, excludingTaskId])
     const selectedArea = data?.areas.find((area) => String(area.id) === selectedAreaId) ?? null
     const selectedFloorPlan = availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ?? null
+    const hasTaskModalOpen = taskAreaId !== null || editingTaskId !== null || excludingTaskId !== null
 
     useEffect(() => {
         if (availableFloorPlans.length === 0) {
@@ -131,7 +132,29 @@ export function DutySettingsPage({ groupId }: Props) {
 
         content = (
             <Stack gap="xl">
-                <DutySettingsTaskSummary summary={data.active_duty.summary} />
+                {viewMode === 'plan' ? (
+                    <Group justify="space-between" align="center" gap="md" wrap="wrap">
+                        <DutySettingsTaskSummary summary={data.active_duty.summary} />
+                        <Select
+                            aria-label="Этаж"
+                            value={selectedFloorPlanId}
+                            data={availableFloorPlans.map((plan) => ({
+                                value: String(plan.floor),
+                                label: getFloorLabel(plan.floor),
+                            }))}
+                            allowDeselect={false}
+                            w={220}
+                            onChange={(value) => {
+                                if (value) {
+                                    setSelectedFloorPlanId(value)
+                                }
+                            }}
+                        />
+                    </Group>
+                ) : (
+                    <DutySettingsTaskSummary summary={data.active_duty.summary} />
+                )}
+
                 {viewMode === 'plan' && selectedFloorPlan ? (
                     <DutySettingsPlanPanel
                         areas={floorAreas}
@@ -189,7 +212,6 @@ export function DutySettingsPage({ groupId }: Props) {
                             data={[
                                 { label: 'Задачи', value: 'tasks' },
                                 { label: 'Команды', value: 'teams' },
-                                { label: 'Следующее дежурство', value: 'next-duty' },
                             ]}
                             classNames={{
                                 control: segmentedControlClasses.control,
@@ -215,26 +237,6 @@ export function DutySettingsPage({ groupId }: Props) {
                             />
                         ) : null}
                     </Group>
-
-                    {mainTab === 'tasks' && viewMode === 'plan' ? (
-                        <Group justify="flex-end">
-                            <Select
-                                aria-label="Этаж"
-                                value={selectedFloorPlanId}
-                                data={availableFloorPlans.map((plan) => ({
-                                    value: String(plan.floor),
-                                    label: getFloorLabel(plan.floor),
-                                }))}
-                                allowDeselect={false}
-                                w={220}
-                                onChange={(value) => {
-                                    if (value) {
-                                        setSelectedFloorPlanId(value)
-                                    }
-                                }}
-                            />
-                        </Group>
-                    ) : null}
                 </Stack>
             )}
         >
@@ -254,6 +256,7 @@ export function DutySettingsPage({ groupId }: Props) {
                     <TaskFormModal
                         opened={editingTaskId !== null}
                         mode="edit"
+                        appearance="settings"
                         taskId={editingTaskId}
                         dormitoryId={String(data.group.dormitory_id)}
                         initialAreaId={taskAreaId == null ? null : String(taskAreaId)}
@@ -320,6 +323,7 @@ export function DutySettingsPage({ groupId }: Props) {
                     <DutySettingsAreaDrawer
                         area={selectedArea}
                         opened={selectedArea !== null}
+                        hasNestedModalOpen={hasTaskModalOpen}
                         onClose={() => setSelectedAreaId(null)}
                         onCreateTask={handleCreateTask}
                         onEditTask={handleEditTask}

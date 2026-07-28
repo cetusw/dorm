@@ -4,6 +4,7 @@ import { Alert, Button, Checkbox, Group, Modal, NumberInput, SimpleGrid, Stack, 
 import { useForm } from '@mantine/form'
 
 import { ApiError } from '../../../shared/api/ApiError'
+import modalClasses from '../../../shared/ui/SettingsModal.module.css'
 import type { CreateTaskRequest } from '../../task-catalog/model/types'
 import classes from './DutySettingsCreateTaskModal.module.css'
 
@@ -114,15 +115,15 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
         <Modal
             opened={opened}
             onClose={onClose}
-            title={<span className={classes.title}>Добавление задачи</span>}
+            title={<span className={modalClasses.title}>Добавление задачи</span>}
             withCloseButton={false}
             centered
             radius={32}
             size={680}
             classNames={{
-                header: classes.header,
-                body: classes.body,
-                content: classes.content,
+                header: modalClasses.header,
+                body: modalClasses.body,
+                content: modalClasses.content,
             }}
         >
             <form
@@ -160,7 +161,7 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
                         placeholder="Название задачи*"
                         maxLength={255}
                         classNames={{
-                            input: classes.input,
+                            input: modalClasses.input,
                         }}
                         key={form.key('title')}
                         {...form.getInputProps('title')}
@@ -174,7 +175,7 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
                             hideControls
                             clampBehavior="strict"
                             classNames={{
-                                input: classes.input,
+                                input: modalClasses.input,
                             }}
                             value={form.values.cost}
                             error={form.errors.cost}
@@ -189,7 +190,7 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
                                 hideControls
                                 clampBehavior="strict"
                                 classNames={{
-                                    input: classes.input,
+                                    input: modalClasses.input,
                                 }}
                                 value={form.values.frequency}
                                 error={form.errors.frequency}
@@ -239,19 +240,19 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
                         />
                     ) : null}
 
-                    <Group justify="flex-end" gap="15" className={classes.actions}>
+                    <Group justify="flex-end" gap="15" className={modalClasses.actions}>
                         <Button
                             type="button"
                             variant="default"
                             onClick={onClose}
-                            className={classes.cancelButton}
+                            className={modalClasses.cancelButton}
                         >
                             Отменить
                         </Button>
                         <Button
                             type="submit"
                             loading={saving}
-                            className={classes.submitButton}
+                            className={[modalClasses.submitButton, modalClasses.accentButton].join(' ')}
                         >
                             Добавить
                         </Button>

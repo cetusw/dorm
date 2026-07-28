@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { CheckCircleIcon, CoinsIcon, UserIcon } from '@phosphor-icons/react'
-import { Group, Text } from '@mantine/core'
+import { Box, Group, Text } from '@mantine/core'
 
 import type { DutySettingsTaskSummary as DutySettingsTaskSummaryModel } from '../model/types'
 
@@ -16,9 +16,27 @@ type SummaryItemProps = {
 
 function SummaryItem({ icon, label }: SummaryItemProps) {
     return (
-        <Group gap="xs" wrap="nowrap">
-            {icon}
-            <Text fw={500}>{label}</Text>
+        <Group gap="xs" wrap="nowrap" align="center">
+            <Box
+                component="span"
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
+                {icon}
+            </Box>
+            <Text
+                fw={500}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    lineHeight: 1.25,
+                }}
+            >
+                {label}
+            </Text>
         </Group>
     )
 }
