@@ -104,6 +104,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 
 	userQueryService := query.NewUserQueryService(db)
 	teamQueryService := query.NewTeamQueryService(db)
+	notificationQueryService := query.NewNotificationQueryService(db)
 
 	userService := user.NewUserService(
 		userRepo,
@@ -131,6 +132,13 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		pushSender,
 		cfg.WebPush.Enabled,
 	)
+	dutyReminderService := notificationuc.NewDutyReminderService(
+		notificationQueryService,
+		notificationQueryService,
+		notificationQueryService,
+		notificationQueryService,
+		userNotificationService,
+	)
 	bus.Subscribe(events.TopicTasksReadyForReview, notificationuc.NewTasksReadyForReviewHandler(userNotificationService).Handle)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
@@ -143,7 +151,10 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		return nil, fmt.Errorf("sheets adapter init failed: %w", err)
 	}
 
-	cronScheduler := scheduler.NewScheduler(cleaningService, cfg)
+	cronScheduler, err := scheduler.NewScheduler(cleaningService, dutyReminderService, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("scheduler init failed: %w", err)
+	}
 
 	engine := html.New("./web", ".html")
 	app := fiber.New(fiber.Config{

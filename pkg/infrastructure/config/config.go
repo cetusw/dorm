@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 type CronConfig struct {
@@ -32,10 +33,11 @@ type AppConfig struct {
 	DBDriver   string
 	AuthSecret string
 
-	Cron              CronConfig
-	BotToken          string
-	GoogleCredentials string
-	WebPush           WebPushConfig
+	Cron                         CronConfig
+	BotToken                     string
+	GoogleCredentials            string
+	WebPush                      WebPushConfig
+	NotificationSchedulerEnabled bool
 }
 
 func LoadConfig(configPath string) (*AppConfig, error) {
@@ -59,8 +61,12 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 
 	cfg.getAuthConfig()
 	cfg.getWebPushConfig()
+	cfg.getNotificationSchedulerConfig()
 
 	if err := cfg.WebPush.Validate(); err != nil {
+		return nil, err
+	}
+	if err := cfg.ValidateTimezone(); err != nil {
 		return nil, err
 	}
 
@@ -166,6 +172,13 @@ func (cfg *AppConfig) getWebPushConfig() {
 	cfg.WebPush.Subject = strings.TrimSpace(os.Getenv("WEB_PUSH_SUBJECT"))
 }
 
+func (cfg *AppConfig) getNotificationSchedulerConfig() {
+	cfg.NotificationSchedulerEnabled = strings.EqualFold(
+		strings.TrimSpace(os.Getenv("NOTIFICATION_SCHEDULER_ENABLED")),
+		"true",
+	)
+}
+
 func (cfg WebPushConfig) Validate() error {
 	if !cfg.Enabled {
 		return nil
@@ -197,6 +210,18 @@ func (cfg WebPushConfig) Validate() error {
 		}
 	default:
 		return errors.New("WEB_PUSH_SUBJECT must start with mailto: or https://")
+	}
+
+	return nil
+}
+
+func (cfg *AppConfig) ValidateTimezone() error {
+	if strings.TrimSpace(cfg.TZ) == "" {
+		return errors.New("TZ environment variable is required")
+	}
+
+	if _, err := time.LoadLocation(cfg.TZ); err != nil {
+		return fmt.Errorf("invalid TZ value %q: %w", cfg.TZ, err)
 	}
 
 	return nil

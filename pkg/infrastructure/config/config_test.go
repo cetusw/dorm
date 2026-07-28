@@ -39,3 +39,15 @@ func TestWebPushConfigValidate(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestAppConfigValidateTimezone(t *testing.T) {
+	t.Run("valid timezone passes", func(t *testing.T) {
+		cfg := &AppConfig{TZ: "Europe/Moscow"}
+		assert.NoError(t, cfg.ValidateTimezone())
+	})
+
+	t.Run("empty timezone fails", func(t *testing.T) {
+		cfg := &AppConfig{}
+		assert.EqualError(t, cfg.ValidateTimezone(), "TZ environment variable is required")
+	})
+}

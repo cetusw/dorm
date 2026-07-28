@@ -4,6 +4,7 @@ import (
 	"context"
 	domain "dorm/pkg/core/domain/notification"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -21,6 +22,13 @@ type NotifyUserCommand struct {
 
 type UserNotificationUseCase interface {
 	NotifyUser(ctx context.Context, command NotifyUserCommand) error
+}
+
+type DutyReminderUseCase interface {
+	SendDutyStartedReminders(ctx context.Context, at time.Time) error
+	SendSaturdayTaskReminders(ctx context.Context, at time.Time) error
+	SendSundayTakeTaskReminders(ctx context.Context, at time.Time) error
+	SendSundayFinishTaskReminders(ctx context.Context, at time.Time) error
 }
 
 type NotificationRepository interface {
