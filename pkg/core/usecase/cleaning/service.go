@@ -8,7 +8,9 @@ import (
 	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/domain/user"
 	"dorm/pkg/core/ports"
+	queryports "dorm/pkg/core/ports/query"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -272,6 +274,7 @@ func (s *Service) applyTaskCompletion(ctx context.Context, data *taskActionConte
 	if err != nil {
 		return fmt.Errorf("complete duty task: %w", err)
 	}
+	s.publishTasksReadyForReviewIfNeeded(ctx, data)
 	_ = s.eventBus.Publish(ctx, events.TopicTaskCompleted, events.TaskCompletedEvent{
 		TaskID: data.task.ID(),
 		UserID: data.user.ID(),
@@ -326,4 +329,54 @@ func (s *Service) currentTime() time.Time {
 		return time.Now()
 	}
 	return s.now()
+}
+
+func (s *Service) publishTasksReadyForReviewIfNeeded(ctx context.Context, data *taskActionContext) {
+	currentDuty, err := s.dutyRepo.FindByID(ctx, data.duty.ID())
+	if err != nil {
+		log.Printf("load duty for tasks ready event: %v", err)
+		return
+	}
+	if currentDuty == nil {
+		return
+	}
+
+	progress := calculateDutyTaskProgress(currentDuty.Tasks())
+	if !progress.IsReadyForReview() {
+		return
+	}
+
+	team, err := s.teamRepo.FindByID(ctx, currentDuty.TeamID())
+	if err != nil {
+		log.Printf("load team for tasks ready event: %v", err)
+		return
+	}
+	if team == nil || team.LeaderID() == nil {
+		log.Printf("skip tasks ready notification: team %s has no leader", currentDuty.TeamID())
+		return
+	}
+
+	_ = s.eventBus.Publish(ctx, events.TopicTasksReadyForReview, events.TasksReadyForReviewEvent{
+		DutyID:     currentDuty.ID(),
+		TeamID:     currentDuty.TeamID(),
+		TeamHeadID: *team.LeaderID(),
+		OccurredAt: data.now,
+	})
+}
+
+func calculateDutyTaskProgress(tasks []*duty.DutyTask) queryports.DutyTaskProgress {
+	progress := queryports.DutyTaskProgress{
+		TotalCount: len(tasks),
+	}
+
+	for _, task := range tasks {
+		if task.CompletionDate() != nil {
+			progress.CompletedCount++
+		}
+		if task.VerificationDate() != nil {
+			progress.VerifiedCount++
+		}
+	}
+
+	return progress
 }

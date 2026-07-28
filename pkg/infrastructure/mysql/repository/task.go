@@ -192,18 +192,60 @@ func (r *TaskRepository) Save(ctx context.Context, task *catalog.TaskDefinition)
 }
 
 func (r *TaskRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	idBytes, err := id.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("TaskRepository.SoftDelete: marshal task id: %w", err)
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("TaskRepository.SoftDelete: begin tx: %w", err)
+	}
+
+	if err := softDeleteTask(ctx, tx, idBytes); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("TaskRepository.SoftDelete: %w", err)
+	}
+
+	if err := deleteActiveDutyTasksByTaskID(ctx, tx, idBytes); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("TaskRepository.SoftDelete: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("TaskRepository.SoftDelete: commit: %w", err)
+	}
+
+	return nil
+}
+
+func softDeleteTask(ctx context.Context, tx *sql.Tx, taskID []byte) error {
 	const query = `
 		UPDATE task
 		SET deleted_at = NOW()
 		WHERE id = ? AND deleted_at IS NULL
 	`
-	idBytes, err := id.MarshalBinary()
-	if err != nil {
-		return fmt.Errorf("TaskRepository.SoftDelete: marshal task id: %w", err)
+
+	if _, err := tx.ExecContext(ctx, query, taskID); err != nil {
+		return fmt.Errorf("soft delete task: %w", err)
 	}
-	_, err = r.db.ExecContext(ctx, query, idBytes)
-	if err != nil {
-		return fmt.Errorf("TaskRepository.SoftDelete: %w", err)
+
+	return nil
+}
+
+func deleteActiveDutyTasksByTaskID(ctx context.Context, tx *sql.Tx, taskID []byte) error {
+	const query = `
+		DELETE dt
+		FROM duty_task dt
+		INNER JOIN duty d ON d.id = dt.duty_id
+		WHERE dt.task_id = ?
+		  AND d.start_date <= NOW()
+		  AND d.end_date > NOW()
+	`
+
+	if _, err := tx.ExecContext(ctx, query, taskID); err != nil {
+		return fmt.Errorf("delete active duty tasks for removed task: %w", err)
 	}
+
 	return nil
 }

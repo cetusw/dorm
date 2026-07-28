@@ -3,6 +3,7 @@ package di
 import (
 	"database/sql"
 	"dorm/pkg/adapters/http"
+	"dorm/pkg/core/domain/events"
 	"dorm/pkg/core/usecase/dormitory"
 	dutyuc "dorm/pkg/core/usecase/duty"
 	dutysettingsuc "dorm/pkg/core/usecase/dutysettings"
@@ -10,6 +11,7 @@ import (
 	residentusecase "dorm/pkg/core/usecase/resident"
 	"dorm/pkg/core/usecase/team"
 	"dorm/pkg/infrastructure/mysql/query"
+	notificationinfra "dorm/pkg/infrastructure/notification"
 	"fmt"
 	"log"
 
@@ -86,6 +88,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	taskOverrideRepo := repository.NewDutyTaskOverrideRepository(db)
 	dormitoryRepo := repository.NewDormitoryRepository(db)
 	pushSubscriptionRepo := repository.NewPushSubscriptionRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
 
 	cleaningService := cleaning.NewCleaningService(
 		userRepo,
@@ -115,7 +118,20 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	dutyService := dutyuc.NewDutyService(dutyRepo, teamRepo, groupRepo, dormitoryRepo, taskRepo, taskOverrideRepo, areaRepo, userRepo)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo, groupRepo)
 	dutySettingsService := dutysettingsuc.NewDutySettingsService(groupRepo, teamRepo, areaRepo, taskRepo, dutyRepo, dutyTaskRepo, userRepo)
-	notificationService := notificationuc.NewNotificationService(pushSubscriptionRepo)
+	pushSubscriptionService := notificationuc.NewNotificationService(pushSubscriptionRepo)
+
+	var pushSender ports.PushSender = notificationinfra.NoopPushSender{}
+	if cfg.WebPush.Enabled {
+		pushSender = notificationinfra.NewWebPushSender(cfg.WebPush)
+	}
+
+	userNotificationService := notificationuc.NewDeliveryService(
+		notificationRepo,
+		pushSubscriptionRepo,
+		pushSender,
+		cfg.WebPush.Enabled,
+	)
+	bus.Subscribe(events.TopicTasksReadyForReview, notificationuc.NewTasksReadyForReviewHandler(userNotificationService).Handle)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)
 	//if err != nil {
@@ -158,7 +174,7 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	residentAuthHandler := http.NewResidentAuthHandler(userService, cfg.AuthSecret)
 	residentAuthHandler.RegisterRoutes(app)
 
-	notificationAPIHandler := http.NewNotificationAPIHandler(cfg.WebPush, notificationService)
+	notificationAPIHandler := http.NewNotificationAPIHandler(cfg.WebPush, pushSubscriptionService)
 	notificationAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	residentDutyService := residentusecase.NewResidentDutyService(

@@ -10,3 +10,17 @@ const (
 	NotificationTasksReadyForReview       NotificationType = "tasks_ready_for_review"
 	NotificationDutyCompleted             NotificationType = "duty_completed"
 )
+
+func (notificationType NotificationType) IsValid() bool {
+	switch notificationType {
+	case NotificationDutyStarted,
+		NotificationTakeTasksSaturdayReminder,
+		NotificationTakeTasksSundayReminder,
+		NotificationFinishTasksSundayReminder,
+		NotificationTasksReadyForReview,
+		NotificationDutyCompleted:
+		return true
+	default:
+		return false
+	}
+}

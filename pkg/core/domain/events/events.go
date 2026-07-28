@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	TopicTaskCompleted   = "task.completed"
-	TopicTaskUncompleted = "task.uncompleted"
-	TopicTaskAssigned    = "task.assigned"
-	TopicWeekStarted     = "week.started"
+	TopicTaskCompleted       = "task.completed"
+	TopicTaskUncompleted     = "task.uncompleted"
+	TopicTaskAssigned        = "task.assigned"
+	TopicTasksReadyForReview = "tasks.ready_for_review"
+	TopicWeekStarted         = "week.started"
 )
 
 type TaskCompletedEvent struct {
@@ -30,6 +31,13 @@ type TaskUncompletedEvent struct {
 type TaskAssignedEvent struct {
 	TaskID     uuid.UUID
 	AssigneeID *uuid.UUID
+}
+
+type TasksReadyForReviewEvent struct {
+	DutyID     uuid.UUID
+	TeamID     uuid.UUID
+	TeamHeadID uuid.UUID
+	OccurredAt time.Time
 }
 
 type WeekStartedEvent struct {
