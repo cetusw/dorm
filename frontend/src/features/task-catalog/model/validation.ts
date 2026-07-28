@@ -30,18 +30,11 @@ export const taskFormValidation = {
         return null
     },
     cost: (value: string) => validateRequiredPositiveNumber(value, 'Введите стоимость', 'Стоимость должна быть больше нуля'),
-    frequency: (value: string) => {
-        const trimmed = value.trim()
-
-        if (trimmed.length === 0) {
-            return 'Введите частоту'
+    recurrenceInterval: (value: string | null) => {
+        if (!value) {
+            return 'Выберите частоту'
         }
 
-        const parsed = Number(trimmed)
-        if (!Number.isInteger(parsed) || parsed < 0) {
-            return 'Частота не может быть отрицательной'
-        }
-
-        return null
+        return ['0', '1', '2', '4', '12'].includes(value) ? null : 'Выберите корректную частоту'
     },
 } satisfies Partial<Record<keyof TaskFormValues, (value: string) => string | null>>

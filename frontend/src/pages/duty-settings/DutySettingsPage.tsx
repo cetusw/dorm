@@ -7,7 +7,6 @@ import {
     createDutySettingsTask,
     deleteDutySettingsTask,
     excludeDutySettingsTask,
-    getDutySettings,
     includeDutySettingsTask,
     updateDutySettingsTask,
 } from '../../features/duty-settings/api/dutySettingsApi'
@@ -21,7 +20,6 @@ import { DutySettingsTaskSummary } from '../../features/duty-settings/ui/DutySet
 import { DutySettingsTeamsTab } from '../../widgets/duty-settings-teams/ui/DutySettingsTeamsTab'
 import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
-import { TaskFormModal } from '../../features/task-catalog/ui/TaskFormModal'
 import { ConfirmActionModal } from '../../shared/ui/ConfirmActionModal'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 import { PageFrame } from '../../shared/ui/PageFrame'
@@ -59,6 +57,30 @@ export function DutySettingsPage({ groupId }: Props) {
     }, [data, deletingTaskId, excludingTaskId])
     const excludingTask = excludingTaskId ? selectedTask : null
     const deletingTask = deletingTaskId ? selectedTask : null
+    const editingTask = useMemo(() => {
+        if (!data || !editingTaskId) {
+            return null
+        }
+
+        for (const area of data.areas) {
+            const task = area.tasks.find((item) => item.id === editingTaskId)
+            if (task) {
+                return {
+                    id: task.id,
+                    title: task.title,
+                    cost: task.cost,
+                    recurrenceInterval: task.recurrenceInterval,
+                    startSequence: task.startSequence,
+                    area: {
+                        id: area.id,
+                        name: area.name,
+                    },
+                }
+            }
+        }
+
+        return null
+    }, [data, editingTaskId])
     const selectedArea = data?.areas.find((area) => String(area.id) === selectedAreaId) ?? null
     const selectedFloorPlan = availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ?? null
     const hasTaskModalOpen = taskAreaId !== null || editingTaskId !== null || excludingTaskId !== null || deletingTaskId !== null
@@ -251,6 +273,7 @@ export function DutySettingsPage({ groupId }: Props) {
                 <>
                     <DutySettingsCreateTaskModal
                         opened={taskAreaId !== null && editingTaskId === null}
+                        mode="create"
                         onClose={handleCloseTaskModal}
                         onCreate={async (request) => {
                             await createDutySettingsTask(groupId, Number(taskAreaId), request)
@@ -258,52 +281,16 @@ export function DutySettingsPage({ groupId }: Props) {
                         }}
                     />
 
-                    <TaskFormModal
+                    <DutySettingsCreateTaskModal
                         opened={editingTaskId !== null}
                         mode="edit"
-                        appearance="settings"
                         taskId={editingTaskId}
-                        dormitoryId={String(data.group.dormitory_id)}
-                        initialAreaId={taskAreaId == null ? null : String(taskAreaId)}
-                        hideAreaField={false}
-                        loadAreas={async () => ({
-                            areas: data.areas.map((area) => ({
-                                id: area.id,
-                                name: area.name,
-                                floor: area.floor,
-                                group: {
-                                    id: data.group.id,
-                                    name: data.group.name,
-                                },
-                            })),
-                        })}
-                        loadTask={async (taskId) => {
-                            const freshData = await getDutySettings(groupId)
-                            for (const area of freshData.areas) {
-                                const task = area.tasks.find((item) => item.id === taskId)
-                                if (task) {
-                                    return {
-                                        id: task.id,
-                                        title: task.title,
-                                        cost: task.cost,
-                                        frequency: task.frequency,
-                                        area: {
-                                            id: area.id,
-                                            name: area.name,
-                                        },
-                                    }
-                                }
-                            }
-
-                            throw new Error('Не удалось загрузить данные задачи')
-                        }}
-                        updateTaskRequest={async (taskId, request) => {
-                            const updated = await updateDutySettingsTask(groupId, taskId, request)
+                        task={editingTask}
+                        onUpdate={async (taskId, request) => {
+                            await updateDutySettingsTask(groupId, taskId, request)
                             await reload({ silent: true })
-                            return updated
                         }}
                         onClose={handleCloseTaskModal}
-                        onSaved={async () => {}}
                     />
 
                     <ConfirmActionModal

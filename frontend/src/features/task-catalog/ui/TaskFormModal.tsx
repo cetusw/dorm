@@ -20,6 +20,7 @@ import type {
     UpdateTaskRequest,
 } from '../model/types'
 import { taskFormValidation } from '../model/validation'
+import { RECURRENCE_OPTIONS } from '../model/recurrence'
 
 type Props = {
     opened: boolean
@@ -40,7 +41,7 @@ type Props = {
 const initialValues: TaskFormValues = {
     title: '',
     cost: '',
-    frequency: '',
+    recurrenceInterval: '1',
     areaId: null,
 }
 
@@ -48,7 +49,7 @@ function toRequest(values: TaskFormValues): CreateTaskRequest | UpdateTaskReques
     return {
         title: values.title.trim(),
         cost: Number(values.cost.trim()),
-        frequency: Number(values.frequency.trim()),
+        recurrenceInterval: Number(values.recurrenceInterval),
         area_id: Number(values.areaId),
     }
 }
@@ -79,7 +80,7 @@ export function TaskFormModal({
         validate: {
             title: taskFormValidation.title,
             cost: taskFormValidation.cost,
-            frequency: taskFormValidation.frequency,
+            recurrenceInterval: taskFormValidation.recurrenceInterval,
             areaId: (value) => (value ? null : 'Выберите территорию'),
         },
     })
@@ -119,7 +120,7 @@ export function TaskFormModal({
                     ? {
                         title: task.title,
                         cost: String(task.cost),
-                        frequency: String(task.frequency),
+                        recurrenceInterval: String(task.recurrenceInterval),
                         areaId: initialAreaId ?? String(task.area.id),
                     }
                     : {
@@ -246,20 +247,18 @@ export function TaskFormModal({
                 onChange={(value) => form.setFieldValue('cost', value === '' ? '' : String(value))}
             />
 
-            <NumberInput
+            <Select
                 label={isSettingsAppearance ? undefined : 'Частота'}
                 placeholder={isSettingsAppearance ? 'Частота*' : 'Частота'}
                 withAsterisk={!isSettingsAppearance}
-                allowDecimal={false}
-                allowNegative={false}
-                hideControls
-                clampBehavior="strict"
+                data={RECURRENCE_OPTIONS}
+                allowDeselect={false}
                 classNames={isSettingsAppearance ? {
                     input: modalClasses.input,
                 } : undefined}
-                value={form.values.frequency}
-                error={form.errors.frequency}
-                onChange={(value) => form.setFieldValue('frequency', value === '' ? '' : String(value))}
+                value={form.values.recurrenceInterval}
+                error={form.errors.recurrenceInterval}
+                onChange={(value) => form.setFieldValue('recurrenceInterval', value)}
             />
 
             {!hideAreaField && (

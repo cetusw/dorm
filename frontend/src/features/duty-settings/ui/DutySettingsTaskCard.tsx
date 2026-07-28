@@ -11,7 +11,7 @@ import { ActionIcon, Menu, Text, Tooltip } from '@mantine/core'
 
 import { TaskStatusBadge } from '../../current-duty/ui/TaskStatusBadge'
 import type { ResidentDutyTask } from '../../current-duty/model/types'
-import { formatLastCompletedAt } from '../model/utils'
+import { formatDutySettingsRecurrence } from '../model/utils'
 import type { DutySettingsTask } from '../model/types'
 import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
 import { SettingsCardSurface } from '../../../shared/ui/SettingsCardSurface'
@@ -69,13 +69,7 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude, onDel
                 </div>
 
                 <div className={classes.dateCell}>
-                    {task.frequency === 0 ? (
-                        <SettingsBadge>Одноразовая</SettingsBadge>
-                    ) : (
-                        <Tooltip label="Дата последнего выполнения">
-                            <Text fw={500}>{formatLastCompletedAt(task.last_completed_at)}</Text>
-                        </Tooltip>
-                    )}
+                    <SettingsBadge>{formatDutySettingsRecurrence(task)}</SettingsBadge>
                 </div>
 
                 <div className={classes.assigneeCell}>

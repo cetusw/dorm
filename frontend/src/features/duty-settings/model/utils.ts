@@ -1,5 +1,6 @@
 import type { AreaListItem } from '../../areas/model/types'
 import type { TaskListItem } from '../../task-catalog/model/types'
+import { formatRecurrenceInterval } from '../../task-catalog/model/recurrence'
 import type { DutySettingsArea, DutySettingsTask, DutySettingsTeamLeader } from './types'
 
 export function formatDutySettingsFloorLabel(floor: number | null): string {
@@ -35,6 +36,10 @@ export function formatLastCompletedAt(value: string | null): string {
     }).format(date)
 }
 
+export function formatDutySettingsRecurrence(task: DutySettingsTask): string {
+    return formatRecurrenceInterval(task.recurrenceInterval)
+}
+
 export function toAreaListItem(area: DutySettingsArea, groupId: string, groupName: string): AreaListItem {
     return {
         id: area.id,
@@ -52,7 +57,8 @@ export function toTaskListItem(task: DutySettingsTask, area: DutySettingsArea): 
         id: task.id,
         title: task.title,
         cost: task.cost,
-        frequency: task.frequency,
+        recurrenceInterval: task.recurrenceInterval,
+        startSequence: task.startSequence,
         area: {
             id: area.id,
             name: area.name,

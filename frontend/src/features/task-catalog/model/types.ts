@@ -7,7 +7,8 @@ export type TaskListItem = {
     id: string
     title: string
     cost: number
-    frequency: number
+    recurrenceInterval: number
+    startSequence: number
     area: TaskArea
 }
 
@@ -19,23 +20,23 @@ export type TaskDetails = {
     id: string
     title: string
     cost: number
-    frequency: number
+    recurrenceInterval: number
+    startSequence: number
     area: TaskArea
 }
 
 export type TaskFormValues = {
     title: string
     cost: string
-    frequency: string
+    recurrenceInterval: string | null
     areaId: string | null
 }
 
 export type CreateTaskRequest = {
     title: string
     cost: number
-    frequency: number
+    recurrenceInterval: number
     area_id: number
-    one_time?: boolean
     include_in_current_duty?: boolean
 }
 

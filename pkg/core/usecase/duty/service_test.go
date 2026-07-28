@@ -17,16 +17,17 @@ import (
 
 func TestSaveTaskOverrides_ReplacesOnlyDifferencesFromAutomaticState(t *testing.T) {
 	ctx := context.Background()
-	taskAutoInclude := catalog.RestoreTaskDefinition(uuid.New(), 1, "Auto include", 1, 1)
-	taskAutoExclude := catalog.RestoreTaskDefinition(uuid.New(), 1, "Auto exclude", 1, 7)
+	taskAutoInclude := catalog.RestoreTaskDefinition(uuid.New(), 1, "Auto include", 1, 1, 1)
+	taskAutoExclude := catalog.RestoreTaskDefinition(uuid.New(), 1, "Auto exclude", 1, 0, 1)
 
-	lastDuty := dutydomain.NewDuty(uuid.New(), time.Now().Add(-48*time.Hour), time.Now().Add(-24*time.Hour))
 	dutyRepo := new(dutyRepoMock)
 	overrideRepo := new(overrideRepoMock)
-	service := &Service{dutyRepo: dutyRepo, overrideRepo: overrideRepo}
+	service := &Service{
+		dutyRepo:     dutyRepo,
+		overrideRepo: overrideRepo,
+		areaRepo:     dutyAreaRepoStub{},
+	}
 
-	dutyRepo.On("FindLastByTaskDefID", ctx, taskAutoInclude.ID()).Return(nil, nil).Once()
-	dutyRepo.On("FindLastByTaskDefID", ctx, taskAutoExclude.ID()).Return(lastDuty, nil).Once()
 	overrideRepo.On("ReplaceForTasks", ctx, []uuid.UUID{taskAutoInclude.ID(), taskAutoExclude.ID()}, mock.MatchedBy(func(overrides []*catalog.DutyTaskOverride) bool {
 		if len(overrides) != 2 {
 			return false
@@ -41,13 +42,16 @@ func TestSaveTaskOverrides_ReplacesOnlyDifferencesFromAutomaticState(t *testing.
 
 func TestSaveTaskOverrides_RemovesOverridesWhenSelectionMatchesAutomaticState(t *testing.T) {
 	ctx := context.Background()
-	task := catalog.RestoreTaskDefinition(uuid.New(), 1, "Auto include", 1, 1)
+	task := catalog.RestoreTaskDefinition(uuid.New(), 1, "Auto include", 1, 1, 1)
 
 	dutyRepo := new(dutyRepoMock)
 	overrideRepo := new(overrideRepoMock)
-	service := &Service{dutyRepo: dutyRepo, overrideRepo: overrideRepo}
+	service := &Service{
+		dutyRepo:     dutyRepo,
+		overrideRepo: overrideRepo,
+		areaRepo:     dutyAreaRepoStub{},
+	}
 
-	dutyRepo.On("FindLastByTaskDefID", ctx, task.ID()).Return(nil, nil).Once()
 	overrideRepo.On("ReplaceForTasks", ctx, []uuid.UUID{task.ID()}, mock.MatchedBy(func(overrides []*catalog.DutyTaskOverride) bool {
 		return len(overrides) == 0
 	})).Return(nil).Once()
@@ -170,6 +174,15 @@ func (taskRepoStub) SoftDelete(ctx context.Context, id uuid.UUID) error         
 type areaRepoStub struct{}
 
 func (areaRepoStub) GetAllAreas(ctx context.Context) ([]*catalog.Area, error) { return nil, nil }
+
+type dutyAreaRepoStub struct{}
+
+func (dutyAreaRepoStub) GetAllAreas(ctx context.Context) ([]*catalog.Area, error) { return nil, nil }
+func (dutyAreaRepoStub) FindByID(ctx context.Context, id int) (*catalog.Area, error) {
+	return catalog.RestoreArea(id, "Area", 1, nil), nil
+}
+func (dutyAreaRepoStub) Save(ctx context.Context, area *catalog.Area) error { return nil }
+func (dutyAreaRepoStub) Delete(ctx context.Context, id int) error           { return nil }
 
 type userRepoStub struct{}
 

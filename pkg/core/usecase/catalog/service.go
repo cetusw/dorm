@@ -47,13 +47,14 @@ func (s *Service) ListTaskGroupsByGroup(ctx context.Context, groupID uuid.UUID) 
 			continue
 		}
 		items = append(items, dto.TaskCatalogItem{
-			ID:        task.ID(),
-			AreaID:    task.AreaID(),
-			AreaName:  area.Name(),
-			AreaFloor: area.Floor(),
-			Title:     task.Title(),
-			Cost:      task.Cost(),
-			Frequency: task.Frequency(),
+			ID:                 task.ID(),
+			AreaID:             task.AreaID(),
+			AreaName:           area.Name(),
+			AreaFloor:          area.Floor(),
+			Title:              task.Title(),
+			Cost:               task.Cost(),
+			RecurrenceInterval: task.RecurrenceInterval(),
+			StartSequence:      task.StartSequence(),
 		})
 	}
 	return groupTaskCatalogItems(items), nil
@@ -79,13 +80,14 @@ func (s *Service) ListCommonTaskGroups(ctx context.Context) ([]dto.TaskCatalogGr
 			continue
 		}
 		items = append(items, dto.TaskCatalogItem{
-			ID:        task.ID(),
-			AreaID:    task.AreaID(),
-			AreaName:  area.Name(),
-			AreaFloor: area.Floor(),
-			Title:     task.Title(),
-			Cost:      task.Cost(),
-			Frequency: task.Frequency(),
+			ID:                 task.ID(),
+			AreaID:             task.AreaID(),
+			AreaName:           area.Name(),
+			AreaFloor:          area.Floor(),
+			Title:              task.Title(),
+			Cost:               task.Cost(),
+			RecurrenceInterval: task.RecurrenceInterval(),
+			StartSequence:      task.StartSequence(),
 		})
 	}
 	return groupTaskCatalogItems(items), nil
@@ -270,10 +272,11 @@ func (s *Service) GetTasksResponse(ctx context.Context, dormitoryID int64) (dto.
 		}
 
 		items = append(items, dto.TaskResponseItem{
-			ID:        task.ID().String(),
-			Title:     task.Title(),
-			Cost:      task.Cost(),
-			Frequency: task.Frequency(),
+			ID:                 task.ID().String(),
+			Title:              task.Title(),
+			Cost:               task.Cost(),
+			RecurrenceInterval: task.RecurrenceInterval(),
+			StartSequence:      task.StartSequence(),
 			Area: dto.AreaSummary{
 				ID:   area.ID(),
 				Name: area.Name(),
@@ -312,10 +315,11 @@ func (s *Service) GetTaskDetails(ctx context.Context, dormitoryID int64, id uuid
 	}
 
 	return &dto.TaskDetails{
-		ID:        task.ID().String(),
-		Title:     task.Title(),
-		Cost:      task.Cost(),
-		Frequency: task.Frequency(),
+		ID:                 task.ID().String(),
+		Title:              task.Title(),
+		Cost:               task.Cost(),
+		RecurrenceInterval: task.RecurrenceInterval(),
+		StartSequence:      task.StartSequence(),
 		Area: dto.AreaSummary{
 			ID:   area.ID(),
 			Name: area.Name(),
@@ -338,12 +342,12 @@ func (s *Service) CreateArea(ctx context.Context, dormitoryID int64, req dto.Cre
 }
 
 func (s *Service) CreateTaskDetails(ctx context.Context, dormitoryID int64, req dto.CreateTaskRequest) (*dto.TaskDetails, error) {
-	input, err := s.normalizeTaskInput(ctx, dormitoryID, req.Title, req.Cost, req.Frequency, req.AreaID)
+	input, err := s.normalizeTaskInput(ctx, dormitoryID, req.Title, req.Cost, req.RecurrenceInterval, req.AreaID)
 	if err != nil {
 		return nil, err
 	}
 
-	task, err := catalog.NewTaskDefinition(input.areaID, input.title, input.cost, input.frequency)
+	task, err := catalog.NewTaskDefinition(input.areaID, input.title, input.cost, input.recurrenceInterval, 1)
 	if err != nil {
 		return nil, fmt.Errorf("create task: %w", err)
 	}
@@ -400,12 +404,19 @@ func (s *Service) UpdateTaskDetails(ctx context.Context, dormitoryID int64, id u
 		return nil, err
 	}
 
-	input, err := s.normalizeTaskInput(ctx, dormitoryID, req.Title, req.Cost, req.Frequency, req.AreaID)
+	input, err := s.normalizeTaskInput(ctx, dormitoryID, req.Title, req.Cost, req.RecurrenceInterval, req.AreaID)
 	if err != nil {
 		return nil, err
 	}
 
-	updated := catalog.RestoreTaskDefinition(id, input.areaID, input.title, input.cost, input.frequency)
+	updated := catalog.RestoreTaskDefinition(
+		id,
+		input.areaID,
+		input.title,
+		input.cost,
+		input.recurrenceInterval,
+		task.StartSequence(),
+	)
 	if err := s.taskRepo.Save(ctx, updated); err != nil {
 		return nil, fmt.Errorf("update task: %w", err)
 	}
@@ -473,11 +484,12 @@ func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (*dto.TaskCatalogIt
 		return nil, err
 	}
 	item := &dto.TaskCatalogItem{
-		ID:        task.ID(),
-		AreaID:    task.AreaID(),
-		Title:     task.Title(),
-		Cost:      task.Cost(),
-		Frequency: task.Frequency(),
+		ID:                 task.ID(),
+		AreaID:             task.AreaID(),
+		Title:              task.Title(),
+		Cost:               task.Cost(),
+		RecurrenceInterval: task.RecurrenceInterval(),
+		StartSequence:      task.StartSequence(),
 	}
 	for _, a := range areas {
 		if a.ID() == task.AreaID() {
@@ -490,7 +502,7 @@ func (s *Service) GetTask(ctx context.Context, id uuid.UUID) (*dto.TaskCatalogIt
 }
 
 func (s *Service) CreateTask(ctx context.Context, req dto.UpsertTaskCatalogRequest) error {
-	task, err := catalog.NewTaskDefinition(req.AreaID, req.Title, req.Cost, req.Frequency)
+	task, err := catalog.NewTaskDefinition(req.AreaID, req.Title, req.Cost, req.RecurrenceInterval, 1)
 	if err != nil {
 		return err
 	}
@@ -524,7 +536,14 @@ func (s *Service) UpdateTask(ctx context.Context, id uuid.UUID, req dto.UpsertTa
 	if existing == nil {
 		return nil
 	}
-	return s.taskRepo.Save(ctx, catalog.RestoreTaskDefinition(id, req.AreaID, req.Title, req.Cost, req.Frequency))
+	return s.taskRepo.Save(ctx, catalog.RestoreTaskDefinition(
+		id,
+		req.AreaID,
+		req.Title,
+		req.Cost,
+		req.RecurrenceInterval,
+		existing.StartSequence(),
+	))
 }
 
 func (s *Service) UpdateTaskInGroup(ctx context.Context, groupID uuid.UUID, id uuid.UUID, req dto.UpsertTaskCatalogRequest) error {
@@ -626,10 +645,10 @@ type normalizedAreaInput struct {
 }
 
 type normalizedTaskInput struct {
-	title     string
-	cost      int
-	frequency int
-	areaID    int
+	title              string
+	cost               int
+	recurrenceInterval int
+	areaID             int
 }
 
 func (i *normalizedAreaInput) floorValue() int {
@@ -684,7 +703,7 @@ func (s *Service) normalizeTaskInput(
 	dormitoryID int64,
 	title string,
 	cost int,
-	frequency int,
+	recurrenceInterval int,
 	areaID int,
 ) (*normalizedTaskInput, error) {
 	trimmedTitle := strings.TrimSpace(title)
@@ -697,8 +716,8 @@ func (s *Service) normalizeTaskInput(
 	if cost <= 0 {
 		return nil, fmt.Errorf("Стоимость должна быть больше нуля")
 	}
-	if frequency <= 0 {
-		return nil, fmt.Errorf("Частота должна быть больше нуля")
+	if !catalog.IsValidRecurrenceInterval(recurrenceInterval) {
+		return nil, fmt.Errorf("Выберите корректную частоту")
 	}
 	if areaID <= 0 {
 		return nil, fmt.Errorf("Выберите территорию")
@@ -716,10 +735,10 @@ func (s *Service) normalizeTaskInput(
 	}
 
 	return &normalizedTaskInput{
-		title:     trimmedTitle,
-		cost:      cost,
-		frequency: frequency,
-		areaID:    areaID,
+		title:              trimmedTitle,
+		cost:               cost,
+		recurrenceInterval: recurrenceInterval,
+		areaID:             areaID,
 	}, nil
 }
 

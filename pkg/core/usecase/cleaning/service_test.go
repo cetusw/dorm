@@ -39,7 +39,7 @@ func TestAssignTask_UsesAtomicRepositoryMethod(t *testing.T) {
 	require.NoError(t, err)
 	resident.JoinTeam(teamID)
 
-	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour), 1)
 	currentDuty.AddTask(taskID, taskDefID)
 	task := duty.RestoreDutyTask(duty.RestoreDutyTaskParams{
 		ID: taskID, DutyID: currentDuty.ID(), TaskDefID: taskDefID,
@@ -80,7 +80,7 @@ func TestAssignTask_DoesNotPublishEventOnAtomicConflict(t *testing.T) {
 	require.NoError(t, err)
 	resident.JoinTeam(teamID)
 
-	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour), 1)
 	currentDuty.AddTask(taskID, taskDefID)
 	task := duty.RestoreDutyTask(duty.RestoreDutyTaskParams{
 		ID: taskID, DutyID: currentDuty.ID(), TaskDefID: taskDefID,
@@ -122,7 +122,7 @@ func TestCompleteTask_UsesAtomicRepositoryMethod(t *testing.T) {
 	require.NoError(t, err)
 	resident.JoinTeam(teamID)
 
-	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour), 1)
 	currentDuty.AddTask(taskID, taskDefID)
 	assigneeID := resident.ID()
 	task := duty.RestoreDutyTask(duty.RestoreDutyTaskParams{
@@ -165,7 +165,7 @@ func TestAssignTask_WrapsRepositoryError(t *testing.T) {
 	require.NoError(t, err)
 	resident.JoinTeam(teamID)
 
-	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour), 1)
 	currentDuty.AddTask(taskID, taskDefID)
 	task := duty.RestoreDutyTask(duty.RestoreDutyTaskParams{
 		ID: taskID, DutyID: currentDuty.ID(), TaskDefID: taskDefID,

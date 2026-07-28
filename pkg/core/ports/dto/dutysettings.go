@@ -9,14 +9,15 @@ type DutySettingsGroup struct {
 }
 
 type DutySettingsTask struct {
-	ID              string     `json:"id"`
-	Title           string     `json:"title"`
-	Cost            int        `json:"cost"`
-	Frequency       int        `json:"frequency"`
-	LastCompletedAt *time.Time `json:"last_completed_at"`
-	IsIncluded      bool       `json:"is_included"`
-	AssigneeName    *string    `json:"assignee_name"`
-	Status          string     `json:"status"`
+	ID                 string     `json:"id"`
+	Title              string     `json:"title"`
+	Cost               int        `json:"cost"`
+	RecurrenceInterval int        `json:"recurrenceInterval"`
+	StartSequence      int        `json:"startSequence"`
+	LastCompletedAt    *time.Time `json:"last_completed_at"`
+	IsIncluded         bool       `json:"is_included"`
+	AssigneeName       *string    `json:"assignee_name"`
+	Status             string     `json:"status"`
 }
 
 type DutySettingsTaskSummary struct {

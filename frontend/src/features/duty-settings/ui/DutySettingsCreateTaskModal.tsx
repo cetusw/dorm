@@ -1,32 +1,35 @@
 import { useEffect, useState } from 'react'
 
-import { Alert, Button, Checkbox, Group, Modal, NumberInput, SimpleGrid, Stack, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Loader, Modal, NumberInput, Select, SimpleGrid, Stack, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 import { ApiError } from '../../../shared/api/ApiError'
 import modalClasses from '../../../shared/ui/SettingsModal.module.css'
-import type { CreateTaskRequest } from '../../task-catalog/model/types'
+import type { CreateTaskRequest, TaskDetails, UpdateTaskRequest } from '../../task-catalog/model/types'
+import { RECURRENCE_OPTIONS } from '../../task-catalog/model/recurrence'
 import classes from './DutySettingsCreateTaskModal.module.css'
 
 type FormValues = {
     title: string
     cost: string
-    frequency: string
-    oneTime: boolean
+    recurrenceInterval: string | null
     includeInCurrentDuty: boolean
 }
 
 type Props = {
     opened: boolean
+    mode: 'create' | 'edit'
+    taskId?: string | null
+    task?: TaskDetails | null
     onClose: () => void
-    onCreate: (request: CreateTaskRequest) => Promise<void>
+    onCreate?: (request: CreateTaskRequest) => Promise<void>
+    onUpdate?: (taskId: string, request: UpdateTaskRequest) => Promise<void>
 }
 
 const initialValues: FormValues = {
     title: '',
     cost: '',
-    frequency: '',
-    oneTime: false,
+    recurrenceInterval: '1',
     includeInCurrentDuty: false,
 }
 
@@ -55,8 +58,17 @@ function checkboxStyles(checked: boolean) {
     }
 }
 
-export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props) {
+export function DutySettingsCreateTaskModal({
+    opened,
+    mode,
+    taskId = null,
+    task = null,
+    onClose,
+    onCreate,
+    onUpdate,
+}: Props) {
     const [saving, setSaving] = useState(false)
+    const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     const form = useForm<FormValues>({
@@ -84,19 +96,11 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
                 }
                 return null
             },
-            frequency: (value, values) => {
-                if (values.oneTime) {
-                    return null
+            recurrenceInterval: (value) => {
+                if (!value) {
+                    return 'Выберите частоту'
                 }
-                const trimmed = value.trim()
-                if (trimmed.length === 0) {
-                    return 'Введите частоту'
-                }
-                const parsed = Number(trimmed)
-                if (!Number.isInteger(parsed) || parsed <= 0) {
-                    return 'Частота должна быть больше нуля'
-                }
-                return null
+                return ['0', '1', '2', '4', '12'].includes(value) ? null : 'Выберите корректную частоту'
             },
         },
     })
@@ -107,15 +111,44 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
             form.resetDirty(initialValues)
             form.clearErrors()
             setSaving(false)
+            setLoading(false)
             setError(null)
         }
     }, [opened])
+
+    useEffect(() => {
+        if (!opened || mode !== 'edit') {
+            return
+        }
+
+        if (!taskId || !task) {
+            setLoading(true)
+            setError(null)
+            return
+        }
+
+        const values: FormValues = {
+            title: task.title,
+            cost: String(task.cost),
+            recurrenceInterval: String(task.recurrenceInterval),
+            includeInCurrentDuty: false,
+        }
+
+        setLoading(false)
+        setError(null)
+        form.setValues(values)
+        form.resetDirty(values)
+        form.clearErrors()
+    }, [mode, opened, task?.id, task?.title, task?.cost, task?.recurrenceInterval, taskId])
+
+    const title = mode === 'create' ? 'Добавление задачи' : 'Редактирование задачи'
+    const submitLabel = mode === 'create' ? 'Добавить' : 'Сохранить'
 
     return (
         <Modal
             opened={opened}
             onClose={onClose}
-            title={<span className={modalClasses.title}>Добавление задачи</span>}
+            title={<span className={modalClasses.title}>{title}</span>}
             withCloseButton={false}
             centered
             radius={32}
@@ -132,14 +165,25 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
                     setError(null)
 
                     try {
-                        await onCreate({
+                        const request: CreateTaskRequest = {
                             title: values.title.trim(),
                             cost: Number(values.cost.trim()),
-                            frequency: values.oneTime ? 0 : Number(values.frequency.trim()),
+                            recurrenceInterval: Number(values.recurrenceInterval),
                             area_id: 0,
-                            one_time: values.oneTime,
-                            include_in_current_duty: values.oneTime ? true : values.includeInCurrentDuty,
-                        })
+                        }
+
+                        if (mode === 'create') {
+                            await onCreate?.({
+                                ...request,
+                                include_in_current_duty: values.includeInCurrentDuty,
+                            })
+                        } else if (taskId && task) {
+                            await onUpdate?.(taskId, {
+                                ...request,
+                                area_id: task.area.id,
+                            })
+                        }
+
                         onClose()
                     } catch (currentError) {
                         if (currentError instanceof ApiError) {
@@ -156,89 +200,65 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
             >
                 <Stack gap="15">
                     {error ? <Alert color="red">{error}</Alert> : null}
-
-                    <TextInput
-                        placeholder="Название задачи*"
-                        maxLength={255}
-                        classNames={{
-                            input: modalClasses.input,
-                        }}
-                        key={form.key('title')}
-                        {...form.getInputProps('title')}
-                    />
-
-                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="15">
-                        <NumberInput
-                            placeholder="Стоимость*"
-                            allowDecimal={false}
-                            allowNegative={false}
-                            hideControls
-                            clampBehavior="strict"
-                            classNames={{
-                                input: modalClasses.input,
-                            }}
-                            value={form.values.cost}
-                            error={form.errors.cost}
-                            onChange={(value) => form.setFieldValue('cost', value === '' ? '' : String(value))}
-                        />
-
-                        {!form.values.oneTime ? (
-                            <NumberInput
-                                placeholder="Частота*"
-                                allowDecimal={false}
-                                allowNegative={false}
-                                hideControls
-                                clampBehavior="strict"
+                    {loading ? <Loader size="sm" mx="auto" /> : (
+                        <>
+                            <TextInput
+                                placeholder="Название задачи*"
+                                maxLength={255}
                                 classNames={{
                                     input: modalClasses.input,
                                 }}
-                                value={form.values.frequency}
-                                error={form.errors.frequency}
-                                onChange={(value) => form.setFieldValue('frequency', value === '' ? '' : String(value))}
+                                key={form.key('title')}
+                                {...form.getInputProps('title')}
                             />
-                        ) : null}
-                    </SimpleGrid>
 
-                    <Checkbox
-                        label="Одноразовая задача"
-                        checked={form.values.oneTime}
-                        size="24px"
-                        radius={6}
-                        iconColor="#FFFFFF"
-                        styles={checkboxStyles(form.values.oneTime)}
-                        onChange={(event) => {
-                            const checked = event.currentTarget.checked
-                            form.setFieldValue('oneTime', checked)
-                            if (checked) {
-                                form.setFieldValue('includeInCurrentDuty', false)
-                                form.setFieldValue('frequency', '')
-                            }
-                        }}
-                        classNames={{
-                            root: classes.checkboxRoot,
-                            body: classes.checkboxBody,
-                            input: classes.checkboxIcon,
-                            label: classes.checkboxLabel,
-                        }}
-                    />
+                            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="15">
+                                <NumberInput
+                                    placeholder="Стоимость*"
+                                    allowDecimal={false}
+                                    allowNegative={false}
+                                    hideControls
+                                    clampBehavior="strict"
+                                    classNames={{
+                                        input: modalClasses.input,
+                                    }}
+                                    value={form.values.cost}
+                                    error={form.errors.cost}
+                                    onChange={(value) => form.setFieldValue('cost', value === '' ? '' : String(value))}
+                                />
 
-                    {!form.values.oneTime ? (
-                        <Checkbox
-                            label="Включить в текущее дежурство"
-                            checked={form.values.includeInCurrentDuty}
-                            size="24px"
-                            radius={6}
-                            iconColor="#FFFFFF"
-                            styles={checkboxStyles(form.values.includeInCurrentDuty)}
-                            onChange={(event) => form.setFieldValue('includeInCurrentDuty', event.currentTarget.checked)}
-                            classNames={{
-                                root: classes.checkboxRoot,
-                                body: classes.checkboxBody,
-                                input: classes.checkboxIcon,
-                                label: classes.checkboxLabel,
-                            }}
-                        />
-                    ) : null}
+                                <Select
+                                    placeholder="Частота*"
+                                    data={RECURRENCE_OPTIONS}
+                                    allowDeselect={false}
+                                    classNames={{
+                                        input: modalClasses.input,
+                                    }}
+                                    value={form.values.recurrenceInterval}
+                                    error={form.errors.recurrenceInterval}
+                                    onChange={(value) => form.setFieldValue('recurrenceInterval', value)}
+                                />
+                            </SimpleGrid>
+
+                            {mode === 'create' ? (
+                                <Checkbox
+                                    label="Включить в текущее дежурство"
+                                    checked={form.values.includeInCurrentDuty}
+                                    size="24px"
+                                    radius={6}
+                                    iconColor="#FFFFFF"
+                                    styles={checkboxStyles(form.values.includeInCurrentDuty)}
+                                    onChange={(event) => form.setFieldValue('includeInCurrentDuty', event.currentTarget.checked)}
+                                    classNames={{
+                                        root: classes.checkboxRoot,
+                                        body: classes.checkboxBody,
+                                        input: classes.checkboxIcon,
+                                        label: classes.checkboxLabel,
+                                    }}
+                                />
+                            ) : null}
+                        </>
+                    )}
 
                     <Group justify="flex-end" gap="15" className={modalClasses.actions}>
                         <Button
@@ -251,10 +271,10 @@ export function DutySettingsCreateTaskModal({ opened, onClose, onCreate }: Props
                         </Button>
                         <Button
                             type="submit"
-                            loading={saving}
+                            loading={saving || loading}
                             className={[modalClasses.submitButton, modalClasses.accentButton].join(' ')}
                         >
-                            Добавить
+                            {submitLabel}
                         </Button>
                     </Group>
                 </Stack>

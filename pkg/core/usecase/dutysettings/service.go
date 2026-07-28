@@ -584,7 +584,7 @@ func (s *Service) CreateTask(ctx context.Context, currentUserID uuid.UUID, group
 		return nil, err
 	}
 
-	task, err := catalog.NewTaskDefinition(area.ID(), normalized.title, normalized.cost, normalized.frequency)
+	task, err := catalog.NewTaskDefinition(area.ID(), normalized.title, normalized.cost, normalized.recurrenceInterval, 1)
 	if err != nil {
 		return nil, fmt.Errorf("create task: %w", err)
 	}
@@ -623,12 +623,19 @@ func (s *Service) UpdateTask(ctx context.Context, currentUserID uuid.UUID, group
 		return nil, err
 	}
 
-	normalized, err := normalizeTaskInput(req.Title, req.Cost, req.Frequency)
+	normalized, err := normalizeTaskInput(req.Title, req.Cost, req.RecurrenceInterval)
 	if err != nil {
 		return nil, err
 	}
 
-	updated := catalog.RestoreTaskDefinition(task.ID(), targetArea.ID(), normalized.title, normalized.cost, normalized.frequency)
+	updated := catalog.RestoreTaskDefinition(
+		task.ID(),
+		targetArea.ID(),
+		normalized.title,
+		normalized.cost,
+		normalized.recurrenceInterval,
+		task.StartSequence(),
+	)
 	if err := s.taskRepo.Save(ctx, updated); err != nil {
 		return nil, fmt.Errorf("update task: %w", err)
 	}
@@ -814,14 +821,15 @@ func (s *Service) buildTaskEditorState(
 		}
 
 		tasksByArea[area.ID()] = append(tasksByArea[area.ID()], dto.DutySettingsTask{
-			ID:              task.ID().String(),
-			Title:           task.Title(),
-			Cost:            task.Cost(),
-			Frequency:       task.Frequency(),
-			LastCompletedAt: lastCompletionDates[task.ID()],
-			IsIncluded:      isIncluded,
-			AssigneeName:    assigneeName,
-			Status:          status,
+			ID:                 task.ID().String(),
+			Title:              task.Title(),
+			Cost:               task.Cost(),
+			RecurrenceInterval: task.RecurrenceInterval(),
+			StartSequence:      task.StartSequence(),
+			LastCompletedAt:    lastCompletionDates[task.ID()],
+			IsIncluded:         isIncluded,
+			AssigneeName:       assigneeName,
+			Status:             status,
 		})
 	}
 
@@ -1333,11 +1341,11 @@ func normalizeAreaInput(name string, floor *int) (*normalizedAreaInput, error) {
 type normalizedTaskInput struct {
 	title                string
 	cost                 int
-	frequency            int
+	recurrenceInterval   int
 	includeInCurrentDuty bool
 }
 
-func normalizeTaskInput(title string, cost int, frequency int) (*normalizedTaskInput, error) {
+func normalizeTaskInput(title string, cost int, recurrenceInterval int) (*normalizedTaskInput, error) {
 	trimmedTitle := strings.TrimSpace(title)
 	if trimmedTitle == "" {
 		return nil, fmt.Errorf("Введите название")
@@ -1348,30 +1356,23 @@ func normalizeTaskInput(title string, cost int, frequency int) (*normalizedTaskI
 	if cost <= 0 {
 		return nil, fmt.Errorf("Стоимость должна быть больше нуля")
 	}
-	if frequency < 0 {
-		return nil, fmt.Errorf("Частота не может быть отрицательной")
+	if !catalog.IsValidRecurrenceInterval(recurrenceInterval) {
+		return nil, fmt.Errorf("Выберите корректную частоту")
 	}
 
 	return &normalizedTaskInput{
-		title:     trimmedTitle,
-		cost:      cost,
-		frequency: frequency,
+		title:              trimmedTitle,
+		cost:               cost,
+		recurrenceInterval: recurrenceInterval,
 	}, nil
 }
 
 func normalizeCreateTaskInput(req dto.CreateTaskRequest) (*normalizedTaskInput, error) {
-	frequency := req.Frequency
-	includeInCurrentDuty := req.IncludeInCurrentDuty
-	if req.OneTime {
-		frequency = 0
-		includeInCurrentDuty = true
-	}
-
-	normalized, err := normalizeTaskInput(req.Title, req.Cost, frequency)
+	normalized, err := normalizeTaskInput(req.Title, req.Cost, req.RecurrenceInterval)
 	if err != nil {
 		return nil, err
 	}
-	normalized.includeInCurrentDuty = includeInCurrentDuty
+	normalized.includeInCurrentDuty = req.IncludeInCurrentDuty
 
 	return normalized, nil
 }
@@ -1407,10 +1408,11 @@ func buildAreaDetails(area *catalog.Area, group *structure.Group) *dto.AreaDetai
 
 func buildTaskDetails(task *catalog.TaskDefinition, group *structure.Group, area *catalog.Area) *dto.TaskDetails {
 	return &dto.TaskDetails{
-		ID:        task.ID().String(),
-		Title:     task.Title(),
-		Cost:      task.Cost(),
-		Frequency: task.Frequency(),
+		ID:                 task.ID().String(),
+		Title:              task.Title(),
+		Cost:               task.Cost(),
+		RecurrenceInterval: task.RecurrenceInterval(),
+		StartSequence:      task.StartSequence(),
 		Area: dto.AreaSummary{
 			ID:   area.ID(),
 			Name: area.Name(),

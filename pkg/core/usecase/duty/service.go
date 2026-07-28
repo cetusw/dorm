@@ -183,16 +183,11 @@ func (s *Service) groupFutureDutyTasks(ctx context.Context, tasks []*catalog.Tas
 		if area == nil {
 			continue
 		}
-		lastDuty, err := s.dutyRepo.FindLastByTaskDefID(ctx, task.ID())
+		nextSequence, err := s.nextDutySequenceForArea(ctx, area)
 		if err != nil {
 			return nil, err
 		}
-		var lastCompletedAt *time.Time
-		if lastDuty != nil {
-			completedAt := lastDuty.End()
-			lastCompletedAt = &completedAt
-		}
-		isDue := isTaskDueByLastCompletion(task, lastCompletedAt, referenceDate)
+		isDue := task.IsScheduledFor(nextSequence)
 		includeInNextDuty := isDue
 		overrideValue, hasOverride := overrideMap[task.ID()]
 		if hasOverride {
@@ -213,16 +208,17 @@ func (s *Service) groupFutureDutyTasks(ctx context.Context, tasks []*catalog.Tas
 			taskGroup.IncludeTasksCount++
 		}
 		taskGroup.Tasks = append(taskGroup.Tasks, dto.FutureDutyTaskItem{
-			ID:                task.ID(),
-			AreaID:            area.ID(),
-			AreaName:          area.Name(),
-			Title:             task.Title(),
-			Frequency:         task.Frequency(),
-			LastCompletedAt:   lastCompletedAt,
-			IsDueByFrequency:  isDue,
-			HasOverride:       hasOverride,
-			IncludeInNextDuty: includeInNextDuty,
-			IsCommon:          area.GroupID() == nil,
+			ID:                 task.ID(),
+			AreaID:             area.ID(),
+			AreaName:           area.Name(),
+			Title:              task.Title(),
+			RecurrenceInterval: task.RecurrenceInterval(),
+			StartSequence:      task.StartSequence(),
+			LastCompletedAt:    nil,
+			IsDueByFrequency:   isDue,
+			HasOverride:        hasOverride,
+			IncludeInNextDuty:  includeInNextDuty,
+			IsCommon:           area.GroupID() == nil,
 		})
 	}
 	groups := make([]dto.FutureDutyTaskGroup, 0, len(groupMap))
@@ -323,7 +319,7 @@ func (s *Service) UpdateCommonDutySettings(ctx context.Context, includeTaskIDs [
 	return nil
 }
 
-func (s *Service) saveTaskOverrides(ctx context.Context, tasks []*catalog.TaskDefinition, includeTaskIDs []uuid.UUID, referenceDate time.Time) error {
+func (s *Service) saveTaskOverrides(ctx context.Context, tasks []*catalog.TaskDefinition, includeTaskIDs []uuid.UUID, _ time.Time) error {
 	includeSet := make(map[uuid.UUID]struct{}, len(includeTaskIDs))
 	for _, taskID := range includeTaskIDs {
 		includeSet[taskID] = struct{}{}
@@ -333,16 +329,18 @@ func (s *Service) saveTaskOverrides(ctx context.Context, tasks []*catalog.TaskDe
 	overrides := make([]*catalog.DutyTaskOverride, 0)
 	for _, task := range tasks {
 		taskIDs = append(taskIDs, task.ID())
-		lastDuty, err := s.dutyRepo.FindLastByTaskDefID(ctx, task.ID())
+		area, err := s.areaRepo.FindByID(ctx, task.AreaID())
 		if err != nil {
 			return err
 		}
-		var lastCompletedAt *time.Time
-		if lastDuty != nil {
-			completedAt := lastDuty.End()
-			lastCompletedAt = &completedAt
+		if area == nil {
+			return fmt.Errorf("task area not found")
 		}
-		isDue := isTaskDueByLastCompletion(task, lastCompletedAt, referenceDate)
+		nextSequence, err := s.nextDutySequenceForArea(ctx, area)
+		if err != nil {
+			return err
+		}
+		isDue := task.IsScheduledFor(nextSequence)
 		_, include := includeSet[task.ID()]
 		if include != isDue {
 			overrides = append(overrides, catalog.NewDutyTaskOverride(task.ID(), include))
@@ -351,18 +349,19 @@ func (s *Service) saveTaskOverrides(ctx context.Context, tasks []*catalog.TaskDe
 	return s.overrideRepo.ReplaceForTasks(ctx, taskIDs, overrides)
 }
 
-func isTaskDueByLastCompletion(task *catalog.TaskDefinition, lastCompletedAt *time.Time, referenceDate time.Time) bool {
-	if task.Frequency() == 0 {
-		return lastCompletedAt == nil
+func (s *Service) nextDutySequenceForArea(ctx context.Context, area *catalog.Area) (int, error) {
+	if area.GroupID() == nil {
+		return 1, nil
 	}
-	if task.Frequency() <= 1 {
-		return true
+
+	lastDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, *area.GroupID())
+	if err != nil {
+		return 0, err
 	}
-	if lastCompletedAt == nil {
-		return true
+	if lastDuty == nil {
+		return 1, nil
 	}
-	daysPassed := int(referenceDate.Sub(*lastCompletedAt).Hours() / 24)
-	return daysPassed >= task.Frequency()
+	return lastDuty.SequenceNumber() + 1, nil
 }
 
 func (s *Service) structureContext(ctx context.Context, teamID uuid.UUID) (*structure.Team, *structure.Group, *structure.Dormitory, error) {

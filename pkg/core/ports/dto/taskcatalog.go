@@ -3,13 +3,14 @@ package dto
 import "github.com/google/uuid"
 
 type TaskCatalogItem struct {
-	ID        uuid.UUID
-	AreaID    int
-	AreaName  string
-	AreaFloor int
-	Title     string
-	Cost      int
-	Frequency int
+	ID                 uuid.UUID
+	AreaID             int
+	AreaName           string
+	AreaFloor          int
+	Title              string
+	Cost               int
+	RecurrenceInterval int
+	StartSequence      int
 }
 
 type TaskCatalogGroup struct {
@@ -20,10 +21,10 @@ type TaskCatalogGroup struct {
 }
 
 type UpsertTaskCatalogRequest struct {
-	AreaID    int    `form:"area_id"`
-	Title     string `form:"title"`
-	Cost      int    `form:"cost"`
-	Frequency int    `form:"frequency"`
+	AreaID             int    `form:"area_id"`
+	Title              string `form:"title"`
+	Cost               int    `form:"cost"`
+	RecurrenceInterval int    `form:"recurrenceInterval"`
 }
 
 type AreaResponseItem struct {
@@ -67,11 +68,12 @@ type AreaSummary struct {
 }
 
 type TaskResponseItem struct {
-	ID        string      `json:"id"`
-	Title     string      `json:"title"`
-	Cost      int         `json:"cost"`
-	Frequency int         `json:"frequency"`
-	Area      AreaSummary `json:"area"`
+	ID                 string      `json:"id"`
+	Title              string      `json:"title"`
+	Cost               int         `json:"cost"`
+	RecurrenceInterval int         `json:"recurrenceInterval"`
+	StartSequence      int         `json:"startSequence"`
+	Area               AreaSummary `json:"area"`
 }
 
 type TaskListResponse struct {
@@ -79,25 +81,25 @@ type TaskListResponse struct {
 }
 
 type TaskDetails struct {
-	ID        string      `json:"id"`
-	Title     string      `json:"title"`
-	Cost      int         `json:"cost"`
-	Frequency int         `json:"frequency"`
-	Area      AreaSummary `json:"area"`
+	ID                 string      `json:"id"`
+	Title              string      `json:"title"`
+	Cost               int         `json:"cost"`
+	RecurrenceInterval int         `json:"recurrenceInterval"`
+	StartSequence      int         `json:"startSequence"`
+	Area               AreaSummary `json:"area"`
 }
 
 type CreateTaskRequest struct {
 	Title                string `json:"title"`
 	Cost                 int    `json:"cost"`
-	Frequency            int    `json:"frequency"`
+	RecurrenceInterval   int    `json:"recurrenceInterval"`
 	AreaID               int    `json:"area_id"`
-	OneTime              bool   `json:"one_time"`
 	IncludeInCurrentDuty bool   `json:"include_in_current_duty"`
 }
 
 type UpdateTaskRequest struct {
-	Title     string `json:"title"`
-	Cost      int    `json:"cost"`
-	Frequency int    `json:"frequency"`
-	AreaID    int    `json:"area_id"`
+	Title              string `json:"title"`
+	Cost               int    `json:"cost"`
+	RecurrenceInterval int    `json:"recurrenceInterval"`
+	AreaID             int    `json:"area_id"`
 }

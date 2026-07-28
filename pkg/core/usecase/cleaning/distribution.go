@@ -212,7 +212,12 @@ func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) 
 			continue
 		}
 
-		newDuty := duty.NewDuty(nextTeam.ID(), c.start, c.end)
+		nextSequence := 1
+		if lastDuty != nil {
+			nextSequence = lastDuty.SequenceNumber() + 1
+		}
+
+		newDuty := duty.NewDuty(nextTeam.ID(), c.start, c.end, nextSequence)
 		c.dutiesByGroup[group.ID()] = newDuty
 		c.dutiesList = append(c.dutiesList, newDuty)
 	}
@@ -277,11 +282,7 @@ func (s *Service) resolveTargetDuty(area *catalog.Area, c *distributingContext, 
 
 func (s *Service) assignBatchToDuty(ctx context.Context, d *duty.Duty, tasks []*catalog.TaskDefinition, c *distributingContext) error {
 	for _, def := range tasks {
-		isDue, err := s.isTaskDue(ctx, def, c.start)
-		if err != nil {
-			fmt.Printf("Frequency check failed for %s: %v\n", def.Title(), err)
-			isDue = true
-		}
+		isDue := def.IsScheduledFor(d.SequenceNumber())
 
 		if include, ok := c.taskOverrides[def.ID()]; ok {
 			isDue = include
@@ -315,32 +316,6 @@ func determineNextTeam(teams []*structure.Team, lastDuty *duty.Duty) (*structure
 	}
 
 	return nil, ErrLastDutyTeamNotFound
-}
-
-func (s *Service) isTaskDue(ctx context.Context, def *catalog.TaskDefinition, referenceDate time.Time) (bool, error) {
-	if def.Frequency() == 0 {
-		lastDuty, err := s.dutyRepo.FindLastByTaskDefID(ctx, def.ID())
-		if err != nil {
-			return false, err
-		}
-		return lastDuty == nil, nil
-	}
-
-	if def.Frequency() <= 1 {
-		return true, nil
-	}
-
-	lastDuty, err := s.dutyRepo.FindLastByTaskDefID(ctx, def.ID())
-	if err != nil {
-		return false, err
-	}
-	if lastDuty == nil {
-		return true, nil
-	}
-
-	daysPassed := int(referenceDate.Sub(lastDuty.End()).Hours() / 24)
-
-	return daysPassed >= def.Frequency(), nil
 }
 
 func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) error {

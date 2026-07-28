@@ -24,30 +24,33 @@ var (
 )
 
 type Duty struct {
-	id     uuid.UUID
-	teamID uuid.UUID
-	start  time.Time
-	end    time.Time
-	tasks  map[uuid.UUID]*DutyTask
+	id             uuid.UUID
+	teamID         uuid.UUID
+	start          time.Time
+	end            time.Time
+	sequenceNumber int
+	tasks          map[uuid.UUID]*DutyTask
 }
 
-func NewDuty(teamID uuid.UUID, start, end time.Time) *Duty {
+func NewDuty(teamID uuid.UUID, start, end time.Time, sequenceNumber int) *Duty {
 	return &Duty{
-		id:     uuid.New(),
-		teamID: teamID,
-		start:  start,
-		end:    end,
-		tasks:  make(map[uuid.UUID]*DutyTask),
+		id:             uuid.New(),
+		teamID:         teamID,
+		start:          start,
+		end:            end,
+		sequenceNumber: sequenceNumber,
+		tasks:          make(map[uuid.UUID]*DutyTask),
 	}
 }
 
-func RestoreDuty(id, teamID uuid.UUID, start, end time.Time, tasks []*DutyTask) *Duty {
+func RestoreDuty(id, teamID uuid.UUID, start, end time.Time, sequenceNumber int, tasks []*DutyTask) *Duty {
 	d := &Duty{
-		id:     id,
-		teamID: teamID,
-		start:  start,
-		end:    end,
-		tasks:  make(map[uuid.UUID]*DutyTask),
+		id:             id,
+		teamID:         teamID,
+		start:          start,
+		end:            end,
+		sequenceNumber: sequenceNumber,
+		tasks:          make(map[uuid.UUID]*DutyTask),
 	}
 	for _, t := range tasks {
 		d.tasks[t.id] = t
@@ -65,6 +68,9 @@ func (d *Duty) AddTask(taskID, taskDefID uuid.UUID) {
 
 func (d *Duty) ID() uuid.UUID     { return d.id }
 func (d *Duty) TeamID() uuid.UUID { return d.teamID }
+func (d *Duty) SequenceNumber() int {
+	return d.sequenceNumber
+}
 func (d *Duty) Tasks() []*DutyTask {
 	list := make([]*DutyTask, 0, len(d.tasks))
 	for _, t := range d.tasks {

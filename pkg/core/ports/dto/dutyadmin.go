@@ -18,16 +18,17 @@ type DutyListItem struct {
 }
 
 type FutureDutyTaskItem struct {
-	ID                uuid.UUID
-	AreaID            int
-	AreaName          string
-	Title             string
-	Frequency         int
-	LastCompletedAt   *time.Time
-	IsDueByFrequency  bool
-	HasOverride       bool
-	IncludeInNextDuty bool
-	IsCommon          bool
+	ID                 uuid.UUID
+	AreaID             int
+	AreaName           string
+	Title              string
+	RecurrenceInterval int
+	StartSequence      int
+	LastCompletedAt    *time.Time
+	IsDueByFrequency   bool
+	HasOverride        bool
+	IncludeInNextDuty  bool
+	IsCommon           bool
 }
 
 type FutureDutyTaskGroup struct {

@@ -23,7 +23,7 @@ func NewTaskRepository(db *sql.DB) *TaskRepository {
 
 func (r *TaskRepository) GetAllTaskDefinitions(ctx context.Context) ([]*catalog.TaskDefinition, error) {
 	const query = `
-		SELECT id, area_id, title, cost, frequency
+		SELECT id, area_id, title, cost, recurrence_interval, start_sequence
 		FROM task
 		WHERE deleted_at IS NULL
 	`
@@ -32,7 +32,7 @@ func (r *TaskRepository) GetAllTaskDefinitions(ctx context.Context) ([]*catalog.
 
 func (r *TaskRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*catalog.TaskDefinition, error) {
 	const query = `
-		SELECT t.id, t.area_id, t.title, t.cost, t.frequency
+		SELECT t.id, t.area_id, t.title, t.cost, t.recurrence_interval, t.start_sequence
 		FROM task t
 		JOIN area a ON a.id = t.area_id
 		WHERE a.group_id = ? AND t.deleted_at IS NULL
@@ -47,7 +47,7 @@ func (r *TaskRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 
 func (r *TaskRepository) FindCommon(ctx context.Context) ([]*catalog.TaskDefinition, error) {
 	const query = `
-		SELECT t.id, t.area_id, t.title, t.cost, t.frequency
+		SELECT t.id, t.area_id, t.title, t.cost, t.recurrence_interval, t.start_sequence
 		FROM task t
 		JOIN area a ON a.id = t.area_id
 		WHERE a.group_id IS NULL AND t.deleted_at IS NULL
@@ -66,24 +66,24 @@ func (r *TaskRepository) fetchTaskDefinitions(ctx context.Context, query string,
 	var tasks []*catalog.TaskDefinition
 	for rows.Next() {
 		var idBytes []byte
-		var areaID, cost, freq int
+		var areaID, cost, recurrenceInterval, startSequence int
 		var title string
 
-		if err := rows.Scan(&idBytes, &areaID, &title, &cost, &freq); err != nil {
+		if err := rows.Scan(&idBytes, &areaID, &title, &cost, &recurrenceInterval, &startSequence); err != nil {
 			return nil, err
 		}
 		id, err := uuid.FromBytes(idBytes)
 		if err != nil {
 			return nil, fmt.Errorf("TaskRepository.fetchTaskDefinitions: parse task id: %w", err)
 		}
-		tasks = append(tasks, catalog.RestoreTaskDefinition(id, areaID, title, cost, freq))
+		tasks = append(tasks, catalog.RestoreTaskDefinition(id, areaID, title, cost, recurrenceInterval, startSequence))
 	}
 	return tasks, rows.Err()
 }
 
 func (r *TaskRepository) FindByID(ctx context.Context, id uuid.UUID) (*catalog.TaskDefinition, error) {
 	const query = `
-		SELECT id, area_id, title, cost, frequency
+		SELECT id, area_id, title, cost, recurrence_interval, start_sequence
 		FROM task
 		WHERE id = ? AND deleted_at IS NULL
 	`
@@ -94,9 +94,9 @@ func (r *TaskRepository) FindByID(ctx context.Context, id uuid.UUID) (*catalog.T
 	row := r.db.QueryRowContext(ctx, query, idBytes)
 
 	var gotID []byte
-	var areaID, cost, frequency int
+	var areaID, cost, recurrenceInterval, startSequence int
 	var title string
-	if err := row.Scan(&gotID, &areaID, &title, &cost, &frequency); err != nil {
+	if err := row.Scan(&gotID, &areaID, &title, &cost, &recurrenceInterval, &startSequence); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -106,7 +106,7 @@ func (r *TaskRepository) FindByID(ctx context.Context, id uuid.UUID) (*catalog.T
 	if err != nil {
 		return nil, fmt.Errorf("TaskRepository.FindByID: parse task id: %w", err)
 	}
-	return catalog.RestoreTaskDefinition(uid, areaID, title, cost, frequency), nil
+	return catalog.RestoreTaskDefinition(uid, areaID, title, cost, recurrenceInterval, startSequence), nil
 }
 
 func (r *TaskRepository) FindLastCompletionDates(ctx context.Context, taskIDs []uuid.UUID) (map[uuid.UUID]*time.Time, error) {
@@ -161,20 +161,30 @@ func (r *TaskRepository) FindLastCompletionDates(ctx context.Context, taskIDs []
 
 func (r *TaskRepository) Save(ctx context.Context, task *catalog.TaskDefinition) error {
 	const query = `
-		INSERT INTO task (id, area_id, title, cost, frequency)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO task (id, area_id, title, cost, recurrence_interval, start_sequence)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 			area_id = VALUES(area_id),
 			title = VALUES(title),
 			cost = VALUES(cost),
-			frequency = VALUES(frequency),
+			recurrence_interval = VALUES(recurrence_interval),
+			start_sequence = VALUES(start_sequence),
 			deleted_at = NULL
 	`
 	idBytes, err := task.ID().MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("TaskRepository.Save: marshal task id: %w", err)
 	}
-	_, err = r.db.ExecContext(ctx, query, idBytes, task.AreaID(), task.Title(), task.Cost(), task.Frequency())
+	_, err = r.db.ExecContext(
+		ctx,
+		query,
+		idBytes,
+		task.AreaID(),
+		task.Title(),
+		task.Cost(),
+		task.RecurrenceInterval(),
+		task.StartSequence(),
+	)
 	if err != nil {
 		return fmt.Errorf("TaskRepository.Save: %w", err)
 	}

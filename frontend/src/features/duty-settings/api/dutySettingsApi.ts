@@ -23,6 +23,8 @@ function normalizeDutySettingsResponse(response: DutySettingsResponse): DutySett
                         tasks: Array.isArray(area.tasks)
                             ? area.tasks.map((task) => ({
                                 ...task,
+                                recurrenceInterval: Number(task.recurrenceInterval ?? 0),
+                                startSequence: Number(task.startSequence ?? 1),
                                 last_completed_at: task.last_completed_at ?? null,
                                 is_included: Boolean(task.is_included),
                                 assignee_name: task.assignee_name ?? null,
@@ -93,7 +95,8 @@ function normalizeTaskDetails(task: Record<string, unknown>): TaskDetails {
         id: String(task.id ?? ''),
         title: String(task.title ?? ''),
         cost: Number(task.cost ?? 0),
-        frequency: Number(task.frequency ?? 0),
+        recurrenceInterval: Number(task.recurrenceInterval ?? 0),
+        startSequence: Number(task.startSequence ?? 1),
         area: {
             id: Number(area.id ?? 0),
             name: String(area.name ?? ''),

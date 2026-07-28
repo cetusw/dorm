@@ -13,8 +13,9 @@ import {
 } from '@mantine/core'
 
 import type { TaskListItem } from '../model/types'
+import { formatRecurrenceInterval } from '../model/recurrence'
 
-type SortField = 'title' | 'cost' | 'frequency' | 'areaName'
+type SortField = 'title' | 'cost' | 'recurrenceInterval' | 'areaName'
 type SortDirection = 'asc' | 'desc'
 
 type Props = {
@@ -38,11 +39,11 @@ export function TaskCatalogTable({ tasks, onEdit, onDelete }: Props) {
         const visibleTasks = query === ''
             ? tasks
             : tasks.filter((task) =>
-                normalize(`${task.title} ${task.cost} ${task.frequency} ${task.area.name}`).includes(query),
+                normalize(`${task.title} ${task.cost} ${formatRecurrenceInterval(task.recurrenceInterval)} ${task.area.name}`).includes(query),
             )
 
         return [...visibleTasks].sort((left, right) => {
-            if (sortField === 'cost' || sortField === 'frequency') {
+            if (sortField === 'cost' || sortField === 'recurrenceInterval') {
                 const result = left[sortField] - right[sortField]
                 return sortDirection === 'asc' ? result : result * -1
             }
@@ -96,9 +97,9 @@ export function TaskCatalogTable({ tasks, onEdit, onDelete }: Props) {
                             <Table.Th w="14%">
                                 <SortButton
                                     label="Частота"
-                                    active={sortField === 'frequency'}
+                                    active={sortField === 'recurrenceInterval'}
                                     direction={sortDirection}
-                                    onClick={() => toggleSort('frequency')}
+                                    onClick={() => toggleSort('recurrenceInterval')}
                                 />
                             </Table.Th>
                             <Table.Th w="24%">
@@ -126,7 +127,7 @@ export function TaskCatalogTable({ tasks, onEdit, onDelete }: Props) {
                                         <Text fw={600}>{task.title}</Text>
                                     </Table.Td>
                                     <Table.Td>{task.cost}</Table.Td>
-                                    <Table.Td>{task.frequency}</Table.Td>
+                                    <Table.Td>{formatRecurrenceInterval(task.recurrenceInterval)}</Table.Td>
                                     <Table.Td>{task.area.name}</Table.Td>
                                     <Table.Td>
                                         <Group justify="flex-start">

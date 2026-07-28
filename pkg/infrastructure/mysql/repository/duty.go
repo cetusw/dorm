@@ -52,12 +52,14 @@ func (r *DutyRepository) createDutyData(
 
 func insertDuty(ctx context.Context, tx *sql.Tx, d *duty.Duty) error {
 	const dutyQuery = `
-		INSERT INTO duty (id, team_id, start_date, end_date)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO duty (id, team_id, group_id, start_date, end_date, sequence_number)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 			team_id = VALUES(team_id),
+			group_id = VALUES(group_id),
 			start_date = VALUES(start_date),
-			end_date = VALUES(end_date)
+			end_date = VALUES(end_date),
+			sequence_number = VALUES(sequence_number)
 	`
 	dIDBytes, err := marshalUUID(d.ID(), "duty id")
 	if err != nil {
@@ -67,12 +69,35 @@ func insertDuty(ctx context.Context, tx *sql.Tx, d *duty.Duty) error {
 	if err != nil {
 		return err
 	}
+	groupIDBytes, err := dutyGroupIDBytes(ctx, tx, d.TeamID())
+	if err != nil {
+		return err
+	}
 
-	_, err = tx.ExecContext(ctx, dutyQuery, dIDBytes, tIDBytes, d.Start(), d.End())
+	_, err = tx.ExecContext(ctx, dutyQuery, dIDBytes, tIDBytes, groupIDBytes, d.Start(), d.End(), d.SequenceNumber())
 	if err != nil {
 		return fmt.Errorf("failed to save duty root: %w", err)
 	}
 	return nil
+}
+
+func dutyGroupIDBytes(ctx context.Context, tx *sql.Tx, teamID uuid.UUID) ([]byte, error) {
+	const query = `SELECT group_id FROM team WHERE id = ?`
+
+	teamIDBytes, err := marshalUUID(teamID, "team id")
+	if err != nil {
+		return nil, err
+	}
+
+	var groupIDBytes []byte
+	if err := tx.QueryRowContext(ctx, query, teamIDBytes).Scan(&groupIDBytes); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("load duty group: team not found")
+		}
+		return nil, fmt.Errorf("load duty group: %w", err)
+	}
+
+	return groupIDBytes, nil
 }
 
 func insertDutyTasks(
@@ -153,7 +178,7 @@ func commitDutyTransaction(tx *sql.Tx) error {
 
 func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
 	const dutyQuery = `
-		SELECT id, team_id, start_date, end_date
+		SELECT id, team_id, start_date, end_date, sequence_number
 		FROM duty
 		WHERE team_id = ? AND start_date = (
 			SELECT MAX(start_date) FROM duty WHERE team_id = ?
@@ -164,8 +189,9 @@ func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UU
 
 	var dID, teamIDBytes []byte
 	var start, end time.Time
+	var sequenceNumber int
 
-	err := row.Scan(&dID, &teamIDBytes, &start, &end)
+	err := row.Scan(&dID, &teamIDBytes, &start, &end, &sequenceNumber)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -180,7 +206,7 @@ func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UU
 		return nil, err
 	}
 
-	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
+	return duty.RestoreDuty(dutyID, teamID, start, end, sequenceNumber, tasks), nil
 }
 
 func (r *DutyRepository) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error {
@@ -205,7 +231,8 @@ func (r *DutyRepository) ReassignTeamAndResetTasks(ctx context.Context, dutyID u
 func reassignDutyTeam(ctx context.Context, tx *sql.Tx, dutyID uuid.UUID, teamID uuid.UUID) error {
 	const query = `
 		UPDATE duty
-		SET team_id = ?
+		SET team_id = ?,
+			group_id = (SELECT group_id FROM team WHERE id = ?)
 		WHERE id = ?
 	`
 
@@ -218,7 +245,7 @@ func reassignDutyTeam(ctx context.Context, tx *sql.Tx, dutyID uuid.UUID, teamID 
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, query, teamIDBytes, dutyIDBytes); err != nil {
+	if _, err := tx.ExecContext(ctx, query, teamIDBytes, teamIDBytes, dutyIDBytes); err != nil {
 		return fmt.Errorf("reassign duty team: %w", err)
 	}
 
@@ -254,7 +281,7 @@ func (r *DutyRepository) FindActiveByTeamID(
 	at time.Time,
 ) (*duty.Duty, error) {
 	const query = `
-		SELECT id, team_id, start_date, end_date
+		SELECT id, team_id, start_date, end_date, sequence_number
 		FROM duty
 		WHERE team_id = ?
 		  AND start_date <= ?
@@ -272,8 +299,9 @@ func (r *DutyRepository) FindActiveByTeamID(
 
 	var dutyIDBytes, teamIDResultBytes []byte
 	var startDate, endDate time.Time
+	var sequenceNumber int
 
-	if err := row.Scan(&dutyIDBytes, &teamIDResultBytes, &startDate, &endDate); err != nil {
+	if err := row.Scan(&dutyIDBytes, &teamIDResultBytes, &startDate, &endDate, &sequenceNumber); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -295,12 +323,12 @@ func (r *DutyRepository) FindActiveByTeamID(
 		return nil, err
 	}
 
-	return duty.RestoreDuty(dutyID, teamIDResult, startDate, endDate, tasks), nil
+	return duty.RestoreDuty(dutyID, teamIDResult, startDate, endDate, sequenceNumber, tasks), nil
 }
 
 func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
 	const dutyQuery = `
-		SELECT id, team_id, start_date, end_date
+		SELECT id, team_id, start_date, end_date, sequence_number
 		FROM duty
 		WHERE team_id = ?
 		ORDER BY start_date DESC
@@ -311,8 +339,9 @@ func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUI
 
 	var dID, teamIDBytes []byte
 	var start, end time.Time
+	var sequenceNumber int
 
-	err := row.Scan(&dID, &teamIDBytes, &start, &end)
+	err := row.Scan(&dID, &teamIDBytes, &start, &end, &sequenceNumber)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -327,19 +356,20 @@ func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUI
 		return nil, err
 	}
 
-	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
+	return duty.RestoreDuty(dutyID, teamID, start, end, sequenceNumber, tasks), nil
 }
 
 func (r *DutyRepository) FindByID(ctx context.Context, id uuid.UUID) (*duty.Duty, error) {
-	const dutyQuery = `SELECT id, team_id, start_date, end_date FROM duty WHERE id = ?`
+	const dutyQuery = `SELECT id, team_id, start_date, end_date, sequence_number FROM duty WHERE id = ?`
 
 	idBytes, _ := id.MarshalBinary()
 	row := r.db.QueryRowContext(ctx, dutyQuery, idBytes)
 
 	var dID, tID []byte
 	var start, end time.Time
+	var sequenceNumber int
 
-	err := row.Scan(&dID, &tID, &start, &end)
+	err := row.Scan(&dID, &tID, &start, &end, &sequenceNumber)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -355,12 +385,12 @@ func (r *DutyRepository) FindByID(ctx context.Context, id uuid.UUID) (*duty.Duty
 		return nil, err
 	}
 
-	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
+	return duty.RestoreDuty(dutyID, teamID, start, end, sequenceNumber, tasks), nil
 }
 
 func (r *DutyRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*duty.Duty, error) {
 	const query = `
-		SELECT d.id, d.team_id, d.start_date, d.end_date
+		SELECT d.id, d.team_id, d.start_date, d.end_date, d.sequence_number
 		FROM duty d
 		JOIN team t ON t.id = d.team_id
 		WHERE t.group_id = ?
@@ -378,7 +408,8 @@ func (r *DutyRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 	for rows.Next() {
 		var dID, tID []byte
 		var start, end time.Time
-		if err := rows.Scan(&dID, &tID, &start, &end); err != nil {
+		var sequenceNumber int
+		if err := rows.Scan(&dID, &tID, &start, &end, &sequenceNumber); err != nil {
 			return nil, err
 		}
 		id, _ := uuid.FromBytes(dID)
@@ -388,18 +419,18 @@ func (r *DutyRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, duty.RestoreDuty(id, teamID, start, end, tasks))
+		result = append(result, duty.RestoreDuty(id, teamID, start, end, sequenceNumber, tasks))
 	}
 	return result, rows.Err()
 }
 
 func (r *DutyRepository) FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*duty.Duty, error) {
 	const query = `
-		SELECT d.id, d.team_id, d.start_date, d.end_date
+		SELECT d.id, d.team_id, d.start_date, d.end_date, d.sequence_number
 		FROM duty d
 		JOIN team t ON t.id = d.team_id
 		WHERE t.group_id = ?
-		ORDER BY d.start_date DESC, d.end_date DESC, d.id DESC
+		ORDER BY d.sequence_number DESC, d.id DESC
 		LIMIT 1
 	`
 
@@ -408,8 +439,9 @@ func (r *DutyRepository) FindLatestByGroupID(ctx context.Context, groupID uuid.U
 
 	var dutyIDBytes, teamIDBytes []byte
 	var startDate, endDate time.Time
+	var sequenceNumber int
 
-	if err := row.Scan(&dutyIDBytes, &teamIDBytes, &startDate, &endDate); err != nil {
+	if err := row.Scan(&dutyIDBytes, &teamIDBytes, &startDate, &endDate, &sequenceNumber); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -424,7 +456,7 @@ func (r *DutyRepository) FindLatestByGroupID(ctx context.Context, groupID uuid.U
 		return nil, err
 	}
 
-	return duty.RestoreDuty(dutyID, teamID, startDate, endDate, tasks), nil
+	return duty.RestoreDuty(dutyID, teamID, startDate, endDate, sequenceNumber, tasks), nil
 }
 
 func (r *DutyRepository) CountDistinctStartDates(ctx context.Context) (int, error) {
@@ -441,11 +473,11 @@ func (r *DutyRepository) CountDistinctStartDates(ctx context.Context) (int, erro
 
 func (r *DutyRepository) FindLastByTaskDefID(ctx context.Context, taskDefID uuid.UUID) (*duty.Duty, error) {
 	const query = `
-		SELECT d.id, d.team_id, d.start_date, d.end_date
+		SELECT d.id, d.team_id, d.start_date, d.end_date, d.sequence_number
 		FROM duty d
 		JOIN duty_task dt ON d.id = dt.duty_id
 		WHERE dt.task_id = ?
-		ORDER BY d.start_date DESC
+		ORDER BY d.sequence_number DESC
 		LIMIT 1
 	`
 
@@ -454,8 +486,9 @@ func (r *DutyRepository) FindLastByTaskDefID(ctx context.Context, taskDefID uuid
 
 	var dID, tID []byte
 	var start, end time.Time
+	var sequenceNumber int
 
-	err := row.Scan(&dID, &tID, &start, &end)
+	err := row.Scan(&dID, &tID, &start, &end, &sequenceNumber)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -471,12 +504,12 @@ func (r *DutyRepository) FindLastByTaskDefID(ctx context.Context, taskDefID uuid
 		return nil, err
 	}
 
-	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
+	return duty.RestoreDuty(dutyID, teamID, start, end, sequenceNumber, tasks), nil
 }
 
 func (r *DutyRepository) FindAllLatest(ctx context.Context) ([]*duty.Duty, error) {
 	const query = `
-		SELECT id, team_id, start_date, end_date 
+		SELECT id, team_id, start_date, end_date, sequence_number 
 		FROM duty 
 		WHERE start_date = (SELECT MAX(start_date) FROM duty)`
 
@@ -490,7 +523,8 @@ func (r *DutyRepository) FindAllLatest(ctx context.Context) ([]*duty.Duty, error
 	for rows.Next() {
 		var dID, tID []byte
 		var start, end time.Time
-		if err := rows.Scan(&dID, &tID, &start, &end); err != nil {
+		var sequenceNumber int
+		if err := rows.Scan(&dID, &tID, &start, &end, &sequenceNumber); err != nil {
 			return nil, err
 		}
 		id, _ := uuid.FromBytes(dID)
@@ -501,7 +535,7 @@ func (r *DutyRepository) FindAllLatest(ctx context.Context) ([]*duty.Duty, error
 			return nil, err
 		}
 
-		result = append(result, duty.RestoreDuty(id, teamID, start, end, tasks))
+		result = append(result, duty.RestoreDuty(id, teamID, start, end, sequenceNumber, tasks))
 	}
 	return result, rows.Err()
 }

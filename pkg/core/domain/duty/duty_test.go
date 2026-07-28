@@ -13,16 +13,17 @@ func TestNewDuty(t *testing.T) {
 	start := time.Now()
 	end := start.Add(7 * 24 * time.Hour)
 
-	d := NewDuty(teamID, start, end)
+	d := NewDuty(teamID, start, end, 3)
 
 	assert.NotNil(t, d)
 	assert.NotEqual(t, uuid.Nil, d.ID())
 	assert.Equal(t, teamID, d.TeamID())
+	assert.Equal(t, 3, d.SequenceNumber())
 	assert.Empty(t, d.Tasks())
 }
 
 func TestDuty_AddTask(t *testing.T) {
-	d := NewDuty(uuid.New(), time.Now(), time.Now().Add(24*time.Hour))
+	d := NewDuty(uuid.New(), time.Now(), time.Now().Add(24*time.Hour), 1)
 	taskID := uuid.New()
 	taskDefID := uuid.New()
 
@@ -70,9 +71,10 @@ func TestRestoreDuty(t *testing.T) {
 		}),
 	}
 
-	d := RestoreDuty(id, teamID, time.Now(), time.Now(), tasks)
+	d := RestoreDuty(id, teamID, time.Now(), time.Now(), 5, tasks)
 
 	assert.Equal(t, id, d.ID())
+	assert.Equal(t, 5, d.SequenceNumber())
 	assert.Len(t, d.Tasks(), 1)
 	assert.Equal(t, taskID, d.Tasks()[0].ID())
 }

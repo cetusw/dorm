@@ -21,7 +21,8 @@ function normalizeTaskDetails(task: Record<string, unknown>): TaskDetails {
         id: String(task.id ?? ''),
         title: String(task.title ?? ''),
         cost: Number(task.cost ?? 0),
-        frequency: Number(task.frequency ?? 0),
+        recurrenceInterval: Number(task.recurrenceInterval ?? 0),
+        startSequence: Number(task.startSequence ?? 1),
         area: {
             id: Number(area.id ?? 0),
             name: String(area.name ?? ''),

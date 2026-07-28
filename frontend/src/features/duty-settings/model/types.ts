@@ -2,7 +2,8 @@ export type DutySettingsTask = {
     id: string
     title: string
     cost: number
-    frequency: number
+    recurrenceInterval: number
+    startSequence: number
     last_completed_at: string | null
     is_included: boolean
     assignee_name: string | null

@@ -10,36 +10,57 @@ import (
 
 var ErrInvalidTaskDefinition = errors.New("area and title are required")
 
-type TaskDefinition struct {
-	id        uuid.UUID
-	areaID    int
-	title     string
-	cost      int
-	frequency int
+func IsValidRecurrenceInterval(value int) bool {
+	switch value {
+	case 0, 1, 2, 4, 12:
+		return true
+	default:
+		return false
+	}
 }
 
-func NewTaskDefinition(areaID int, title string, cost, frequency int) (*TaskDefinition, error) {
+type TaskDefinition struct {
+	id                 uuid.UUID
+	areaID             int
+	title              string
+	cost               int
+	recurrenceInterval int
+	startSequence      int
+}
+
+func NewTaskDefinition(areaID int, title string, cost, recurrenceInterval, startSequence int) (*TaskDefinition, error) {
 	if areaID == 0 || title == "" {
 		return nil, ErrInvalidTaskDefinition
 	}
-	return RestoreTaskDefinition(uuid.New(), areaID, title, cost, frequency), nil
+	return RestoreTaskDefinition(uuid.New(), areaID, title, cost, recurrenceInterval, startSequence), nil
 }
 
-func RestoreTaskDefinition(id uuid.UUID, areaID int, title string, cost, frequency int) *TaskDefinition {
+func RestoreTaskDefinition(id uuid.UUID, areaID int, title string, cost, recurrenceInterval, startSequence int) *TaskDefinition {
 	return &TaskDefinition{
-		id:        id,
-		areaID:    areaID,
-		title:     title,
-		cost:      cost,
-		frequency: frequency,
+		id:                 id,
+		areaID:             areaID,
+		title:              title,
+		cost:               cost,
+		recurrenceInterval: recurrenceInterval,
+		startSequence:      startSequence,
 	}
 }
 
-func (t *TaskDefinition) ID() uuid.UUID  { return t.id }
-func (t *TaskDefinition) Title() string  { return t.title }
-func (t *TaskDefinition) Cost() int      { return t.cost }
-func (t *TaskDefinition) AreaID() int    { return t.areaID }
-func (t *TaskDefinition) Frequency() int { return t.frequency }
+func (t *TaskDefinition) ID() uuid.UUID           { return t.id }
+func (t *TaskDefinition) Title() string           { return t.title }
+func (t *TaskDefinition) Cost() int               { return t.cost }
+func (t *TaskDefinition) AreaID() int             { return t.areaID }
+func (t *TaskDefinition) RecurrenceInterval() int { return t.recurrenceInterval }
+func (t *TaskDefinition) StartSequence() int      { return t.startSequence }
+func (t *TaskDefinition) IsScheduledFor(dutySequence int) bool {
+	if t.recurrenceInterval <= 0 {
+		return false
+	}
+	if dutySequence < t.startSequence {
+		return false
+	}
+	return (dutySequence-t.startSequence)%t.recurrenceInterval == 0
+}
 
 type TaskDefinitionRepository interface {
 	GetAllTaskDefinitions(ctx context.Context) ([]*TaskDefinition, error)
