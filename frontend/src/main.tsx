@@ -6,7 +6,10 @@ import '@mantine/dates/styles.css'
 
 import { App } from './app/App'
 import { AppProviders } from './app/providers'
+import { registerServiceWorker } from './shared/lib/service-worker/registerServiceWorker'
 import './shared/styles/globals.css'
+
+void registerServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
