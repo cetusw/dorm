@@ -24,3 +24,6 @@ secrets/*
 
 # IDE
 .idea/
+
+# Certs
+.cert/
