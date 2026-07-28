@@ -165,7 +165,7 @@ func (m *MockCatalogRepo) FindByID(ctx context.Context, id uuid.UUID) (*catalog.
 func (m *MockCatalogRepo) Save(ctx context.Context, task *catalog.TaskDefinition) error {
 	return nil
 }
-func (m *MockCatalogRepo) Delete(ctx context.Context, id uuid.UUID) error { return nil }
+func (m *MockCatalogRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return nil }
 
 type MockTaskOverrideRepo struct{ mock.Mock }
 

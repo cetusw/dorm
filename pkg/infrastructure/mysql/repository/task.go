@@ -22,7 +22,11 @@ func NewTaskRepository(db *sql.DB) *TaskRepository {
 }
 
 func (r *TaskRepository) GetAllTaskDefinitions(ctx context.Context) ([]*catalog.TaskDefinition, error) {
-	const query = `SELECT id, area_id, title, cost, frequency FROM task`
+	const query = `
+		SELECT id, area_id, title, cost, frequency
+		FROM task
+		WHERE deleted_at IS NULL
+	`
 	return r.fetchTaskDefinitions(ctx, query)
 }
 
@@ -31,7 +35,7 @@ func (r *TaskRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 		SELECT t.id, t.area_id, t.title, t.cost, t.frequency
 		FROM task t
 		JOIN area a ON a.id = t.area_id
-		WHERE a.group_id = ?
+		WHERE a.group_id = ? AND t.deleted_at IS NULL
 		ORDER BY a.floor DESC, a.name, t.title
 	`
 	groupIDBytes, err := groupID.MarshalBinary()
@@ -46,7 +50,7 @@ func (r *TaskRepository) FindCommon(ctx context.Context) ([]*catalog.TaskDefinit
 		SELECT t.id, t.area_id, t.title, t.cost, t.frequency
 		FROM task t
 		JOIN area a ON a.id = t.area_id
-		WHERE a.group_id IS NULL
+		WHERE a.group_id IS NULL AND t.deleted_at IS NULL
 		ORDER BY a.floor DESC, a.name, t.title
 	`
 	return r.fetchTaskDefinitions(ctx, query)
@@ -78,7 +82,11 @@ func (r *TaskRepository) fetchTaskDefinitions(ctx context.Context, query string,
 }
 
 func (r *TaskRepository) FindByID(ctx context.Context, id uuid.UUID) (*catalog.TaskDefinition, error) {
-	const query = `SELECT id, area_id, title, cost, frequency FROM task WHERE id = ?`
+	const query = `
+		SELECT id, area_id, title, cost, frequency
+		FROM task
+		WHERE id = ? AND deleted_at IS NULL
+	`
 	idBytes, err := id.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("TaskRepository.FindByID: marshal task id: %w", err)
@@ -159,7 +167,8 @@ func (r *TaskRepository) Save(ctx context.Context, task *catalog.TaskDefinition)
 			area_id = VALUES(area_id),
 			title = VALUES(title),
 			cost = VALUES(cost),
-			frequency = VALUES(frequency)
+			frequency = VALUES(frequency),
+			deleted_at = NULL
 	`
 	idBytes, err := task.ID().MarshalBinary()
 	if err != nil {
@@ -172,15 +181,19 @@ func (r *TaskRepository) Save(ctx context.Context, task *catalog.TaskDefinition)
 	return nil
 }
 
-func (r *TaskRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	const query = `DELETE FROM task WHERE id = ?`
+func (r *TaskRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	const query = `
+		UPDATE task
+		SET deleted_at = NOW()
+		WHERE id = ? AND deleted_at IS NULL
+	`
 	idBytes, err := id.MarshalBinary()
 	if err != nil {
-		return fmt.Errorf("TaskRepository.Delete: marshal task id: %w", err)
+		return fmt.Errorf("TaskRepository.SoftDelete: marshal task id: %w", err)
 	}
 	_, err = r.db.ExecContext(ctx, query, idBytes)
 	if err != nil {
-		return fmt.Errorf("TaskRepository.Delete: %w", err)
+		return fmt.Errorf("TaskRepository.SoftDelete: %w", err)
 	}
 	return nil
 }

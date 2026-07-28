@@ -642,7 +642,7 @@ func (s *Service) DeleteTask(ctx context.Context, currentUserID uuid.UUID, group
 		return err
 	}
 
-	if err := s.taskRepo.Delete(ctx, taskID); err != nil {
+	if err := s.taskRepo.SoftDelete(ctx, taskID); err != nil {
 		return fmt.Errorf("delete task: %w", err)
 	}
 

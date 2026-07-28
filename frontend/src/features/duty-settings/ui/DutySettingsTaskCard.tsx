@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import {
+    BackspaceIcon,
     CheckIcon,
     DotsThreeVerticalIcon,
     PencilIcon,
@@ -21,6 +22,7 @@ type Props = {
     onEdit: (taskId: string) => void
     onInclude: (taskId: string) => void
     onExclude: (taskId: string) => void
+    onDelete: (taskId: string) => void
 }
 
 function toResidentDutyTask(task: DutySettingsTask): ResidentDutyTask {
@@ -42,7 +44,7 @@ function toResidentDutyTask(task: DutySettingsTask): ResidentDutyTask {
     }
 }
 
-export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Props) {
+export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude, onDelete }: Props) {
     const [menuOpened, setMenuOpened] = useState(false)
     const badgeTask = useMemo(() => toResidentDutyTask(task), [task])
     const canExclude = task.is_included && (task.status === 'free' || task.status === 'assigned' || task.status === '')
@@ -106,7 +108,7 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
                             </Menu.Item>
                             {task.is_included ? (
                                 canExclude ? (
-                                    <Menu.Item color="red" leftSection={<TrashIcon size={25} />} onClick={() => onExclude(task.id)}>
+                                    <Menu.Item leftSection={<BackspaceIcon size={25} />} onClick={() => onExclude(task.id)}>
                                         Исключить из дежурства
                                     </Menu.Item>
                                 ) : null
@@ -115,6 +117,9 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude }: Pro
                                     Включить в дежурство
                                 </Menu.Item>
                             )}
+                            <Menu.Item color="red" leftSection={<TrashIcon size={25} />} onClick={() => onDelete(task.id)}>
+                                Удалить
+                            </Menu.Item>
                         </Menu.Dropdown>
                     </Menu>
                 </div>

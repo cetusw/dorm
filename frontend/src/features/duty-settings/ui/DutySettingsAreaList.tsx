@@ -9,6 +9,7 @@ type Props = {
     onEditTask: (taskId: string) => void
     onIncludeTask: (taskId: string) => void
     onExcludeTask: (taskId: string) => void
+    onDeleteTask: (taskId: string) => void
 }
 
 export function DutySettingsAreaList(props: Props) {
@@ -32,6 +33,7 @@ export function DutySettingsAreaList(props: Props) {
                     onEditTask={props.onEditTask}
                     onIncludeTask={props.onIncludeTask}
                     onExcludeTask={props.onExcludeTask}
+                    onDeleteTask={props.onDeleteTask}
                 />
             ))}
         </Stack>

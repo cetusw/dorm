@@ -165,7 +165,7 @@ func (taskRepoStub) FindByID(ctx context.Context, id uuid.UUID) (*catalog.TaskDe
 	return nil, nil
 }
 func (taskRepoStub) Save(ctx context.Context, task *catalog.TaskDefinition) error { return nil }
-func (taskRepoStub) Delete(ctx context.Context, id uuid.UUID) error               { return nil }
+func (taskRepoStub) SoftDelete(ctx context.Context, id uuid.UUID) error           { return nil }
 
 type areaRepoStub struct{}
 

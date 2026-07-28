@@ -5,6 +5,7 @@ import { Alert, Box, Center, Group, Loader, SegmentedControl, Select, Stack } fr
 
 import {
     createDutySettingsTask,
+    deleteDutySettingsTask,
     excludeDutySettingsTask,
     getDutySettings,
     includeDutySettingsTask,
@@ -39,25 +40,28 @@ export function DutySettingsPage({ groupId }: Props) {
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
     const [taskAreaId, setTaskAreaId] = useState<number | null>(null)
     const [excludingTaskId, setExcludingTaskId] = useState<string | null>(null)
+    const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
     const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
 
-    const excludingTask = useMemo(() => {
-        if (!data || !excludingTaskId) {
+    const selectedTask = useMemo(() => {
+        if (!data) {
             return null
         }
 
         for (const area of data.areas) {
-            const task = area.tasks.find((item) => item.id === excludingTaskId)
+            const task = area.tasks.find((item) => item.id === excludingTaskId || item.id === deletingTaskId)
             if (task) {
                 return task
             }
         }
 
         return null
-    }, [data, excludingTaskId])
+    }, [data, deletingTaskId, excludingTaskId])
+    const excludingTask = excludingTaskId ? selectedTask : null
+    const deletingTask = deletingTaskId ? selectedTask : null
     const selectedArea = data?.areas.find((area) => String(area.id) === selectedAreaId) ?? null
     const selectedFloorPlan = availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ?? null
-    const hasTaskModalOpen = taskAreaId !== null || editingTaskId !== null || excludingTaskId !== null
+    const hasTaskModalOpen = taskAreaId !== null || editingTaskId !== null || excludingTaskId !== null || deletingTaskId !== null
 
     useEffect(() => {
         if (availableFloorPlans.length === 0) {
@@ -172,6 +176,7 @@ export function DutySettingsPage({ groupId }: Props) {
                             await reload({ silent: true })
                         }}
                         onExcludeTask={(taskId) => setExcludingTaskId(taskId)}
+                        onDeleteTask={(taskId) => setDeletingTaskId(taskId)}
                     />
                 )}
             </Stack>
@@ -320,6 +325,23 @@ export function DutySettingsPage({ groupId }: Props) {
                         errorMessage="Не удалось исключить задачу из дежурства"
                     />
 
+                    <ConfirmActionModal
+                        opened={deletingTask !== null}
+                        title="Удалить задачу"
+                        description={`Вы уверены, что хотите удалить задачу «${deletingTask?.title ?? ''}»? Она будет скрыта из списков и больше не попадет в дежурства.`}
+                        confirmLabel="Удалить"
+                        confirmColor="red"
+                        onClose={() => setDeletingTaskId(null)}
+                        onConfirm={async () => {
+                            if (!deletingTask) {
+                                return
+                            }
+                            await deleteDutySettingsTask(groupId, deletingTask.id)
+                            await reload({ silent: true })
+                        }}
+                        errorMessage="Не удалось удалить задачу"
+                    />
+
                     <DutySettingsAreaDrawer
                         area={selectedArea}
                         opened={selectedArea !== null}
@@ -332,6 +354,7 @@ export function DutySettingsPage({ groupId }: Props) {
                             await reload({ silent: true })
                         }}
                         onExcludeTask={(taskId) => setExcludingTaskId(taskId)}
+                        onDeleteTask={(taskId) => setDeletingTaskId(taskId)}
                     />
                 </>
             ) : null}

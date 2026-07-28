@@ -48,7 +48,7 @@ type TaskDefinitionRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*TaskDefinition, error)
 	FindLastCompletionDates(ctx context.Context, taskIDs []uuid.UUID) (map[uuid.UUID]*time.Time, error)
 	Save(ctx context.Context, task *TaskDefinition) error
-	Delete(ctx context.Context, id uuid.UUID) error
+	SoftDelete(ctx context.Context, id uuid.UUID) error
 }
 
 type DutyTaskOverride struct {

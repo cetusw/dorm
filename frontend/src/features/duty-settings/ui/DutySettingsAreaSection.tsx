@@ -12,6 +12,7 @@ type Props = {
     onEditTask: (taskId: string) => void
     onIncludeTask: (taskId: string) => void
     onExcludeTask: (taskId: string) => void
+    onDeleteTask: (taskId: string) => void
 }
 
 export function DutySettingsAreaSection({
@@ -20,6 +21,7 @@ export function DutySettingsAreaSection({
     onEditTask,
     onIncludeTask,
     onExcludeTask,
+    onDeleteTask,
 }: Props) {
     return (
         <Stack gap="md" className={classes.section}>
@@ -33,6 +35,7 @@ export function DutySettingsAreaSection({
                         onEdit={onEditTask}
                         onInclude={onIncludeTask}
                         onExclude={onExcludeTask}
+                        onDelete={onDeleteTask}
                     />
                 ))}
             </Stack>

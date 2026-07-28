@@ -453,7 +453,7 @@ func (s *Service) DeleteTaskDetails(ctx context.Context, dormitoryID int64, id u
 		return err
 	}
 
-	if err := s.taskRepo.Delete(ctx, id); err != nil {
+	if err := s.taskRepo.SoftDelete(ctx, id); err != nil {
 		return fmt.Errorf("delete task: %w", err)
 	}
 
@@ -547,7 +547,7 @@ func (s *Service) UpdateCommonTask(ctx context.Context, id uuid.UUID, req dto.Up
 }
 
 func (s *Service) DeleteTask(ctx context.Context, id uuid.UUID) error {
-	return s.taskRepo.Delete(ctx, id)
+	return s.taskRepo.SoftDelete(ctx, id)
 }
 
 func (s *Service) DeleteTaskInGroup(ctx context.Context, groupID uuid.UUID, id uuid.UUID) error {

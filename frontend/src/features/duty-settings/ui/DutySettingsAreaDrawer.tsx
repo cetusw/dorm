@@ -15,6 +15,7 @@ type Props = {
     onEditTask: (taskId: string) => void
     onIncludeTask: (taskId: string) => void
     onExcludeTask: (taskId: string) => void
+    onDeleteTask: (taskId: string) => void
 }
 
 export function DutySettingsAreaDrawer({
@@ -26,6 +27,7 @@ export function DutySettingsAreaDrawer({
     onEditTask,
     onIncludeTask,
     onExcludeTask,
+    onDeleteTask,
 }: Props) {
     return (
         <Drawer
@@ -62,6 +64,7 @@ export function DutySettingsAreaDrawer({
                                 onEdit={onEditTask}
                                 onInclude={onIncludeTask}
                                 onExclude={onExcludeTask}
+                                onDelete={onDeleteTask}
                             />
                         ))}
 
