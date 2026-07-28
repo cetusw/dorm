@@ -2,15 +2,24 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
+	"strings"
 )
 
 type CronConfig struct {
 	WeekStart string `json:"weekStart"`
 	SyncStart string `json:"syncStart"`
+}
+
+type WebPushConfig struct {
+	Enabled    bool
+	PublicKey  string
+	PrivateKey string
+	Subject    string
 }
 
 type AppConfig struct {
@@ -26,6 +35,7 @@ type AppConfig struct {
 	Cron              CronConfig
 	BotToken          string
 	GoogleCredentials string
+	WebPush           WebPushConfig
 }
 
 func LoadConfig(configPath string) (*AppConfig, error) {
@@ -48,6 +58,11 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 	}
 
 	cfg.getAuthConfig()
+	cfg.getWebPushConfig()
+
+	if err := cfg.WebPush.Validate(); err != nil {
+		return nil, err
+	}
 
 	return cfg, nil
 }
@@ -142,4 +157,47 @@ func (cfg *AppConfig) getAuthConfig() {
 
 	cfg.AuthSecret = "dev-auth-secret"
 	log.Println("Warning: AUTH_SECRET not set, using insecure development fallback secret.")
+}
+
+func (cfg *AppConfig) getWebPushConfig() {
+	cfg.WebPush.Enabled = strings.EqualFold(strings.TrimSpace(os.Getenv("WEB_PUSH_ENABLED")), "true")
+	cfg.WebPush.PublicKey = strings.TrimSpace(os.Getenv("WEB_PUSH_PUBLIC_KEY"))
+	cfg.WebPush.PrivateKey = strings.TrimSpace(os.Getenv("WEB_PUSH_PRIVATE_KEY"))
+	cfg.WebPush.Subject = strings.TrimSpace(os.Getenv("WEB_PUSH_SUBJECT"))
+}
+
+func (cfg WebPushConfig) Validate() error {
+	if !cfg.Enabled {
+		return nil
+	}
+
+	if cfg.PublicKey == "" {
+		return errors.New("WEB_PUSH_PUBLIC_KEY is required when WEB_PUSH_ENABLED=true")
+	}
+	if cfg.PrivateKey == "" {
+		return errors.New("WEB_PUSH_PRIVATE_KEY is required when WEB_PUSH_ENABLED=true")
+	}
+	if cfg.Subject == "" {
+		return errors.New("WEB_PUSH_SUBJECT is required when WEB_PUSH_ENABLED=true")
+	}
+
+	parsedSubject, err := url.Parse(cfg.Subject)
+	if err != nil || parsedSubject == nil {
+		return errors.New("WEB_PUSH_SUBJECT must be a valid mailto: or https URL")
+	}
+
+	switch parsedSubject.Scheme {
+	case "mailto":
+		if parsedSubject.Opaque == "" {
+			return errors.New("WEB_PUSH_SUBJECT mailto: value must include an email address")
+		}
+	case "https":
+		if parsedSubject.Host == "" {
+			return errors.New("WEB_PUSH_SUBJECT https URL must include a host")
+		}
+	default:
+		return errors.New("WEB_PUSH_SUBJECT must start with mailto: or https://")
+	}
+
+	return nil
 }

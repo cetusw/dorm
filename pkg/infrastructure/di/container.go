@@ -155,6 +155,9 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 	residentAuthHandler := http.NewResidentAuthHandler(userService, cfg.AuthSecret)
 	residentAuthHandler.RegisterRoutes(app)
 
+	notificationAPIHandler := http.NewNotificationAPIHandler(cfg.WebPush)
+	notificationAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+
 	residentDutyService := residentusecase.NewResidentDutyService(
 		userRepo,
 		teamRepo,
