@@ -94,6 +94,7 @@ type DutyRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Duty, error)
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*Duty, error)
 	FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*Duty, error)
+	ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error
 	CountDistinctStartDates(ctx context.Context) (int, error)
 	FindLastByTaskDefID(ctx context.Context, taskDefID uuid.UUID) (*Duty, error)
 	FindAllLatest(ctx context.Context) ([]*Duty, error)

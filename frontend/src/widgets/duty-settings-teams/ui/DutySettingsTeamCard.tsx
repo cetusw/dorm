@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import {
     DotsSixVerticalIcon,
     DotsThreeVerticalIcon,
+    SprayBottleIcon,
     TrashIcon,
     UsersThreeIcon,
 } from '@phosphor-icons/react'
@@ -21,6 +22,7 @@ type Props = {
     isDutyTeam: boolean
     disabled?: boolean
     onOpenMembers: (team: DutySettingsTeam) => void
+    onAssignDuty: (team: DutySettingsTeam) => void
     onDelete: (team: DutySettingsTeam) => void
 }
 
@@ -37,7 +39,7 @@ function formatMembersCount(count: number): string {
     return `${count} участников`
 }
 
-export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpenMembers, onDelete }: Props) {
+export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpenMembers, onAssignDuty, onDelete }: Props) {
     const [menuOpened, setMenuOpened] = useState(false)
     const {
         attributes,
@@ -126,6 +128,17 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpe
                                 >
                                     Участники
                                 </Menu.Item>
+                                {!isDutyTeam ? (
+                                    <Menu.Item
+                                        leftSection={<SprayBottleIcon size={25} />}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            onAssignDuty(team)
+                                        }}
+                                    >
+                                        Назначить дежурной
+                                    </Menu.Item>
+                                ) : null}
                                 <Menu.Item
                                     color="red"
                                     leftSection={<TrashIcon size={25} />}

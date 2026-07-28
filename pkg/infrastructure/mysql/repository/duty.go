@@ -183,6 +183,71 @@ func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UU
 	return duty.RestoreDuty(dutyID, teamID, start, end, tasks), nil
 }
 
+func (r *DutyRepository) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin reassign duty transaction: %w", err)
+	}
+
+	if err := reassignDutyTeam(ctx, tx, dutyID, teamID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := resetDutyTasks(ctx, tx, dutyID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return commitDutyTransaction(tx)
+}
+
+func reassignDutyTeam(ctx context.Context, tx *sql.Tx, dutyID uuid.UUID, teamID uuid.UUID) error {
+	const query = `
+		UPDATE duty
+		SET team_id = ?
+		WHERE id = ?
+	`
+
+	teamIDBytes, err := marshalUUID(teamID, "team id")
+	if err != nil {
+		return err
+	}
+	dutyIDBytes, err := marshalUUID(dutyID, "duty id")
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, query, teamIDBytes, dutyIDBytes); err != nil {
+		return fmt.Errorf("reassign duty team: %w", err)
+	}
+
+	return nil
+}
+
+func resetDutyTasks(ctx context.Context, tx *sql.Tx, dutyID uuid.UUID) error {
+	const query = `
+		UPDATE duty_task
+		SET assignee_id = NULL,
+			reviewer_id = NULL,
+			assignment_date = NULL,
+			completion_date = NULL,
+			verification_date = NULL
+		WHERE duty_id = ?
+	`
+
+	dutyIDBytes, err := marshalUUID(dutyID, "duty id")
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, query, dutyIDBytes); err != nil {
+		return fmt.Errorf("reset duty tasks: %w", err)
+	}
+
+	return nil
+}
+
 func (r *DutyRepository) FindActiveByTeamID(
 	ctx context.Context,
 	teamID uuid.UUID,

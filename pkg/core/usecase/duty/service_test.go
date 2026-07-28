@@ -85,6 +85,9 @@ func (m *dutyRepoMock) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]
 func (m *dutyRepoMock) FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*dutydomain.Duty, error) {
 	return nil, nil
 }
+func (m *dutyRepoMock) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error {
+	return nil
+}
 func (m *dutyRepoMock) CountDistinctStartDates(ctx context.Context) (int, error) { return 0, nil }
 func (m *dutyRepoMock) FindLastByTaskDefID(ctx context.Context, taskDefID uuid.UUID) (*dutydomain.Duty, error) {
 	args := m.Called(ctx, taskDefID)

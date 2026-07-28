@@ -468,6 +468,27 @@ func (s *Service) DeleteTeam(ctx context.Context, currentUserID uuid.UUID, group
 	return s.teamRepo.Delete(ctx, teamID)
 }
 
+func (s *Service) AssignActiveDutyTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID) error {
+	_, team, err := s.requireManagedGroupTeam(ctx, currentUserID, groupID, teamID)
+	if err != nil {
+		return err
+	}
+
+	activeDuty, err := s.requireActiveLatestDuty(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if activeDuty.TeamID() == team.ID() {
+		return nil
+	}
+
+	if err := s.dutyRepo.ReassignTeamAndResetTasks(ctx, activeDuty.ID(), team.ID()); err != nil {
+		return fmt.Errorf("assign active duty team: %w", err)
+	}
+
+	return nil
+}
+
 func (s *Service) ReorderTeams(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamIDs []uuid.UUID) error {
 	group, err := s.requireManagedGroup(ctx, currentUserID, groupID)
 	if err != nil {

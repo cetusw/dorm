@@ -359,6 +359,12 @@ export async function deleteDutySettingsTeam(groupId: string, teamId: string): P
     })
 }
 
+export async function assignDutySettingsActiveTeam(groupId: string, teamId: string): Promise<void> {
+    await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}/assign-active-duty`, {
+        method: 'POST',
+    })
+}
+
 export async function reorderDutySettingsTeams(groupId: string, teamIds: string[]): Promise<void> {
     await apiRequest(`/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/reorder`, {
         method: 'POST',

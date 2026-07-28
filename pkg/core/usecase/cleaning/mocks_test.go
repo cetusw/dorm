@@ -54,6 +54,9 @@ func (m *MockDutyRepo) FindLatestByGroupID(ctx context.Context, id uuid.UUID) (*
 	}
 	return args.Get(0).(*duty.Duty), args.Error(1)
 }
+func (m *MockDutyRepo) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error {
+	return m.Called(ctx, dutyID, teamID).Error(0)
+}
 func (m *MockDutyRepo) CountDistinctStartDates(ctx context.Context) (int, error) {
 	args := m.Called(ctx)
 	return args.Int(0), args.Error(1)

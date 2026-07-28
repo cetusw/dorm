@@ -6,6 +6,7 @@ import { RowsPlusBottomIcon } from '@phosphor-icons/react'
 import { Alert, Stack } from '@mantine/core'
 
 import {
+    assignDutySettingsActiveTeam,
     createDutySettingsTeam,
     deleteDutySettingsTeam,
     getDutySettingsTeam,
@@ -15,6 +16,7 @@ import {
 } from '../../../features/duty-settings/api/dutySettingsApi'
 import type { DutySettingsTeam } from '../../../features/duty-settings/model/types'
 import type { TeamListItem } from '../../../features/teams/model/types'
+import { ConfirmActionModal } from '../../../shared/ui/ConfirmActionModal'
 import { DeleteTeamModal } from '../../../features/teams/ui/DeleteTeamModal'
 import { TeamFormModal } from '../../../features/teams/ui/TeamFormModal'
 import { SettingsAddAction } from '../../../shared/ui/SettingsAddAction'
@@ -46,7 +48,15 @@ function toTeamListItem(team: DutySettingsTeam): TeamListItem {
         leader: team.leader,
         members_count: team.members_count,
         rotation_position: team.rotation_position,
-    }
+	}
+}
+
+function getDutyTeamWarningName(team: DutySettingsTeam | null): string {
+	if (!team) {
+		return ""
+	}
+
+	return team.leader?.name ?? team.name
 }
 
 export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReload }: Props) {
@@ -55,6 +65,7 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
     const [error, setError] = useState<string | null>(null)
     const [formOpened, setFormOpened] = useState(false)
     const [deletingTeam, setDeletingTeam] = useState<DutySettingsTeam | null>(null)
+    const [assigningDutyTeam, setAssigningDutyTeam] = useState<DutySettingsTeam | null>(null)
     const [selectedTeam, setSelectedTeam] = useState<DutySettingsTeam | null>(null)
 
     useEffect(() => {
@@ -133,6 +144,7 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
                                     isDutyTeam={activeDutyTeamId === team.id}
                                     disabled={savingOrder}
                                     onOpenMembers={setSelectedTeam}
+                                    onAssignDuty={setAssigningDutyTeam}
                                     onDelete={setDeletingTeam}
                                 />
                             ))}
@@ -169,6 +181,24 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
                     setDeletingTeam(null)
                     await onReload()
                 }}
+            />
+
+            <ConfirmActionModal
+                opened={assigningDutyTeam !== null}
+                title="Назначить дежурной"
+                description={`Вы уверены, что хотите назначить команду ${getDutyTeamWarningName(assigningDutyTeam)} дежурной? Прогресс по задачам текущей дежурной команды будет утерян.`}
+                confirmLabel="Назначить"
+                onClose={() => setAssigningDutyTeam(null)}
+                onConfirm={async () => {
+                    if (!assigningDutyTeam) {
+                        return
+                    }
+
+                    await assignDutySettingsActiveTeam(groupId, assigningDutyTeam.id)
+                    setAssigningDutyTeam(null)
+                    await onReload()
+                }}
+                errorMessage="Не удалось назначить дежурную команду"
             />
 
             <DutySettingsTeamMembersDrawer

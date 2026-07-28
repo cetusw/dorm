@@ -40,6 +40,7 @@ func (h *GroupAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api.Post("/:id/duty-settings/teams", h.HandleCreateDutySettingsTeam)
 	api.Put("/:id/duty-settings/teams/:teamId", h.HandleUpdateDutySettingsTeam)
 	api.Delete("/:id/duty-settings/teams/:teamId", h.HandleDeleteDutySettingsTeam)
+	api.Post("/:id/duty-settings/teams/:teamId/assign-active-duty", h.HandleAssignDutySettingsActiveTeam)
 	api.Post("/:id/duty-settings/areas", h.HandleCreateDutySettingsArea)
 	api.Put("/:id/duty-settings/areas/:areaId", h.HandleUpdateDutySettingsArea)
 	api.Delete("/:id/duty-settings/areas/:areaId", h.HandleDeleteDutySettingsArea)
@@ -401,6 +402,24 @@ func (h *GroupAPIHandler) HandleDeleteDutySettingsTeam(c *fiber.Ctx) error {
 	}
 
 	if err := h.dutySettingsUC.DeleteTeam(c.Context(), userID, groupID, teamID); err != nil {
+		return h.respondDutySettingsError(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *GroupAPIHandler) HandleAssignDutySettingsActiveTeam(c *fiber.Ctx) error {
+	userID, groupID, err := h.parseDutySettingsAccess(c)
+	if err != nil {
+		return err
+	}
+
+	teamID, err := uuid.Parse(c.Params("teamId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
+	}
+
+	if err := h.dutySettingsUC.AssignActiveDutyTeam(c.Context(), userID, groupID, teamID); err != nil {
 		return h.respondDutySettingsError(c, err)
 	}
 
