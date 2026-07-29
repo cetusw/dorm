@@ -24,12 +24,11 @@ function getAssigneeLabel(task: ResidentDutyTask): string | null {
 
 export function getMobileTaskCardPresentation({
     isReadOnly,
-    mode,
     task,
 }: Params): MobileTaskCardPresentation {
     const showCheckbox = !isReadOnly && task.is_mine && (task.can_complete || task.can_open)
     const assigneeLabel = getAssigneeLabel(task)
-    const showVerificationMeta = mode === 'verification' && task.status === 'completed' && (task.can_verify || task.can_review_open)
+    const showVerificationMeta = task.status === 'completed' && (task.can_verify || task.can_review_open)
 
     if (task.status === 'free') {
         return {

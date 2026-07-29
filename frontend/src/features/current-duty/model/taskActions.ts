@@ -20,23 +20,18 @@ type TaskActionParams = {
 
 export function getLeftSwipeActionSpec({
     isReadOnly,
-    mode,
     task,
 }: TaskActionParams): TaskActionSpec | null {
     if (isReadOnly) {
         return null
     }
 
-    if (mode === 'verification') {
-        if (task.status === 'completed' && task.can_review_open) {
-            return {
-                kind: 'reopen',
-                label: 'Переоткрыть',
-                tone: 'danger',
-            }
+    if (task.status === 'completed' && task.can_review_open) {
+        return {
+            kind: 'reopen',
+            label: 'Переоткрыть',
+            tone: 'danger',
         }
-
-        return null
     }
 
     if (task.can_return) {
@@ -52,23 +47,18 @@ export function getLeftSwipeActionSpec({
 
 export function getRightSwipeActionSpec({
     isReadOnly,
-    mode,
     task,
 }: TaskActionParams): TaskActionSpec | null {
     if (isReadOnly) {
         return null
     }
 
-    if (mode === 'verification') {
-        if (task.status === 'completed' && task.can_verify) {
-            return {
-                kind: 'verify',
-                label: 'Подтвердить',
-                tone: 'default',
-            }
+    if (task.status === 'completed' && task.can_verify) {
+        return {
+            kind: 'verify',
+            label: 'Подтвердить',
+            tone: 'default',
         }
-
-        return null
     }
 
     if (task.can_take) {
@@ -84,14 +74,13 @@ export function getRightSwipeActionSpec({
 
 export function getDrawerActionSpecs({
     isReadOnly,
-    mode,
     task,
 }: TaskActionParams): TaskActionSpec[] {
     if (isReadOnly) {
         return []
     }
 
-    if (mode === 'verification' && task.status === 'completed') {
+    if (task.status === 'completed' && (task.can_review_open || task.can_verify)) {
         const actions: TaskActionSpec[] = []
 
         if (task.can_review_open) {
