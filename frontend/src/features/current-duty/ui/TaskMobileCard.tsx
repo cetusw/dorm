@@ -149,6 +149,7 @@ export function TaskMobileCard({
     const rightSwipeButtonWidth = rightSwipeAction ? DEFAULT_SWIPE_ACTION_WIDTH : 0
     const leftSwipeWidth = leftSwipeAction ? leftSwipeButtonWidth + SWIPE_GAP : 0
     const rightSwipeWidth = rightSwipeAction ? rightSwipeButtonWidth + SWIPE_GAP : 0
+    const shouldRenderActionLayer = swipeEnabled && (isDragging || swipeOffset !== 0)
 
     useEffect(() => {
         setSwipeOffset(0)
@@ -298,7 +299,7 @@ export function TaskMobileCard({
 
     return (
         <div className={classes.swipeRoot}>
-            {swipeEnabled && (
+            {shouldRenderActionLayer && (
                 <div className={classes.actionLayer}>
                     <div className={`${classes.actionSide} ${classes.actionSideLeft}`}>
                         {leftSwipeAction && (
