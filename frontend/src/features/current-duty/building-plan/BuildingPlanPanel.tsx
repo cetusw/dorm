@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Box, Stack } from '@mantine/core'
 
+import type { TaskActionHandler } from '../model/taskActions'
 import type { DutyTaskSelect, ResidentDutyTask } from '../model/types'
 import type { TaskRowActionMode } from '../ui/TaskRowActions'
 import { BuildingPlanDrawer } from './BuildingPlanDrawer'
@@ -17,12 +18,12 @@ type Props = {
     isReadOnly?: boolean
     pendingTaskId: string | null
     tasks: ResidentDutyTask[]
-    onTake: (taskId: string) => void | Promise<unknown>
-    onReturn: (taskId: string) => void | Promise<unknown>
-    onComplete: (taskId: string) => void | Promise<unknown>
-    onOpen: (taskId: string) => void | Promise<unknown>
-    onReopen?: (taskId: string) => void | Promise<unknown>
-    onVerify?: (taskId: string) => void | Promise<unknown>
+    onTake: TaskActionHandler
+    onReturn: TaskActionHandler
+    onComplete: TaskActionHandler
+    onOpen: TaskActionHandler
+    onReopen?: TaskActionHandler
+    onVerify?: TaskActionHandler
 }
 
 export function BuildingPlanPanel({

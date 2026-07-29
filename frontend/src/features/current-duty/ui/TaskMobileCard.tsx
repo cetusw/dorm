@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Badge, Button, Checkbox, Paper, Stack, Text } from '@mantine/core'
 
+import { DutyTaskStatusBadge } from '../../../entities/duty-task'
+import {
+    getLeftSwipeActionSpec,
+    getRightSwipeActionSpec,
+    type TaskActionHandler,
+    type TaskActionSpec,
+    type TaskRowActionMode,
+} from '../model/taskActions'
+import { getMobileTaskCardPresentation } from '../model/taskMobilePresentation'
 import type { ResidentDutyTask } from '../model/types'
-import { getStatusBadgeConfig } from './TaskStatusBadge'
-import type { TaskRowActionMode } from './TaskRowActions'
 import classes from './TaskMobileCard.module.css'
 
 type Props = {
@@ -13,106 +20,56 @@ type Props = {
     mode?: TaskRowActionMode
     pending: boolean
     task: ResidentDutyTask
-    onTake: (taskId: string) => void | Promise<unknown>
-    onReturn: (taskId: string) => void | Promise<unknown>
-    onComplete: (taskId: string) => void | Promise<unknown>
-    onOpen: (taskId: string) => void | Promise<unknown>
-    onReopen?: (taskId: string) => void | Promise<unknown>
+    onTake: TaskActionHandler
+    onReturn: TaskActionHandler
+    onComplete: TaskActionHandler
+    onOpen: TaskActionHandler
+    onOpenDetails: (taskId: string) => void
+    onReopen?: TaskActionHandler
     onSwipeActiveChange: (taskId: string | null) => void
-    onVerify?: (taskId: string) => void | Promise<unknown>
-}
-
-type StatusConfig = {
-    backgroundColor: string
-    label: string
+    onVerify?: TaskActionHandler
 }
 
 type SwipeAction = {
-    kind: 'danger' | 'default'
     label: string
-    onClick: (taskId: string) => void | Promise<unknown>
+    onClick: TaskActionHandler
+    tone: TaskActionSpec['tone']
 }
 
 const SWIPE_GAP = 6
 const DEFAULT_SWIPE_ACTION_WIDTH = 128
 const DANGER_SWIPE_ACTION_WIDTH = 136
 
-function getMobileStatusConfig(task: ResidentDutyTask): StatusConfig | null {
-    if (task.status === 'free') {
-        return null
-    }
-
-    const config = getStatusBadgeConfig(task)
-
-    if (!config) {
-        return null
-    }
-
-    return {
-        backgroundColor: config.backgroundColor,
-        label: config.label,
-    }
-}
-
-function MobileTaskStatus({ task }: { task: ResidentDutyTask }) {
-    const statusConfig = getMobileStatusConfig(task)
-    if (!statusConfig) {
-        return null
-    }
-
-    return (
-        <Badge
-            radius="sm"
-            variant="filled"
-            styles={{
-                root: {
-                    backgroundColor: statusConfig.backgroundColor,
-                    color: 'var(--app-color-text)',
-                    fontWeight: 500,
-                },
-            }}
-        >
-            {statusConfig.label}
-        </Badge>
-    )
-}
-
-function getAssigneeLabel(task: ResidentDutyTask): string | null {
-    if (!task.assignee_name) {
-        return null
-    }
-
-    return task.is_mine ? 'Вы' : task.assignee_name
-}
-
 function getLeftSwipeAction(
     mode: TaskRowActionMode,
     task: ResidentDutyTask,
     isReadOnly: boolean,
-    onReturn: (taskId: string) => void | Promise<unknown>,
-    onReopen?: (taskId: string) => void | Promise<unknown>,
+    onReturn: TaskActionHandler,
+    onReopen?: TaskActionHandler,
 ): SwipeAction | null {
-    if (isReadOnly) {
+    const action = getLeftSwipeActionSpec({
+        isReadOnly,
+        mode,
+        task,
+    })
+
+    if (!action) {
         return null
     }
 
-    if (mode === 'verification') {
-        if (task.status === 'completed' && task.can_review_open && onReopen) {
-            return {
-                kind: 'danger',
-                label: 'Переоткрыть',
-                onClick: onReopen,
-            }
-        }
-
-        return null
-    }
-
-    if (task.can_return) {
+    if (action.kind === 'return') {
         return {
-            kind: 'default',
-            label: 'Вернуть',
+            label: action.label,
             onClick: onReturn,
+            tone: action.tone,
+        }
+    }
+
+    if (action.kind === 'reopen' && onReopen) {
+        return {
+            label: action.label,
+            onClick: onReopen,
+            tone: action.tone,
         }
     }
 
@@ -123,30 +80,32 @@ function getRightSwipeAction(
     mode: TaskRowActionMode,
     task: ResidentDutyTask,
     isReadOnly: boolean,
-    onTake: (taskId: string) => void | Promise<unknown>,
-    onVerify?: (taskId: string) => void | Promise<unknown>,
+    onTake: TaskActionHandler,
+    onVerify?: TaskActionHandler,
 ): SwipeAction | null {
-    if (isReadOnly) {
+    const action = getRightSwipeActionSpec({
+        isReadOnly,
+        mode,
+        task,
+    })
+
+    if (!action) {
         return null
     }
 
-    if (mode === 'verification') {
-        if (task.status === 'completed' && task.can_verify && onVerify) {
-            return {
-                kind: 'default',
-                label: 'Подтвердить',
-                onClick: onVerify,
-            }
-        }
-
-        return null
-    }
-
-    if (task.can_take) {
+    if (action.kind === 'take') {
         return {
-            kind: 'default',
-            label: 'Взять',
+            label: action.label,
             onClick: onTake,
+            tone: action.tone,
+        }
+    }
+
+    if (action.kind === 'verify' && onVerify) {
+        return {
+            label: action.label,
+            onClick: onVerify,
+            tone: action.tone,
         }
     }
 
@@ -163,6 +122,7 @@ export function TaskMobileCard({
     onReturn,
     onComplete,
     onOpen,
+    onOpenDetails,
     onReopen,
     onSwipeActiveChange,
     onVerify,
@@ -173,14 +133,18 @@ export function TaskMobileCard({
     const touchStartYRef = useRef<number | null>(null)
     const touchStartOffsetRef = useRef(0)
     const swipeAxisRef = useRef<'x' | 'y' | null>(null)
-    const assigneeLabel = getAssigneeLabel(task)
-    const statusConfig = getMobileStatusConfig(task)
-    const showCheckbox = !isReadOnly && task.is_mine && (task.can_complete || task.can_open)
+    const suppressClickTimeoutRef = useRef<number | null>(null)
+    const suppressNextClickRef = useRef(false)
+    const presentation = getMobileTaskCardPresentation({
+        isReadOnly,
+        mode,
+        task,
+    })
     const leftSwipeAction = getLeftSwipeAction(mode, task, isReadOnly, onReturn, onReopen)
     const rightSwipeAction = getRightSwipeAction(mode, task, isReadOnly, onTake, onVerify)
     const swipeEnabled = Boolean(leftSwipeAction || rightSwipeAction)
     const leftSwipeButtonWidth = leftSwipeAction
-        ? (leftSwipeAction.kind === 'danger' ? DANGER_SWIPE_ACTION_WIDTH : DEFAULT_SWIPE_ACTION_WIDTH)
+        ? (leftSwipeAction.tone === 'danger' ? DANGER_SWIPE_ACTION_WIDTH : DEFAULT_SWIPE_ACTION_WIDTH)
         : 0
     const rightSwipeButtonWidth = rightSwipeAction ? DEFAULT_SWIPE_ACTION_WIDTH : 0
     const leftSwipeWidth = leftSwipeAction ? leftSwipeButtonWidth + SWIPE_GAP : 0
@@ -196,6 +160,12 @@ export function TaskMobileCard({
             setIsDragging(false)
         }
     }, [activeSwipeTaskId, swipeOffset, task.id])
+
+    useEffect(() => () => {
+        if (suppressClickTimeoutRef.current !== null) {
+            window.clearTimeout(suppressClickTimeoutRef.current)
+        }
+    }, [])
 
     function handleTouchStart(clientX: number, clientY: number) {
         if (!swipeEnabled) {
@@ -264,6 +234,16 @@ export function TaskMobileCard({
             return
         }
 
+        if (swipeAxisRef.current === 'x') {
+            suppressNextClickRef.current = true
+            if (suppressClickTimeoutRef.current !== null) {
+                window.clearTimeout(suppressClickTimeoutRef.current)
+            }
+            suppressClickTimeoutRef.current = window.setTimeout(() => {
+                suppressNextClickRef.current = false
+            }, 250)
+        }
+
         const openThreshold = 56
         if (swipeOffset <= -openThreshold && rightSwipeAction) {
             setSwipeOffset(-rightSwipeWidth)
@@ -299,6 +279,23 @@ export function TaskMobileCard({
         await action.onClick(task.id)
     }
 
+    function handleSurfaceClick() {
+        if (suppressNextClickRef.current || isDragging) {
+            return
+        }
+
+        if (swipeOffset !== 0) {
+            setSwipeOffset(0)
+            if (activeSwipeTaskId === task.id) {
+                onSwipeActiveChange(null)
+            }
+            return
+        }
+
+        onSwipeActiveChange(null)
+        onOpenDetails(task.id)
+    }
+
     return (
         <div className={classes.swipeRoot}>
             {swipeEnabled && (
@@ -312,7 +309,7 @@ export function TaskMobileCard({
                                 style={{ width: `${leftSwipeButtonWidth}px` }}
                                 loading={pending && swipeOffset > 0}
                                 styles={{
-                                    root: leftSwipeAction.kind === 'danger'
+                                    root: leftSwipeAction.tone === 'danger'
                                         ? {
                                             backgroundColor: '#FEE2E2',
                                             borderColor: '#991B1B',
@@ -379,11 +376,12 @@ export function TaskMobileCard({
                 )}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
+                onClick={handleSurfaceClick}
             >
                 <Stack gap={8}>
                     <div className={classes.headerRow}>
                         <div className={classes.titleWrap}>
-                            {showCheckbox && (
+                            {presentation.showCheckbox && (
                                 <div className={classes.checkboxWrap}>
                                     <Checkbox
                                         checked={task.status === 'completed'}
@@ -400,13 +398,17 @@ export function TaskMobileCard({
                                                 : undefined,
                                         }}
                                         aria-label={`${task.status === 'completed' ? 'Отменить выполнение' : 'Выполнить'} задачу ${task.title}`}
-                                        onChange={(event) => {
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                        }}
+                                        onChange={async (event) => {
+                                            event.stopPropagation()
                                             if (event.currentTarget.checked) {
-                                                void onComplete(task.id)
+                                                await onComplete(task.id)
                                                 return
                                             }
 
-                                            void onOpen(task.id)
+                                            await onOpen(task.id)
                                         }}
                                     />
                                 </div>
@@ -420,7 +422,7 @@ export function TaskMobileCard({
 
                     <div
                         className={classes.metaRow}
-                        data-has-checkbox={showCheckbox ? 'true' : 'false'}
+                        data-has-checkbox={presentation.showCheckbox ? 'true' : 'false'}
                     >
                         <Badge
                             radius="sm"
@@ -430,16 +432,20 @@ export function TaskMobileCard({
                                     backgroundColor: '#EEF2F1',
                                     color: 'var(--app-color-text)',
                                     fontWeight: 500,
+                                    textTransform: 'none',
+                                },
+                                label: {
+                                    textTransform: 'none',
                                 },
                             }}
                         >
                             {task.cost} баллов
                         </Badge>
 
-                        {statusConfig && <MobileTaskStatus task={task} />}
-                        {assigneeLabel && (
+                        {presentation.showStatus && <DutyTaskStatusBadge status={task.status} justify="flex-start" />}
+                        {presentation.showAssignee && presentation.assigneeLabel && (
                             <Text className={classes.assigneeText}>
-                                {assigneeLabel}
+                                {presentation.assigneeLabel}
                             </Text>
                         )}
                     </div>

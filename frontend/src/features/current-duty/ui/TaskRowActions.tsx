@@ -1,1 +1,1 @@
-export type TaskRowActionMode = 'default' | 'verification'
+export type { TaskRowActionMode } from '../model/taskActions'

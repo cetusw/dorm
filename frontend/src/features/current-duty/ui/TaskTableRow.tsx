@@ -1,8 +1,12 @@
 import { Badge, Button, Checkbox, Table, Text } from '@mantine/core'
 
+import { DutyTaskStatusBadge } from '../../../entities/duty-task'
+import {
+    getDrawerActionSpecs,
+    type TaskActionHandler,
+    type TaskRowActionMode,
+} from '../model/taskActions'
 import type { ResidentDutyTask } from '../model/types'
-import type { TaskRowActionMode } from './TaskRowActions'
-import { TaskStatusBadge } from './TaskStatusBadge'
 import classes from './TaskTableRow.module.css'
 
 type Props = {
@@ -11,19 +15,19 @@ type Props = {
     mode?: TaskRowActionMode
     pending: boolean
     task: ResidentDutyTask
-    onTake: (taskId: string) => void | Promise<unknown>
-    onReturn: (taskId: string) => void | Promise<unknown>
-    onComplete: (taskId: string) => void | Promise<unknown>
-    onOpen: (taskId: string) => void | Promise<unknown>
-    onReopen?: (taskId: string) => void | Promise<unknown>
-    onVerify?: (taskId: string) => void | Promise<unknown>
+    onTake: TaskActionHandler
+    onReturn: TaskActionHandler
+    onComplete: TaskActionHandler
+    onOpen: TaskActionHandler
+    onReopen?: TaskActionHandler
+    onVerify?: TaskActionHandler
 }
 
 type HoverAction = {
     label: string
     kind?: 'danger' | 'default'
     loading: boolean
-    onClick: () => void | Promise<unknown>
+    onClick: () => Promise<boolean>
 }
 
 function getHoverActions(
@@ -35,44 +39,44 @@ function getHoverActions(
     onReopen: Props['onReopen'],
     onVerify: Props['onVerify'],
 ) : HoverAction[] {
-    if (mode === 'verification' && task.status === 'completed' && task.can_verify && onVerify) {
-        const actions: HoverAction[] = []
-
-        if (task.can_review_open && onReopen) {
-            actions.push({
-                label: 'Переоткрыть',
-                kind: 'danger',
-                loading: pending,
-                onClick: () => onReopen(task.id),
-            })
+    return getDrawerActionSpecs({
+        isReadOnly: false,
+        mode,
+        task,
+    }).flatMap((action) => {
+        switch (action.kind) {
+            case 'take':
+                return [{
+                    label: action.label,
+                    kind: action.tone,
+                    loading: pending,
+                    onClick: () => onTake(task.id),
+                }]
+            case 'return':
+                return [{
+                    label: action.label,
+                    kind: action.tone,
+                    loading: pending,
+                    onClick: () => onReturn(task.id),
+                }]
+            case 'reopen':
+                return onReopen ? [{
+                    label: action.label,
+                    kind: action.tone,
+                    loading: pending,
+                    onClick: () => onReopen(task.id),
+                }] : []
+            case 'verify':
+                return onVerify ? [{
+                    label: action.label,
+                    kind: action.tone,
+                    loading: pending,
+                    onClick: () => onVerify(task.id),
+                }] : []
+            default:
+                return []
         }
-
-        actions.push({
-            label: 'Подтвердить',
-            loading: pending,
-            onClick: () => onVerify(task.id),
-        })
-
-        return actions
-    }
-
-    if (task.can_take) {
-        return [{
-            label: 'Взять',
-            loading: pending,
-            onClick: () => onTake(task.id),
-        }]
-    }
-
-    if (task.can_return) {
-        return [{
-            label: 'Вернуть',
-            loading: pending,
-            onClick: () => onReturn(task.id),
-        }]
-    }
-
-    return []
+    })
 }
 
 export function TaskTableRow({
@@ -162,7 +166,7 @@ export function TaskTableRow({
 
                     <div className={classes.right}>
                         <div className={[classes.persistent, hoverActions.length > 0 ? classes.persistentHiddenOnHover : ''].join(' ').trim()}>
-                            <TaskStatusBadge task={task} />
+                            <DutyTaskStatusBadge status={task.status} />
                         </div>
 
                         {hoverActions.length > 0 && (

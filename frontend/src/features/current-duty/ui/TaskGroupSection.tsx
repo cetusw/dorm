@@ -1,7 +1,7 @@
 import { Box, ScrollArea, Table, Text } from '@mantine/core'
 
+import type { TaskActionHandler, TaskRowActionMode } from '../model/taskActions'
 import type { TaskAreaGroup } from '../model/utils'
-import { type TaskRowActionMode } from './TaskRowActions'
 import { TaskTableRow } from './TaskTableRow'
 
 type Props = {
@@ -9,12 +9,12 @@ type Props = {
     group: TaskAreaGroup
     isReadOnly?: boolean
     pendingTaskId: string | null
-    onTake: (taskId: string) => void | Promise<unknown>
-    onReturn: (taskId: string) => void | Promise<unknown>
-    onComplete: (taskId: string) => void | Promise<unknown>
-    onOpen: (taskId: string) => void | Promise<unknown>
-    onReopen?: (taskId: string) => void | Promise<unknown>
-    onVerify?: (taskId: string) => void | Promise<unknown>
+    onTake: TaskActionHandler
+    onReturn: TaskActionHandler
+    onComplete: TaskActionHandler
+    onOpen: TaskActionHandler
+    onReopen?: TaskActionHandler
+    onVerify?: TaskActionHandler
 }
 
 export function TaskGroupSection({

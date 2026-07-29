@@ -1,7 +1,7 @@
 import { Alert, Drawer, ScrollArea, Table } from '@mantine/core'
 
+import type { TaskActionHandler, TaskRowActionMode } from '../model/taskActions'
 import type { ResidentDutyTask } from '../model/types'
-import { type TaskRowActionMode } from '../ui/TaskRowActions'
 import { TaskTableRow } from '../ui/TaskTableRow'
 import type { FloorPlan } from './types'
 import { getFloorLabel } from './utils'
@@ -14,12 +14,12 @@ type Props = {
     pendingTaskId: string | null
     tasks: ResidentDutyTask[]
     onClose: () => void
-    onTake: (taskId: string) => void | Promise<unknown>
-    onReturn: (taskId: string) => void | Promise<unknown>
-    onComplete: (taskId: string) => void | Promise<unknown>
-    onOpen: (taskId: string) => void | Promise<unknown>
-    onReopen?: (taskId: string) => void | Promise<unknown>
-    onVerify?: (taskId: string) => void | Promise<unknown>
+    onTake: TaskActionHandler
+    onReturn: TaskActionHandler
+    onComplete: TaskActionHandler
+    onOpen: TaskActionHandler
+    onReopen?: TaskActionHandler
+    onVerify?: TaskActionHandler
 }
 
 export function BuildingPlanDrawer({

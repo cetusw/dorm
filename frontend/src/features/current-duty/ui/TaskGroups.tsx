@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 
 import { Alert, Stack } from '@mantine/core'
 
+import type { TaskActionHandler, TaskRowActionMode } from '../model/taskActions'
 import type { ResidentDutyTask } from '../model/types'
 import { groupTasksByArea } from '../model/utils'
 import { TaskGroupSection } from './TaskGroupSection'
 import { TaskMobileGroupSection } from './TaskMobileGroupSection'
-import type { TaskRowActionMode } from './TaskRowActions'
+import { TaskMobileDetailsDrawer } from './TaskMobileDetailsDrawer'
 
 type Props = {
     actionMode?: TaskRowActionMode
@@ -14,12 +15,12 @@ type Props = {
     pendingTaskId: string | null
     tasks: ResidentDutyTask[]
     emptyMessage?: string
-    onTake: (taskId: string) => void | Promise<unknown>
-    onReturn: (taskId: string) => void | Promise<unknown>
-    onComplete: (taskId: string) => void | Promise<unknown>
-    onOpen: (taskId: string) => void | Promise<unknown>
-    onReopen?: (taskId: string) => void | Promise<unknown>
-    onVerify?: (taskId: string) => void | Promise<unknown>
+    onTake: TaskActionHandler
+    onReturn: TaskActionHandler
+    onComplete: TaskActionHandler
+    onOpen: TaskActionHandler
+    onReopen?: TaskActionHandler
+    onVerify?: TaskActionHandler
 }
 
 export function TaskGroups({
@@ -37,6 +38,10 @@ export function TaskGroups({
 }: Props) {
     const groups = groupTasksByArea(tasks)
     const [activeMobileSwipeTaskId, setActiveMobileSwipeTaskId] = useState<string | null>(null)
+    const [selectedMobileTaskId, setSelectedMobileTaskId] = useState<string | null>(null)
+    const selectedMobileTask = selectedMobileTaskId
+        ? tasks.find((task) => task.id === selectedMobileTaskId) ?? null
+        : null
 
     useEffect(() => {
         if (!activeMobileSwipeTaskId) {
@@ -53,6 +58,17 @@ export function TaskGroups({
             window.removeEventListener('scroll', handleScroll)
         }
     }, [activeMobileSwipeTaskId])
+
+    useEffect(() => {
+        if (selectedMobileTaskId && !selectedMobileTask) {
+            setSelectedMobileTaskId(null)
+        }
+    }, [selectedMobileTask, selectedMobileTaskId])
+
+    function handleOpenMobileDetails(taskId: string) {
+        setActiveMobileSwipeTaskId(null)
+        setSelectedMobileTaskId(taskId)
+    }
 
     if (groups.length === 0) {
         return <Alert color="gray">{emptyMessage}</Alert>
@@ -73,12 +89,26 @@ export function TaskGroups({
                         onReturn={onReturn}
                         onComplete={onComplete}
                         onOpen={onOpen}
+                        onOpenDetails={handleOpenMobileDetails}
                         onReopen={onReopen}
                         onVerify={onVerify}
                         onSwipeActiveChange={setActiveMobileSwipeTaskId}
                     />
                 ))}
             </Stack>
+
+            <TaskMobileDetailsDrawer
+                isReadOnly={isReadOnly}
+                mode={actionMode}
+                opened={selectedMobileTask !== null}
+                pendingTaskId={pendingTaskId}
+                task={selectedMobileTask}
+                onClose={() => setSelectedMobileTaskId(null)}
+                onTake={onTake}
+                onReturn={onReturn}
+                onReopen={onReopen ?? (async () => false)}
+                onVerify={onVerify ?? (async () => false)}
+            />
 
             <Stack visibleFrom="md" gap="lg">
                 {groups.map((group) => (

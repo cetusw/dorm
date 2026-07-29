@@ -1,4 +1,4 @@
-export type DutyTaskStatus = 'free' | 'assigned' | 'completed' | 'verified'
+import type { DutyTaskStatus } from '../../../entities/duty-task'
 
 export type DutyTaskSelect = 'mine' | 'free' | 'all' | 'verification' | 'team'
 

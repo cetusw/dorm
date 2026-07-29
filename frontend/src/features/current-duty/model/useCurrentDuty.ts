@@ -16,6 +16,7 @@ import {
     sortTasksForInitialDisplay,
     toErrorMessage,
 } from './utils'
+import type { TaskActionHandler } from './taskActions'
 
 function applyInitialTaskOrdering(duty: ResidentCurrentDuty): ResidentCurrentDuty {
     return {
@@ -99,22 +100,24 @@ export function useCurrentDuty() {
         }
     }
 
-    async function handleTake(taskId: string) {
+    const handleTake: TaskActionHandler = async (taskId) => {
         const success = await runTaskAction(taskId, takeTask)
         if (!success) {
-            return
+            return false
         }
 
         visibleMineTaskIdsRef.current = appendUniqueTaskId(visibleMineTaskIdsRef.current, taskId)
+        return true
     }
 
-    async function handleReturn(taskId: string) {
+    const handleReturn: TaskActionHandler = async (taskId) => {
         const success = await runTaskAction(taskId, returnTask)
         if (!success) {
-            return
+            return false
         }
 
         visibleFreeTaskIdsRef.current = appendUniqueTaskId(visibleFreeTaskIdsRef.current, taskId)
+        return true
     }
 
     useEffect(() => {
@@ -130,10 +133,10 @@ export function useCurrentDuty() {
         selectGroup: (groupId: string) => reload(groupId),
         handleTake,
         handleReturn,
-        handleComplete: (taskId: string) => runTaskAction(taskId, completeTask),
-        handleOpen: (taskId: string) => runTaskAction(taskId, openTask),
-        handleReopen: (taskId: string) => runTaskAction(taskId, reopenTask),
-        handleVerify: (taskId: string) => runTaskAction(taskId, verifyTask),
+        handleComplete: ((taskId: string) => runTaskAction(taskId, completeTask)) satisfies TaskActionHandler,
+        handleOpen: ((taskId: string) => runTaskAction(taskId, openTask)) satisfies TaskActionHandler,
+        handleReopen: ((taskId: string) => runTaskAction(taskId, reopenTask)) satisfies TaskActionHandler,
+        handleVerify: ((taskId: string) => runTaskAction(taskId, verifyTask)) satisfies TaskActionHandler,
         reloadCurrentDuty: () => reload(selectedGroupId ?? undefined),
         visibleMineTaskIds: visibleMineTaskIdsRef.current,
         visibleFreeTaskIds: visibleFreeTaskIdsRef.current,

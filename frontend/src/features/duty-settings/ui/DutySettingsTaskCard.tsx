@@ -9,8 +9,7 @@ import {
 } from '@phosphor-icons/react'
 import { ActionIcon, Menu, Text, Tooltip } from '@mantine/core'
 
-import { TaskStatusBadge } from '../../current-duty/ui/TaskStatusBadge'
-import type { ResidentDutyTask } from '../../current-duty/model/types'
+import { DutyTaskStatusBadge, type DutyTaskStatus } from '../../../entities/duty-task'
 import { formatDutySettingsRecurrence } from '../model/utils'
 import type { DutySettingsTask } from '../model/types'
 import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
@@ -25,28 +24,9 @@ type Props = {
     onDelete: (taskId: string) => void
 }
 
-function toResidentDutyTask(task: DutySettingsTask): ResidentDutyTask {
-    return {
-        id: task.id,
-        area_id: 0,
-        area_name: '',
-        area_floor: 0,
-        title: task.title,
-        cost: task.cost,
-        status: task.status === '' ? 'free' : task.status,
-        is_mine: false,
-        can_take: false,
-        can_return: false,
-        can_complete: false,
-        can_open: false,
-        can_verify: false,
-        can_review_open: false,
-    }
-}
-
 export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude, onDelete }: Props) {
     const [menuOpened, setMenuOpened] = useState(false)
-    const badgeTask = useMemo(() => toResidentDutyTask(task), [task])
+    const badgeStatus = useMemo<DutyTaskStatus>(() => (task.status === '' ? 'free' : task.status), [task.status])
     const canExclude = task.is_included && (task.status === 'free' || task.status === 'assigned' || task.status === '')
     const shouldShowStatus = task.is_included && (task.status === 'completed' || task.status === 'verified')
     const shouldShowAssignee = task.is_included && Boolean(task.assignee_name)
@@ -80,7 +60,7 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude, onDel
 
                 <div className={classes.statusCell}>
                     {shouldShowStatus ? (
-                        <TaskStatusBadge task={badgeTask} justify="flex-start" />
+                        <DutyTaskStatusBadge status={badgeStatus} justify="flex-start" />
                     ) : null}
                 </div>
 

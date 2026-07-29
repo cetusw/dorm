@@ -1,8 +1,8 @@
 import { Stack, Text } from '@mantine/core'
 
+import type { TaskActionHandler, TaskRowActionMode } from '../model/taskActions'
 import type { TaskAreaGroup } from '../model/utils'
 import { TaskMobileCard } from './TaskMobileCard'
-import type { TaskRowActionMode } from './TaskRowActions'
 import classes from './TaskMobileGroupSection.module.css'
 
 type Props = {
@@ -11,13 +11,14 @@ type Props = {
     group: TaskAreaGroup
     isReadOnly?: boolean
     pendingTaskId: string | null
-    onTake: (taskId: string) => void | Promise<unknown>
-    onReturn: (taskId: string) => void | Promise<unknown>
-    onComplete: (taskId: string) => void | Promise<unknown>
-    onOpen: (taskId: string) => void | Promise<unknown>
-    onReopen?: (taskId: string) => void | Promise<unknown>
+    onTake: TaskActionHandler
+    onReturn: TaskActionHandler
+    onComplete: TaskActionHandler
+    onOpen: TaskActionHandler
+    onOpenDetails: (taskId: string) => void
+    onReopen?: TaskActionHandler
     onSwipeActiveChange: (taskId: string | null) => void
-    onVerify?: (taskId: string) => void | Promise<unknown>
+    onVerify?: TaskActionHandler
 }
 
 export function TaskMobileGroupSection({
@@ -30,6 +31,7 @@ export function TaskMobileGroupSection({
     onReturn,
     onComplete,
     onOpen,
+    onOpenDetails,
     onReopen,
     onSwipeActiveChange,
     onVerify,
@@ -53,6 +55,7 @@ export function TaskMobileGroupSection({
                         onReturn={onReturn}
                         onComplete={onComplete}
                         onOpen={onOpen}
+                        onOpenDetails={onOpenDetails}
                         onReopen={onReopen}
                         onSwipeActiveChange={onSwipeActiveChange}
                         onVerify={onVerify}

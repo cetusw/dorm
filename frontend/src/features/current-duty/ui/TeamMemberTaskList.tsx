@@ -1,7 +1,7 @@
 import { Badge, ScrollArea, Stack, Table, Text, Tooltip } from '@mantine/core'
 
+import { DutyTaskStatusBadge } from '../../../entities/duty-task'
 import type { ResidentDutyTask } from '../model/types'
-import { TaskStatusBadge } from './TaskStatusBadge'
 
 type Props = {
     tasks: ResidentDutyTask[]
@@ -31,11 +31,11 @@ export function TeamMemberTaskList({ tasks }: Props) {
                                 {task.cost} баллов
                             </Badge>
                         </Tooltip>
-                        <Tooltip label="Статус">
-                            <div>
-                                <TaskStatusBadge task={task} justify="flex-start" />
-                            </div>
-                        </Tooltip>
+                                <Tooltip label="Статус">
+                                    <div>
+                                        <DutyTaskStatusBadge status={task.status} justify="flex-start" />
+                                    </div>
+                                </Tooltip>
                     </Stack>
                 ))}
             </Stack>
@@ -63,7 +63,7 @@ export function TeamMemberTaskList({ tasks }: Props) {
                                 <Table.Td w="22%">
                                     <Tooltip label="Статус">
                                         <div>
-                                            <TaskStatusBadge task={task} justify="flex-start" />
+                                            <DutyTaskStatusBadge status={task.status} justify="flex-start" />
                                         </div>
                                     </Tooltip>
                                 </Table.Td>
