@@ -121,10 +121,18 @@ func (m *MockGroupRepo) FindAll(ctx context.Context) ([]*structure.Group, error)
 	return args.Get(0).([]*structure.Group), args.Error(1)
 }
 func (m *MockGroupRepo) FindByID(ctx context.Context, id uuid.UUID) (*structure.Group, error) {
-	return nil, nil
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*structure.Group), args.Error(1)
 }
 func (m *MockGroupRepo) FindByDormitoryID(ctx context.Context, dormitoryID int64) ([]*structure.Group, error) {
-	return nil, nil
+	args := m.Called(ctx, dormitoryID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*structure.Group), args.Error(1)
 }
 func (m *MockGroupRepo) Save(ctx context.Context, group *structure.Group) error { return nil }
 func (m *MockGroupRepo) Delete(ctx context.Context, id uuid.UUID) error         { return nil }
@@ -154,7 +162,11 @@ func (m *MockCatalogRepo) FindLastCompletionDates(ctx context.Context, taskIDs [
 	return nil, nil
 }
 func (m *MockCatalogRepo) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*catalog.TaskDefinition, error) {
-	return nil, nil
+	args := m.Called(ctx, groupID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*catalog.TaskDefinition), args.Error(1)
 }
 func (m *MockCatalogRepo) FindCommon(ctx context.Context) ([]*catalog.TaskDefinition, error) {
 	return nil, nil

@@ -3,10 +3,7 @@ package http
 import (
 	"dorm/pkg/core/domain/duty"
 	"dorm/pkg/core/ports"
-	"dorm/pkg/core/ports/dto"
 	"errors"
-	"os"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -14,19 +11,13 @@ import (
 
 type ResidentAPIHandler struct {
 	residentDutyUC ports.ResidentDutyUseCase
-	dormitoryUC    ports.DormitoryUseCase
-	cleaningUC     ports.CleaningUseCase
 }
 
 func NewResidentAPIHandler(
 	residentDutyUC ports.ResidentDutyUseCase,
-	dormitoryUC ports.DormitoryUseCase,
-	cleaningUC ports.CleaningUseCase,
 ) *ResidentAPIHandler {
 	return &ResidentAPIHandler{
 		residentDutyUC: residentDutyUC,
-		dormitoryUC:    dormitoryUC,
-		cleaningUC:     cleaningUC,
 	}
 }
 
@@ -34,7 +25,6 @@ func (h *ResidentAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) 
 	api := app.Group("/api/v1/resident", auth)
 
 	api.Get("/current-duty", h.HandleGetCurrentDuty)
-	api.Post("/duties", h.HandleCreateDormitoryDutyWeek)
 	api.Post("/tasks/:taskId/take", h.HandleTakeTask)
 	api.Post("/tasks/:taskId/return", h.HandleReturnTask)
 	api.Post("/tasks/:taskId/complete", h.HandleCompleteTask)
@@ -60,37 +50,6 @@ func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(currentDuty)
-}
-
-func (h *ResidentAPIHandler) HandleCreateDormitoryDutyWeek(c *fiber.Ctx) error {
-	userID, err := currentUserID(c)
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
-	}
-
-	canManage, err := h.dormitoryUC.CanManageDormitories(c.Context(), userID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
-	}
-	if !canManage {
-		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
-	}
-
-	var req dto.CreateDormitoryDutyWeekRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
-	}
-
-	startDate, endDate, err := parseResidentDutyWeekDates(req)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
-	}
-
-	if err := h.cleaningUC.StartNewDutiesForDormitory(c.Context(), req.DormitoryID, startDate, endDate); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
-	}
-
-	return c.SendStatus(fiber.StatusNoContent)
 }
 
 func (h *ResidentAPIHandler) HandleTakeTask(c *fiber.Ctx) error {
@@ -232,36 +191,4 @@ func optionalGroupID(c *fiber.Ctx) (*uuid.UUID, error) {
 	}
 
 	return &groupID, nil
-}
-
-func parseResidentDutyWeekDates(req dto.CreateDormitoryDutyWeekRequest) (time.Time, time.Time, error) {
-	if req.DormitoryID <= 0 {
-		return time.Time{}, time.Time{}, fiber.NewError(fiber.StatusBadRequest, "некорректный идентификатор общежития")
-	}
-
-	location := residentDutyWeekLocation()
-
-	startDate, err := time.ParseInLocation("2006-01-02", req.StartDate, location)
-	if err != nil {
-		return time.Time{}, time.Time{}, fiber.NewError(fiber.StatusBadRequest, "некорректная дата начала")
-	}
-
-	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 9, 0, 0, 0, location)
-	endDate := startDate.AddDate(0, 0, 7)
-
-	return startDate, endDate, nil
-}
-
-func residentDutyWeekLocation() *time.Location {
-	timezone := os.Getenv("TZ")
-	if timezone == "" {
-		return time.Local
-	}
-
-	location, err := time.LoadLocation(timezone)
-	if err != nil {
-		return time.Local
-	}
-
-	return location
 }

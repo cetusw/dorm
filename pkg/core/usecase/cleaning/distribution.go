@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"time"
 
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
 	"dorm/pkg/core/domain/catalog"
@@ -18,12 +20,16 @@ import (
 )
 
 var (
-	ErrGroupHasNoTeams      = errors.New("group has no teams")
-	ErrLastDutyTeamNotFound = errors.New("last duty team is not present in group rotation")
+	ErrGroupHasNoTeams          = errors.New("group has no teams")
+	ErrLastDutyTeamNotFound     = errors.New("last duty team is not present in group rotation")
+	ErrDutyCreationAccessDenied = errors.New("duty creation access denied")
+	ErrDutyGroupNotFound        = errors.New("duty group not found")
+	ErrDutyAlreadyCreated       = errors.New("duty already created")
 )
 
 type distributingContext struct {
 	groups        []*structure.Group
+	groupID       *uuid.UUID
 	taskDefs      []*catalog.TaskDefinition
 	areas         []*catalog.Area
 	areaGroupMap  map[int]*uuid.UUID
@@ -38,6 +44,7 @@ type distributingContext struct {
 
 type schedulingOptions struct {
 	dormitoryID *int64
+	groupID     *uuid.UUID
 	start       time.Time
 	end         time.Time
 }
@@ -88,12 +95,41 @@ func (s *Service) StartNewDutiesForDormitory(ctx context.Context, dormitoryID in
 	return s.finalizeNewWeek(ctx, distributingCtx)
 }
 
+func (s *Service) StartNewDutyForGroup(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, startDate, endDate time.Time) error {
+	if !startDate.Before(endDate) {
+		return fmt.Errorf("start date must be before end date")
+	}
+
+	if _, err := s.requireGroupLeaderAccess(ctx, currentUserID, groupID); err != nil {
+		return err
+	}
+
+	distributingCtx, err := s.loadSchedulingData(ctx, schedulingOptions{
+		groupID: &groupID,
+		start:   startDate,
+		end:     endDate,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := s.initializeDuties(ctx, distributingCtx); err != nil {
+		return err
+	}
+
+	if err := s.distributeTasks(ctx, distributingCtx); err != nil {
+		return err
+	}
+
+	return s.finalizeNewWeek(ctx, distributingCtx)
+}
+
 func (s *Service) loadSchedulingData(ctx context.Context, opts schedulingOptions) (*distributingContext, error) {
 	groups, err := s.loadSchedulingGroups(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("load groups: %w", err)
 	}
-	areas, err := s.areaRepo.GetAllAreas(ctx)
+	areas, err := s.loadSchedulingAreas(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("load areas: %w", err)
 	}
@@ -113,6 +149,7 @@ func (s *Service) loadSchedulingData(ctx context.Context, opts schedulingOptions
 
 	distributingCtx := &distributingContext{
 		groups:        groups,
+		groupID:       opts.groupID,
 		taskDefs:      taskDefs,
 		areas:         areas,
 		weekNumber:    weekNum,
@@ -132,13 +169,47 @@ func (s *Service) loadSchedulingData(ctx context.Context, opts schedulingOptions
 }
 
 func (s *Service) loadSchedulingGroups(ctx context.Context, opts schedulingOptions) ([]*structure.Group, error) {
+	if opts.groupID != nil {
+		group, err := s.groupRepo.FindByID(ctx, *opts.groupID)
+		if err != nil {
+			return nil, err
+		}
+		if group == nil {
+			return nil, nil
+		}
+		return []*structure.Group{group}, nil
+	}
 	if opts.dormitoryID != nil {
 		return s.groupRepo.FindByDormitoryID(ctx, *opts.dormitoryID)
 	}
 	return s.groupRepo.FindAll(ctx)
 }
 
+func (s *Service) loadSchedulingAreas(ctx context.Context, opts schedulingOptions) ([]*catalog.Area, error) {
+	areas, err := s.areaRepo.GetAllAreas(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.groupID == nil {
+		return areas, nil
+	}
+
+	filtered := make([]*catalog.Area, 0, len(areas))
+	for _, area := range areas {
+		if area.GroupID() != nil && *area.GroupID() == *opts.groupID {
+			filtered = append(filtered, area)
+		}
+	}
+
+	return filtered, nil
+}
+
 func (s *Service) loadSchedulingTasks(ctx context.Context, groups []*structure.Group, areas []*catalog.Area, opts schedulingOptions) ([]*catalog.TaskDefinition, error) {
+	if opts.groupID != nil {
+		return s.taskRepo.FindByGroupID(ctx, *opts.groupID)
+	}
+
 	if opts.dormitoryID == nil {
 		return s.taskRepo.GetAllTaskDefinitions(ctx)
 	}
@@ -186,6 +257,9 @@ func (s *Service) indexData(c *distributingContext) {
 
 func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) error {
 	if len(c.groups) == 0 {
+		if c.groupID != nil {
+			return ErrDutyGroupNotFound
+		}
 		return fmt.Errorf("cannot start new week: no groups found")
 	}
 
@@ -325,6 +399,9 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 
 	for _, d := range c.dutiesList {
 		if err := s.dutyRepo.CreateWithTasks(ctx, d, d.Tasks()); err != nil {
+			if isDutySequenceConflict(err) {
+				return ErrDutyAlreadyCreated
+			}
 			return fmt.Errorf("save duty %s: %w", d.ID(), err)
 		}
 	}
@@ -337,6 +414,8 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 		log.Printf("Failed to load duties for week started event: %v", err)
 		return nil
 	}
+
+	duties = filterDutyViewModels(duties, c.dutiesList)
 
 	go func(dutiesSnapshot []dto.DutyViewModel, start, end time.Time) {
 		pubCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -360,4 +439,49 @@ func (s *Service) clearAppliedTaskOverrides(ctx context.Context, tasks []*catalo
 		taskIDs = append(taskIDs, task.ID())
 	}
 	return s.overrideRepo.DeleteByTaskIDs(ctx, taskIDs)
+}
+
+func (s *Service) requireGroupLeaderAccess(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID) (*structure.Group, error) {
+	group, err := s.groupRepo.FindByID(ctx, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("load group: %w", err)
+	}
+	if group == nil {
+		return nil, ErrDutyGroupNotFound
+	}
+	if group.LeaderID() == nil || *group.LeaderID() != currentUserID {
+		return nil, ErrDutyCreationAccessDenied
+	}
+
+	return group, nil
+}
+
+func filterDutyViewModels(all []dto.DutyViewModel, created []*duty.Duty) []dto.DutyViewModel {
+	if len(all) == 0 || len(created) == 0 {
+		return all
+	}
+
+	createdIDs := make(map[uuid.UUID]struct{}, len(created))
+	for _, createdDuty := range created {
+		createdIDs[createdDuty.ID()] = struct{}{}
+	}
+
+	filtered := make([]dto.DutyViewModel, 0, len(created))
+	for _, current := range all {
+		if _, ok := createdIDs[current.DutyID]; ok {
+			filtered = append(filtered, current)
+		}
+	}
+
+	return filtered
+}
+
+func isDutySequenceConflict(err error) bool {
+	var mysqlErr *mysqlDriver.MySQLError
+	if !errors.As(err, &mysqlErr) {
+		return strings.Contains(strings.ToLower(err.Error()), "uq_duty_group_sequence")
+	}
+
+	return mysqlErr.Number == 1062 &&
+		strings.Contains(strings.ToLower(mysqlErr.Message), "uq_duty_group_sequence")
 }

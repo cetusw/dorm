@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { GearIcon, PlusIcon } from '@phosphor-icons/react'
 import { ActionIcon, Alert, Box, Button, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text, Tooltip } from '@mantine/core'
 
-import type { CurrentUser } from '../../features/current-user/model/types'
 import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 import {
     calculateDutyAnalytics,
@@ -12,8 +11,7 @@ import {
     selectDutyViewOptions,
     selectTasksForActiveSelect,
 } from '../../features/current-duty/model/selectors'
-import { CreateDutyWeekModal } from '../../features/current-duty/ui/CreateDutyWeekModal'
-import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
+import { CreateGroupDutyModal } from '../../features/current-duty/ui/CreateGroupDutyModal'
 import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty'
 import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
@@ -27,10 +25,6 @@ import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 import { navigateTo } from '../../app/navigation'
-
-type Props = {
-    currentUser: CurrentUser | null
-}
 
 type PlanLegendItem = {
     color: string
@@ -70,7 +64,7 @@ function getPlanLegendItems(activeSelect: DutyTaskSelect): PlanLegendItem[] {
     }
 }
 
-export function CurrentDutyPage({ currentUser }: Props) {
+export function CurrentDutyPage() {
     const {
         selectedGroupId,
         duty,
@@ -88,7 +82,6 @@ export function CurrentDutyPage({ currentUser }: Props) {
         visibleMineTaskIds,
         visibleFreeTaskIds,
     } = useCurrentDuty()
-    const selectedDormitoryId = useSelectedDormitoryId()
     const [createModalOpened, setCreateModalOpened] = useState(false)
     const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
@@ -153,10 +146,9 @@ export function CurrentDutyPage({ currentUser }: Props) {
         availableFloorPlans[0] ??
         null
 
-    const canCreateDuty = Boolean(currentUser?.can_manage_dormitories || duty.can_manage_duty_settings)
-    const createDutyDormitoryId = selectedDormitoryId ?? String(duty.dormitory_id)
+    const canManageGroupDuty = duty.can_manage_duty_settings
 
-    const createDutyButton = canCreateDuty ? (
+    const createDutyButton = canManageGroupDuty ? (
         <Button
             radius="md"
             leftSection={<PlusIcon size={18} />}
@@ -167,7 +159,7 @@ export function CurrentDutyPage({ currentUser }: Props) {
         </Button>
     ) : null
 
-    const dutySettingsButton = duty.can_manage_duty_settings ? (
+    const dutySettingsButton = canManageGroupDuty ? (
         <Tooltip label="Настройки дежурства">
             <ActionIcon
                 variant="default"
@@ -300,9 +292,9 @@ export function CurrentDutyPage({ currentUser }: Props) {
         return (
             <PageFrame title="Дежурство" titleActions={titleActions} error={error} controls={controls}>
                 <Alert color="gray">В выбранной группе сейчас нет активного дежурства.</Alert>
-                <CreateDutyWeekModal
+                <CreateGroupDutyModal
                     opened={createModalOpened}
-                    dormitoryId={createDutyDormitoryId}
+                    groupId={duty.selected_group_id}
                     onClose={() => setCreateModalOpened(false)}
                     onCreated={reloadCurrentDuty}
                 />
@@ -321,9 +313,9 @@ export function CurrentDutyPage({ currentUser }: Props) {
                 controls={controls}
             >
                 <Alert color="gray">На текущее дежурство не заведены задачи.</Alert>
-                <CreateDutyWeekModal
+                <CreateGroupDutyModal
                     opened={createModalOpened}
-                    dormitoryId={createDutyDormitoryId}
+                    groupId={duty.selected_group_id}
                     onClose={() => setCreateModalOpened(false)}
                     onCreated={reloadCurrentDuty}
                 />
@@ -395,9 +387,9 @@ export function CurrentDutyPage({ currentUser }: Props) {
                     onVerify={handleVerify}
                 />
             )}
-            <CreateDutyWeekModal
+            <CreateGroupDutyModal
                 opened={createModalOpened}
-                dormitoryId={createDutyDormitoryId}
+                groupId={duty.selected_group_id}
                 onClose={() => setCreateModalOpened(false)}
                 onCreated={reloadCurrentDuty}
             />

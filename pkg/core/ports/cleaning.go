@@ -18,6 +18,7 @@ type CleaningUseCase interface {
 	VerifyTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	ReopenTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	StartNewWeek(ctx context.Context) error
+	StartNewDutyForGroup(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, startDate, endDate time.Time) error
 	StartNewDutiesForDormitory(ctx context.Context, dormitoryID int64, startDate, endDate time.Time) error
 
 	IsUserOnDuty(ctx context.Context, userID uuid.UUID) (bool, error)

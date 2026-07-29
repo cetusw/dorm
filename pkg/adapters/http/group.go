@@ -3,6 +3,7 @@ package http
 import (
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
+	cleaninguc "dorm/pkg/core/usecase/cleaning"
 	dutysettingsuc "dorm/pkg/core/usecase/dutysettings"
 	"errors"
 	"strconv"
@@ -13,12 +14,23 @@ import (
 
 type GroupAPIHandler struct {
 	dormitoryUC    ports.DormitoryUseCase
+	cleaningUC     ports.CleaningUseCase
 	dutySettingsUC ports.DutySettingsUseCase
 }
 
-func NewGroupAPIHandler(dormitoryUC ports.DormitoryUseCase, dutySettingsUC ports.DutySettingsUseCase) *GroupAPIHandler {
+type CreateGroupDutyRequest struct {
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
+}
+
+func NewGroupAPIHandler(
+	dormitoryUC ports.DormitoryUseCase,
+	cleaningUC ports.CleaningUseCase,
+	dutySettingsUC ports.DutySettingsUseCase,
+) *GroupAPIHandler {
 	return &GroupAPIHandler{
 		dormitoryUC:    dormitoryUC,
+		cleaningUC:     cleaningUC,
 		dutySettingsUC: dutySettingsUC,
 	}
 }
@@ -28,6 +40,7 @@ func (h *GroupAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api.Get("", h.HandleGetGroups)
 	api.Get("/options", h.HandleGetDormitoryUserOptions)
 	api.Get("/:id", h.HandleGetGroup)
+	api.Post("/:id/duties", h.HandleCreateGroupDuty)
 	api.Get("/:id/duty-settings", h.HandleGetDutySettings)
 	api.Get("/:id/duty-settings/teams/members", h.HandleGetDutySettingsTeamMemberOptions)
 	api.Post("/:id/duty-settings/teams/reorder", h.HandleReorderDutySettingsTeams)
@@ -167,6 +180,39 @@ func (h *GroupAPIHandler) HandleDeleteGroup(c *fiber.Ctx) error {
 
 	if err := h.dormitoryUC.DeleteGroup(c.Context(), groupID); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *GroupAPIHandler) HandleCreateGroupDuty(c *fiber.Ctx) error {
+	userID, err := currentUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+	}
+
+	groupID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор группы"))
+	}
+
+	var req CreateGroupDutyRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
+	}
+
+	startDate, endDate, err := parseDutyPeriod(req.StartDate, req.EndDate)
+	if err != nil {
+		var fiberErr *fiber.Error
+		if errors.As(err, &fiberErr) {
+			return c.Status(fiberErr.Code).JSON(errorResponse(fiberErr.Message))
+		}
+
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	if err := h.cleaningUC.StartNewDutyForGroup(c.Context(), userID, groupID, startDate, endDate); err != nil {
+		return h.respondCreateGroupDutyError(c, err)
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
@@ -646,6 +692,24 @@ func (h *GroupAPIHandler) respondDutySettingsError(c *fiber.Ctx, err error) erro
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	default:
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+}
+
+func (h *GroupAPIHandler) respondCreateGroupDutyError(c *fiber.Ctx, err error) error {
+	switch {
+	case errors.Is(err, cleaninguc.ErrDutyCreationAccessDenied):
+		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
+	case errors.Is(err, cleaninguc.ErrDutyGroupNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(errorResponse("группа не найдена"))
+	case errors.Is(err, cleaninguc.ErrDutyAlreadyCreated):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("Для группы уже было создано новое дежурство. Обновите страницу."))
+	default:
+		var fiberErr *fiber.Error
+		if errors.As(err, &fiberErr) {
+			return c.Status(fiberErr.Code).JSON(errorResponse(fiberErr.Message))
+		}
+
+		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось создать дежурство"))
 	}
 }
 

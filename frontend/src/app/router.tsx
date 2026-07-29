@@ -35,7 +35,7 @@ function renderResidentPage(pathname: string, currentUser: ReturnType<typeof use
     }
 
     if (!canManageDormitories) {
-        return <CurrentDutyPage currentUser={currentUser} />
+        return <CurrentDutyPage />
     }
 
     const teamGroupId = matchGroupTeamsPath(pathname)
@@ -63,7 +63,7 @@ function renderResidentPage(pathname: string, currentUser: ReturnType<typeof use
         return <TaskCatalogPage />
     }
 
-    return <CurrentDutyPage currentUser={currentUser} />
+    return <CurrentDutyPage />
 }
 
 export function AppRouter() {

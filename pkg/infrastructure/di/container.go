@@ -199,13 +199,13 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		cleaningService,
 	)
 
-	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService, dormitoryService, cleaningService)
+	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService)
 	residentAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	dormitoryAPIHandler := http.NewDormitoryAPIHandler(dormitoryService)
 	dormitoryAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
-	groupAPIHandler := http.NewGroupAPIHandler(dormitoryService, dutySettingsService)
+	groupAPIHandler := http.NewGroupAPIHandler(dormitoryService, cleaningService, dutySettingsService)
 	groupAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	teamAPIHandler := http.NewTeamAPIHandler(dormitoryService, teamService)
