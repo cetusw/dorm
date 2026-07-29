@@ -1,8 +1,9 @@
 import { BellIcon, BellSlashIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { Alert, Button, Group, Loader, Stack, Text } from '@mantine/core'
 
-import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
 import { usePushNotifications } from '../model/usePushNotifications'
+
+const notificationDescription = 'Включите уведомления, чтобы не забывать о дежурстве и задачах'
 
 export function PushNotificationSettings() {
     const {
@@ -62,10 +63,6 @@ export function PushNotificationSettings() {
             case 'subscribed':
                 return (
                     <Stack gap="sm">
-                        <Group gap="sm" align="center">
-                            <SettingsBadge color="success">Включены</SettingsBadge>
-                            <Text c="dimmed">Это устройство будет получать напоминания о дежурстве и задачах.</Text>
-                        </Group>
                         <Group>
                             <Button
                                 color="red"
@@ -80,9 +77,14 @@ export function PushNotificationSettings() {
                 )
             case 'subscribing':
                 return (
-                    <Group gap="sm" wrap="nowrap">
-                        <Loader size="sm" />
-                        <Text c="dimmed">Подключаем уведомления…</Text>
+                    <Group>
+                        <Button
+                            leftSection={<BellIcon size={18} />}
+                            rightSection={<Loader size="xs" color="white" />}
+                            disabled
+                        >
+                            Подключаем уведомления...
+                        </Button>
                     </Group>
                 )
             case 'unsubscribing':
@@ -98,37 +100,27 @@ export function PushNotificationSettings() {
                         <Alert color="red" icon={<WarningCircleIcon size={18} />}>
                             {error ?? 'Не удалось обновить настройки уведомлений.'}
                         </Alert>
-                        <Group>
-                            <Button variant="default" onClick={() => void refresh()}>
-                                Повторить
-                            </Button>
-                        </Group>
                     </Stack>
                 )
             case 'unsubscribed':
             default:
                 return (
-                    <Stack gap="sm">
-                        <Text c="dimmed">
-                            Получайте напоминания о дежурстве и задачах.
-                        </Text>
-                        <Group>
-                            <Button
-                                leftSection={<BellIcon size={18} />}
-                                onClick={() => void enable()}
-                            >
-                                Включить уведомления
-                            </Button>
-                        </Group>
-                    </Stack>
+                    <Group>
+                        <Button
+                            leftSection={<BellIcon size={18} />}
+                            onClick={() => void enable()}
+                        >
+                            Включить уведомления
+                        </Button>
+                    </Group>
                 )
         }
     }
 
     return (
         <Stack gap="md">
-            <Text size="sm" c="dimmed">
-                Браузерные push-уведомления для этого устройства.
+            <Text c="dimmed">
+                {notificationDescription}
             </Text>
             {renderBody()}
         </Stack>

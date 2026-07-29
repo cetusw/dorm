@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react'
 
+import { BellIcon } from '@phosphor-icons/react'
 import {
     Alert,
     AppShell,
@@ -10,8 +11,10 @@ import {
     Group,
     Loader,
     NavLink,
+    ActionIcon,
     Select,
     Stack,
+    Tooltip,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 
@@ -88,19 +91,11 @@ export function ResidentAppShell({
                 href: '/app/tasks',
                 label: 'Дежурство',
             },
-            {
-                href: '/app/settings',
-                label: 'Настройки',
-            },
         ]
         : [
             {
                 href: '/app/tasks',
                 label: 'Дежурство',
-            },
-            {
-                href: '/app/settings',
-                label: 'Настройки',
             },
         ]
 
@@ -271,6 +266,19 @@ export function ResidentAppShell({
                             </Group>
                         )}
                     </Group>
+
+                    <Tooltip label="Уведомления" withArrow>
+                        <ActionIcon
+                            aria-label="Открыть уведомления"
+                            variant="subtle"
+                            color="gray"
+                            size="lg"
+                            radius="xl"
+                            onClick={() => onNavigate('/app/notifications')}
+                        >
+                            <BellIcon size={25} />
+                        </ActionIcon>
+                    </Tooltip>
                 </Group>
             </AppShell.Header>
 
