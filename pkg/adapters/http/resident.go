@@ -5,6 +5,7 @@ import (
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -238,15 +239,29 @@ func parseResidentDutyWeekDates(req dto.CreateDormitoryDutyWeekRequest) (time.Ti
 		return time.Time{}, time.Time{}, fiber.NewError(fiber.StatusBadRequest, "некорректный идентификатор общежития")
 	}
 
-	startDate, err := time.Parse("2006-01-02", req.StartDate)
+	location := residentDutyWeekLocation()
+
+	startDate, err := time.ParseInLocation("2006-01-02", req.StartDate, location)
 	if err != nil {
 		return time.Time{}, time.Time{}, fiber.NewError(fiber.StatusBadRequest, "некорректная дата начала")
 	}
 
-	endDate, err := time.Parse("2006-01-02", req.EndDate)
-	if err != nil {
-		return time.Time{}, time.Time{}, fiber.NewError(fiber.StatusBadRequest, "некорректная дата окончания")
-	}
+	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 9, 0, 0, 0, location)
+	endDate := startDate.AddDate(0, 0, 7)
 
 	return startDate, endDate, nil
+}
+
+func residentDutyWeekLocation() *time.Location {
+	timezone := os.Getenv("TZ")
+	if timezone == "" {
+		return time.Local
+	}
+
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		return time.Local
+	}
+
+	return location
 }

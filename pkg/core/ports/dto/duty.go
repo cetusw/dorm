@@ -10,6 +10,7 @@ import (
 )
 
 type DutyViewModel struct {
+	DutyID        uuid.UUID
 	TeamID        uuid.UUID
 	TeamName      string
 	TeamOrder     int
@@ -30,6 +31,7 @@ func NewDutyViewModel(
 	tasks []TaskViewModel,
 ) DutyViewModel {
 	return DutyViewModel{
+		DutyID:        duty.ID(),
 		TeamID:        team.ID(),
 		TeamName:      team.Name(),
 		TeamOrder:     team.RotationPosition(),

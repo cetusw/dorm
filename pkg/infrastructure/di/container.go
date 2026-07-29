@@ -136,9 +136,9 @@ func NewContainerWithOptions(configPath string, opts ContainerOptions) (*Contain
 		notificationQueryService,
 		notificationQueryService,
 		notificationQueryService,
-		notificationQueryService,
 		userNotificationService,
 	)
+	bus.Subscribe(events.TopicWeekStarted, notificationuc.NewWeekStartedHandler(dutyReminderService).Handle)
 	bus.Subscribe(events.TopicTasksReadyForReview, notificationuc.NewTasksReadyForReviewHandler(userNotificationService).Handle)
 
 	//botAdapter, err := telegram.NewBotAdapter(cfg.BotToken, cleaningService, userService)

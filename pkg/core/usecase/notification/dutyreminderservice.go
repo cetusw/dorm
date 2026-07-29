@@ -8,32 +8,30 @@ import (
 
 	domain "dorm/pkg/core/domain/notification"
 	"dorm/pkg/core/ports"
+	"dorm/pkg/core/ports/dto"
 	queryports "dorm/pkg/core/ports/query"
 
 	"github.com/google/uuid"
 )
 
 type DutyReminderService struct {
-	activeDutyQuery               queryports.ActiveDutyQuery
-	dutyTeamMembersQuery          queryports.DutyTeamMembersQuery
-	dutyUsersWithoutAssignedQuery queryports.DutyUsersWithoutAssignedTasksQuery
-	dutyFinishReminderQuery       queryports.DutyFinishReminderQuery
-	notifications                 ports.UserNotificationUseCase
+	activeDutyQuery         queryports.ActiveDutyQuery
+	dutyTeamMembersQuery    queryports.DutyTeamMembersQuery
+	dutyFinishReminderQuery queryports.DutyFinishReminderQuery
+	notifications           ports.UserNotificationUseCase
 }
 
 func NewDutyReminderService(
 	activeDutyQuery queryports.ActiveDutyQuery,
 	dutyTeamMembersQuery queryports.DutyTeamMembersQuery,
-	dutyUsersWithoutAssignedQuery queryports.DutyUsersWithoutAssignedTasksQuery,
 	dutyFinishReminderQuery queryports.DutyFinishReminderQuery,
 	notifications ports.UserNotificationUseCase,
 ) *DutyReminderService {
 	return &DutyReminderService{
-		activeDutyQuery:               activeDutyQuery,
-		dutyTeamMembersQuery:          dutyTeamMembersQuery,
-		dutyUsersWithoutAssignedQuery: dutyUsersWithoutAssignedQuery,
-		dutyFinishReminderQuery:       dutyFinishReminderQuery,
-		notifications:                 notifications,
+		activeDutyQuery:         activeDutyQuery,
+		dutyTeamMembersQuery:    dutyTeamMembersQuery,
+		dutyFinishReminderQuery: dutyFinishReminderQuery,
+		notifications:           notifications,
 	}
 }
 
@@ -42,7 +40,7 @@ func (s *DutyReminderService) SendDutyStartedReminders(ctx context.Context, at t
 		ctx,
 		at,
 		domain.NotificationDutyStarted,
-		"Началась ваша дежурная неделя",
+		"Дежурная неделя",
 		"На этой неделе дежурит ваша команда. Ознакомьтесь со списком задач.",
 		"/app/current-duty",
 	)
@@ -53,8 +51,8 @@ func (s *DutyReminderService) SendSaturdayTaskReminders(ctx context.Context, at 
 		ctx,
 		at,
 		domain.NotificationTakeTasksSaturdayReminder,
-		"Выберите задачи для уборки",
-		"Завтра уборка. Возьмите задачи, которые вы планируете выполнить.",
+		"Завтра уборка",
+		"Возьмите задачи, которые вы планируете выполнить.",
 		"/app/current-duty?tab=free",
 	)
 }
@@ -66,19 +64,23 @@ func (s *DutyReminderService) SendSundayTakeTaskReminders(ctx context.Context, a
 	}
 
 	for _, activeDuty := range activeDuties {
-		userIDs, err := s.dutyUsersWithoutAssignedQuery.FindUserIDs(ctx, activeDuty.ID, activeDuty.TeamID)
+		state, err := s.dutyFinishReminderQuery.GetByDutyID(ctx, activeDuty.ID, activeDuty.TeamID)
 		if err != nil {
-			log.Printf("notification reminder: load users without assigned tasks for duty %s: %v", activeDuty.ID, err)
+			log.Printf("notification reminder: load sunday take state for duty %s: %v", activeDuty.ID, err)
+			continue
+		}
+
+		if state.FreeTaskCount == 0 || len(state.UsersBelowAssignedGoalIDs) == 0 {
 			continue
 		}
 
 		s.notifyDutyUsers(
 			ctx,
 			activeDuty,
-			userIDs,
+			state.UsersBelowAssignedGoalIDs,
 			domain.NotificationTakeTasksSundayReminder,
 			"Возьмите задачи",
-			"Сегодня уборка, но у вас пока нет выбранных задач.",
+			"Сегодня уборка. У вас пока недостаточно задач по баллам, а в списке еще есть свободные.",
 			"/app/current-duty?tab=free",
 		)
 	}
@@ -93,7 +95,7 @@ func (s *DutyReminderService) SendSundayFinishTaskReminders(ctx context.Context,
 	}
 
 	for _, activeDuty := range activeDuties {
-		state, err := s.dutyFinishReminderQuery.GetByDutyID(ctx, activeDuty.ID)
+		state, err := s.dutyFinishReminderQuery.GetByDutyID(ctx, activeDuty.ID, activeDuty.TeamID)
 		if err != nil {
 			log.Printf("notification reminder: load finish state for duty %s: %v", activeDuty.ID, err)
 			continue
@@ -105,12 +107,7 @@ func (s *DutyReminderService) SendSundayFinishTaskReminders(ctx context.Context,
 		}
 
 		if state.FreeTaskCount > 0 {
-			memberIDs, err := s.dutyTeamMembersQuery.FindUserIDsByTeamID(ctx, activeDuty.TeamID)
-			if err != nil {
-				log.Printf("notification reminder: load team members for duty %s: %v", activeDuty.ID, err)
-				continue
-			}
-			for _, userID := range memberIDs {
+			for _, userID := range state.UsersBelowAssignedGoalIDs {
 				recipientSet[userID] = struct{}{}
 			}
 		}
@@ -133,6 +130,40 @@ func (s *DutyReminderService) SendSundayFinishTaskReminders(ctx context.Context,
 			"В дежурстве остались невыполненные задачи. Возьмите и завершите их.",
 			"/app/current-duty",
 		)
+	}
+
+	return nil
+}
+
+func (s *DutyReminderService) NotifyDutyStartedForDuties(ctx context.Context, duties []dto.DutyViewModel) error {
+	for _, dutyView := range duties {
+		for _, userStats := range dutyView.UsersStats {
+			if userStats == nil {
+				continue
+			}
+
+			deduplicationKey, err := domain.BuildDutyNotificationDeduplicationKey(
+				domain.NotificationDutyStarted,
+				dutyView.DutyID,
+				userStats.ID,
+			)
+			if err != nil {
+				log.Printf("notification reminder: build duty started deduplication key for duty %s user %s: %v", dutyView.DutyID, userStats.ID, err)
+				continue
+			}
+
+			err = s.notifications.NotifyUser(ctx, ports.NotifyUserCommand{
+				UserID:           userStats.ID,
+				Type:             domain.NotificationDutyStarted,
+				Title:            "Дежурная неделя",
+				Body:             "На этой неделе дежурит ваша команда. Ознакомьтесь со списком задач.",
+				TargetURL:        "/app/current-duty",
+				DeduplicationKey: deduplicationKey,
+			})
+			if err != nil {
+				log.Printf("notification reminder: notify duty started for duty %s user %s: %v", dutyView.DutyID, userStats.ID, err)
+			}
+		}
 	}
 
 	return nil

@@ -102,57 +102,27 @@ func (q *NotificationQueryService) FindUserIDsByTeamID(ctx context.Context, team
 	return scanUUIDRows(rows, "scan team member id")
 }
 
-func (q *NotificationQueryService) FindUserIDs(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) ([]uuid.UUID, error) {
-	const query = `
-		SELECT DISTINCT team_users.user_id
-		FROM (
-			SELECT u.id AS user_id
-			FROM user u
-			WHERE u.team_id = ?
-			  AND u.deleted_at IS NULL
-
-			UNION
-
-			SELECT t.leader_id AS user_id
-			FROM team t
-			JOIN user u ON u.id = t.leader_id
-			WHERE t.id = ?
-			  AND t.leader_id IS NOT NULL
-			  AND u.deleted_at IS NULL
-		) AS team_users
-		WHERE NOT EXISTS (
-			SELECT 1
-			FROM duty_task dt
-			WHERE dt.duty_id = ?
-			  AND dt.assignee_id = team_users.user_id
-		)
-	`
-
-	teamIDBytes, err := teamID.MarshalBinary()
-	if err != nil {
-		return nil, fmt.Errorf("marshal team id: %w", err)
-	}
-	dutyIDBytes, err := dutyID.MarshalBinary()
-	if err != nil {
-		return nil, fmt.Errorf("marshal duty id: %w", err)
-	}
-
-	rows, err := q.db.QueryContext(ctx, query, teamIDBytes, teamIDBytes, dutyIDBytes)
-	if err != nil {
-		return nil, fmt.Errorf("find users without assigned tasks: %w", err)
-	}
-	defer rows.Close()
-
-	return scanUUIDRows(rows, "scan user without assigned tasks")
-}
-
-func (q *NotificationQueryService) GetByDutyID(ctx context.Context, dutyID uuid.UUID) (queryports.DutyFinishReminderState, error) {
+func (q *NotificationQueryService) GetByDutyID(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) (queryports.DutyFinishReminderState, error) {
 	dutyIDBytes, err := dutyID.MarshalBinary()
 	if err != nil {
 		return queryports.DutyFinishReminderState{}, fmt.Errorf("marshal duty id: %w", err)
 	}
+	teamIDBytes, err := teamID.MarshalBinary()
+	if err != nil {
+		return queryports.DutyFinishReminderState{}, fmt.Errorf("marshal team id: %w", err)
+	}
 
 	freeTaskCount, err := q.getFreeTaskCount(ctx, dutyIDBytes)
+	if err != nil {
+		return queryports.DutyFinishReminderState{}, err
+	}
+
+	memberIDs, err := q.FindUserIDsByTeamID(ctx, teamID)
+	if err != nil {
+		return queryports.DutyFinishReminderState{}, err
+	}
+
+	usersBelowAssignedGoalIDs, err := q.getUsersBelowAssignedGoal(ctx, dutyIDBytes, teamIDBytes, memberIDs)
 	if err != nil {
 		return queryports.DutyFinishReminderState{}, err
 	}
@@ -164,6 +134,7 @@ func (q *NotificationQueryService) GetByDutyID(ctx context.Context, dutyID uuid.
 
 	return queryports.DutyFinishReminderState{
 		FreeTaskCount:              freeTaskCount,
+		UsersBelowAssignedGoalIDs:  usersBelowAssignedGoalIDs,
 		UsersWithIncompleteTaskIDs: userIDs,
 	}, nil
 }
@@ -200,6 +171,88 @@ func (q *NotificationQueryService) getUsersWithIncompleteTasks(ctx context.Conte
 	defer rows.Close()
 
 	return scanUUIDRows(rows, "scan user with incomplete task")
+}
+
+func (q *NotificationQueryService) getUsersBelowAssignedGoal(
+	ctx context.Context,
+	dutyID []byte,
+	teamID []byte,
+	memberIDs []uuid.UUID,
+) ([]uuid.UUID, error) {
+	memberCount := len(memberIDs)
+	if memberCount == 0 {
+		return nil, nil
+	}
+
+	requiredGoal, err := q.getAssignedGoalPerMember(ctx, dutyID, teamID, memberCount)
+	if err != nil {
+		return nil, err
+	}
+	if requiredGoal <= 0 {
+		return nil, nil
+	}
+
+	const query = `
+		SELECT user_id
+		FROM (
+			SELECT team_users.user_id AS user_id, COALESCE(SUM(task.cost), 0) AS assigned_cost
+			FROM (
+				SELECT u.id AS user_id
+				FROM user u
+				WHERE u.team_id = ?
+				  AND u.deleted_at IS NULL
+
+				UNION
+
+				SELECT t.leader_id AS user_id
+				FROM team t
+				JOIN user u ON u.id = t.leader_id
+				WHERE t.id = ?
+				  AND t.leader_id IS NOT NULL
+				  AND u.deleted_at IS NULL
+			) AS team_users
+			LEFT JOIN duty_task dt
+				ON dt.duty_id = ?
+			   AND dt.assignee_id = team_users.user_id
+			LEFT JOIN task
+				ON task.id = dt.task_id
+			GROUP BY team_users.user_id
+		) AS user_costs
+		WHERE assigned_cost < ?
+	`
+
+	rows, err := q.db.QueryContext(ctx, query, teamID, teamID, dutyID, requiredGoal)
+	if err != nil {
+		return nil, fmt.Errorf("find users below assigned goal: %w", err)
+	}
+	defer rows.Close()
+
+	return scanUUIDRows(rows, "scan user below assigned goal")
+}
+
+func (q *NotificationQueryService) getAssignedGoalPerMember(
+	ctx context.Context,
+	dutyID []byte,
+	teamID []byte,
+	memberCount int,
+) (int, error) {
+	const query = `
+		SELECT COALESCE(SUM(task.cost), 0)
+		FROM duty_task dt
+		JOIN task ON task.id = dt.task_id
+		WHERE dt.duty_id = ?
+	`
+
+	var totalCost int
+	if err := q.db.QueryRowContext(ctx, query, dutyID).Scan(&totalCost); err != nil {
+		return 0, fmt.Errorf("count total duty cost: %w", err)
+	}
+
+	if memberCount == 0 {
+		return 0, nil
+	}
+
+	return (totalCost + memberCount - 1) / memberCount, nil
 }
 
 func scanUUIDRows(rows *sql.Rows, action string) ([]uuid.UUID, error) {

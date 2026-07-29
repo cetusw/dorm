@@ -17,6 +17,7 @@ type ActiveDuty struct {
 
 type DutyFinishReminderState struct {
 	FreeTaskCount              int
+	UsersBelowAssignedGoalIDs  []uuid.UUID
 	UsersWithIncompleteTaskIDs []uuid.UUID
 }
 
@@ -28,10 +29,6 @@ type DutyTeamMembersQuery interface {
 	FindUserIDsByTeamID(ctx context.Context, teamID uuid.UUID) ([]uuid.UUID, error)
 }
 
-type DutyUsersWithoutAssignedTasksQuery interface {
-	FindUserIDs(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) ([]uuid.UUID, error)
-}
-
 type DutyFinishReminderQuery interface {
-	GetByDutyID(ctx context.Context, dutyID uuid.UUID) (DutyFinishReminderState, error)
+	GetByDutyID(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) (DutyFinishReminderState, error)
 }

@@ -199,6 +199,19 @@ func (cfg WebPushConfig) Validate() error {
 		return errors.New("WEB_PUSH_SUBJECT must be a valid mailto: or https URL")
 	}
 
+	switch parsedSubject.Scheme {
+	case "mailto":
+		if parsedSubject.Opaque == "" {
+			return errors.New("WEB_PUSH_SUBJECT mailto: value must include an email address")
+		}
+	case "https":
+		if parsedSubject.Host == "" {
+			return errors.New("WEB_PUSH_SUBJECT https URL must include a host")
+		}
+	default:
+		return errors.New("WEB_PUSH_SUBJECT must start with mailto: or https://")
+	}
+
 	return nil
 }
 

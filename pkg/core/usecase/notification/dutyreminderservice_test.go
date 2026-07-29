@@ -53,7 +53,7 @@ type dutyFinishReminderQueryStub struct {
 	err    error
 }
 
-func (s *dutyFinishReminderQueryStub) GetByDutyID(_ context.Context, dutyID uuid.UUID) (queryports.DutyFinishReminderState, error) {
+func (s *dutyFinishReminderQueryStub) GetByDutyID(_ context.Context, dutyID uuid.UUID, _ uuid.UUID) (queryports.DutyFinishReminderState, error) {
 	if s.err != nil {
 		return queryports.DutyFinishReminderState{}, s.err
 	}
@@ -79,7 +79,6 @@ func TestDutyReminderServiceSendDutyStartedReminders(t *testing.T) {
 	service := NewDutyReminderService(
 		&activeDutyQueryStub{result: []queryports.ActiveDuty{{ID: dutyID, TeamID: teamID}}},
 		&dutyTeamMembersQueryStub{result: map[uuid.UUID][]uuid.UUID{teamID: {userA, userB}}},
-		&dutyUsersWithoutAssignedTasksQueryStub{},
 		&dutyFinishReminderQueryStub{},
 		&userNotificationUseCaseStub{},
 	)
@@ -101,8 +100,12 @@ func TestDutyReminderServiceSendSundayTakeTaskRemindersFiltersRecipients(t *test
 	service := NewDutyReminderService(
 		&activeDutyQueryStub{result: []queryports.ActiveDuty{{ID: dutyID, TeamID: teamID}}},
 		&dutyTeamMembersQueryStub{},
-		&dutyUsersWithoutAssignedTasksQueryStub{result: map[uuid.UUID][]uuid.UUID{dutyID: {userA}}},
-		&dutyFinishReminderQueryStub{},
+		&dutyFinishReminderQueryStub{result: map[uuid.UUID]queryports.DutyFinishReminderState{
+			dutyID: {
+				FreeTaskCount:             1,
+				UsersBelowAssignedGoalIDs: []uuid.UUID{userA},
+			},
+		}},
 		&userNotificationUseCaseStub{},
 	)
 
@@ -124,10 +127,10 @@ func TestDutyReminderServiceSendSundayFinishTaskRemindersIncludesTeamWhenFreeTas
 	service := NewDutyReminderService(
 		&activeDutyQueryStub{result: []queryports.ActiveDuty{{ID: dutyID, TeamID: teamID}}},
 		&dutyTeamMembersQueryStub{result: map[uuid.UUID][]uuid.UUID{teamID: {userA, userB}}},
-		&dutyUsersWithoutAssignedTasksQueryStub{},
 		&dutyFinishReminderQueryStub{result: map[uuid.UUID]queryports.DutyFinishReminderState{
 			dutyID: {
 				FreeTaskCount:              1,
+				UsersBelowAssignedGoalIDs:  []uuid.UUID{userB},
 				UsersWithIncompleteTaskIDs: []uuid.UUID{userA},
 			},
 		}},
@@ -145,7 +148,6 @@ func TestDutyReminderServiceReturnsActiveDutyError(t *testing.T) {
 	service := NewDutyReminderService(
 		&activeDutyQueryStub{err: errors.New("db failure")},
 		&dutyTeamMembersQueryStub{},
-		&dutyUsersWithoutAssignedTasksQueryStub{},
 		&dutyFinishReminderQueryStub{},
 		&userNotificationUseCaseStub{},
 	)

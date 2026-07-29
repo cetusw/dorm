@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	domain "dorm/pkg/core/domain/notification"
 	"dorm/pkg/core/ports"
@@ -27,7 +28,7 @@ type WebPushSender struct {
 func NewWebPushSender(cfg config.WebPushConfig) *WebPushSender {
 	return &WebPushSender{
 		options: webpush.Options{
-			Subscriber:      cfg.Subject,
+			Subscriber:      webPushSubscriber(cfg.Subject),
 			TTL:             60,
 			VAPIDPublicKey:  cfg.PublicKey,
 			VAPIDPrivateKey: cfg.PrivateKey,
@@ -64,4 +65,8 @@ func (s *WebPushSender) Send(ctx context.Context, subscription *domain.PushSubsc
 	}
 
 	return nil
+}
+
+func webPushSubscriber(subject string) string {
+	return strings.TrimPrefix(strings.TrimSpace(subject), "mailto:")
 }

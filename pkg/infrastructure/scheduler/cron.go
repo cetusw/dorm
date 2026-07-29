@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	dutyStartedReminderSpec      = "0 9 * * 1"
 	saturdayTaskReminderSpec     = "0 9 * * 6"
 	sundayTakeTaskReminderSpec   = "0 9 * * 0"
 	sundayFinishTaskReminderSpec = "0 18 * * 0"
@@ -86,7 +85,6 @@ func (s *Scheduler) registerReminderJobs() error {
 		spec string
 		job  cron.Job
 	}{
-		{spec: dutyStartedReminderSpec, job: DutyStartedReminderJob{service: s.dutyReminderUseCase, location: s.location}},
 		{spec: saturdayTaskReminderSpec, job: SaturdayTaskReminderJob{service: s.dutyReminderUseCase, location: s.location}},
 		{spec: sundayTakeTaskReminderSpec, job: SundayTakeTaskReminderJob{service: s.dutyReminderUseCase, location: s.location}},
 		{spec: sundayFinishTaskReminderSpec, job: SundayFinishTaskReminderJob{service: s.dutyReminderUseCase, location: s.location}},
@@ -99,15 +97,6 @@ func (s *Scheduler) registerReminderJobs() error {
 	}
 
 	return nil
-}
-
-type DutyStartedReminderJob struct {
-	service  ports.DutyReminderUseCase
-	location *time.Location
-}
-
-func (j DutyStartedReminderJob) Run() {
-	runReminderJob("duty started reminders", j.location, j.service.SendDutyStartedReminders)
 }
 
 type SaturdayTaskReminderJob struct {
