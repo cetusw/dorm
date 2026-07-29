@@ -3,8 +3,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { CaretLeftIcon } from '@phosphor-icons/react'
 import { Alert, Box, Center, Group, Loader, SegmentedControl, Select, Stack } from '@mantine/core'
 
+import { AreaFormModal } from '../../features/areas/ui/AreaFormModal'
+import { DeleteAreaModal } from '../../features/areas/ui/DeleteAreaModal'
 import {
+    createDutySettingsArea,
+    deleteDutySettingsArea,
     createDutySettingsTask,
+    updateDutySettingsArea,
     deleteDutySettingsTask,
     excludeDutySettingsTask,
     includeDutySettingsTask,
@@ -35,6 +40,9 @@ export function DutySettingsPage({ groupId }: Props) {
     const [viewMode, setViewMode] = useState<DutySettingsViewMode>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
     const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
+    const [createAreaOpened, setCreateAreaOpened] = useState(false)
+    const [editingAreaId, setEditingAreaId] = useState<number | null>(null)
+    const [deletingAreaId, setDeletingAreaId] = useState<number | null>(null)
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
     const [taskAreaId, setTaskAreaId] = useState<number | null>(null)
     const [excludingTaskId, setExcludingTaskId] = useState<string | null>(null)
@@ -82,8 +90,9 @@ export function DutySettingsPage({ groupId }: Props) {
         return null
     }, [data, editingTaskId])
     const selectedArea = data?.areas.find((area) => String(area.id) === selectedAreaId) ?? null
+    const deletingArea = data?.areas.find((area) => area.id === deletingAreaId) ?? null
     const selectedFloorPlan = availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ?? null
-    const hasTaskModalOpen = taskAreaId !== null || editingTaskId !== null || excludingTaskId !== null || deletingTaskId !== null
+    const hasTaskModalOpen = createAreaOpened || editingAreaId !== null || deletingAreaId !== null || taskAreaId !== null || editingTaskId !== null || excludingTaskId !== null || deletingTaskId !== null
 
     useEffect(() => {
         if (availableFloorPlans.length === 0) {
@@ -124,6 +133,21 @@ export function DutySettingsPage({ groupId }: Props) {
 
     function handleOpenArea(areaId: string) {
         setSelectedAreaId(areaId)
+    }
+
+    function handleCreateArea() {
+        setCreateAreaOpened(true)
+        setEditingAreaId(null)
+    }
+
+    function handleEditArea(areaId: number) {
+        setCreateAreaOpened(false)
+        setEditingAreaId(areaId)
+    }
+
+    function handleCloseAreaFormModal() {
+        setCreateAreaOpened(false)
+        setEditingAreaId(null)
     }
 
     let content = null
@@ -191,6 +215,9 @@ export function DutySettingsPage({ groupId }: Props) {
                 ) : (
                     <DutySettingsAreaList
                         areas={data.areas}
+                        onCreateArea={handleCreateArea}
+                        onEditArea={handleEditArea}
+                        onDeleteArea={(areaId) => setDeletingAreaId(areaId)}
                         onCreateTask={handleCreateTask}
                         onEditTask={handleEditTask}
                         onIncludeTask={async (taskId) => {
@@ -271,6 +298,62 @@ export function DutySettingsPage({ groupId }: Props) {
 
             {data ? (
                 <>
+                    <AreaFormModal
+                        opened={createAreaOpened || editingAreaId !== null}
+                        mode={editingAreaId === null ? 'create' : 'edit'}
+                        areaId={editingAreaId}
+                        dormitoryId={String(data.group.dormitory_id)}
+                        fixedGroupId={data.group.id}
+                        hideGroupField
+                        requireFloor
+                        variant="settings"
+                        onClose={handleCloseAreaFormModal}
+                        onSaved={async () => {
+                            await reload({ silent: true })
+                        }}
+                        loadArea={async (areaId) => {
+                            const area = data.areas.find((item) => item.id === areaId)
+                            if (!area) {
+                                throw new Error('Не удалось загрузить данные территории')
+                            }
+
+                            return {
+                                id: area.id,
+                                name: area.name,
+                                floor: area.floor,
+                                group: {
+                                    id: data.group.id,
+                                    name: data.group.name,
+                                },
+                            }
+                        }}
+                        createAreaRequest={(request) => createDutySettingsArea(groupId, request)}
+                        updateAreaRequest={(areaId, request) => updateDutySettingsArea(groupId, areaId, request)}
+                    />
+
+                    <DeleteAreaModal
+                        opened={deletingArea !== null}
+                        area={deletingArea ? {
+                            id: deletingArea.id,
+                            name: deletingArea.name,
+                            floor: deletingArea.floor,
+                            group: {
+                                id: data.group.id,
+                                name: data.group.name,
+                            },
+                        } : null}
+                        dormitoryId={String(data.group.dormitory_id)}
+                        deleteAreaRequest={(areaId) => deleteDutySettingsArea(groupId, areaId)}
+                        onClose={() => setDeletingAreaId(null)}
+                        onDeleted={async () => {
+                            if (selectedArea && deletingArea && selectedArea.id === deletingArea.id) {
+                                setSelectedAreaId(null)
+                            }
+                            setDeletingAreaId(null)
+                            await reload({ silent: true })
+                        }}
+                    />
+
                     <DutySettingsCreateTaskModal
                         opened={taskAreaId !== null && editingTaskId === null}
                         mode="create"
@@ -334,6 +417,9 @@ export function DutySettingsPage({ groupId }: Props) {
                         opened={selectedArea !== null}
                         hasNestedModalOpen={hasTaskModalOpen}
                         onClose={() => setSelectedAreaId(null)}
+                        onCreateArea={handleCreateArea}
+                        onEditArea={handleEditArea}
+                        onDeleteArea={(areaId) => setDeletingAreaId(areaId)}
                         onCreateTask={handleCreateTask}
                         onEditTask={handleEditTask}
                         onIncludeTask={async (taskId) => {

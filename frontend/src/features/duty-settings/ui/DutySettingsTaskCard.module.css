@@ -2,7 +2,7 @@
     --duty-settings-score-column-width: 110px;
     --duty-settings-date-column-width: 140px;
     --duty-settings-assignee-column-width: 180px;
-    --duty-settings-status-column-width: 100px;
+    --duty-settings-status-column-width: 140px;
 }
 
 .cardRoot + .cardRoot {

@@ -1,10 +1,13 @@
-import { Alert, Stack } from '@mantine/core'
-
+import { PlusIcon } from '@phosphor-icons/react'
+import { ActionIcon, Alert, Group, Stack, Text } from '@mantine/core'
 import type { DutySettingsArea } from '../model/types'
 import { DutySettingsAreaSection } from './DutySettingsAreaSection'
 
 type Props = {
     areas: DutySettingsArea[]
+    onCreateArea: () => void
+    onEditArea: (areaId: number) => void
+    onDeleteArea: (areaId: number) => void
     onCreateTask: (areaId: number) => void
     onEditTask: (taskId: string) => void
     onIncludeTask: (taskId: string) => void
@@ -17,7 +20,18 @@ export function DutySettingsAreaList(props: Props) {
         return (
             <Alert color="gray">
                 <Stack gap="md">
-                    <span>В доступных территориях пока нет задач.</span>
+                    <Group gap={15} wrap="nowrap" align="center">
+                        <Text>В доступных территориях пока нет задач.</Text>
+                        <ActionIcon
+                            variant="subtle"
+                            color="gray"
+                            size={25}
+                            aria-label="Добавить территорию"
+                            onClick={props.onCreateArea}
+                        >
+                            <PlusIcon size={25} />
+                        </ActionIcon>
+                    </Group>
                 </Stack>
             </Alert>
         )
@@ -29,6 +43,9 @@ export function DutySettingsAreaList(props: Props) {
                 <DutySettingsAreaSection
                     key={area.id}
                     area={area}
+                    onCreateArea={props.onCreateArea}
+                    onEditArea={props.onEditArea}
+                    onDeleteArea={props.onDeleteArea}
                     onCreateTask={props.onCreateTask}
                     onEditTask={props.onEditTask}
                     onIncludeTask={props.onIncludeTask}

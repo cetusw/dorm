@@ -25,6 +25,7 @@ export function DutyTaskStatusBadge({ status, justify = 'flex-end' }: Props) {
                         textTransform: 'none',
                     },
                     label: {
+                        fontSize: 'var(--mantine-font-size-sm)',
                         textTransform: 'none',
                     },
                 }}

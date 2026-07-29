@@ -157,7 +157,7 @@ export function useDutySettings(groupId: string) {
                             ...area,
                             tasks: sortTasks([...nextTasks, updatedTask]),
                         }
-                    }).filter((area) => area.tasks.length > 0)),
+                    })),
                 }
             })
         }, []),
@@ -179,7 +179,7 @@ export function useDutySettings(groupId: string) {
                             ...area,
                             tasks: sortTasks([...area.tasks, updatedTask]),
                         }
-                        : area).filter((area) => area.tasks.length > 0),
+                        : area),
                 }
             })
         }, []),

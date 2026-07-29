@@ -833,9 +833,9 @@ func (s *Service) buildTaskEditorState(
 		})
 	}
 
-	responseAreas := make([]dto.DutySettingsArea, 0, len(tasksByArea))
-	for areaID, areaTasks := range tasksByArea {
-		area := areasByID[areaID]
+	responseAreas := make([]dto.DutySettingsArea, 0, len(areasByID))
+	for areaID, area := range areasByID {
+		areaTasks := tasksByArea[areaID]
 		sortDutySettingsTasks(areaTasks)
 		responseAreas = append(responseAreas, dto.DutySettingsArea{
 			ID:    area.ID(),

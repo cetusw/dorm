@@ -7,6 +7,7 @@ import { getGroups } from '../../groups/api/groupsApi'
 import type { GroupListItem } from '../../groups/model/types'
 import { ApiError } from '../../../shared/api/ApiError'
 import { EntityFormModal } from '../../../shared/ui/EntityFormModal'
+import modalClasses from '../../../shared/ui/SettingsModal.module.css'
 import { createArea, getArea, updateArea } from '../api/areasApi'
 import type {
     AreaDetails,
@@ -24,6 +25,7 @@ type Props = {
     fixedGroupId?: string | null
     hideGroupField?: boolean
     requireFloor?: boolean
+    variant?: 'default' | 'settings'
     loadGroups?: () => Promise<{ groups: GroupListItem[] }>
     loadArea?: (areaId: number) => Promise<AreaDetails>
     createAreaRequest?: (request: CreateAreaRequest) => Promise<AreaDetails>
@@ -63,6 +65,7 @@ export function AreaFormModal({
     fixedGroupId = null,
     hideGroupField = false,
     requireFloor = false,
+    variant = 'default',
     loadGroups,
     loadArea,
     createAreaRequest,
@@ -114,7 +117,9 @@ export function AreaFormModal({
 
             try {
                 const [{ groups: loadedGroups }, area] = await Promise.all([
-                    (loadGroups ?? (() => getGroups(dormitoryId)))(),
+                    hideGroupField
+                        ? Promise.resolve({ groups: [] as GroupListItem[] })
+                        : (loadGroups ?? (() => getGroups(dormitoryId)))(),
                     mode === 'edit' && areaId !== null
                         ? (loadArea ?? getArea)(areaId)
                         : Promise.resolve(null),
@@ -162,7 +167,7 @@ export function AreaFormModal({
         return () => {
             active = false
         }
-    }, [areaId, dormitoryId, fixedGroupId, loadArea, loadGroups, mode, opened])
+    }, [areaId, dormitoryId, fixedGroupId, hideGroupField, loadArea, loadGroups, mode, opened])
 
     const groupOptions = useMemo(
         () =>
@@ -174,16 +179,29 @@ export function AreaFormModal({
     )
 
     const title = mode === 'create' ? 'Создание территории' : 'Редактирование территории'
+    const submitLabel = mode === 'create' ? 'Добавить' : 'Сохранить'
+    const isSettingsVariant = variant === 'settings'
 
     return (
         <EntityFormModal
             opened={opened}
             onClose={onClose}
-            title={title}
+            title={isSettingsVariant ? <span className={modalClasses.title}>{title}</span> : title}
             loading={loading}
             saving={saving}
             error={submitError}
-            size={640}
+            size={isSettingsVariant ? 680 : 640}
+            withCloseButton={!isSettingsVariant}
+            modalClassNames={isSettingsVariant ? {
+                header: modalClasses.header,
+                body: modalClasses.body,
+                content: modalClasses.content,
+            } : undefined}
+            contentGap={isSettingsVariant ? 15 : 'md'}
+            actionsClassName={isSettingsVariant ? modalClasses.actions : undefined}
+            cancelButtonClassName={isSettingsVariant ? modalClasses.cancelButton : undefined}
+            submitButtonClassName={isSettingsVariant ? modalClasses.submitButton : undefined}
+            submitLabel={submitLabel}
             onSubmit={form.onSubmit(async (values) => {
                 setSubmitError(null)
                 setSaving(true)
@@ -218,10 +236,13 @@ export function AreaFormModal({
             })}
         >
             <TextInput
-                label="Название"
-                placeholder="Название"
-                withAsterisk
+                label={isSettingsVariant ? undefined : 'Название'}
+                placeholder={isSettingsVariant ? 'Название территории*' : 'Название'}
+                withAsterisk={!isSettingsVariant}
                 maxLength={255}
+                classNames={isSettingsVariant ? {
+                    input: modalClasses.input,
+                } : undefined}
                 key={form.key('name')}
                 {...form.getInputProps('name')}
             />
@@ -240,10 +261,13 @@ export function AreaFormModal({
             )}
 
             <TextInput
-                label="Этаж"
-                placeholder="Этаж"
-                withAsterisk={requireFloor}
+                label={isSettingsVariant ? undefined : 'Этаж'}
+                placeholder={isSettingsVariant ? (requireFloor ? 'Этаж*' : 'Этаж') : 'Этаж'}
+                withAsterisk={requireFloor && !isSettingsVariant}
                 inputMode="numeric"
+                classNames={isSettingsVariant ? {
+                    input: modalClasses.input,
+                } : undefined}
                 key={form.key('floor')}
                 {...form.getInputProps('floor')}
             />
