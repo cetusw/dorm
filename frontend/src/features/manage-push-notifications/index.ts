@@ -1,1 +1,1 @@
-export { PushNotificationSettings } from './ui/PushNotificationSettings'
+export { PushNotificationsSettingsSection } from './ui/PushNotificationsSettingsSection'

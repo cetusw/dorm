@@ -6,10 +6,10 @@ export type BuildingPlanSource = {
 export const buildingPlanSources = [
     {
         floor: 1,
-        source: 'assets/building-plans/first-floor.svg',
+        source: 'assets/building-plans/dev/first-floor.svg',
     },
     {
         floor: 3,
-        source: 'assets/building-plans/third-floor.svg',
+        source: 'assets/building-plans/dev/third-floor.svg',
     },
 ] as const satisfies readonly BuildingPlanSource[]

@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 
-import { BellIcon } from '@phosphor-icons/react'
+import { GearIcon } from '@phosphor-icons/react'
 import {
     Alert,
     AppShell,
@@ -19,7 +19,7 @@ import {
 import { useDisclosure } from '@mantine/hooks'
 
 import logo from '../assets/logo.svg'
-import { logoutResident } from '../features/auth/api/authApi'
+import { getSettingsReturnPath } from './navigation'
 import type { CurrentUser } from '../features/current-user/model/types'
 import { useDormitorySelection } from '../features/dormitories/model/useDormitorySelection'
 import {
@@ -52,6 +52,10 @@ function isCurrentPathActive(currentPath: string, href: string): boolean {
     return currentPath === href
 }
 
+function isSettingsPath(pathname: string): boolean {
+    return pathname === '/app/settings' || pathname === '/app/notifications'
+}
+
 export function ResidentAppShell({
     currentPath,
     currentUser,
@@ -62,14 +66,15 @@ export function ResidentAppShell({
 }: Props) {
     const [navbarOpened, { toggle: toggleNavbar, close: closeNavbar }] =
         useDisclosure(false)
+    const hasManagementNavigation = Boolean(currentUser?.can_manage_dormitories)
     const {
         dormitories,
         loading: dormitoriesLoading,
         selectedDormitoryId,
         setSelectedDormitoryId,
-    } = useDormitorySelection(Boolean(currentUser?.can_manage_dormitories))
+    } = useDormitorySelection(hasManagementNavigation)
 
-    const navigationItems: NavigationItem[] = currentUser?.can_manage_dormitories
+    const navigationItems: NavigationItem[] = hasManagementNavigation
         ? [
             {
                 href: '/app/residents',
@@ -123,7 +128,7 @@ export function ResidentAppShell({
         }
     }
 
-    const desktopDormitoryControls = currentUser?.can_manage_dormitories ? (
+    const desktopDormitoryControls = hasManagementNavigation ? (
         <Group align="center" gap="sm" wrap="nowrap">
             <Select
                 aria-label="Общежитие"
@@ -146,7 +151,7 @@ export function ResidentAppShell({
         </Group>
     ) : null
 
-    const mobileDormitoryControls = currentUser?.can_manage_dormitories ? (
+    const mobileDormitoryControls = hasManagementNavigation ? (
         <Stack gap="sm">
             <Select
                 aria-label="Общежитие"
@@ -172,23 +177,32 @@ export function ResidentAppShell({
         </Stack>
     ) : null
 
-    async function handleLogout() {
-        try {
-            await logoutResident()
-        } finally {
-            window.location.assign('/app/login')
+    function handleLogoClick() {
+        closeNavbar()
+        onNavigate('/app/tasks')
+    }
+
+    function handleSettingsClick() {
+        closeNavbar()
+
+        if (isSettingsPath(currentPath)) {
+            onNavigate(getSettingsReturnPath())
+            return
         }
+
+        onNavigate('/app/settings')
     }
 
     return (
         <AppShell
-            navbar={{
+            navbar={hasManagementNavigation ? {
                 width: 280,
                 breakpoint: 'sm',
                 collapsed: {
+                    desktop: false,
                     mobile: !navbarOpened,
                 },
-            }}
+            } : undefined}
             header={{ height: 60 }}
             padding={0}
             styles={{
@@ -207,14 +221,14 @@ export function ResidentAppShell({
                 },
             }}
         >
-            <AppShell.Navbar p="md">
-                <Stack justify="space-between" h="100%">
+            {hasManagementNavigation ? (
+                <AppShell.Navbar p="md">
                     <Stack gap="md">
-                        {mobileDormitoryControls && (
+                        {mobileDormitoryControls ? (
                             <Stack gap="sm" hiddenFrom="sm">
                                 {mobileDormitoryControls}
                             </Stack>
-                        )}
+                        ) : null}
 
                         {navigationItems.map((item) => (
                             <NavLink
@@ -231,25 +245,21 @@ export function ResidentAppShell({
                             />
                         ))}
                     </Stack>
-
-                    <NavLink
-                        label="Выйти"
-                        onClick={() => void handleLogout()}
-                        styles={getNavigationItemStyles(false)}
-                    />
-                </Stack>
-            </AppShell.Navbar>
+                </AppShell.Navbar>
+            ) : null}
 
             <AppShell.Header px={{ base: 'md', md: 'xl' }}>
                 <Group align="center" h="100%" justify="space-between" wrap="nowrap">
                     <Group align="center" wrap="nowrap" gap="md">
-                        <Burger
-                            opened={navbarOpened}
-                            onClick={toggleNavbar}
-                            hiddenFrom="sm"
-                            size="sm"
-                            aria-label="Открыть навигацию"
-                        />
+                        {hasManagementNavigation ? (
+                            <Burger
+                                opened={navbarOpened}
+                                onClick={toggleNavbar}
+                                hiddenFrom="sm"
+                                size="sm"
+                                aria-label="Открыть навигацию"
+                            />
+                        ) : null}
 
                         <Box
                             component="img"
@@ -257,7 +267,11 @@ export function ResidentAppShell({
                             alt="Dorm"
                             h={32}
                             w="auto"
-                            style={{ display: 'block' }}
+                            style={{
+                                display: 'block',
+                                cursor: 'pointer',
+                            }}
+                            onClick={handleLogoClick}
                         />
 
                         {desktopDormitoryControls && (
@@ -267,16 +281,16 @@ export function ResidentAppShell({
                         )}
                     </Group>
 
-                    <Tooltip label="Уведомления" withArrow>
+                    <Tooltip label="Настройки" withArrow>
                         <ActionIcon
-                            aria-label="Открыть уведомления"
+                            aria-label="Открыть настройки"
                             variant="subtle"
                             color="gray"
                             size="lg"
                             radius="xl"
-                            onClick={() => onNavigate('/app/notifications')}
+                            onClick={handleSettingsClick}
                         >
-                            <BellIcon size={25} />
+                            <GearIcon size={25} />
                         </ActionIcon>
                     </Tooltip>
                 </Group>
