@@ -20,7 +20,7 @@ export function PushNotificationSettings() {
                 return (
                     <Group gap="sm" wrap="nowrap">
                         <Loader size="sm" />
-                        <Text c="dimmed">Проверяем состояние уведомлений…</Text>
+                        <Text c="dimmed">Проверяем состояние уведомлений...</Text>
                     </Group>
                 )
             case 'unsupported':
@@ -91,7 +91,7 @@ export function PushNotificationSettings() {
                 return (
                     <Group gap="sm" wrap="nowrap">
                         <Loader size="sm" />
-                        <Text c="dimmed">Отключаем уведомления…</Text>
+                        <Text c="dimmed">Отключаем уведомления...</Text>
                     </Group>
                 )
             case 'error':
