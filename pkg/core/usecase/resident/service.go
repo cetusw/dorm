@@ -183,9 +183,18 @@ func (s *Service) loadCurrentDutyContext(
 	}
 
 	canSelectGroup := isDormitoryLeader(dormitory, resident.ID())
-	selectedGroup, err := resolveSelectedGroup(groups, residentGroup, groupID, canSelectGroup)
-	if err != nil {
-		return nil, err
+	var selectedGroup *structure.Group
+
+	if residentGroup == nil && !canSelectGroup && groupID == nil {
+		selectedGroup, err = s.resolveObserverGroupFallback(ctx, groups)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		selectedGroup, err = resolveSelectedGroup(groups, residentGroup, groupID, canSelectGroup)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	dutyTeam, duty, err := s.loadActiveDutyForGroup(ctx, selectedGroup.ID())
@@ -249,7 +258,7 @@ func (s *Service) resolveResidentAffiliation(
 		return nil, nil, nil
 	}
 
-	return nil, nil, fmt.Errorf("resident is not assigned to a team")
+	return nil, nil, nil
 }
 
 func resolveSelectedGroup(
@@ -297,6 +306,27 @@ func (s *Service) loadActiveDutyForGroup(
 	}
 
 	return nil, nil, nil
+}
+
+func (s *Service) resolveObserverGroupFallback(
+	ctx context.Context,
+	groups []*structure.Group,
+) (*structure.Group, error) {
+	for _, group := range groups {
+		dutyTeam, duty, err := s.loadActiveDutyForGroup(ctx, group.ID())
+		if err != nil {
+			return nil, fmt.Errorf("resolve observer group fallback: %w", err)
+		}
+		if dutyTeam != nil && duty != nil {
+			return group, nil
+		}
+	}
+
+	if len(groups) == 0 {
+		return nil, fmt.Errorf("resident is not assigned to a group")
+	}
+
+	return groups[0], nil
 }
 
 func (s *Service) loadCurrentDutyLookups(
