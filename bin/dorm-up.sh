@@ -28,6 +28,6 @@ echo "Local environment is up."
 docker compose $COMPOSE_FILES ps
 
 echo ""
-echo "Admin panel: http://localhost:8080/admin"
+echo "App:         http://localhost:8080/app/"
 echo "Adminer:     http://localhost:8081"
 echo "MySQL:       localhost:3307"

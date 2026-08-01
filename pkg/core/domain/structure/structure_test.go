@@ -13,16 +13,16 @@ func TestRestoreTeam(t *testing.T) {
 	leaderID := uuid.New()
 	name := "Test Team"
 	color := "#FF0000"
-	order := 1
+	rotationPosition := 1
 
-	team := RestoreTeam(id, name, groupID, &leaderID, color, order)
+	team := RestoreTeam(id, name, groupID, &leaderID, color, rotationPosition)
 
 	assert.Equal(t, id, team.ID())
 	assert.Equal(t, groupID, team.GroupID())
 	assert.Equal(t, &leaderID, team.LeaderID())
 	assert.Equal(t, name, team.Name())
 	assert.Equal(t, color, team.Color())
-	assert.Equal(t, order, team.Order())
+	assert.Equal(t, rotationPosition, team.RotationPosition())
 }
 
 func TestNewTeam(t *testing.T) {
@@ -35,25 +35,20 @@ func TestNewTeam(t *testing.T) {
 	assert.Nil(t, team.LeaderID())
 	assert.Equal(t, "Test Team", team.Name())
 	assert.Equal(t, "#FF0000", team.Color())
-	assert.Equal(t, 1, team.Order())
+	assert.Equal(t, 1, team.RotationPosition())
 }
 
 func TestRestoreGroup(t *testing.T) {
 	id := uuid.New()
 	leaderID := uuid.New()
 	name := "Cleaning Group A"
-	sheetID := "spreadsheet-123"
 	dormID := int64(10)
-	nextDutyTeam := 2
-
-	group := RestoreGroup(id, &leaderID, name, sheetID, dormID, &nextDutyTeam)
+	group := RestoreGroup(id, &leaderID, name, dormID)
 
 	assert.Equal(t, id, group.ID())
 	assert.Equal(t, &leaderID, group.LeaderID())
 	assert.Equal(t, name, group.Name())
-	assert.Equal(t, sheetID, group.SpreadsheetID())
 	assert.Equal(t, dormID, group.DormitoryID())
-	assert.Equal(t, &nextDutyTeam, group.NextDutyTeam())
 }
 
 func TestRestoreDormitory(t *testing.T) {

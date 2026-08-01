@@ -74,16 +74,37 @@ func (r *DormitoryRepository) FindAll(ctx context.Context) ([]*structure.Dormito
 	return dormitories, nil
 }
 
+func (r *DormitoryRepository) ExistsByLeaderID(ctx context.Context, leaderID uuid.UUID) (bool, error) {
+	const query = `SELECT EXISTS(SELECT 1 FROM dormitory WHERE leader_id = ?)`
+
+	leaderIDBytes, err := leaderID.MarshalBinary()
+	if err != nil {
+		return false, fmt.Errorf("marshal dormitory leader id: %w", err)
+	}
+
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, query, leaderIDBytes).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check dormitory leader: %w", err)
+	}
+
+	return exists, nil
+}
+
 func (r *DormitoryRepository) Save(ctx context.Context, dormitory *structure.Dormitory) error {
 	if dormitory.ID() == 0 {
 		const query = `
 			INSERT INTO dormitory (leader_id, name, city, street_type, street_name, house_number)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`
-		_, err := r.db.ExecContext(ctx, query, leaderIDBytes(dormitory.LeaderID()), dormitory.Name(), dormitory.City(), dormitory.StreetType(), dormitory.StreetName(), dormitory.HouseNumber())
+		result, err := r.db.ExecContext(ctx, query, leaderIDBytes(dormitory.LeaderID()), dormitory.Name(), dormitory.City(), dormitory.StreetType(), dormitory.StreetName(), dormitory.HouseNumber())
 		if err != nil {
 			return fmt.Errorf("SaveDormitory insert: %w", err)
 		}
+		insertedID, err := result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("SaveDormitory last insert id: %w", err)
+		}
+		dormitory.AssignID(insertedID)
 		return nil
 	}
 

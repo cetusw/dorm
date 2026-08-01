@@ -1,0 +1,69 @@
+.drawerContent {
+    border-radius: 20px 20px 0 0;
+}
+
+.content {
+    padding: 25px 20px;
+}
+
+.header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 15px;
+}
+
+.title {
+    font-size: var(--mantine-font-size-md);
+    line-height: 1.3;
+    font-weight: 600;
+}
+
+.closeButton {
+    margin-top: -4px;
+    margin-right: -8px;
+}
+
+.infoRow {
+    margin-bottom: 10px;
+    font-size: var(--mantine-font-size-sm);
+    line-height: 1.4;
+}
+
+.badgesRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.statusRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.actions {
+    margin-top: 15px;
+}
+
+.singleActionButton,
+.splitActionButton {
+    width: 100%;
+    min-height: 80px;
+    font-size: var(--mantine-font-size-md);
+    font-weight: 500;
+    border-radius: 16px;
+}
+
+.splitActions {
+    display: flex;
+    gap: 10px;
+}
+
+.splitActionWrap {
+    flex: 1 1 0;
+    min-width: 0;
+}

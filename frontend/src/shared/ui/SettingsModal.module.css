@@ -1,0 +1,52 @@
+.header {
+    padding: 30px 40px 0;
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.body {
+    padding: 25px 40px 30px;
+}
+
+.content {
+    padding: 0;
+}
+
+.input {
+    height: 40px;
+    min-height: 40px;
+    border-radius: 12px;
+    font-size: 1rem;
+}
+
+.actions {
+    margin-top: 15px;
+}
+
+.cancelButton,
+.submitButton {
+    width: 135px;
+    min-width: 135px;
+    height: 40px;
+    border-radius: 14px;
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 0 16px;
+}
+
+.accentButton {
+    background: #197c74;
+}
+
+.accentButton:hover {
+    background: #166d66;
+}
+
+.description {
+    font-size: 1rem;
+    line-height: 1.5;
+}

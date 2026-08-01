@@ -20,13 +20,8 @@ func main() {
 	log.Println("Starting Scheduler...")
 	ctn.Scheduler.Start()
 
-	//go func() {
-	//	log.Println("Starting Telegram Bot...")
-	//	ctn.Bot.Start()
-	//}()
-
 	go func() {
-		log.Println("Starting Admin Panel on :8080...")
+		log.Println("Starting HTTP server on :8080...")
 		if err := ctn.HTTPServer.Listen(":8080"); err != nil {
 			log.Printf("Fiber error: %v", err)
 		}

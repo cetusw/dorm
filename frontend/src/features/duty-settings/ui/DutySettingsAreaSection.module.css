@@ -1,0 +1,71 @@
+.section {
+    position: relative;
+}
+
+.header {
+    width: fit-content;
+}
+
+.headerActions,
+.addTaskAction {
+    opacity: 1;
+    transition: opacity 140ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .headerActions,
+    .addTaskAction {
+        opacity: 0;
+    }
+
+    .header:hover .headerActions,
+    .header:focus-within .headerActions,
+    .section:hover .addTaskAction,
+    .section:focus-within .addTaskAction {
+        opacity: 1;
+    }
+}
+
+.actions {
+    gap: 4px;
+}
+
+.addTaskWrap {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition:
+        max-height 140ms ease,
+        opacity 140ms ease,
+        margin-top 140ms ease;
+}
+
+.section:hover .addTaskWrap,
+.section:focus-within .addTaskWrap {
+    max-height: 40px;
+    opacity: 1;
+    margin-top: 4px;
+}
+
+.addTaskLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--mantine-color-gray-6);
+    cursor: pointer;
+    transition: color 140ms ease;
+}
+
+.addTaskLink:hover,
+.addTaskLink:focus-visible {
+    color: var(--app-color-text);
+}
+
+.addTaskText {
+    font-size: 1rem;
+    line-height: 1.5;
+    font-weight: 500;
+}

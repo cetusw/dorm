@@ -1,0 +1,103 @@
+.swipeRoot {
+    position: relative;
+    overflow: hidden;
+}
+
+.actionLayer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+.actionSide {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    pointer-events: none;
+}
+
+.actionSideLeft {
+    justify-content: flex-start;
+    padding-right: 6px;
+}
+
+.actionSideRight {
+    justify-content: flex-end;
+    margin-left: auto;
+    padding-left: 6px;
+}
+
+.actionButton {
+    height: 100%;
+    border-radius: 16px;
+    pointer-events: auto;
+}
+
+.surface {
+    position: relative;
+    z-index: 1;
+    transition: transform 160ms ease;
+    will-change: transform;
+    touch-action: pan-y;
+}
+
+.surface[data-dragging='true'] {
+    transition: none;
+}
+
+.headerRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.titleWrap {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    min-width: 0;
+    flex: 1;
+}
+
+.checkboxWrap {
+    width: 20px;
+    min-width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+    line-height: 20px;
+}
+
+.metaRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.metaRow[data-has-checkbox='true'] {
+    padding-left: 35px;
+}
+
+.assigneeText {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 20px;
+}

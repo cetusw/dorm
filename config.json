@@ -1,4 +1,3 @@
 {
-    "weekStart": "0 9 * * 1",
-    "syncStart": "0 20 * * 0"
+    "weekStart": "0 9 * * 1"
 }

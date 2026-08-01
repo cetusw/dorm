@@ -22,3 +22,7 @@ docker compose $COMPOSE_FILES up -d --build app adminer
 
 echo "Local environment restarted."
 docker compose $COMPOSE_FILES ps
+echo ""
+echo "App:         http://localhost:8080/app/"
+echo "Adminer:     http://localhost:8081"
+echo "MySQL:       localhost:3307"

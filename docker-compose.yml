@@ -2,28 +2,36 @@ services:
   app:
     image: dorm-app:latest
     container_name: dorm-app
+    restart: unless-stopped
+
     env_file:
       - .env
+
     depends_on:
       db:
         condition: service_healthy
 
   migrate:
     image: dorm-app:latest
-    container_name: dorm-migrate
     env_file:
       - .env
+
     depends_on:
       db:
         condition: service_healthy
+
     command: [ "./dorm-migrate", "up" ]
 
   db:
     build:
       context: ./mysql
+
     container_name: dorm-db
+    restart: unless-stopped
+
     env_file:
       - .env
+
     environment:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
@@ -33,11 +41,17 @@ services:
       LC_ALL: C.UTF-8
     volumes:
       - dorm-db-data:/var/lib/mysql
+
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "$$MYSQL_USER", "-p$$MYSQL_PASSWORD" ]
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"
+        ]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 30
+      start_period: 20s
 
 volumes:
   dorm-db-data:

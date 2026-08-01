@@ -15,4 +15,5 @@ type ResidentDutyUseCase interface {
 	CompleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
 	OpenTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
 	VerifyTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
+	ReopenTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error
 }

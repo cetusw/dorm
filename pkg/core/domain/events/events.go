@@ -4,15 +4,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
-	"dorm/pkg/core/ports/dto"
 )
 
 const (
-	TopicTaskCompleted   = "task.completed"
-	TopicTaskUncompleted = "task.uncompleted"
-	TopicTaskAssigned    = "task.assigned"
-	TopicWeekStarted     = "week.started"
+	TopicTaskCompleted       = "task.completed"
+	TopicTaskUncompleted     = "task.uncompleted"
+	TopicTaskAssigned        = "task.assigned"
+	TopicTasksReadyForReview = "tasks.ready_for_review"
+	TopicWeekStarted         = "week.started"
 )
 
 type TaskCompletedEvent struct {
@@ -32,8 +31,18 @@ type TaskAssignedEvent struct {
 	AssigneeID *uuid.UUID
 }
 
+type TasksReadyForReviewEvent struct {
+	DutyID     uuid.UUID
+	TeamID     uuid.UUID
+	TeamHeadID uuid.UUID
+	OccurredAt time.Time
+}
+
+type StartedDuty struct {
+	DutyID uuid.UUID
+	TeamID uuid.UUID
+}
+
 type WeekStartedEvent struct {
-	StartDate time.Time
-	EndDate   time.Time
-	Duties    []dto.DutyViewModel
+	Duties []StartedDuty
 }

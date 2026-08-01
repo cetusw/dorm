@@ -40,6 +40,7 @@ func RestoreDormitory(id int64, name string, leaderID *uuid.UUID, city, streetTy
 }
 
 func (d *Dormitory) ID() int64            { return d.id }
+func (d *Dormitory) AssignID(id int64)    { d.id = id }
 func (d *Dormitory) Name() string         { return d.name }
 func (d *Dormitory) LeaderID() *uuid.UUID { return d.leaderID }
 func (d *Dormitory) City() string         { return d.city }
@@ -60,6 +61,7 @@ func (d *Dormitory) Address() string {
 type DormitoryRepository interface {
 	FindAll(ctx context.Context) ([]*Dormitory, error)
 	FindByID(ctx context.Context, id int64) (*Dormitory, error)
+	ExistsByLeaderID(ctx context.Context, leaderID uuid.UUID) (bool, error)
 	Save(ctx context.Context, dormitory *Dormitory) error
 	Delete(ctx context.Context, id int64) error
 }

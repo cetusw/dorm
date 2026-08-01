@@ -20,23 +20,36 @@ type currentDutyContext struct {
 	resident      *user.User
 	residentTeam  *structure.Team
 	residentGroup *structure.Group
+	dormitory     *structure.Dormitory
 	selectedGroup *structure.Group
 	dutyTeam      *structure.Team
 	duty          *dutydomain.Duty
 	groups        []*structure.Group
 }
 
+type residentDutyView struct {
+	showGroupSelect bool
+	visibleTabs     []string
+	readOnly        bool
+	canViewTasks    bool
+	canManageTasks  bool
+	canVerifyTasks  bool
+	noticeMessage   string
+}
+
 type currentDutyLookups struct {
 	taskDefinitions map[uuid.UUID]*catalog.TaskDefinition
 	areas           map[int]*catalog.Area
 	userNames       map[uuid.UUID]string
+	teamMembers     []dto.ResidentDutyTeamMember
 }
 
 type Service struct {
 	userRepo   user.Repository
 	teamRepo   structure.TeamRepository
 	groupRepo  structure.GroupRepository
-	dutyRepo   dutydomain.Repository
+	dormRepo   structure.DormitoryRepository
+	dutyRepo   dutydomain.DutyRepository
 	taskRepo   catalog.TaskDefinitionRepository
 	areaRepo   catalog.AreaRepository
 	cleaningUC ports.CleaningUseCase
@@ -47,7 +60,8 @@ func NewResidentDutyService(
 	userRepo user.Repository,
 	teamRepo structure.TeamRepository,
 	groupRepo structure.GroupRepository,
-	dutyRepo dutydomain.Repository,
+	dormRepo structure.DormitoryRepository,
+	dutyRepo dutydomain.DutyRepository,
 	taskRepo catalog.TaskDefinitionRepository,
 	areaRepo catalog.AreaRepository,
 	cleaningUC ports.CleaningUseCase,
@@ -56,6 +70,7 @@ func NewResidentDutyService(
 		userRepo:   userRepo,
 		teamRepo:   teamRepo,
 		groupRepo:  groupRepo,
+		dormRepo:   dormRepo,
 		dutyRepo:   dutyRepo,
 		taskRepo:   taskRepo,
 		areaRepo:   areaRepo,
@@ -75,7 +90,13 @@ func (s *Service) GetCurrentDuty(
 	}
 
 	if currentDuty.duty == nil || currentDuty.dutyTeam == nil {
-		return buildResidentCurrentDutyResponse(currentDuty, nil, 0), nil
+		view := resolveResidentDutyView(currentDuty)
+		return buildResidentCurrentDutyResponse(currentDuty, view, nil, nil, 0), nil
+	}
+
+	view := resolveResidentDutyView(currentDuty)
+	if !view.canViewTasks {
+		return buildResidentCurrentDutyResponse(currentDuty, view, nil, nil, 0), nil
 	}
 
 	lookups, err := s.loadCurrentDutyLookups(ctx, currentDuty.dutyTeam.ID())
@@ -83,15 +104,14 @@ func (s *Service) GetCurrentDuty(
 		return nil, err
 	}
 
-	canManageTasks := currentDuty.resident.TeamID() != nil &&
-		*currentDuty.resident.TeamID() == currentDuty.dutyTeam.ID()
-
-	tasks := buildResidentDutyTasks(currentDuty.duty.Tasks(), userID, lookups, canManageTasks)
+	tasks := buildResidentDutyTasks(currentDuty.duty.Tasks(), userID, lookups, view)
 	sortResidentDutyTasks(tasks)
 
 	return buildResidentCurrentDutyResponse(
 		currentDuty,
+		view,
 		tasks,
+		lookups.teamMembers,
 		len(lookups.userNames),
 	), nil
 }
@@ -116,6 +136,10 @@ func (s *Service) VerifyTask(ctx context.Context, userID uuid.UUID, taskID uuid.
 	return s.cleaningUC.VerifyTask(ctx, taskID, userID)
 }
 
+func (s *Service) ReopenTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+	return s.cleaningUC.ReopenTask(ctx, taskID, userID)
+}
+
 func (s *Service) loadCurrentDutyContext(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -128,27 +152,16 @@ func (s *Service) loadCurrentDutyContext(
 	if resident == nil {
 		return nil, fmt.Errorf("resident not found")
 	}
-	if resident.TeamID() == nil {
-		return nil, fmt.Errorf("resident is not assigned to a team")
-	}
 	if resident.DormitoryID() == nil {
 		return nil, fmt.Errorf("resident is not assigned to a dormitory")
 	}
 
-	residentTeam, err := s.teamRepo.FindByID(ctx, *resident.TeamID())
+	dormitory, err := s.dormRepo.FindByID(ctx, *resident.DormitoryID())
 	if err != nil {
-		return nil, fmt.Errorf("load resident team: %w", err)
+		return nil, fmt.Errorf("load dormitory: %w", err)
 	}
-	if residentTeam == nil {
-		return nil, fmt.Errorf("team not found")
-	}
-
-	residentGroup, err := s.groupRepo.FindByID(ctx, residentTeam.GroupID())
-	if err != nil {
-		return nil, fmt.Errorf("load resident group: %w", err)
-	}
-	if residentGroup == nil {
-		return nil, fmt.Errorf("group not found")
+	if dormitory == nil {
+		return nil, fmt.Errorf("dormitory not found")
 	}
 
 	groups, err := s.groupRepo.FindByDormitoryID(ctx, *resident.DormitoryID())
@@ -159,7 +172,18 @@ func (s *Service) loadCurrentDutyContext(
 		return nil, fmt.Errorf("no groups found for resident dormitory")
 	}
 
-	selectedGroup, err := resolveSelectedGroup(groups, residentGroup, groupID)
+	residentTeam, residentGroup, err := s.resolveResidentAffiliation(
+		ctx,
+		resident,
+		groups,
+		isDormitoryLeader(dormitory, resident.ID()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	canSelectGroup := isDormitoryLeader(dormitory, resident.ID())
+	selectedGroup, err := resolveSelectedGroup(groups, residentGroup, groupID, canSelectGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +197,7 @@ func (s *Service) loadCurrentDutyContext(
 		resident:      resident,
 		residentTeam:  residentTeam,
 		residentGroup: residentGroup,
+		dormitory:     dormitory,
 		selectedGroup: selectedGroup,
 		dutyTeam:      dutyTeam,
 		duty:          duty,
@@ -180,13 +205,67 @@ func (s *Service) loadCurrentDutyContext(
 	}, nil
 }
 
+func (s *Service) resolveResidentAffiliation(
+	ctx context.Context,
+	resident *user.User,
+	groups []*structure.Group,
+	isDormitoryLeader bool,
+) (*structure.Team, *structure.Group, error) {
+	if resident.TeamID() != nil {
+		residentTeam, err := s.teamRepo.FindByID(ctx, *resident.TeamID())
+		if err != nil {
+			return nil, nil, fmt.Errorf("load resident team: %w", err)
+		}
+		if residentTeam != nil {
+			residentGroup, err := s.groupRepo.FindByID(ctx, residentTeam.GroupID())
+			if err != nil {
+				return nil, nil, fmt.Errorf("load resident group: %w", err)
+			}
+			if residentGroup != nil {
+				return residentTeam, residentGroup, nil
+			}
+		}
+	}
+
+	for _, group := range groups {
+		teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
+		if err != nil {
+			return nil, nil, fmt.Errorf("load group teams: %w", err)
+		}
+		for _, team := range teams {
+			if isTeamLeader(team, resident.ID()) {
+				return team, group, nil
+			}
+		}
+	}
+
+	for _, group := range groups {
+		if isGroupLeader(group, resident.ID()) {
+			return nil, group, nil
+		}
+	}
+
+	if isDormitoryLeader {
+		return nil, nil, nil
+	}
+
+	return nil, nil, fmt.Errorf("resident is not assigned to a team")
+}
+
 func resolveSelectedGroup(
 	groups []*structure.Group,
 	residentGroup *structure.Group,
 	groupID *uuid.UUID,
+	canSelectGroup bool,
 ) (*structure.Group, error) {
-	if groupID == nil {
-		return residentGroup, nil
+	if !canSelectGroup || groupID == nil {
+		if residentGroup != nil {
+			return residentGroup, nil
+		}
+		if canSelectGroup && len(groups) > 0 {
+			return groups[0], nil
+		}
+		return nil, fmt.Errorf("resident is not assigned to a group")
 	}
 
 	for _, group := range groups {
@@ -243,6 +322,7 @@ func (s *Service) loadCurrentDutyLookups(
 		taskDefinitions: taskDefinitions,
 		areas:           areas,
 		userNames:       userNames,
+		teamMembers:     teamMembersFromNames(userNames),
 	}, nil
 }
 
@@ -250,7 +330,7 @@ func buildResidentDutyTasks(
 	dutyTasks []*dutydomain.DutyTask,
 	userID uuid.UUID,
 	lookups *currentDutyLookups,
-	canManageTasks bool,
+	view residentDutyView,
 ) []dto.ResidentDutyTask {
 	tasks := make([]dto.ResidentDutyTask, 0, len(dutyTasks))
 
@@ -266,7 +346,7 @@ func buildResidentDutyTasks(
 			area,
 			userID,
 			lookups.userNames,
-			canManageTasks,
+			view,
 		))
 	}
 
@@ -296,19 +376,21 @@ func buildResidentDutyTask(
 	area *catalog.Area,
 	userID uuid.UUID,
 	userNames map[uuid.UUID]string,
-	canManageTasks bool,
+	view residentDutyView,
 ) dto.ResidentDutyTask {
 	status := resolveTaskStatus(dutyTask)
 	isMine := dutyTask.AssigneeID() != nil && *dutyTask.AssigneeID() == userID
 	canTake, canReturn, canComplete, canOpen, canVerify, canReviewOpen := buildTaskPermissions(
 		status,
 		isMine,
-		canManageTasks,
+		view.canManageTasks,
+		view.canVerifyTasks,
 	)
 	assigneeID, assigneeName := resolveAssignee(dutyTask, userNames)
 
 	return dto.ResidentDutyTask{
 		ID:            dutyTask.ID().String(),
+		AreaID:        area.ID(),
 		AreaName:      area.Name(),
 		AreaFloor:     area.Floor(),
 		Title:         taskDefinition.Title(),
@@ -345,18 +427,24 @@ func resolveAssignee(
 
 func buildResidentCurrentDutyResponse(
 	currentDuty *currentDutyContext,
+	view residentDutyView,
 	tasks []dto.ResidentDutyTask,
+	teamMembers []dto.ResidentDutyTeamMember,
 	residentCount int,
 ) *dto.ResidentCurrentDutyResponse {
 	response := &dto.ResidentCurrentDutyResponse{
-		SelectedGroupID: currentDuty.selectedGroup.ID().String(),
-		Groups:          buildResidentDutyGroupOptions(currentDuty.groups),
-		Group:           currentDuty.selectedGroup.Name(),
-		CanManageTasks: currentDuty.duty != nil &&
-			currentDuty.resident.TeamID() != nil &&
-			currentDuty.dutyTeam != nil &&
-			*currentDuty.resident.TeamID() == currentDuty.dutyTeam.ID(),
-		Tasks: tasks,
+		DormitoryID:           currentDuty.selectedGroup.DormitoryID(),
+		SelectedGroupID:       currentDuty.selectedGroup.ID().String(),
+		Groups:                buildResidentDutyGroupOptions(currentDuty.groups, view.showGroupSelect),
+		Group:                 currentDuty.selectedGroup.Name(),
+		CanManageTasks:        view.canManageTasks,
+		CanManageDutySettings: isGroupLeader(currentDuty.selectedGroup, currentDuty.resident.ID()),
+		ReadOnly:              view.readOnly,
+		ShowGroupSelect:       view.showGroupSelect,
+		VisibleTabs:           view.visibleTabs,
+		NoticeMessage:         view.noticeMessage,
+		TeamMembers:           teamMembers,
+		Tasks:                 tasks,
 	}
 
 	if currentDuty.duty == nil || currentDuty.dutyTeam == nil {
@@ -364,22 +452,33 @@ func buildResidentCurrentDutyResponse(
 	}
 
 	return &dto.ResidentCurrentDutyResponse{
-		SelectedGroupID:     response.SelectedGroupID,
-		HasActiveDuty:       true,
-		CanManageTasks:      response.CanManageTasks,
-		Groups:              response.Groups,
-		DutyID:              currentDuty.duty.ID().String(),
-		Group:               currentDuty.selectedGroup.Name(),
-		Team:                currentDuty.dutyTeam.Name(),
-		StartDate:           currentDuty.duty.Start().Format("2006-01-02"),
-		EndDate:             currentDuty.duty.End().Format("2006-01-02"),
-		CostPerResidentGoal: calculateCostPerResidentGoal(tasks, residentCount),
-		MyTakenCostSum:      countMyTakenCost(tasks),
-		Tasks:               response.Tasks,
+		DormitoryID:           response.DormitoryID,
+		SelectedGroupID:       response.SelectedGroupID,
+		HasActiveDuty:         true,
+		CanManageTasks:        response.CanManageTasks,
+		CanManageDutySettings: response.CanManageDutySettings,
+		ReadOnly:              response.ReadOnly,
+		ShowGroupSelect:       response.ShowGroupSelect,
+		VisibleTabs:           response.VisibleTabs,
+		NoticeMessage:         response.NoticeMessage,
+		Groups:                response.Groups,
+		DutyID:                currentDuty.duty.ID().String(),
+		Group:                 currentDuty.selectedGroup.Name(),
+		Team:                  currentDuty.dutyTeam.Name(),
+		StartDate:             currentDuty.duty.Start().Format("2006-01-02"),
+		EndDate:               currentDuty.duty.End().Format("2006-01-02"),
+		CostPerResidentGoal:   calculateCostPerResidentGoal(tasks, residentCount),
+		MyTakenCostSum:        countMyTakenCost(tasks),
+		TeamMembers:           response.TeamMembers,
+		Tasks:                 response.Tasks,
 	}
 }
 
-func buildResidentDutyGroupOptions(groups []*structure.Group) []dto.ResidentDutyGroupOption {
+func buildResidentDutyGroupOptions(groups []*structure.Group, enabled bool) []dto.ResidentDutyGroupOption {
+	if !enabled {
+		return nil
+	}
+
 	options := make([]dto.ResidentDutyGroupOption, 0, len(groups))
 	for _, group := range groups {
 		options = append(options, dto.ResidentDutyGroupOption{
@@ -438,6 +537,22 @@ func (s *Service) userNamesByID(
 	return result, nil
 }
 
+func teamMembersFromNames(userNames map[uuid.UUID]string) []dto.ResidentDutyTeamMember {
+	members := make([]dto.ResidentDutyTeamMember, 0, len(userNames))
+	for userID, name := range userNames {
+		members = append(members, dto.ResidentDutyTeamMember{
+			ID:   userID.String(),
+			Name: name,
+		})
+	}
+
+	sort.Slice(members, func(i, j int) bool {
+		return members[i].Name < members[j].Name
+	})
+
+	return members
+}
+
 func resolveTaskStatus(task *dutydomain.DutyTask) string {
 	if task.VerificationDate() != nil {
 		return dto.ResidentDutyTaskStatusVerified
@@ -455,8 +570,12 @@ func buildTaskPermissions(
 	status string,
 	isMine bool,
 	canManageTasks bool,
+	canVerifyTasks bool,
 ) (canTake bool, canReturn bool, canComplete bool, canOpen bool, canVerify bool, canReviewOpen bool) {
 	if !canManageTasks {
+		if canVerifyTasks && status == dto.ResidentDutyTaskStatusCompleted {
+			return false, false, false, false, true, true
+		}
 		return false, false, false, false, false, false
 	}
 
@@ -470,12 +589,101 @@ func buildTaskPermissions(
 		return false, false, false, false, false, false
 	case dto.ResidentDutyTaskStatusCompleted:
 		if isMine {
-			return false, false, false, true, true, true
+			return false, false, false, true, canVerifyTasks, canVerifyTasks
 		}
-		return false, false, false, false, true, true
+		return false, false, false, false, canVerifyTasks, canVerifyTasks
 	default:
 		return false, false, false, false, false, false
 	}
+}
+
+func resolveResidentDutyView(currentDuty *currentDutyContext) residentDutyView {
+	if currentDuty == nil {
+		return residentDutyView{}
+	}
+
+	isOnDutyTeam := currentDuty.duty != nil &&
+		currentDuty.dutyTeam != nil &&
+		currentDuty.resident.TeamID() != nil &&
+		*currentDuty.resident.TeamID() == currentDuty.dutyTeam.ID()
+
+	isTeamLeader := isTeamLeader(currentDuty.residentTeam, currentDuty.resident.ID())
+
+	if currentDuty.dormitory != nil && isDormitoryLeader(currentDuty.dormitory, currentDuty.resident.ID()) {
+		visibleTabs := []string{}
+		canManageTasks := false
+		canVerifyTasks := false
+		readOnly := true
+
+		if isOnDutyTeam {
+			visibleTabs = []string{"all", "mine", "team"}
+			canManageTasks = true
+			readOnly = false
+
+			if isTeamLeader {
+				visibleTabs = append(visibleTabs, "verification")
+				canVerifyTasks = true
+			}
+		} else if currentDuty.duty != nil && currentDuty.dutyTeam != nil {
+			visibleTabs = []string{"all", "team"}
+		}
+
+		return residentDutyView{
+			showGroupSelect: true,
+			visibleTabs:     visibleTabs,
+			readOnly:        readOnly,
+			canViewTasks:    currentDuty.duty != nil && currentDuty.dutyTeam != nil,
+			canManageTasks:  canManageTasks,
+			canVerifyTasks:  canVerifyTasks,
+			noticeMessage:   observerNoticeMessage(currentDuty, isOnDutyTeam),
+		}
+	}
+
+	if isOnDutyTeam {
+		tabs := []string{"all", "mine", "team"}
+		if isTeamLeader {
+			tabs = append(tabs, "verification")
+		}
+
+		return residentDutyView{
+			visibleTabs:    tabs,
+			canViewTasks:   true,
+			canManageTasks: true,
+			canVerifyTasks: isTeamLeader,
+		}
+	}
+
+	visibleTabs := []string{}
+	if currentDuty.duty != nil && currentDuty.dutyTeam != nil {
+		visibleTabs = []string{"all", "team"}
+	}
+
+	return residentDutyView{
+		readOnly:      true,
+		visibleTabs:   visibleTabs,
+		canViewTasks:  currentDuty.duty != nil && currentDuty.dutyTeam != nil,
+		noticeMessage: observerNoticeMessage(currentDuty, false),
+	}
+}
+
+func observerNoticeMessage(currentDuty *currentDutyContext, isOnDutyTeam bool) string {
+	if isOnDutyTeam || currentDuty == nil || currentDuty.dutyTeam == nil {
+		return ""
+	}
+
+	return fmt.Sprintf("На этой неделе дежурит команда %s", currentDuty.dutyTeam.Name())
+}
+
+func isDormitoryLeader(dormitory *structure.Dormitory, userID uuid.UUID) bool {
+	return dormitory != nil && dormitory.LeaderID() != nil && *dormitory.LeaderID() == userID
+}
+
+func isGroupLeader(group *structure.Group, userID uuid.UUID) bool {
+	return group != nil && group.LeaderID() != nil && *group.LeaderID() == userID
+}
+
+func isTeamLeader(team *structure.Team, userID uuid.UUID) bool {
+	return team != nil && team.LeaderID() != nil && *team.LeaderID() == userID
 }
 
 func countMyTakenCost(tasks []dto.ResidentDutyTask) int {

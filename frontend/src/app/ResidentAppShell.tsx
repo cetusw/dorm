@@ -1,50 +1,316 @@
-import type {ReactNode} from 'react'
-import {AppShell, Group, Stack, Text, ThemeIcon} from '@mantine/core'
+import { type ReactNode } from 'react'
+
+import { GearIcon } from '@phosphor-icons/react'
+import {
+    Alert,
+    AppShell,
+    Box,
+    Burger,
+    Button,
+    Center,
+    Group,
+    Loader,
+    NavLink,
+    ActionIcon,
+    Select,
+    Stack,
+    Tooltip,
+} from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
+
+import logo from '../assets/logo.svg'
+import { getSettingsReturnPath } from './navigation'
+import type { CurrentUser } from '../features/current-user/model/types'
+import { useDormitorySelection } from '../features/dormitories/model/useDormitorySelection'
+import {
+    HEADER_HEIGHT_PX,
+} from '../shared/ui/mobileStickyThreshold'
 
 type Props = {
+    currentPath: string
+    currentUser: CurrentUser | null
+    currentUserError: string | null
+    currentUserLoading: boolean
+    onNavigate: (pathname: string) => void
     children: ReactNode
 }
 
-export function ResidentAppShell({children}: Props) {
+type NavigationItem = {
+    href: string
+    label: string
+}
+
+function isCurrentPathActive(currentPath: string, href: string): boolean {
+    if (href === '/app/tasks') {
+        return currentPath === '/app' || currentPath === '/app/tasks'
+    }
+
+    if (href === '/app/groups') {
+        return currentPath === '/app/groups' || currentPath.startsWith('/app/groups/')
+    }
+
+    return currentPath === href
+}
+
+function isSettingsPath(pathname: string): boolean {
+    return pathname === '/app/settings' || pathname === '/app/notifications'
+}
+
+export function ResidentAppShell({
+    currentPath,
+    currentUser,
+    currentUserError,
+    currentUserLoading,
+    onNavigate,
+    children,
+}: Props) {
+    const [navbarOpened, { toggle: toggleNavbar, close: closeNavbar }] =
+        useDisclosure(false)
+    const hasManagementNavigation = Boolean(currentUser?.can_manage_dormitories)
+    const {
+        dormitories,
+        loading: dormitoriesLoading,
+        selectedDormitoryId,
+        setSelectedDormitoryId,
+    } = useDormitorySelection(hasManagementNavigation)
+
+    const navigationItems: NavigationItem[] = hasManagementNavigation
+        ? [
+            {
+                href: '/app/residents',
+                label: 'Жители',
+            },
+            {
+                href: '/app/groups',
+                label: 'Группы',
+            },
+            {
+                href: '/app/areas',
+                label: 'Территории',
+            },
+            {
+                href: '/app/task-definitions',
+                label: 'Задачи',
+            },
+            {
+                href: '/app/tasks',
+                label: 'Дежурство',
+            },
+        ]
+        : [
+            {
+                href: '/app/tasks',
+                label: 'Дежурство',
+            },
+        ]
+
+    const dormitoryOptions = dormitories.map((dormitory) => ({
+        value: String(dormitory.id),
+        label: dormitory.name,
+    }))
+
+    function getNavigationItemStyles(active: boolean) {
+        return {
+            root: {
+                color: '#f9fafb',
+                borderRadius: 8,
+                backgroundColor: active
+                    ? 'rgba(204, 251, 241, 0.16)'
+                    : 'transparent',
+                border: active
+                    ? '1px solid rgba(204, 251, 241, 0.28)'
+                    : '1px solid transparent',
+            },
+            label: {
+                color: '#f9fafb',
+                fontWeight: 500,
+            },
+        }
+    }
+
+    const desktopDormitoryControls = hasManagementNavigation ? (
+        <Group align="center" gap="sm" wrap="nowrap">
+            <Select
+                aria-label="Общежитие"
+                placeholder="Общежитие"
+                data={dormitoryOptions}
+                value={selectedDormitoryId}
+                onChange={(value) => setSelectedDormitoryId(value)}
+                allowDeselect={false}
+                disabled={dormitories.length === 0}
+                w={{ base: '100%', sm: 240 }}
+                loading={dormitoriesLoading}
+            />
+
+            <Button
+                variant="default"
+                onClick={() => onNavigate('/app/dormitories')}
+            >
+                Управление общежитиями
+            </Button>
+        </Group>
+    ) : null
+
+    const mobileDormitoryControls = hasManagementNavigation ? (
+        <Stack gap="sm">
+            <Select
+                aria-label="Общежитие"
+                placeholder="Общежитие"
+                data={dormitoryOptions}
+                value={selectedDormitoryId}
+                onChange={(value) => setSelectedDormitoryId(value)}
+                allowDeselect={false}
+                disabled={dormitories.length === 0}
+                comboboxProps={{ withinPortal: false }}
+                loading={dormitoriesLoading}
+            />
+
+            <Button
+                variant="default"
+                onClick={() => {
+                    closeNavbar()
+                    onNavigate('/app/dormitories')
+                }}
+            >
+                Управление общежитиями
+            </Button>
+        </Stack>
+    ) : null
+
+    function handleLogoClick() {
+        closeNavbar()
+        onNavigate('/app/tasks')
+    }
+
+    function handleSettingsClick() {
+        closeNavbar()
+
+        if (isSettingsPath(currentPath)) {
+            onNavigate(getSettingsReturnPath())
+            return
+        }
+
+        onNavigate('/app/settings')
+    }
+
     return (
         <AppShell
-            navbar={{width: 88, breakpoint: 0}}
-            header={{height: 72}}
+            navbar={hasManagementNavigation ? {
+                width: 280,
+                breakpoint: 'sm',
+                collapsed: {
+                    desktop: false,
+                    mobile: !navbarOpened,
+                },
+            } : undefined}
+            header={{ height: 60 }}
             padding={0}
             styles={{
                 main: {
-                    backgroundColor: '#f5f7fb',
+                    backgroundColor: 'var(--app-color-bg)',
                     minHeight: '100vh',
+                    '--app-shell-header-offset': `${HEADER_HEIGHT_PX}px`,
                 },
                 navbar: {
-                    backgroundColor: '#111827',
-                    borderRight: '1px solid #1f2937',
+                    backgroundColor: '#1F2927',
+                    borderRight: '1px solid #31403D',
                 },
                 header: {
-                    backgroundColor: '#ffffff',
-                    borderBottom: '1px solid #e5e7eb',
+                    backgroundColor: 'var(--app-color-surface)',
+                    borderBottom: '1px solid var(--app-color-border)',
                 },
             }}
         >
-            <AppShell.Navbar p="md">
-                <Stack justify="space-between" h="100%">
-                    <Stack align="center" gap="md">
-                        <ThemeIcon size={48} radius="md" color="blue">
-                            Д
-                        </ThemeIcon>
-                    </Stack>
-                </Stack>
-            </AppShell.Navbar>
+            {hasManagementNavigation ? (
+                <AppShell.Navbar p="md">
+                    <Stack gap="md">
+                        {mobileDormitoryControls ? (
+                            <Stack gap="sm" hiddenFrom="sm">
+                                {mobileDormitoryControls}
+                            </Stack>
+                        ) : null}
 
-            <AppShell.Header px="xl">
-                <Group align="center" h="100%">
-                    <Text size="lg" c="dimmed">
-                        Dorm
-                    </Text>
+                        {navigationItems.map((item) => (
+                            <NavLink
+                                key={item.href}
+                                active={isCurrentPathActive(currentPath, item.href)}
+                                label={item.label}
+                                onClick={() => {
+                                    closeNavbar()
+                                    onNavigate(item.href)
+                                }}
+                                styles={getNavigationItemStyles(
+                                    isCurrentPathActive(currentPath, item.href),
+                                )}
+                            />
+                        ))}
+                    </Stack>
+                </AppShell.Navbar>
+            ) : null}
+
+            <AppShell.Header px={{ base: 'md', md: 'xl' }}>
+                <Group align="center" h="100%" justify="space-between" wrap="nowrap">
+                    <Group align="center" wrap="nowrap" gap="md">
+                        {hasManagementNavigation ? (
+                            <Burger
+                                opened={navbarOpened}
+                                onClick={toggleNavbar}
+                                hiddenFrom="sm"
+                                size="sm"
+                                aria-label="Открыть навигацию"
+                            />
+                        ) : null}
+
+                        <Box
+                            component="img"
+                            src={logo}
+                            alt="Dorm"
+                            h={32}
+                            w="auto"
+                            style={{
+                                display: 'block',
+                                cursor: 'pointer',
+                            }}
+                            onClick={handleLogoClick}
+                        />
+
+                        {desktopDormitoryControls && (
+                            <Group align="center" gap="sm" wrap="nowrap" visibleFrom="sm">
+                                {desktopDormitoryControls}
+                            </Group>
+                        )}
+                    </Group>
+
+                    <Tooltip label="Настройки" withArrow>
+                        <ActionIcon
+                            aria-label="Открыть настройки"
+                            variant="subtle"
+                            color="gray"
+                            size="lg"
+                            radius="xl"
+                            onClick={handleSettingsClick}
+                        >
+                            <GearIcon size={25} />
+                        </ActionIcon>
+                    </Tooltip>
                 </Group>
             </AppShell.Header>
 
-            <AppShell.Main>{children}</AppShell.Main>
+            <AppShell.Main>
+                {currentUserLoading ? (
+                    <Center h="100vh">
+                        <Loader />
+                    </Center>
+                ) : currentUserError ? (
+                    <Center h="100vh" px="md">
+                        <Alert color="red" title="Ошибка">
+                            {currentUserError}
+                        </Alert>
+                    </Center>
+                ) : (
+                    children
+                )}
+            </AppShell.Main>
         </AppShell>
     )
 }

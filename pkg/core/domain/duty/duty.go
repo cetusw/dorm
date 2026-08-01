@@ -9,36 +9,48 @@ import (
 )
 
 var (
-	ErrTaskNotFound    = errors.New("task not found in this duty")
-	ErrTaskAssigned    = errors.New("task is already assigned")
-	ErrTaskNotAssigned = errors.New("task is not assigned")
+	ErrTaskNotFound           = errors.New("duty task not found")
+	ErrTaskAlreadyIncluded    = errors.New("duty task already included")
+	ErrTaskAssigned           = errors.New("duty task already assigned")
+	ErrTaskNotAssigned        = errors.New("duty task not assigned")
+	ErrTaskOwnedByAnotherUser = errors.New("duty task belongs to another user")
+	ErrTaskAlreadyCompleted   = errors.New("duty task already completed")
+	ErrTaskNotCompleted       = errors.New("duty task not completed")
+	ErrTaskAlreadyVerified    = errors.New("duty task already verified")
+	ErrTaskStateConflict      = errors.New("duty task state conflict")
+	ErrAssigneeRequired       = errors.New("assignee is required")
+	ErrReviewerRequired       = errors.New("reviewer is required")
+	ErrTaskAccessDenied       = errors.New("duty task access denied")
 )
 
 type Duty struct {
-	id     uuid.UUID
-	teamID uuid.UUID
-	start  time.Time
-	end    time.Time
-	tasks  map[uuid.UUID]*DutyTask
+	id             uuid.UUID
+	teamID         uuid.UUID
+	start          time.Time
+	end            time.Time
+	sequenceNumber int
+	tasks          map[uuid.UUID]*DutyTask
 }
 
-func NewDuty(teamID uuid.UUID, start, end time.Time) *Duty {
+func NewDuty(teamID uuid.UUID, start, end time.Time, sequenceNumber int) *Duty {
 	return &Duty{
-		id:     uuid.New(),
-		teamID: teamID,
-		start:  start,
-		end:    end,
-		tasks:  make(map[uuid.UUID]*DutyTask),
+		id:             uuid.New(),
+		teamID:         teamID,
+		start:          start,
+		end:            end,
+		sequenceNumber: sequenceNumber,
+		tasks:          make(map[uuid.UUID]*DutyTask),
 	}
 }
 
-func RestoreDuty(id, teamID uuid.UUID, start, end time.Time, tasks []*DutyTask) *Duty {
+func RestoreDuty(id, teamID uuid.UUID, start, end time.Time, sequenceNumber int, tasks []*DutyTask) *Duty {
 	d := &Duty{
-		id:     id,
-		teamID: teamID,
-		start:  start,
-		end:    end,
-		tasks:  make(map[uuid.UUID]*DutyTask),
+		id:             id,
+		teamID:         teamID,
+		start:          start,
+		end:            end,
+		sequenceNumber: sequenceNumber,
+		tasks:          make(map[uuid.UUID]*DutyTask),
 	}
 	for _, t := range tasks {
 		d.tasks[t.id] = t
@@ -49,77 +61,16 @@ func RestoreDuty(id, teamID uuid.UUID, start, end time.Time, tasks []*DutyTask) 
 func (d *Duty) AddTask(taskID, taskDefID uuid.UUID) {
 	d.tasks[taskID] = &DutyTask{
 		id:        taskID,
+		dutyID:    d.id,
 		taskDefID: taskDefID,
 	}
 }
 
-func (d *Duty) AssignTask(taskID uuid.UUID, userID uuid.UUID) error {
-	task, exists := d.tasks[taskID]
-	if !exists {
-		return ErrTaskNotFound
-	}
-	if task.assigneeID != nil {
-		return ErrTaskAssigned
-	}
-	task.assigneeID = &userID
-	return nil
-}
-
-func (d *Duty) UnassignTask(taskID uuid.UUID) error {
-	task, exists := d.tasks[taskID]
-	if !exists {
-		return ErrTaskNotFound
-	}
-	task.assigneeID = nil
-	task.completionDate = nil
-	return nil
-}
-
-func (d *Duty) CompleteTask(taskID uuid.UUID) error {
-	task, exists := d.tasks[taskID]
-	if !exists {
-		return ErrTaskNotFound
-	}
-	if task.assigneeID == nil {
-		return ErrTaskNotAssigned
-	}
-	now := time.Now()
-	task.completionDate = &now
-	task.verificationDate = nil
-	return nil
-}
-
-func (d *Duty) OpenTask(taskID uuid.UUID) error {
-	task, exists := d.tasks[taskID]
-	if !exists {
-		return ErrTaskNotFound
-	}
-	if task.assigneeID == nil {
-		return ErrTaskNotAssigned
-	}
-	task.completionDate = nil
-	task.verificationDate = nil
-	return nil
-}
-
-func (d *Duty) VerifyTask(taskID uuid.UUID) error {
-	task, exists := d.tasks[taskID]
-	if !exists {
-		return ErrTaskNotFound
-	}
-	if task.assigneeID == nil {
-		return ErrTaskNotAssigned
-	}
-	if task.completionDate == nil {
-		return ErrTaskNotAssigned
-	}
-	now := time.Now()
-	task.verificationDate = &now
-	return nil
-}
-
 func (d *Duty) ID() uuid.UUID     { return d.id }
 func (d *Duty) TeamID() uuid.UUID { return d.teamID }
+func (d *Duty) SequenceNumber() int {
+	return d.sequenceNumber
+}
 func (d *Duty) Tasks() []*DutyTask {
 	list := make([]*DutyTask, 0, len(d.tasks))
 	for _, t := range d.tasks {
@@ -129,13 +80,27 @@ func (d *Duty) Tasks() []*DutyTask {
 }
 func (d *Duty) Start() time.Time { return d.start }
 func (d *Duty) End() time.Time   { return d.end }
+func (d *Duty) StartDate() time.Time {
+	return d.start
+}
+func (d *Duty) EndDate() time.Time {
+	return d.end
+}
+func (d *Duty) IsActiveAt(at time.Time) bool {
+	return !at.Before(d.start) && at.Before(d.end)
+}
+func (d *Duty) BelongsToTeam(teamID uuid.UUID) bool {
+	return d.teamID == teamID
+}
 
-type Repository interface {
-	Save(ctx context.Context, duty *Duty) error
+type DutyRepository interface {
+	CreateWithTasks(ctx context.Context, currentDuty *Duty, tasks []*DutyTask) error
 	FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
 	FindActiveByTeamID(ctx context.Context, teamID uuid.UUID, at time.Time) (*Duty, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Duty, error)
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*Duty, error)
+	FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*Duty, error)
+	ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error
 	CountDistinctStartDates(ctx context.Context) (int, error)
 	FindLastByTaskDefID(ctx context.Context, taskDefID uuid.UUID) (*Duty, error)
 	FindAllLatest(ctx context.Context) ([]*Duty, error)

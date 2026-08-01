@@ -8,18 +8,25 @@ const (
 )
 
 type ResidentCurrentDutyResponse struct {
-	SelectedGroupID     string                    `json:"selected_group_id"`
-	HasActiveDuty       bool                      `json:"has_active_duty"`
-	CanManageTasks      bool                      `json:"can_manage_tasks"`
-	Groups              []ResidentDutyGroupOption `json:"groups"`
-	DutyID              string                    `json:"duty_id"`
-	Group               string                    `json:"group"`
-	Team                string                    `json:"team"`
-	StartDate           string                    `json:"start_date"`
-	EndDate             string                    `json:"end_date"`
-	CostPerResidentGoal int                       `json:"cost_per_resident_goal"`
-	MyTakenCostSum      int                       `json:"my_taken_cost_sum"`
-	Tasks               []ResidentDutyTask        `json:"tasks"`
+	DormitoryID           int64                     `json:"dormitory_id"`
+	SelectedGroupID       string                    `json:"selected_group_id"`
+	HasActiveDuty         bool                      `json:"has_active_duty"`
+	CanManageTasks        bool                      `json:"can_manage_tasks"`
+	CanManageDutySettings bool                      `json:"can_manage_duty_settings"`
+	ReadOnly              bool                      `json:"read_only"`
+	ShowGroupSelect       bool                      `json:"show_group_select"`
+	VisibleTabs           []string                  `json:"visible_tabs"`
+	NoticeMessage         string                    `json:"notice_message"`
+	Groups                []ResidentDutyGroupOption `json:"groups"`
+	DutyID                string                    `json:"duty_id"`
+	Group                 string                    `json:"group"`
+	Team                  string                    `json:"team"`
+	StartDate             string                    `json:"start_date"`
+	EndDate               string                    `json:"end_date"`
+	CostPerResidentGoal   int                       `json:"cost_per_resident_goal"`
+	MyTakenCostSum        int                       `json:"my_taken_cost_sum"`
+	TeamMembers           []ResidentDutyTeamMember  `json:"team_members"`
+	Tasks                 []ResidentDutyTask        `json:"tasks"`
 }
 
 type ResidentDutyGroupOption struct {
@@ -27,8 +34,14 @@ type ResidentDutyGroupOption struct {
 	Name string `json:"name"`
 }
 
+type ResidentDutyTeamMember struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type ResidentDutyTask struct {
 	ID           string  `json:"id"`
+	AreaID       int     `json:"area_id"`
 	AreaName     string  `json:"area_name"`
 	AreaFloor    int     `json:"area_floor"`
 	Title        string  `json:"title"`
