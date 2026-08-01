@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { Alert, Button, Group, Modal, Stack, Text } from '@mantine/core'
+import { Alert, Button, FocusTrap, Group, Modal, Stack, Text } from '@mantine/core'
 
 import { ApiError } from '../api/ApiError'
 import classes from './SettingsModal.module.css'
@@ -51,6 +51,8 @@ export function ConfirmActionModal({
                 content: classes.content,
             }}
         >
+            <FocusTrap.InitialFocus />
+
             <Stack gap="lg">
                 {error ? <Alert color="red">{error}</Alert> : null}
 

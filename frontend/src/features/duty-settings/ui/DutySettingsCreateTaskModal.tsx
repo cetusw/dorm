@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { Alert, Button, Checkbox, Group, Loader, Modal, NumberInput, Select, SimpleGrid, Stack, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, FocusTrap, Group, Loader, Modal, NumberInput, Select, SimpleGrid, Stack, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 import { ApiError } from '../../../shared/api/ApiError'
@@ -159,6 +159,8 @@ export function DutySettingsCreateTaskModal({
                 content: modalClasses.content,
             }}
         >
+            <FocusTrap.InitialFocus />
+
             <form
                 onSubmit={form.onSubmit(async (values) => {
                     setSaving(true)

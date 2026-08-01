@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { Badge, Button, Checkbox, Paper, Stack, Text } from '@mantine/core'
+import { Button, Checkbox, Paper, Stack, Text } from '@mantine/core'
 
 import { DutyTaskStatusBadge } from '../../../entities/duty-task'
 import {
@@ -12,6 +12,7 @@ import {
 } from '../model/taskActions'
 import { getMobileTaskCardPresentation } from '../model/taskMobilePresentation'
 import type { ResidentDutyTask } from '../model/types'
+import { TaskCostBadge } from './TaskCostBadge'
 import classes from './TaskMobileCard.module.css'
 
 type Props = {
@@ -425,23 +426,7 @@ export function TaskMobileCard({
                         className={classes.metaRow}
                         data-has-checkbox={presentation.showCheckbox ? 'true' : 'false'}
                     >
-                        <Badge
-                            radius="sm"
-                            variant="filled"
-                            styles={{
-                                root: {
-                                    backgroundColor: '#EEF2F1',
-                                    color: 'var(--app-color-text)',
-                                    fontWeight: 500,
-                                    textTransform: 'none',
-                                },
-                                label: {
-                                    textTransform: 'none',
-                                },
-                            }}
-                        >
-                            {task.cost} баллов
-                        </Badge>
+                        <TaskCostBadge cost={task.cost} />
 
                         {presentation.showStatus && <DutyTaskStatusBadge status={task.status} justify="flex-start" />}
                         {presentation.showAssignee && presentation.assigneeLabel && (

@@ -1,0 +1,158 @@
+.memberCard {
+    display: block;
+    width: 100%;
+    background: var(--app-color-surface);
+    border: 1px solid var(--app-color-border);
+    border-radius: 20px;
+    min-height: 72px;
+    padding: 0 20px;
+    text-align: left;
+    cursor: pointer;
+    transition:
+        border-color 120ms ease,
+        box-shadow 120ms ease,
+        transform 120ms ease;
+}
+
+.memberCard:hover {
+    border-color: #c6d1ce;
+    box-shadow: 0 8px 24px rgba(31, 41, 39, 0.08);
+}
+
+.memberCard:focus-visible {
+    outline: 2px solid var(--app-color-primary);
+    outline-offset: 2px;
+}
+
+.memberCardInner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 70px;
+}
+
+.memberName {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 700;
+    font-size: var(--mantine-font-size-md);
+    line-height: 1.35;
+}
+
+.memberProgress {
+    flex: 0 0 216px;
+    width: 216px;
+    max-width: 100%;
+    margin-left: auto;
+}
+
+.drawerBody {
+    padding: 20px;
+}
+
+.drawerProgress {
+    margin-bottom: 20px;
+}
+
+.areaSection {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.areaTitle {
+    font-size: var(--mantine-font-size-md);
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.taskCard {
+    background: var(--app-color-surface);
+    border: 1px solid var(--app-color-border);
+    border-radius: 20px;
+    padding: 0;
+}
+
+.taskCardContent {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 268px;
+    align-items: center;
+    column-gap: 12px;
+    min-height: 72px;
+    padding: 0 20px;
+}
+
+.taskTitle {
+    min-width: 0;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.taskScoreCell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
+}
+
+.taskStatusCell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.taskMetaRow {
+    display: grid;
+    grid-template-columns: 100px 156px;
+    align-items: center;
+    column-gap: 12px;
+    min-width: 0;
+}
+
+@media (max-width: 48em) {
+    .drawerContent {
+        border-radius: 20px 20px 0 0;
+    }
+
+    .memberCard {
+        padding: 16px;
+    }
+
+    .memberCardInner {
+        flex-direction: column;
+        align-items: stretch;
+        min-height: 0;
+    }
+
+    .memberProgress {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+
+    .taskCardContent {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        min-height: 72px;
+        padding: 16px;
+        gap: 12px;
+    }
+
+    .taskMetaRow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .taskScoreCell,
+    .taskStatusCell {
+        justify-content: flex-start;
+    }
+}

@@ -1,6 +1,6 @@
 import type { FormEventHandler, ReactNode } from 'react'
 
-import { Alert, Button, Center, Group, Loader, Modal, Stack } from '@mantine/core'
+import { Alert, Button, Center, FocusTrap, Group, Loader, Modal, Stack } from '@mantine/core'
 import type { ModalProps } from '@mantine/core'
 
 type Props = {
@@ -65,6 +65,8 @@ export function EntityFormModal({
                 },
             }}
         >
+            <FocusTrap.InitialFocus />
+
             {loading ? (
                 <Center py="xl">
                     <Loader />

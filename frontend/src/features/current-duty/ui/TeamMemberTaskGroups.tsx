@@ -1,11 +1,18 @@
-import { Accordion, Alert, Box, Group, Stack, Text } from '@mantine/core'
+import { useMemo, useState } from 'react'
 
-import type { TeamMemberTaskGroup } from '../model/selectors'
-import { MemberDutyProgressCard } from './MemberDutyProgressCard'
-import { TeamMemberTaskList } from './TeamMemberTaskList'
+import { Alert, Stack, Text } from '@mantine/core'
+
+import {
+    groupAndSortMemberTasks,
+    selectSortedTeamMembers,
+    selectTasksForTeamMember,
+} from '../model/selectors'
+import type { ResidentCurrentDuty } from '../model/types'
+import { TeamMemberCard } from './TeamMemberCard'
+import { TeamMemberTasksDrawer } from './TeamMemberTasksDrawer'
 
 type Props = {
-    groups: TeamMemberTaskGroup[]
+    duty: ResidentCurrentDuty
 }
 
 function TooltipContent({ lines }: { lines: string[] }) {
@@ -20,67 +27,44 @@ function TooltipContent({ lines }: { lines: string[] }) {
     )
 }
 
-export function TeamMemberTaskGroups({ groups }: Props) {
+export function TeamMemberTaskGroups({ duty }: Props) {
+    const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+    const teamMembers = useMemo(() => selectSortedTeamMembers(duty), [duty])
+    const selectedMemberSummary = selectedMemberId
+        ? teamMembers.find((memberSummary) => memberSummary.member.id === selectedMemberId) ?? null
+        : null
+    const selectedMemberTaskGroups = useMemo(() => {
+        if (!selectedMemberId) {
+            return []
+        }
+
+        return groupAndSortMemberTasks(selectTasksForTeamMember(duty, selectedMemberId))
+    }, [duty, selectedMemberId])
+
+    if (teamMembers.length === 0) {
+        return <Alert color="gray">В дежурной команде нет участников</Alert>
+    }
+
     return (
-        <Accordion
-            radius="lg"
-            variant="separated"
-            styles={{
-                item: {
-                    backgroundColor: 'var(--app-color-surface)',
-                    border: '1px solid var(--app-color-border)',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                },
-                control: {
-                    backgroundColor: 'var(--app-color-surface)',
-                    paddingTop: 14,
-                    paddingBottom: 14,
-                    paddingLeft: 20,
-                    paddingRight: 16,
-                    borderRadius: '16px',
-                },
-                chevron: {
-                    marginInlineStart: 12,
-                },
-                panel: {
-                    backgroundColor: 'var(--app-color-surface)',
-                    paddingTop: 0,
-                    borderBottomLeftRadius: '16px',
-                    borderBottomRightRadius: '16px',
-                },
-                content: {
-                    paddingRight: 0,
-                },
-            }}
-        >
-            {groups.map((group) => (
-                <Accordion.Item key={group.member.id} value={group.member.id}>
-                    <Accordion.Control>
-                        <Group justify="space-between" wrap="nowrap" gap="md">
-                            <Text fw={700} size="md" style={{ flex: 1, minWidth: 0 }}>
-                                {group.member.name}
-                            </Text>
-                            <Box style={{ width: 216, maxWidth: '100%', marginLeft: 'auto' }}>
-                                <MemberDutyProgressCard
-                                    progress={group.progress}
-                                    showTitle={false}
-                                    withContainer={false}
-                                    tooltip={<TooltipContent lines={group.tooltipLines} />}
-                                    barWidth="100%"
-                                />
-                            </Box>
-                        </Group>
-                    </Accordion.Control>
-                    <Accordion.Panel px="lg" pb="lg">
-                        {group.tasks.length === 0 ? (
-                            <Alert color="gray">Участник не взял ни одной задачи</Alert>
-                        ) : (
-                            <TeamMemberTaskList tasks={group.tasks} />
-                        )}
-                    </Accordion.Panel>
-                </Accordion.Item>
-            ))}
-        </Accordion>
+        <>
+            <Stack gap="sm">
+                {teamMembers.map((memberSummary) => (
+                    <TeamMemberCard
+                        key={memberSummary.member.id}
+                        memberSummary={memberSummary}
+                        tooltip={<TooltipContent lines={memberSummary.tooltipLines} />}
+                        onOpen={() => setSelectedMemberId(memberSummary.member.id)}
+                    />
+                ))}
+            </Stack>
+
+            <TeamMemberTasksDrawer
+                opened={selectedMemberSummary !== null}
+                memberSummary={selectedMemberSummary}
+                taskGroups={selectedMemberTaskGroups}
+                tooltip={<TooltipContent lines={selectedMemberSummary?.tooltipLines ?? []} />}
+                onClose={() => setSelectedMemberId(null)}
+            />
+        </>
     )
 }

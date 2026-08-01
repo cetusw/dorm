@@ -51,6 +51,20 @@ export type TeamMemberTaskGroup = {
     tooltipLines: string[]
 }
 
+export type TeamMemberSummary = {
+    member: ResidentDutyTeamMember
+    progress: MemberDutyProgressModel
+    tooltipLines: string[]
+}
+
+export type TeamMemberTaskAreaGroup = {
+    areaId: number
+    areaFloor: number
+    areaName: string
+    label: string
+    tasks: ResidentDutyTask[]
+}
+
 type SelectTasksForActiveSelectParams = {
     activeSelect: DutyTaskSelect
     duty: ResidentCurrentDuty
@@ -367,22 +381,123 @@ function calculateAnalyticsForMember(tasks: ResidentDutyTask[], memberId: string
     }
 }
 
-export function selectTeamMemberTaskGroups(
-    duty: ResidentCurrentDuty,
-): TeamMemberTaskGroup[] {
-    return duty.team_members.map((member) => {
-        const tasks = duty.tasks.filter((task) => task.assignee_id === member.id)
-        const analytics = calculateAnalyticsForMember(duty.tasks, member.id)
+function buildTeamMemberTooltipLines(
+    analytics: DutyAnalytics,
+    targetCost: number,
+): string[] {
+    return [
+        `Взято ${analytics.takenCostSum} из ${targetCost} баллов`,
+        `Выполнено ${analytics.completedTasksCount} из ${analytics.takenTasksCount} задач`,
+        `Проверено ${analytics.myVerifiedTasksCount} из ${analytics.takenTasksCount} задач`,
+    ]
+}
 
-        return {
-            member,
-            progress: buildMemberDutyProgressModel(analytics, duty.cost_per_resident_goal),
-            tasks,
-            tooltipLines: [
-                `Взято ${analytics.takenCostSum} из ${duty.cost_per_resident_goal} баллов`,
-                `Выполнено ${analytics.completedTasksCount} из ${analytics.takenTasksCount} задач`,
-                `Проверено ${analytics.myVerifiedTasksCount} из ${analytics.takenTasksCount} задач`,
-            ],
-        }
+function compareTeamMembers(
+    left: ResidentDutyTeamMember,
+    right: ResidentDutyTeamMember,
+): number {
+    return left.name.localeCompare(right.name, 'ru', {
+        sensitivity: 'base',
     })
+}
+
+function compareMemberTasks(
+    left: ResidentDutyTask,
+    right: ResidentDutyTask,
+): number {
+    const statusPriority: Record<ResidentDutyTask['status'], number> = {
+        assigned: 0,
+        completed: 1,
+        verified: 2,
+        free: 3,
+    }
+
+    const statusDifference = statusPriority[left.status] - statusPriority[right.status]
+    if (statusDifference !== 0) {
+        return statusDifference
+    }
+
+    if (left.cost !== right.cost) {
+        return right.cost - left.cost
+    }
+
+    const titleDifference = left.title.localeCompare(right.title, 'ru', {
+        sensitivity: 'base',
+    })
+    if (titleDifference !== 0) {
+        return titleDifference
+    }
+
+    return left.id.localeCompare(right.id)
+}
+
+export function selectSortedTeamMembers(
+    duty: ResidentCurrentDuty,
+): TeamMemberSummary[] {
+    return [...duty.team_members]
+        .sort(compareTeamMembers)
+        .map((member) => {
+            const analytics = calculateAnalyticsForMember(duty.tasks, member.id)
+
+            return {
+                member,
+                progress: buildMemberDutyProgressModel(analytics, duty.cost_per_resident_goal),
+                tooltipLines: buildTeamMemberTooltipLines(
+                    analytics,
+                    duty.cost_per_resident_goal,
+                ),
+            }
+        })
+}
+
+export function selectTasksForTeamMember(
+    duty: ResidentCurrentDuty,
+    memberId: string,
+): ResidentDutyTask[] {
+    return duty.tasks
+        .filter((task) => task.assignee_id === memberId)
+        .sort(compareMemberTasks)
+}
+
+export function groupAndSortMemberTasks(
+    tasks: ResidentDutyTask[],
+): TeamMemberTaskAreaGroup[] {
+    const groups = new Map<number, TeamMemberTaskAreaGroup>()
+
+    tasks.forEach((task) => {
+        const existing = groups.get(task.area_id)
+
+        if (existing) {
+            existing.tasks.push(task)
+            return
+        }
+
+        groups.set(task.area_id, {
+            areaId: task.area_id,
+            areaFloor: task.area_floor,
+            areaName: task.area_name,
+            label: `${task.area_floor} этаж · ${task.area_name}`,
+            tasks: [task],
+        })
+    })
+
+    return Array.from(groups.values())
+        .map((group) => ({
+            ...group,
+            tasks: [...group.tasks].sort(compareMemberTasks),
+        }))
+        .sort((left, right) => {
+            if (left.areaFloor !== right.areaFloor) {
+                return right.areaFloor - left.areaFloor
+            }
+
+            const areaNameDifference = left.areaName.localeCompare(right.areaName, 'ru', {
+                sensitivity: 'base',
+            })
+            if (areaNameDifference !== 0) {
+                return areaNameDifference
+            }
+
+            return left.areaId - right.areaId
+        })
 }

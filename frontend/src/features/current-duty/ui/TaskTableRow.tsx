@@ -1,4 +1,4 @@
-import { Badge, Button, Checkbox, Table, Text } from '@mantine/core'
+import { Button, Checkbox, Table, Text } from '@mantine/core'
 
 import { DutyTaskStatusBadge } from '../../../entities/duty-task'
 import {
@@ -7,6 +7,7 @@ import {
     type TaskRowActionMode,
 } from '../model/taskActions'
 import type { ResidentDutyTask } from '../model/types'
+import { TaskCostBadge } from './TaskCostBadge'
 import classes from './TaskTableRow.module.css'
 
 type Props = {
@@ -141,19 +142,7 @@ export function TaskTableRow({
                     </div>
 
                     <div className={classes.scoreCell}>
-                        <Badge
-                            radius="sm"
-                            variant="filled"
-                            styles={{
-                                root: {
-                                    backgroundColor: '#EEF2F1',
-                                    color: 'var(--app-color-text)',
-                                    fontWeight: 500,
-                                },
-                            }}
-                        >
-                            {task.cost} баллов
-                        </Badge>
+                        <TaskCostBadge cost={task.cost} />
                     </div>
 
                     <div className={classes.assigneeCell}>

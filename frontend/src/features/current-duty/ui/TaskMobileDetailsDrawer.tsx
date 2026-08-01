@@ -1,10 +1,11 @@
 import { XIcon } from '@phosphor-icons/react'
-import { ActionIcon, Badge, Button, Drawer, Group, Text } from '@mantine/core'
+import { ActionIcon, Button, Drawer, FocusTrap, Group, Text } from '@mantine/core'
 
 import { DutyTaskStatusBadge } from '../../../entities/duty-task'
 import { formatEstimatedDuration } from '../model/formatEstimatedDuration'
 import { getDrawerActionSpecs, type TaskActionHandler, type TaskRowActionMode } from '../model/taskActions'
 import type { ResidentDutyTask } from '../model/types'
+import { TaskCostBadge } from './TaskCostBadge'
 import classes from './TaskMobileDetailsDrawer.module.css'
 
 type Props = {
@@ -80,6 +81,8 @@ export function TaskMobileDetailsDrawer({
                 content: classes.drawerContent,
             }}
         >
+            <FocusTrap.InitialFocus />
+
             {task ? (
                 <>
                     <div className={classes.header}>
@@ -101,23 +104,7 @@ export function TaskMobileDetailsDrawer({
                     </Text>
 
                     <Group gap="sm" wrap="wrap" className={classes.infoRow}>
-                        <Badge
-                            radius="sm"
-                            variant="filled"
-                            styles={{
-                                root: {
-                                    backgroundColor: '#EEF2F1',
-                                    color: 'var(--app-color-text)',
-                                    fontWeight: 500,
-                                    textTransform: 'none',
-                                },
-                                label: {
-                                    textTransform: 'none',
-                                },
-                            }}
-                        >
-                            {task.cost} баллов
-                        </Badge>
+                        <TaskCostBadge cost={task.cost} />
                         <Text size="sm">{formatEstimatedDuration(task.cost)}</Text>
                     </Group>
 

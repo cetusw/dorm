@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { Box, Paper, Stack, Text, Tooltip } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 
 import type { MemberDutyProgressModel } from '../model/selectors'
 
@@ -78,6 +79,7 @@ export function MemberDutyProgressCard({
     tooltip,
     barWidth,
 }: Props) {
+    const allowTooltip = useMediaQuery('(hover: hover) and (pointer: fine)')
     const sections = buildProgressSections(progress)
     const content = (
         <Stack gap="sm">
@@ -86,7 +88,11 @@ export function MemberDutyProgressCard({
                     {progress.title}
                 </Text>
             ) : null}
-            <ProgressBar sections={sections} tooltip={tooltip} width={barWidth} />
+            <ProgressBar
+                sections={sections}
+                tooltip={allowTooltip ? tooltip : undefined}
+                width={barWidth}
+            />
         </Stack>
     )
 

@@ -7,7 +7,6 @@ import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 import {
     calculateDutyAnalytics,
     selectVisibleDutyTabs,
-    selectTeamMemberTaskGroups,
     selectDutyViewOptions,
     selectTasksForActiveSelect,
 } from '../../features/current-duty/model/selectors'
@@ -138,7 +137,6 @@ export function CurrentDutyPage() {
         visibleMineTaskIds,
     })
     const planLegendItems = getPlanLegendItems(activeSelect)
-    const teamTaskGroups = selectTeamMemberTaskGroups(duty)
     const analytics = calculateDutyAnalytics(duty.tasks)
 
     const selectedFloorPlan =
@@ -371,7 +369,7 @@ export function CurrentDutyPage() {
                     </Box>
                 </>
             ) : activeSelect === 'team' ? (
-                <TeamMemberTaskGroups groups={teamTaskGroups} />
+                <TeamMemberTaskGroups duty={duty} />
             ) : (
                 <TaskGroups
                     isReadOnly={viewOptions.isReadOnly}

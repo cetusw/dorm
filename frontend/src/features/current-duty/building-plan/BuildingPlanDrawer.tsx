@@ -1,4 +1,4 @@
-import { Alert, Drawer, ScrollArea, Table } from '@mantine/core'
+import { Alert, Drawer, FocusTrap, ScrollArea, Table } from '@mantine/core'
 
 import type { TaskActionHandler, TaskRowActionMode } from '../model/taskActions'
 import type { ResidentDutyTask } from '../model/types'
@@ -41,6 +41,8 @@ export function BuildingPlanDrawer({
 
     return (
         <Drawer opened={opened} onClose={onClose} position="right" size={860} title={opened ? title : 'Территория'}>
+            <FocusTrap.InitialFocus />
+
             {tasks.length === 0 ? (
                 <Alert color="gray">Для этой территории нет задач.</Alert>
             ) : (
