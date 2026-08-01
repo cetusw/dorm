@@ -10,9 +10,10 @@ import {
 import { ActionIcon, Menu, Text, Tooltip } from '@mantine/core'
 
 import { DutyTaskStatusBadge, type DutyTaskStatus } from '../../../entities/duty-task'
+import { formatPointsLabel } from '../../../shared/lib/formatPointsLabel'
+import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
 import { formatDutySettingsRecurrence } from '../model/utils'
 import type { DutySettingsTask } from '../model/types'
-import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
 import { SettingsCardSurface } from '../../../shared/ui/SettingsCardSurface'
 import classes from './DutySettingsTaskCard.module.css'
 
@@ -45,7 +46,7 @@ export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude, onDel
                 </div>
 
                 <div className={classes.scoreCell}>
-                    <SettingsBadge>{task.cost} баллов</SettingsBadge>
+                    <SettingsBadge>{formatPointsLabel(task.cost)}</SettingsBadge>
                 </div>
 
                 <div className={classes.dateCell}>

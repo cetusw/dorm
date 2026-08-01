@@ -1,5 +1,7 @@
 import { Badge } from '@mantine/core'
 
+import { formatPointsLabel } from '../../../shared/lib/formatPointsLabel'
+
 type Props = {
     cost: number
 }
@@ -21,7 +23,7 @@ export function TaskCostBadge({ cost }: Props) {
                 },
             }}
         >
-            {cost} баллов
+            {formatPointsLabel(cost)}
         </Badge>
     )
 }
