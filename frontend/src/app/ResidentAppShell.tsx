@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 
 import { GearIcon } from '@phosphor-icons/react'
 import {
@@ -12,6 +12,7 @@ import {
     Loader,
     NavLink,
     ActionIcon,
+    ScrollArea,
     Select,
     Stack,
     Tooltip,
@@ -64,6 +65,7 @@ export function ResidentAppShell({
     onNavigate,
     children,
 }: Props) {
+    const pageViewportRef = useRef<HTMLDivElement | null>(null)
     const [navbarOpened, { toggle: toggleNavbar, close: closeNavbar }] =
         useDisclosure(false)
     const hasManagementNavigation = Boolean(currentUser?.can_manage_dormitories)
@@ -193,8 +195,34 @@ export function ResidentAppShell({
         onNavigate('/app/settings')
     }
 
+    useEffect(() => {
+        pageViewportRef.current?.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: 'auto',
+        })
+    }, [currentPath])
+
+    const pageContent = currentUserLoading ? (
+        <Center h="100%">
+            <Loader />
+        </Center>
+    ) : currentUserError ? (
+        <Center h="100%" px="md">
+            <Alert color="red" title="Ошибка">
+                {currentUserError}
+            </Alert>
+        </Center>
+    ) : (
+        children
+    )
+
     return (
         <AppShell
+            style={{
+                height: '100dvh',
+                minHeight: '100vh',
+            }}
             navbar={hasManagementNavigation ? {
                 width: 280,
                 breakpoint: 'sm',
@@ -208,7 +236,11 @@ export function ResidentAppShell({
             styles={{
                 main: {
                     backgroundColor: 'var(--app-color-bg)',
+                    height: '100dvh',
                     minHeight: '100vh',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
                     '--app-shell-header-offset': `${HEADER_HEIGHT_PX}px`,
                 },
                 navbar: {
@@ -297,19 +329,33 @@ export function ResidentAppShell({
             </AppShell.Header>
 
             <AppShell.Main>
-                {currentUserLoading ? (
-                    <Center h="100vh">
-                        <Loader />
-                    </Center>
-                ) : currentUserError ? (
-                    <Center h="100vh" px="md">
-                        <Alert color="red" title="Ошибка">
-                            {currentUserError}
-                        </Alert>
-                    </Center>
-                ) : (
-                    children
-                )}
+                <ScrollArea
+                    viewportRef={pageViewportRef}
+                    type="auto"
+                    scrollbars="y"
+                    h="100%"
+                    viewportProps={{
+                        style: {
+                            overflowX: 'hidden',
+                        },
+                    }}
+                    styles={{
+                        root: {
+                            flex: 1,
+                            minHeight: 0,
+                        },
+                        viewport: {
+                            height: '100%',
+                        },
+                        content: {
+                            minHeight: '100%',
+                        },
+                    }}
+                >
+                    <Box mih="100%">
+                        {pageContent}
+                    </Box>
+                </ScrollArea>
             </AppShell.Main>
         </AppShell>
     )
