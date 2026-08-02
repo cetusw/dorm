@@ -12,12 +12,16 @@ function toErrorMessage(error: unknown): string {
     return 'Не удалось загрузить текущего пользователя'
 }
 
-export function useCurrentUserState() {
+export function useCurrentUserState(enabled = true) {
     const [currentUser, setCurrentUser] = useState<CurrentUserState | null>(null)
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(enabled)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
+        if (!enabled) {
+            return
+        }
+
         let active = true
 
         async function loadCurrentUser() {
@@ -49,7 +53,7 @@ export function useCurrentUserState() {
         return () => {
             active = false
         }
-    }, [])
+    }, [enabled])
 
     return {
         currentUser,

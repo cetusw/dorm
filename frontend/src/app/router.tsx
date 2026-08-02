@@ -1,3 +1,5 @@
+import { Alert } from '@mantine/core'
+
 import { navigateTo, useAppPathname } from './navigation'
 import { ResidentAppShell } from './ResidentAppShell'
 import { AreasPage } from '../pages/areas/AreasPage'
@@ -7,10 +9,12 @@ import { DutySettingsPage } from '../pages/duty-settings/DutySettingsPage'
 import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
 import { GroupsPage } from '../pages/groups/GroupsPage'
 import { LoginPage } from '../pages/login/LoginPage'
+import { PenaltiesPage } from '../pages/penalties/PenaltiesPage'
 import { ResidentsPage } from '../pages/residents/ResidentsPage'
 import { SettingsPage } from '../pages/settings/SettingsPage'
 import { TaskCatalogPage } from '../pages/task-catalog/TaskCatalogPage'
 import { GroupTeamsPage } from '../pages/teams/GroupTeamsPage'
+import { PageFrame } from '../shared/ui/PageFrame'
 
 function matchGroupTeamsPath(pathname: string): string | null {
     const match = pathname.match(/^\/app\/groups\/([^/]+)\/teams$/)
@@ -24,6 +28,7 @@ function matchDutySettingsPath(pathname: string): string | null {
 
 function renderResidentPage(pathname: string, currentUser: ReturnType<typeof useCurrentUserState>['currentUser']) {
     const canManageDormitories = Boolean(currentUser?.can_manage_dormitories)
+    const canManagePenalties = currentUser?.can_manage_penalties === true
     const dutySettingsGroupId = matchDutySettingsPath(pathname)
 
     if (dutySettingsGroupId) {
@@ -32,6 +37,20 @@ function renderResidentPage(pathname: string, currentUser: ReturnType<typeof use
 
     if (pathname === '/app/settings' || pathname === '/app/notifications') {
         return <SettingsPage />
+    }
+
+    if (pathname === '/app/penalties') {
+        if (!canManagePenalties) {
+            return (
+                <PageFrame title="Предупреждения">
+                    <Alert color="red">
+                        Недостаточно прав для управления предупреждениями.
+                    </Alert>
+                </PageFrame>
+            )
+        }
+
+        return <PenaltiesPage />
     }
 
     if (!canManageDormitories) {
@@ -68,12 +87,11 @@ function renderResidentPage(pathname: string, currentUser: ReturnType<typeof use
 
 export function AppRouter() {
     const pathname = useAppPathname()
+    const { currentUser, loading, error } = useCurrentUserState(pathname !== '/app/login')
 
     if (pathname === '/app/login') {
         return <LoginPage />
     }
-
-    const { currentUser, loading, error } = useCurrentUserState()
 
     return (
         <ResidentAppShell
