@@ -7,12 +7,14 @@ import (
 	"dorm/pkg/core/usecase/dormitory"
 	dutysettingsuc "dorm/pkg/core/usecase/dutysettings"
 	notificationuc "dorm/pkg/core/usecase/notification"
+	penaltyuc "dorm/pkg/core/usecase/penalty"
 	residentusecase "dorm/pkg/core/usecase/resident"
 	"dorm/pkg/core/usecase/team"
 	"dorm/pkg/infrastructure/mysql/query"
 	notificationinfra "dorm/pkg/infrastructure/notification"
 	"fmt"
 	"log"
+	"time"
 
 	"dorm/pkg/core/ports"
 	cataloguc "dorm/pkg/core/usecase/catalog"
@@ -60,6 +62,7 @@ func NewContainer(configPath string) (*Container, error) {
 	dormitoryRepo := repository.NewDormitoryRepository(db)
 	pushSubscriptionRepo := repository.NewPushSubscriptionRepository(db)
 	notificationRepo := repository.NewNotificationRepository(db)
+	penaltyRepo := repository.NewPenaltyRepository(db)
 
 	cleaningService := cleaning.NewCleaningService(
 		userRepo,
@@ -76,6 +79,7 @@ func NewContainer(configPath string) (*Container, error) {
 	userQueryService := query.NewUserQueryService(db)
 	teamQueryService := query.NewTeamQueryService(db)
 	notificationQueryService := query.NewNotificationQueryService(db)
+	penaltyQueryService := query.NewPenaltyQueryService(db)
 
 	userService := user.NewUserService(
 		userRepo,
@@ -83,11 +87,25 @@ func NewContainer(configPath string) (*Container, error) {
 		userQueryService,
 	)
 
+	location, err := time.LoadLocation(cfg.TZ)
+	if err != nil {
+		return nil, fmt.Errorf("load app timezone: %w", err)
+	}
+
 	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo, groupRepo, teamRepo, userRepo)
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo, groupRepo)
 	dutySettingsService := dutysettingsuc.NewDutySettingsService(groupRepo, teamRepo, areaRepo, taskRepo, dutyRepo, dutyTaskRepo, userRepo)
 	pushSubscriptionService := notificationuc.NewNotificationService(pushSubscriptionRepo)
+	penaltyService := penaltyuc.NewPenaltyService(
+		penaltyRepo,
+		userRepo,
+		teamRepo,
+		groupRepo,
+		dormitoryRepo,
+		penaltyQueryService,
+		location,
+	)
 
 	var pushSender ports.PushSender = notificationinfra.NoopPushSender{}
 	if cfg.WebPush.Enabled {
@@ -131,6 +149,9 @@ func NewContainer(configPath string) (*Container, error) {
 
 	notificationAPIHandler := http.NewNotificationAPIHandler(cfg.WebPush, pushSubscriptionService)
 	notificationAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+
+	penaltyAPIHandler := http.NewPenaltyAPIHandler(penaltyService)
+	penaltyAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	residentDutyService := residentusecase.NewResidentDutyService(
 		userRepo,
