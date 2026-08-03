@@ -27,17 +27,20 @@ var (
 type Service struct {
 	userRepo      user.Repository
 	dormitoryRepo structure.DormitoryRepository
+	groupRepo     structure.GroupRepository
 	queryService  ports.UserQueryService
 }
 
 func NewUserService(
 	userRepo user.Repository,
 	dormitoryRepo structure.DormitoryRepository,
+	groupRepo structure.GroupRepository,
 	queryService ports.UserQueryService,
 ) *Service {
 	return &Service{
 		userRepo:      userRepo,
 		dormitoryRepo: dormitoryRepo,
+		groupRepo:     groupRepo,
 		queryService:  queryService,
 	}
 }
@@ -97,12 +100,45 @@ func (s *Service) GetCurrentUser(ctx context.Context, userID uuid.UUID) (*dto.Cu
 		return nil, fmt.Errorf("check dormitory management access: %w", err)
 	}
 
+	canManagePenalties, err := s.canManagePenalties(ctx, u)
+	if err != nil {
+		return nil, fmt.Errorf("check penalty management access: %w", err)
+	}
+
 	return &dto.CurrentUserResponse{
 		ID:                   u.ID().String(),
 		FirstName:            u.FirstName(),
 		LastName:             u.LastName(),
 		CanManageDormitories: canManageDormitories,
+		CanManagePenalties:   canManagePenalties,
 	}, nil
+}
+
+func (s *Service) canManagePenalties(ctx context.Context, currentUser *user.User) (bool, error) {
+	canManageDormitories, err := s.dormitoryRepo.ExistsByLeaderID(ctx, currentUser.ID())
+	if err != nil {
+		return false, fmt.Errorf("check dormitory leadership for penalties: %w", err)
+	}
+	if canManageDormitories {
+		return true, nil
+	}
+
+	if currentUser.DormitoryID() == nil {
+		return false, nil
+	}
+
+	groups, err := s.groupRepo.FindByDormitoryID(ctx, *currentUser.DormitoryID())
+	if err != nil {
+		return false, fmt.Errorf("load dormitory groups for penalties: %w", err)
+	}
+
+	for _, group := range groups {
+		if group.LeaderID() != nil && *group.LeaderID() == currentUser.ID() {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s *Service) GetResidentsResponse(ctx context.Context, dormitoryID int64) (dto.ResidentListResponse, error) {

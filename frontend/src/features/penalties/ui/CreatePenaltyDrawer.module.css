@@ -1,0 +1,27 @@
+.rowFields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+}
+
+.field {
+    display: block;
+}
+
+.drawerBody {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.submitError {
+    color: var(--mantine-color-red-6);
+    font-size: var(--mantine-font-size-sm);
+    line-height: 1.4;
+}
+
+@media (max-width: 48em) {
+    .rowFields {
+        grid-template-columns: 1fr;
+    }
+}

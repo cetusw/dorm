@@ -3,4 +3,5 @@ export type CurrentUser = {
     first_name: string
     last_name: string
     can_manage_dormitories: boolean
+    can_manage_penalties: boolean
 }

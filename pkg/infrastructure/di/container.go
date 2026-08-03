@@ -84,6 +84,7 @@ func NewContainer(configPath string) (*Container, error) {
 	userService := user.NewUserService(
 		userRepo,
 		dormitoryRepo,
+		groupRepo,
 		userQueryService,
 	)
 

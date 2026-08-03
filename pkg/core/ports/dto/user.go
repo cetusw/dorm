@@ -52,4 +52,5 @@ type CurrentUserResponse struct {
 	FirstName            string `json:"first_name"`
 	LastName             string `json:"last_name"`
 	CanManageDormitories bool   `json:"can_manage_dormitories"`
+	CanManagePenalties   bool   `json:"can_manage_penalties"`
 }

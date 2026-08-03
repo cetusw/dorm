@@ -4,22 +4,18 @@ import {
     CrownSimpleIcon,
     DotsThreeVerticalIcon,
     TrashIcon,
-    UserIcon,
 } from '@phosphor-icons/react'
 import {
     ActionIcon,
     Alert,
     Center,
-    Combobox,
     Drawer,
     FocusTrap,
-    InputBase,
     Loader,
     Menu,
     ScrollArea,
     Stack,
     Text,
-    useCombobox,
 } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 
@@ -39,6 +35,10 @@ import type {
 import { formatDutySettingsLeaderName } from '../../../features/duty-settings/model/utils'
 import { ApiError } from '../../../shared/api/ApiError'
 import { ConfirmActionModal } from '../../../shared/ui/ConfirmActionModal'
+import {
+    ResidentSearchCombobox,
+    type ResidentSearchOption,
+} from '../../../shared/ui/ResidentSearchCombobox'
 import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
 import { SettingsCardSurface } from '../../../shared/ui/SettingsCardSurface'
 import classes from './DutySettingsTeamMembersDrawer.module.css'
@@ -119,7 +119,6 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
     const [searchFocused, setSearchFocused] = useState(false)
     const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
     const [pendingAction, setPendingAction] = useState<PendingMemberAction | null>(null)
-    const combobox = useCombobox()
     const teamID = team?.id ?? null
 
     const title = useMemo(() => {
@@ -164,7 +163,6 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
             setSearchFocused(false)
             setPendingMove(null)
             setPendingAction(null)
-            combobox.closeDropdown()
             return
         }
 
@@ -178,7 +176,6 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
             setSearchItems([])
             setSearchError(null)
             setSearchLoading(false)
-            combobox.closeDropdown()
             return
         }
 
@@ -193,9 +190,6 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                 }
 
                 setSearchItems(response.users)
-                if (searchFocused) {
-                    combobox.openDropdown()
-                }
             })
             .catch((currentError) => {
                 if (cancelled) {
@@ -204,9 +198,6 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
 
                 setSearchError(currentError instanceof Error ? currentError.message : 'Не удалось выполнить поиск')
                 setSearchItems([])
-                if (searchFocused) {
-                    combobox.openDropdown()
-                }
             })
             .finally(() => {
                 if (!cancelled) {
@@ -235,7 +226,6 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
             await addDutySettingsTeamMember(groupId, teamID, user.id)
             setSearchValue('')
             setSearchItems([])
-            combobox.closeDropdown()
             await refreshAfterMutation()
         } catch (currentError) {
             if (currentError instanceof ApiError) {
@@ -247,6 +237,13 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
     }
 
     const members = data?.members ?? []
+    const searchOptions: ResidentSearchOption[] = searchItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.current_team_id && item.current_team_id !== teamID
+            ? `В команде ${formatDutySettingsLeaderName(item.current_team_leader)}`
+            : null,
+    }))
 
     return (
         <>
@@ -291,78 +288,29 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                         </ScrollArea>
                     )}
 
-                    <Combobox
-                        store={combobox}
-                        onOptionSubmit={(value) => {
-                            const selectedUser = searchItems.find((item) => item.id === value)
+                    <ResidentSearchCombobox
+                        searchValue={searchValue}
+                        options={searchOptions}
+                        loading={searchLoading}
+                        error={searchError}
+                        placeholder="Добавить участника"
+                        selectedId={null}
+                        onSearchChange={setSearchValue}
+                        onFocus={() => setSearchFocused(true)}
+                        onOptionSelect={(option) => {
+                            const selectedUser = searchItems.find((item) => item.id === option.id)
                             if (!selectedUser) {
                                 return
                             }
 
                             if (selectedUser.current_team_id && selectedUser.current_team_id !== teamID) {
                                 setPendingMove({ user: selectedUser })
-                                combobox.closeDropdown()
                                 return
                             }
 
                             void addMember(selectedUser)
                         }}
-                        withinPortal={false}
-                    >
-                        <Combobox.Target>
-                            <InputBase
-                                value={searchValue}
-                                onChange={(event) => {
-                                    const nextValue = event.currentTarget.value
-                                    setSearchValue(nextValue)
-                                    if (nextValue.trim() !== '') {
-                                        combobox.openDropdown()
-                                    }
-                                }}
-                                onFocus={() => {
-                                    setSearchFocused(true)
-                                    if (searchItems.length > 0) {
-                                        combobox.openDropdown()
-                                    }
-                                }}
-                                onBlur={() => {
-                                    setSearchFocused(false)
-                                    combobox.closeDropdown()
-                                }}
-                                placeholder="Добавить участника"
-                                leftSection={searchLoading ? <Loader size={20} /> : <UserIcon size={20} />}
-                                classNames={{
-                                    input: classes.searchInput,
-                                    section: classes.searchSection,
-                                }}
-                            />
-                        </Combobox.Target>
-
-                        <Combobox.Dropdown hidden={searchValue.trim() === '' && !searchLoading}>
-                            <Combobox.Options mah={280} style={{ overflowY: 'auto' }}>
-                                {searchItems.length === 0 ? (
-                                    <Combobox.Empty>
-                                        {searchLoading ? 'Поиск...' : 'Ничего не найдено'}
-                                    </Combobox.Empty>
-                                ) : (
-                                    searchItems.map((item) => (
-                                        <Combobox.Option value={item.id} key={item.id}>
-                                            <Stack gap={2}>
-                                                <Text fw={500}>{item.name}</Text>
-                                                {item.current_team_id && item.current_team_id !== teamID ? (
-                                                    <Text size="sm" className={classes.searchHint}>
-                                                        В команде {formatDutySettingsLeaderName(item.current_team_leader)}
-                                                    </Text>
-                                                ) : null}
-                                            </Stack>
-                                        </Combobox.Option>
-                                    ))
-                                )}
-                            </Combobox.Options>
-                        </Combobox.Dropdown>
-                    </Combobox>
-
-                    {searchError ? <Alert color="red">{searchError}</Alert> : null}
+                    />
                 </Stack>
             </Drawer>
 

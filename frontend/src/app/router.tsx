@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 import { Alert } from '@mantine/core'
 
 import { navigateTo, useAppPathname } from './navigation'
@@ -87,7 +89,21 @@ function renderResidentPage(pathname: string, currentUser: ReturnType<typeof use
 
 export function AppRouter() {
     const pathname = useAppPathname()
-    const { currentUser, loading, error } = useCurrentUserState(pathname !== '/app/login')
+    const shouldRedirectToLogin =
+        pathname === '/' || pathname === '/app' || pathname === '/app/'
+    const { currentUser, loading, error } = useCurrentUserState(
+        pathname !== '/app/login' && !shouldRedirectToLogin,
+    )
+
+    useEffect(() => {
+        if (shouldRedirectToLogin) {
+            window.location.replace('/app/login')
+        }
+    }, [shouldRedirectToLogin])
+
+    if (shouldRedirectToLogin) {
+        return null
+    }
 
     if (pathname === '/app/login') {
         return <LoginPage />

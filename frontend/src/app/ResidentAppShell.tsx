@@ -69,6 +69,8 @@ export function ResidentAppShell({
     const [navbarOpened, { toggle: toggleNavbar, close: closeNavbar }] =
         useDisclosure(false)
     const hasManagementNavigation = Boolean(currentUser?.can_manage_dormitories)
+    const canManagePenalties = currentUser?.can_manage_penalties === true
+    const hasNavigation = hasManagementNavigation || canManagePenalties
     const {
         dormitories,
         loading: dormitoriesLoading,
@@ -98,13 +100,21 @@ export function ResidentAppShell({
                 href: '/app/tasks',
                 label: 'Дежурство',
             },
+            {
+                href: '/app/penalties',
+                label: 'Предупреждения',
+            },
         ]
-        : [
+        : canManagePenalties ? [
             {
                 href: '/app/tasks',
                 label: 'Дежурство',
             },
-        ]
+            {
+                href: '/app/penalties',
+                label: 'Предупреждения',
+            },
+        ] : []
 
     const dormitoryOptions = dormitories.map((dormitory) => ({
         value: String(dormitory.id),
@@ -223,7 +233,7 @@ export function ResidentAppShell({
                 height: '100dvh',
                 minHeight: '100vh',
             }}
-            navbar={hasManagementNavigation ? {
+            navbar={hasNavigation ? {
                 width: 280,
                 breakpoint: 'sm',
                 collapsed: {
@@ -253,7 +263,7 @@ export function ResidentAppShell({
                 },
             }}
         >
-            {hasManagementNavigation ? (
+            {hasNavigation ? (
                 <AppShell.Navbar p="md">
                     <Stack gap="md">
                         {mobileDormitoryControls ? (
@@ -283,7 +293,7 @@ export function ResidentAppShell({
             <AppShell.Header px={{ base: 'md', md: 'xl' }}>
                 <Group align="center" h="100%" justify="space-between" wrap="nowrap">
                     <Group align="center" wrap="nowrap" gap="md">
-                        {hasManagementNavigation ? (
+                        {hasNavigation ? (
                             <Burger
                                 opened={navbarOpened}
                                 onClick={toggleNavbar}
