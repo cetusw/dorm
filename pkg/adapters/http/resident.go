@@ -3,6 +3,7 @@ package http
 import (
 	"dorm/pkg/core/domain/duty"
 	"dorm/pkg/core/ports"
+	residentuc "dorm/pkg/core/usecase/resident"
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
@@ -25,6 +26,8 @@ func (h *ResidentAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) 
 	api := app.Group("/api/v1/resident", auth)
 
 	api.Get("/current-duty", h.HandleGetCurrentDuty)
+	api.Get("/duties", h.HandleGetDutyHistory)
+	api.Get("/duties/:dutyId", h.HandleGetDutyDetails)
 	api.Post("/tasks/:taskId/take", h.HandleTakeTask)
 	api.Post("/tasks/:taskId/return", h.HandleReturnTask)
 	api.Post("/tasks/:taskId/complete", h.HandleCompleteTask)
@@ -46,10 +49,48 @@ func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
 
 	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+		return h.respondResidentDutyError(c, err)
 	}
 
 	return c.JSON(currentDuty)
+}
+
+func (h *ResidentAPIHandler) HandleGetDutyHistory(c *fiber.Ctx) error {
+	userID, err := currentUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse(err.Error()))
+	}
+
+	groupID, err := optionalGroupID(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	history, err := h.residentDutyUC.GetDutyHistory(c.Context(), userID, groupID)
+	if err != nil {
+		return h.respondResidentDutyError(c, err)
+	}
+
+	return c.JSON(history)
+}
+
+func (h *ResidentAPIHandler) HandleGetDutyDetails(c *fiber.Ctx) error {
+	userID, err := currentUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse(err.Error()))
+	}
+
+	dutyID, err := uuid.Parse(c.Params("dutyId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор дежурства"))
+	}
+
+	dutyDetails, err := h.residentDutyUC.GetDutyDetails(c.Context(), userID, dutyID)
+	if err != nil {
+		return h.respondResidentDutyError(c, err)
+	}
+
+	return c.JSON(dutyDetails)
 }
 
 func (h *ResidentAPIHandler) HandleTakeTask(c *fiber.Ctx) error {
@@ -156,6 +197,8 @@ func (h *ResidentAPIHandler) respondResidentTaskError(c *fiber.Ctx, err error) e
 		return c.Status(fiber.StatusConflict).JSON(errorResponse("эту задачу уже взял другой пользователь"))
 	case errors.Is(err, duty.ErrTaskStateConflict):
 		return c.Status(fiber.StatusConflict).JSON(errorResponse("состояние задачи уже изменилось, обновите список"))
+	case errors.Is(err, duty.ErrDutyActionsUnavailable):
+		return c.Status(fiber.StatusForbidden).JSON(errorResponse("Действия с этим дежурством недоступны"))
 	case errors.Is(err, duty.ErrTaskNotFound):
 		return c.Status(fiber.StatusNotFound).JSON(errorResponse("задача не найдена"))
 	case errors.Is(err, duty.ErrTaskAccessDenied):
@@ -173,10 +216,23 @@ func (h *ResidentAPIHandler) respondWithCurrentDuty(c *fiber.Ctx, userID uuid.UU
 
 	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+		return h.respondResidentDutyError(c, err)
 	}
 
 	return c.JSON(currentDuty)
+}
+
+func (h *ResidentAPIHandler) respondResidentDutyError(c *fiber.Ctx, err error) error {
+	switch {
+	case errors.Is(err, residentuc.ErrResidentDutyGroupNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(errorResponse("группа не найдена"))
+	case errors.Is(err, residentuc.ErrResidentDutyAccessDenied):
+		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
+	case errors.Is(err, residentuc.ErrResidentDutyNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(errorResponse("дежурство не найдено"))
+	default:
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
 }
 
 func optionalGroupID(c *fiber.Ctx) (*uuid.UUID, error) {

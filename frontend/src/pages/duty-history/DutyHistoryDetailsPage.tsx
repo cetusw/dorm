@@ -1,29 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { BookOpenIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
-import { ActionIcon, Alert, Box, Center, Group, Loader, Menu, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import { CaretLeftIcon } from '@phosphor-icons/react'
+import { Alert, Box, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
-import type { DutyTaskSelect } from '../../features/current-duty/model/types'
-import {
-    calculateDutyAnalytics,
-    selectVisibleDutyTabs,
-    selectDutyViewOptions,
-    selectTasksForActiveSelect,
-} from '../../features/current-duty/model/selectors'
-import { CreateGroupDutyModal } from '../../features/current-duty/ui/CreateGroupDutyModal'
-import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty'
+import { navigateTo } from '../../app/navigation'
+import { calculateDutyAnalytics, selectDutyViewOptions, selectTasksForActiveSelect } from '../../features/current-duty/model/selectors'
 import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
-import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
-import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
-import { TeamMemberTaskGroups } from '../../features/current-duty/ui/TeamMemberTaskGroups'
-import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
 import { BuildingPlanPanel } from '../../features/current-duty/building-plan/BuildingPlanPanel'
 import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
-import { PageFrame } from '../../shared/ui/PageFrame'
+import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
+import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
+import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
+import { TeamMemberTaskGroups } from '../../features/current-duty/ui/TeamMemberTaskGroups'
+import { useDutyDetails } from '../../features/duty-history/model/useDutyDetails'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
-import { navigateTo } from '../../app/navigation'
+import { PageFrame } from '../../shared/ui/PageFrame'
+import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 
 type PlanLegendItem = {
     color: string
@@ -64,33 +58,16 @@ function getPlanLegendItems(activeSelect: DutyTaskSelect): PlanLegendItem[] {
 }
 
 type Props = {
-    selectedGroupId?: string
+    dutyId: string
 }
 
-export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
-    const {
-        selectedGroupId,
-        duty,
-        error,
-        loading,
-        pendingTaskId,
-        selectGroup,
-        handleTake,
-        handleReturn,
-        handleComplete,
-        handleOpen,
-        handleReopen,
-        handleVerify,
-        reloadCurrentDuty,
-        visibleMineTaskIds,
-        visibleFreeTaskIds,
-    } = useCurrentDuty(initialGroupId)
-    const [createModalOpened, setCreateModalOpened] = useState(false)
+export function DutyHistoryDetailsPage({ dutyId }: Props) {
+    const { duty, loading, error } = useDutyDetails(dutyId)
+    const visibleTabs = duty ? duty.visible_tabs : []
+    const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
     const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
     const [legendOpened, setLegendOpened] = useState(false)
-    const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
-    const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
     const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
 
     useEffect(() => {
@@ -108,91 +85,38 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     }, [availableFloorPlans, selectedFloorPlanId])
 
     if (loading) {
+        return <Center py="xl"><Loader /></Center>
+    }
+
+    if (error || !duty) {
         return (
-            <Center py="xl">
-                <Loader />
-            </Center>
+            <PageFrame title="Дежурство" error={error ?? 'Не удалось загрузить дежурство'}>
+                <Alert color="gray">Дежурство недоступно</Alert>
+            </PageFrame>
         )
     }
 
-    if (error && !duty) {
-        return (
-            <Box px={{ base: 'md', md: 'xl' }} py="xl">
-                <Alert color="red" title="Ошибка">
-                    {error}
-                </Alert>
-            </Box>
-        )
-    }
-
-    if (!duty) {
-        return (
-            <Box px={{ base: 'md', md: 'xl' }} py="xl">
-                <Alert color="gray">Не удалось загрузить текущее дежурство</Alert>
-            </Box>
-        )
-    }
-
+    const selectedGroupId = new URLSearchParams(window.location.search).get('group_id') ?? duty.selected_group_id
     const viewOptions = selectDutyViewOptions(duty, activeSelect, visibleTabs)
     const displayedTasks = selectTasksForActiveSelect({
         activeSelect,
         duty,
-        visibleFreeTaskIds,
-        visibleMineTaskIds,
+        visibleFreeTaskIds: [],
+        visibleMineTaskIds: [],
     })
-    const planLegendItems = getPlanLegendItems(activeSelect)
     const analytics = calculateDutyAnalytics(duty.tasks)
-
+    const planLegendItems = getPlanLegendItems(activeSelect)
     const selectedFloorPlan =
         availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ??
         availableFloorPlans[0] ??
         null
 
-    const canManageGroupDuty = duty.can_manage_duty_settings
-
-    const titleActions = canManageGroupDuty ? (
-        <Menu shadow="md" width={292} position="bottom-end">
-            <Menu.Target>
-                <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    radius="md"
-                    size={42}
-                    aria-label="Действия дежурства"
-                >
-                    <DotsThreeOutlineIcon size={32} weight="fill" />
-                </ActionIcon>
-            </Menu.Target>
-
-            <Menu.Dropdown>
-                <Menu.Item
-                    leftSection={<PlusIcon size={24} />}
-                    onClick={() => setCreateModalOpened(true)}
-                >
-                    Новое дежурство
-                </Menu.Item>
-                <Menu.Item
-                    leftSection={<BookOpenIcon size={24} />}
-                    onClick={() => navigateTo(`/app/duties/history?group_id=${encodeURIComponent(duty.selected_group_id)}`)}
-                >
-                    История дежурств
-                </Menu.Item>
-                <Menu.Item
-                    leftSection={<GearIcon size={24} />}
-                    onClick={() => navigateTo(`/app/groups/${duty.selected_group_id}/duty-settings`)}
-                >
-                    Настройки дежурства
-                </Menu.Item>
-            </Menu.Dropdown>
-        </Menu>
-    ) : null
-
     const dutyControls = viewOptions.showControls ? (
         <DutyTaskSelects
             activeSelect={activeSelect}
             groups={duty.groups}
-            selectedGroupId={selectedGroupId ?? duty.selected_group_id}
-            showGroupSelect={duty.show_group_select}
+            selectedGroupId={selectedGroupId}
+            showGroupSelect={false}
             visibleSelects={visibleTabs}
             rightSection={activeSelect === 'team' ? undefined : (
                 <SegmentedControl
@@ -209,10 +133,10 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                     onChange={(value) => setDisplayMode(value as 'list' | 'plan')}
                 />
             )}
-            onGroupChange={selectGroup}
+            onGroupChange={() => {}}
             onChange={setActiveSelect}
         />
-    ) : null
+    ) : undefined
 
     const buildingPlanControls = activeSelect === 'team' ? null : (
         <Box>
@@ -294,51 +218,35 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
             {buildingPlanControls}
         </Stack>
     ) : undefined
-
-    if (!duty.has_active_duty) {
-        return (
-            <PageFrame title="Дежурство" titleActions={titleActions} error={error} controls={controls}>
-                <Alert color="gray">В выбранной группе сейчас нет активного дежурства.</Alert>
-                <CreateGroupDutyModal
-                    opened={createModalOpened}
-                    groupId={duty.selected_group_id}
-                    onClose={() => setCreateModalOpened(false)}
-                    onCreated={reloadCurrentDuty}
-                />
-            </PageFrame>
-        )
-    }
-
-    if (duty.tasks.length === 0) {
-        return (
-            <PageFrame
-                title="Дежурство"
-                subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
-                titleActions={titleActions}
-                error={error}
-                notice={duty.notice_message}
-                noticeTone={duty.notice_tone}
-                controls={controls}
-            >
-                <Alert color="gray">На текущее дежурство не заведены задачи.</Alert>
-                <CreateGroupDutyModal
-                    opened={createModalOpened}
-                    groupId={duty.selected_group_id}
-                    onClose={() => setCreateModalOpened(false)}
-                    onCreated={reloadCurrentDuty}
-                />
-            </PageFrame>
-        )
-    }
+    const noopTaskAction = async () => false
 
     return (
         <PageFrame
-            title="Дежурство"
+            topContent={(
+                <button
+                    type="button"
+                    onClick={() => navigateTo(`/app/duties/history?group_id=${encodeURIComponent(selectedGroupId)}`)}
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        width: 'fit-content',
+                        padding: 0,
+                        border: 0,
+                        background: 'transparent',
+                        color: 'var(--mantine-color-gray-7)',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        lineHeight: 1.5,
+                        fontWeight: 500,
+                    }}
+                >
+                    <CaretLeftIcon size={20} />
+                    <span>История дежурств</span>
+                </button>
+            )}
+            title={duty.team || 'Глава команды не назначен'}
             subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
-            titleActions={titleActions}
-            error={error}
-            notice={duty.notice_message}
-            noticeTone={duty.notice_tone}
             controls={controls}
         >
             {displayMode === 'plan' && activeSelect !== 'team' ? (
@@ -350,32 +258,32 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                             actionMode={viewOptions.actionMode}
                             allTasks={duty.tasks}
                             floorPlan={selectedFloorPlan}
-                            isReadOnly={viewOptions.isReadOnly}
-                            pendingTaskId={pendingTaskId}
+                            isReadOnly
+                            pendingTaskId={null}
                             tasks={displayedTasks}
-                            onTake={handleTake}
-                            onReturn={handleReturn}
-                            onComplete={handleComplete}
-                            onOpen={handleOpen}
-                            onReopen={handleReopen}
-                            onVerify={handleVerify}
+                            onTake={noopTaskAction}
+                            onReturn={noopTaskAction}
+                            onComplete={noopTaskAction}
+                            onOpen={noopTaskAction}
+                            onReopen={noopTaskAction}
+                            onVerify={noopTaskAction}
                         />
                     ) : (
                         <Alert color="gray">Для выбранного общежития план здания не настроен.</Alert>
                     )}
                     <Box hiddenFrom="md">
                         <TaskGroups
-                            isReadOnly={viewOptions.isReadOnly}
-                            actionMode={viewOptions.actionMode}
-                            pendingTaskId={pendingTaskId}
                             tasks={displayedTasks}
+                            actionMode={viewOptions.actionMode}
                             emptyMessage={viewOptions.emptyMessage}
-                            onTake={handleTake}
-                            onReturn={handleReturn}
-                            onComplete={handleComplete}
-                            onOpen={handleOpen}
-                            onReopen={handleReopen}
-                            onVerify={handleVerify}
+                            isReadOnly
+                            pendingTaskId={null}
+                            onTake={noopTaskAction}
+                            onReturn={noopTaskAction}
+                            onComplete={noopTaskAction}
+                            onOpen={noopTaskAction}
+                            onVerify={noopTaskAction}
+                            onReopen={noopTaskAction}
                         />
                     </Box>
                 </>
@@ -383,25 +291,19 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                 <TeamMemberTaskGroups duty={duty} />
             ) : (
                 <TaskGroups
-                    isReadOnly={viewOptions.isReadOnly}
-                    actionMode={viewOptions.actionMode}
-                    pendingTaskId={pendingTaskId}
                     tasks={displayedTasks}
+                    actionMode={viewOptions.actionMode}
                     emptyMessage={viewOptions.emptyMessage}
-                    onTake={handleTake}
-                    onReturn={handleReturn}
-                    onComplete={handleComplete}
-                    onOpen={handleOpen}
-                    onReopen={handleReopen}
-                    onVerify={handleVerify}
+                    isReadOnly
+                    pendingTaskId={null}
+                    onTake={noopTaskAction}
+                    onReturn={noopTaskAction}
+                    onComplete={noopTaskAction}
+                    onOpen={noopTaskAction}
+                    onVerify={noopTaskAction}
+                    onReopen={noopTaskAction}
                 />
             )}
-            <CreateGroupDutyModal
-                opened={createModalOpened}
-                groupId={duty.selected_group_id}
-                onClose={() => setCreateModalOpened(false)}
-                onCreated={reloadCurrentDuty}
-            />
         </PageFrame>
     )
 }

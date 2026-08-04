@@ -30,7 +30,23 @@ func (r *DutyRepository) CreateWithTasks(
 		return fmt.Errorf("begin duty transaction: %w", err)
 	}
 
-	if err := r.createDutyData(ctx, tx, currentDuty, tasks); err != nil {
+	groupIDBytes, err := dutyGroupIDBytes(ctx, tx, currentDuty.TeamID())
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := lockDutyGroup(ctx, tx, groupIDBytes); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := ensureNoDutyOverlap(ctx, tx, groupIDBytes, currentDuty.Start(), currentDuty.End()); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := r.createDutyData(ctx, tx, currentDuty, tasks, groupIDBytes); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -43,23 +59,18 @@ func (r *DutyRepository) createDutyData(
 	tx *sql.Tx,
 	currentDuty *duty.Duty,
 	tasks []*duty.DutyTask,
+	groupIDBytes []byte,
 ) error {
-	if err := insertDuty(ctx, tx, currentDuty); err != nil {
+	if err := insertDuty(ctx, tx, currentDuty, groupIDBytes); err != nil {
 		return err
 	}
 	return insertDutyTasks(ctx, tx, currentDuty.ID(), tasks)
 }
 
-func insertDuty(ctx context.Context, tx *sql.Tx, d *duty.Duty) error {
+func insertDuty(ctx context.Context, tx *sql.Tx, d *duty.Duty, groupIDBytes []byte) error {
 	const dutyQuery = `
 		INSERT INTO duty (id, team_id, group_id, start_date, end_date, sequence_number)
 		VALUES (?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE
-			team_id = VALUES(team_id),
-			group_id = VALUES(group_id),
-			start_date = VALUES(start_date),
-			end_date = VALUES(end_date),
-			sequence_number = VALUES(sequence_number)
 	`
 	dIDBytes, err := marshalUUID(d.ID(), "duty id")
 	if err != nil {
@@ -69,11 +80,6 @@ func insertDuty(ctx context.Context, tx *sql.Tx, d *duty.Duty) error {
 	if err != nil {
 		return err
 	}
-	groupIDBytes, err := dutyGroupIDBytes(ctx, tx, d.TeamID())
-	if err != nil {
-		return err
-	}
-
 	_, err = tx.ExecContext(ctx, dutyQuery, dIDBytes, tIDBytes, groupIDBytes, d.Start(), d.End(), d.SequenceNumber())
 	if err != nil {
 		return fmt.Errorf("failed to save duty root: %w", err)
@@ -100,6 +106,41 @@ func dutyGroupIDBytes(ctx context.Context, tx *sql.Tx, teamID uuid.UUID) ([]byte
 	return groupIDBytes, nil
 }
 
+func lockDutyGroup(ctx context.Context, tx *sql.Tx, groupIDBytes []byte) error {
+	const query = "SELECT id FROM `group` WHERE id = ? FOR UPDATE"
+
+	var lockedGroupID []byte
+	if err := tx.QueryRowContext(ctx, query, groupIDBytes).Scan(&lockedGroupID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("lock duty group: group not found")
+		}
+		return fmt.Errorf("lock duty group: %w", err)
+	}
+
+	return nil
+}
+
+func ensureNoDutyOverlap(ctx context.Context, tx *sql.Tx, groupIDBytes []byte, startDate, endDate time.Time) error {
+	const query = `
+		SELECT 1
+		FROM duty
+		WHERE group_id = ?
+		  AND start_date < ?
+		  AND end_date > ?
+		LIMIT 1
+	`
+
+	var marker int
+	if err := tx.QueryRowContext(ctx, query, groupIDBytes, endDate, startDate).Scan(&marker); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("check duty overlap: %w", err)
+	}
+
+	return duty.ErrDutyPeriodOverlap
+}
+
 func insertDutyTasks(
 	ctx context.Context,
 	tx *sql.Tx,
@@ -112,12 +153,6 @@ func insertDutyTasks(
 			assignment_date, completion_date, verification_date
 		)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE
-			assignee_id = VALUES(assignee_id),
-			reviewer_id = VALUES(reviewer_id),
-			assignment_date = VALUES(assignment_date),
-			completion_date = VALUES(completion_date),
-			verification_date = VALUES(verification_date)
 	`
 
 	dIDBytes, err := marshalUUID(dutyID, "duty id")
@@ -331,7 +366,7 @@ func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUI
 		SELECT id, team_id, start_date, end_date, sequence_number
 		FROM duty
 		WHERE team_id = ?
-		ORDER BY start_date DESC
+		ORDER BY sequence_number DESC, start_date DESC, id DESC
 		LIMIT 1
 	`
 	tIDBytes, _ := teamID.MarshalBinary()
@@ -394,7 +429,7 @@ func (r *DutyRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 		FROM duty d
 		JOIN team t ON t.id = d.team_id
 		WHERE t.group_id = ?
-		ORDER BY d.start_date DESC, d.end_date DESC
+		ORDER BY d.start_date DESC, d.sequence_number DESC, d.id DESC
 	`
 
 	groupIDBytes, _ := groupID.MarshalBinary()
@@ -430,7 +465,7 @@ func (r *DutyRepository) FindLatestByGroupID(ctx context.Context, groupID uuid.U
 		FROM duty d
 		JOIN team t ON t.id = d.team_id
 		WHERE t.group_id = ?
-		ORDER BY d.sequence_number DESC, d.id DESC
+		ORDER BY d.sequence_number DESC, d.start_date DESC, d.id DESC
 		LIMIT 1
 	`
 
@@ -537,6 +572,80 @@ func (r *DutyRepository) FindAllLatest(ctx context.Context) ([]*duty.Duty, error
 
 		result = append(result, duty.RestoreDuty(id, teamID, start, end, sequenceNumber, tasks))
 	}
+	return result, rows.Err()
+}
+
+func (r *DutyRepository) FindHistoryByGroupID(ctx context.Context, groupID uuid.UUID) ([]duty.DutyHistoryEntry, error) {
+	const query = `
+		SELECT
+			d.id,
+			d.team_id,
+			d.start_date,
+			d.end_date,
+			d.sequence_number,
+			COALESCE(NULLIF(CONCAT_WS(' ', leader.first_name, leader.last_name), ''), 'Глава команды не назначен') AS team_leader_name,
+			COALESCE(SUM(tk.cost), 0) AS total_cost_sum,
+			COALESCE(SUM(CASE WHEN dt.assignee_id IS NOT NULL THEN tk.cost ELSE 0 END), 0) AS taken_cost_sum,
+			COUNT(dt.id) AS total_tasks_count,
+			COALESCE(SUM(CASE WHEN dt.assignee_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS taken_tasks_count,
+			COALESCE(SUM(CASE WHEN dt.completion_date IS NOT NULL THEN 1 ELSE 0 END), 0) AS completed_tasks_count,
+			COALESCE(SUM(CASE WHEN dt.verification_date IS NOT NULL THEN 1 ELSE 0 END), 0) AS verified_tasks_count
+		FROM duty d
+		JOIN team t ON t.id = d.team_id
+		LEFT JOIN user leader ON leader.id = t.leader_id
+		LEFT JOIN duty_task dt ON dt.duty_id = d.id
+		LEFT JOIN task tk ON tk.id = dt.task_id
+		WHERE t.group_id = ?
+		GROUP BY d.id, d.team_id, d.start_date, d.end_date, d.sequence_number, team_leader_name
+		ORDER BY d.start_date DESC, d.sequence_number DESC, d.id DESC
+	`
+
+	groupIDBytes, err := marshalUUID(groupID, "group id")
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, groupIDBytes)
+	if err != nil {
+		return nil, fmt.Errorf("find duty history by group: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]duty.DutyHistoryEntry, 0)
+	for rows.Next() {
+		var dutyIDBytes []byte
+		var teamIDBytes []byte
+		var entry duty.DutyHistoryEntry
+
+		if err := rows.Scan(
+			&dutyIDBytes,
+			&teamIDBytes,
+			&entry.Start,
+			&entry.End,
+			&entry.SequenceNumber,
+			&entry.TeamLeaderName,
+			&entry.TotalCostSum,
+			&entry.TakenCostSum,
+			&entry.TotalTasksCount,
+			&entry.TakenTasksCount,
+			&entry.CompletedTasksCount,
+			&entry.VerifiedTasksCount,
+		); err != nil {
+			return nil, fmt.Errorf("scan duty history row: %w", err)
+		}
+
+		entry.DutyID, err = uuid.FromBytes(dutyIDBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse duty history duty id: %w", err)
+		}
+		entry.TeamID, err = uuid.FromBytes(teamIDBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse duty history team id: %w", err)
+		}
+
+		result = append(result, entry)
+	}
+
 	return result, rows.Err()
 }
 

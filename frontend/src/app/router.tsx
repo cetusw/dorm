@@ -7,6 +7,8 @@ import { ResidentAppShell } from './ResidentAppShell'
 import { AreasPage } from '../pages/areas/AreasPage'
 import { useCurrentUserState } from '../features/current-user/model/useCurrentUser'
 import { CurrentDutyPage } from '../pages/current-duty/CurrentDutyPage'
+import { DutyHistoryDetailsPage } from '../pages/duty-history/DutyHistoryDetailsPage'
+import { DutyHistoryPage } from '../pages/duty-history/DutyHistoryPage'
 import { DutySettingsPage } from '../pages/duty-settings/DutySettingsPage'
 import { DormitoriesPage } from '../pages/dormitories/DormitoriesPage'
 import { GroupsPage } from '../pages/groups/GroupsPage'
@@ -28,7 +30,15 @@ function matchDutySettingsPath(pathname: string): string | null {
     return match ? match[1] : null
 }
 
-function renderResidentPage(pathname: string, currentUser: ReturnType<typeof useCurrentUserState>['currentUser']) {
+function matchDutyHistoryDetailsPath(pathname: string): string | null {
+    const match = pathname.match(/^\/app\/duties\/([^/]+)$/)
+    return match ? match[1] : null
+}
+
+function renderResidentPage(path: string, currentUser: ReturnType<typeof useCurrentUserState>['currentUser']) {
+    const [pathname, search = ''] = path.split('?')
+    const searchParams = new URLSearchParams(search)
+    const selectedGroupId = searchParams.get('group_id') ?? undefined
     const canManageDormitories = Boolean(currentUser?.can_manage_dormitories)
     const canManagePenalties = currentUser?.can_manage_penalties === true
     const dutySettingsGroupId = matchDutySettingsPath(pathname)
@@ -56,7 +66,25 @@ function renderResidentPage(pathname: string, currentUser: ReturnType<typeof use
     }
 
     if (!canManageDormitories) {
-        return <CurrentDutyPage />
+        if (pathname === '/app/duties/history') {
+            return <DutyHistoryPage />
+        }
+
+        const dutyId = matchDutyHistoryDetailsPath(pathname)
+        if (dutyId) {
+            return <DutyHistoryDetailsPage dutyId={dutyId} />
+        }
+
+        return <CurrentDutyPage selectedGroupId={selectedGroupId} />
+    }
+
+    if (pathname === '/app/duties/history') {
+        return <DutyHistoryPage />
+    }
+
+    const dutyId = matchDutyHistoryDetailsPath(pathname)
+    if (dutyId) {
+        return <DutyHistoryDetailsPage dutyId={dutyId} />
     }
 
     const teamGroupId = matchGroupTeamsPath(pathname)
@@ -84,7 +112,7 @@ function renderResidentPage(pathname: string, currentUser: ReturnType<typeof use
         return <TaskCatalogPage />
     }
 
-    return <CurrentDutyPage />
+    return <CurrentDutyPage selectedGroupId={selectedGroupId} />
 }
 
 export function AppRouter() {

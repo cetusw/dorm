@@ -33,7 +33,18 @@ function appendUniqueTaskId(taskIds: string[], taskId: string): string[] {
     return [...taskIds, taskId]
 }
 
-export function useCurrentDuty() {
+function syncGroupIdInUrl(groupId: string) {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('group_id') === groupId) {
+        return
+    }
+
+    params.set('group_id', groupId)
+    const suffix = params.toString()
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}?${suffix}`)
+}
+
+export function useCurrentDuty(initialGroupId?: string) {
     const [duty, setDuty] = useState<ResidentCurrentDuty | null>(null)
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
@@ -52,6 +63,9 @@ export function useCurrentDuty() {
             .filter((task) => !task.assignee_id)
             .map((task) => task.id)
         setSelectedGroupId(loadedDuty.selected_group_id)
+        if (loadedDuty.selected_group_id) {
+            syncGroupIdInUrl(loadedDuty.selected_group_id)
+        }
         setDuty(loadedDuty)
     }
 
@@ -121,8 +135,8 @@ export function useCurrentDuty() {
     }
 
     useEffect(() => {
-        void reload()
-    }, [])
+        void reload(initialGroupId)
+    }, [initialGroupId])
 
     return {
         selectedGroupId,

@@ -92,6 +92,7 @@ func NewContainer(configPath string) (*Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load app timezone: %w", err)
 	}
+	cleaningService.SetLocation(location)
 
 	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo, groupRepo, teamRepo, userRepo)
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
@@ -164,6 +165,7 @@ func NewContainer(configPath string) (*Container, error) {
 		areaRepo,
 		cleaningService,
 	)
+	residentDutyService.SetLocation(location)
 
 	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService)
 	residentAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))

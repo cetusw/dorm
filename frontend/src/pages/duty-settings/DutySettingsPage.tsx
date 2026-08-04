@@ -237,7 +237,7 @@ export function DutySettingsPage({ groupId }: Props) {
             topContent={(
                 <button
                     type="button"
-                    onClick={() => navigateTo('/app')}
+                    onClick={() => navigateTo(`/app/tasks?group_id=${encodeURIComponent(groupId)}`)}
                     style={{
                         display: 'inline-flex',
                         alignItems: 'center',

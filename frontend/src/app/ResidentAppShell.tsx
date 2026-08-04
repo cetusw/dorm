@@ -42,19 +42,22 @@ type NavigationItem = {
 }
 
 function isCurrentPathActive(currentPath: string, href: string): boolean {
+    const pathWithoutSearch = currentPath.split('?')[0] ?? currentPath
+
     if (href === '/app/tasks') {
-        return currentPath === '/app' || currentPath === '/app/tasks'
+        return pathWithoutSearch === '/app' || pathWithoutSearch === '/app/tasks'
     }
 
     if (href === '/app/groups') {
-        return currentPath === '/app/groups' || currentPath.startsWith('/app/groups/')
+        return pathWithoutSearch === '/app/groups' || pathWithoutSearch.startsWith('/app/groups/')
     }
 
-    return currentPath === href
+    return pathWithoutSearch === href
 }
 
 function isSettingsPath(pathname: string): boolean {
-    return pathname === '/app/settings' || pathname === '/app/notifications'
+    const pathWithoutSearch = pathname.split('?')[0] ?? pathname
+    return pathWithoutSearch === '/app/settings' || pathWithoutSearch === '/app/notifications'
 }
 
 export function ResidentAppShell({

@@ -33,6 +33,13 @@ func (m *MockDutyRepo) FindActiveByTeamID(ctx context.Context, id uuid.UUID, at 
 	}
 	return args.Get(0).(*duty.Duty), args.Error(1)
 }
+func (m *MockDutyRepo) FindLatestByTeamID(ctx context.Context, id uuid.UUID) (*duty.Duty, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*duty.Duty), args.Error(1)
+}
 func (m *MockDutyRepo) FindByID(ctx context.Context, id uuid.UUID) (*duty.Duty, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
@@ -53,6 +60,13 @@ func (m *MockDutyRepo) FindLatestByGroupID(ctx context.Context, id uuid.UUID) (*
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*duty.Duty), args.Error(1)
+}
+func (m *MockDutyRepo) FindHistoryByGroupID(ctx context.Context, id uuid.UUID) ([]duty.DutyHistoryEntry, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]duty.DutyHistoryEntry), args.Error(1)
 }
 func (m *MockDutyRepo) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error {
 	return m.Called(ctx, dutyID, teamID).Error(0)

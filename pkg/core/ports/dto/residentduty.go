@@ -17,6 +17,8 @@ type ResidentCurrentDutyResponse struct {
 	ShowGroupSelect       bool                      `json:"show_group_select"`
 	VisibleTabs           []string                  `json:"visible_tabs"`
 	NoticeMessage         string                    `json:"notice_message"`
+	NoticeTone            string                    `json:"notice_tone"`
+	PeriodStatus          string                    `json:"period_status"`
 	Groups                []ResidentDutyGroupOption `json:"groups"`
 	DutyID                string                    `json:"duty_id"`
 	Group                 string                    `json:"group"`
@@ -27,6 +29,33 @@ type ResidentCurrentDutyResponse struct {
 	MyTakenCostSum        int                       `json:"my_taken_cost_sum"`
 	TeamMembers           []ResidentDutyTeamMember  `json:"team_members"`
 	Tasks                 []ResidentDutyTask        `json:"tasks"`
+}
+
+type ResidentDutyDetailsResponse = ResidentCurrentDutyResponse
+
+type ResidentDutyHistoryResponse struct {
+	SelectedGroupID string                    `json:"selected_group_id"`
+	ShowGroupSelect bool                      `json:"show_group_select"`
+	Groups          []ResidentDutyGroupOption `json:"groups"`
+	Duties          []ResidentDutyHistoryItem `json:"duties"`
+}
+
+type ResidentDutyHistoryItem struct {
+	ID             string                      `json:"id"`
+	StartDate      string                      `json:"start_date"`
+	EndDate        string                      `json:"end_date"`
+	TeamLeaderName string                      `json:"team_leader_name"`
+	PeriodStatus   string                      `json:"period_status"`
+	Progress       ResidentDutyProgressSummary `json:"progress"`
+}
+
+type ResidentDutyProgressSummary struct {
+	TotalCostSum        int `json:"total_cost_sum"`
+	TakenCostSum        int `json:"taken_cost_sum"`
+	TotalTasksCount     int `json:"total_tasks_count"`
+	TakenTasksCount     int `json:"taken_tasks_count"`
+	CompletedTasksCount int `json:"completed_tasks_count"`
+	VerifiedTasksCount  int `json:"verified_tasks_count"`
 }
 
 type ResidentDutyGroupOption struct {

@@ -92,6 +92,7 @@ func (s *dormitoryRepositoryStub) Delete(context.Context, int64) error          
 
 type dutyRepositoryStub struct {
 	activeByTeam map[uuid.UUID]*duty.Duty
+	byID         map[uuid.UUID]*duty.Duty
 }
 
 func (s *dutyRepositoryStub) CreateWithTasks(context.Context, *duty.Duty, []*duty.DutyTask) error {
@@ -103,13 +104,24 @@ func (s *dutyRepositoryStub) FindCurrentByTeamID(context.Context, uuid.UUID) (*d
 func (s *dutyRepositoryStub) FindActiveByTeamID(_ context.Context, teamID uuid.UUID, _ time.Time) (*duty.Duty, error) {
 	return s.activeByTeam[teamID], nil
 }
-func (s *dutyRepositoryStub) FindByID(context.Context, uuid.UUID) (*duty.Duty, error) {
-	return nil, nil
+func (s *dutyRepositoryStub) FindLatestByTeamID(_ context.Context, teamID uuid.UUID) (*duty.Duty, error) {
+	for _, currentDuty := range s.byID {
+		if currentDuty.TeamID() == teamID {
+			return currentDuty, nil
+		}
+	}
+	return s.activeByTeam[teamID], nil
+}
+func (s *dutyRepositoryStub) FindByID(_ context.Context, id uuid.UUID) (*duty.Duty, error) {
+	return s.byID[id], nil
 }
 func (s *dutyRepositoryStub) FindByGroupID(context.Context, uuid.UUID) ([]*duty.Duty, error) {
 	return nil, nil
 }
 func (s *dutyRepositoryStub) FindLatestByGroupID(context.Context, uuid.UUID) (*duty.Duty, error) {
+	return nil, nil
+}
+func (s *dutyRepositoryStub) FindHistoryByGroupID(context.Context, uuid.UUID) ([]duty.DutyHistoryEntry, error) {
 	return nil, nil
 }
 func (s *dutyRepositoryStub) ReassignTeamAndResetTasks(context.Context, uuid.UUID, uuid.UUID) error {
@@ -240,9 +252,9 @@ func TestGetCurrentDutyFallsBackToObserverViewForResidentWithoutTeam(t *testing.
 	assert.False(t, response.ShowGroupSelect)
 	assert.Equal(t, groupID.String(), response.SelectedGroupID)
 	assert.Equal(t, "Group A", response.Group)
-	assert.Equal(t, "Team A", response.Team)
+	assert.Equal(t, "Глава команды не назначен", response.Team)
 	assert.Equal(t, []string{"all", "team"}, response.VisibleTabs)
-	assert.Equal(t, "На этой неделе дежурит команда Team A", response.NoticeMessage)
+	assert.Equal(t, "На этой неделе дежурит команда Глава команды не назначен", response.NoticeMessage)
 	assert.Empty(t, response.Tasks)
 	assert.Len(t, response.TeamMembers, 1)
 	assert.Equal(t, teamMemberID.String(), response.TeamMembers[0].ID)

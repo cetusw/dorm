@@ -398,6 +398,9 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 
 	for _, d := range c.dutiesList {
 		if err := s.dutyRepo.CreateWithTasks(ctx, d, d.Tasks()); err != nil {
+			if errors.Is(err, duty.ErrDutyPeriodOverlap) {
+				return duty.ErrDutyPeriodOverlap
+			}
 			if isDutySequenceConflict(err) {
 				return ErrDutyAlreadyCreated
 			}

@@ -1,31 +1,3 @@
-.table {
-    background: transparent;
-}
-
-.table th,
-.table td {
-    font-size: 16px;
-    line-height: 1.5;
-}
-
-.table th {
-    white-space: nowrap;
-}
-
-.row {
-    cursor: pointer;
-}
-
-.row td {
-    height: 40px;
-    padding-top: 8px;
-    padding-bottom: 8px;
-}
-
-.row:hover {
-    background: #EEF2F1;
-}
-
 .thresholdRow {
     background: #FEE2E2;
     color: #991B1B;

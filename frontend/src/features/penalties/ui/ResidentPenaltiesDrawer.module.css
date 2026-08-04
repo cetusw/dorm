@@ -1,0 +1,33 @@
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.addPenaltyLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--mantine-color-gray-6);
+    cursor: pointer;
+    transition: color 140ms ease;
+}
+
+.addPenaltyLink:hover,
+.addPenaltyLink:focus-visible {
+    color: var(--app-color-text);
+}
+
+.addPenaltyText {
+    font-size: 1rem;
+    line-height: 1.5;
+    font-weight: 500;
+}

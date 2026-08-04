@@ -1,6 +1,7 @@
 package http
 
 import (
+	"dorm/pkg/core/domain/duty"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
 	cleaninguc "dorm/pkg/core/usecase/cleaning"
@@ -703,6 +704,8 @@ func (h *GroupAPIHandler) respondCreateGroupDutyError(c *fiber.Ctx, err error) e
 		return c.Status(fiber.StatusNotFound).JSON(errorResponse("группа не найдена"))
 	case errors.Is(err, cleaninguc.ErrDutyAlreadyCreated):
 		return c.Status(fiber.StatusConflict).JSON(errorResponse("Для группы уже было создано новое дежурство. Обновите страницу."))
+	case errors.Is(err, duty.ErrDutyPeriodOverlap):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("В выбранном периоде уже существует дежурство этой группы"))
 	default:
 		var fiberErr *fiber.Error
 		if errors.As(err, &fiberErr) {

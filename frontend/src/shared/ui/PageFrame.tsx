@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { InfoIcon, WarningIcon } from '@phosphor-icons/react'
 import { Alert, Box, Group, Stack, Title } from '@mantine/core'
 import {
     MOBILE_BREAKPOINT_PX,
@@ -13,6 +14,7 @@ type Props = {
     titleActions?: ReactNode
     error?: string | null
     notice?: string | null
+    noticeTone?: 'info' | 'warning' | ''
     controls?: ReactNode
     analytics?: ReactNode
     children: ReactNode
@@ -25,6 +27,7 @@ export function PageFrame({
     titleActions,
     error,
     notice,
+    noticeTone,
     controls,
     analytics,
     children,
@@ -130,6 +133,11 @@ export function PageFrame({
     }
 
     const showStickyClone = isScrollingUp && isStickyCloneVisible
+    const resolvedNoticeTone = noticeTone === 'warning' ? 'warning' : 'info'
+    const noticeColor = resolvedNoticeTone === 'warning'
+        ? { backgroundColor: '#FEF3C7', color: '#92400E' }
+        : { backgroundColor: '#E0F2FE', color: '#0369A1' }
+    const NoticeIcon = resolvedNoticeTone === 'warning' ? WarningIcon : InfoIcon
 
     return (
         <Box px={{ base: 'md', md: 'xl' }} py="xl">
@@ -141,9 +149,40 @@ export function PageFrame({
                 )}
 
                 {notice && (
-                    <Alert color="gray">
-                        {notice}
-                    </Alert>
+                    <Box
+                        style={{
+                            minHeight: 80,
+                            borderRadius: 16,
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: 24,
+                            ...noticeColor,
+                        }}
+                    >
+                        <Group gap={15} wrap="nowrap">
+                            <Box
+                                style={{
+                                    width: 32,
+                                    minWidth: 32,
+                                    height: 32,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <NoticeIcon size={32} weight="regular" />
+                            </Box>
+                            <Box
+                                style={{
+                                    fontSize: 16,
+                                    lineHeight: '28px',
+                                }}
+                            >
+                                {notice}
+                            </Box>
+                        </Group>
+                    </Box>
                 )}
 
                 {topContent}

@@ -27,6 +27,7 @@ type Service struct {
 	areaRepo     catalog.AreaRepository
 	eventBus     ports.EventBus
 	now          func() time.Time
+	location     *time.Location
 }
 
 func NewCleaningService(
@@ -51,6 +52,13 @@ func NewCleaningService(
 		areaRepo:     areaRepo,
 		eventBus:     eventBus,
 		now:          time.Now,
+		location:     time.Local,
+	}
+}
+
+func (s *Service) SetLocation(location *time.Location) {
+	if location != nil {
+		s.location = location
 	}
 }
 
@@ -59,7 +67,7 @@ func (s *Service) AssignTask(ctx context.Context, taskID, userID uuid.UUID) erro
 	if err != nil {
 		return err
 	}
-	if err := s.canAssignTask(data); err != nil {
+	if err := s.canAssignTask(ctx, data); err != nil {
 		return err
 	}
 	return s.applyTaskAssignment(ctx, data)
@@ -70,7 +78,7 @@ func (s *Service) CompleteTask(ctx context.Context, taskID, userID uuid.UUID) er
 	if err != nil {
 		return err
 	}
-	if err := s.canCompleteTask(data); err != nil {
+	if err := s.canCompleteTask(ctx, data); err != nil {
 		return err
 	}
 	return s.applyTaskCompletion(ctx, data)
@@ -81,7 +89,7 @@ func (s *Service) UnassignTask(ctx context.Context, taskID, userID uuid.UUID) er
 	if err != nil {
 		return err
 	}
-	if err := s.canUnassignTask(data); err != nil {
+	if err := s.canUnassignTask(ctx, data); err != nil {
 		return err
 	}
 	return s.applyTaskUnassignment(ctx, data)
@@ -96,7 +104,7 @@ func (s *Service) CancelCompletion(ctx context.Context, taskID, userID uuid.UUID
 	if err != nil {
 		return err
 	}
-	if err := s.canCancelCompletion(data); err != nil {
+	if err := s.canCancelCompletion(ctx, data); err != nil {
 		return err
 	}
 	return s.applyCompletionCancellation(ctx, data)
@@ -181,29 +189,29 @@ func (s *Service) loadDuty(ctx context.Context, dutyID uuid.UUID) (*duty.Duty, e
 	return currentDuty, nil
 }
 
-func (s *Service) canAssignTask(data *taskActionContext) error {
-	if err := s.requireActiveTeamDuty(data); err != nil {
+func (s *Service) canAssignTask(ctx context.Context, data *taskActionContext) error {
+	if err := s.requireActionableTeamDuty(ctx, data); err != nil {
 		return err
 	}
 	return data.task.CanAssign(data.user.ID())
 }
 
-func (s *Service) canUnassignTask(data *taskActionContext) error {
-	if err := s.requireActiveTeamDuty(data); err != nil {
+func (s *Service) canUnassignTask(ctx context.Context, data *taskActionContext) error {
+	if err := s.requireActionableTeamDuty(ctx, data); err != nil {
 		return err
 	}
 	return data.task.CanUnassign(data.user.ID())
 }
 
-func (s *Service) canCompleteTask(data *taskActionContext) error {
-	if err := s.requireActiveTeamDuty(data); err != nil {
+func (s *Service) canCompleteTask(ctx context.Context, data *taskActionContext) error {
+	if err := s.requireActionableTeamDuty(ctx, data); err != nil {
 		return err
 	}
 	return data.task.CanComplete(data.user.ID())
 }
 
-func (s *Service) canCancelCompletion(data *taskActionContext) error {
-	if err := s.requireActiveTeamDuty(data); err != nil {
+func (s *Service) canCancelCompletion(ctx context.Context, data *taskActionContext) error {
+	if err := s.requireActionableTeamDuty(ctx, data); err != nil {
 		return err
 	}
 	return data.task.CanCancelCompletion(data.user.ID())
@@ -223,21 +231,30 @@ func (s *Service) canReopenTask(ctx context.Context, data *taskActionContext) er
 	return data.task.CanReopen(data.user.ID())
 }
 
-func (s *Service) requireActiveTeamDuty(data *taskActionContext) error {
+func (s *Service) requireActionableTeamDuty(ctx context.Context, data *taskActionContext) error {
 	if data.user.TeamID() == nil {
 		return duty.ErrTaskAccessDenied
 	}
 	if !data.duty.BelongsToTeam(*data.user.TeamID()) {
 		return duty.ErrTaskAccessDenied
 	}
-	if !data.duty.IsActiveAt(data.now) {
-		return fmt.Errorf("duty is not active")
+
+	at := s.currentTime()
+	if data.duty.IsActiveAt(at) {
+		return nil
 	}
+	if data.duty.Start().After(at) {
+		return duty.ErrDutyActionsUnavailable
+	}
+	if !dutyHasOutstandingTasks(data.duty) {
+		return duty.ErrDutyActionsUnavailable
+	}
+
 	return nil
 }
 
 func (s *Service) requireTaskReviewer(ctx context.Context, data *taskActionContext) error {
-	if err := s.requireActiveTeamDuty(data); err != nil {
+	if err := s.requireActionableTeamDuty(ctx, data); err != nil {
 		return err
 	}
 	team, err := s.teamRepo.FindByID(ctx, data.duty.TeamID())
@@ -248,6 +265,31 @@ func (s *Service) requireTaskReviewer(ctx context.Context, data *taskActionConte
 		return duty.ErrTaskAccessDenied
 	}
 	return nil
+}
+
+func dutyHasOutstandingTasks(currentDuty *duty.Duty) bool {
+	if currentDuty == nil {
+		return false
+	}
+
+	for _, task := range currentDuty.Tasks() {
+		if task.VerificationDate() == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *Service) currentTime() time.Time {
+	if s.now == nil {
+		s.now = time.Now
+	}
+	now := s.now()
+	if s.location == nil {
+		return now
+	}
+	return now.In(s.location)
 }
 
 func (s *Service) applyTaskAssignment(ctx context.Context, data *taskActionContext) error {
@@ -322,13 +364,6 @@ func (s *Service) publishTaskUncompleted(ctx context.Context, data *taskActionCo
 		UserID: data.user.ID(),
 		Time:   data.now,
 	})
-}
-
-func (s *Service) currentTime() time.Time {
-	if s.now == nil {
-		return time.Now()
-	}
-	return s.now()
 }
 
 func (s *Service) publishTasksReadyForReviewIfNeeded(ctx context.Context, data *taskActionContext) {

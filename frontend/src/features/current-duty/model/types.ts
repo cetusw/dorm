@@ -42,6 +42,8 @@ export type ResidentCurrentDuty = {
     show_group_select: boolean
     visible_tabs: DutyTaskSelect[]
     notice_message: string
+    notice_tone?: 'info' | 'warning' | ''
+    period_status: 'past' | 'active' | 'future' | ''
     groups: ResidentDutyGroupOption[]
     duty_id: string
     group: string
@@ -52,4 +54,32 @@ export type ResidentCurrentDuty = {
     my_taken_cost_sum: number
     team_members: ResidentDutyTeamMember[]
     tasks: ResidentDutyTask[]
+}
+
+export type ResidentDutyDetails = ResidentCurrentDuty
+
+export type DutyPeriodStatus = 'past' | 'active' | 'future'
+
+export type DutyHistoryProgress = {
+    total_cost_sum: number
+    taken_cost_sum: number
+    total_tasks_count: number
+    taken_tasks_count: number
+    completed_tasks_count: number
+    verified_tasks_count: number
+}
+
+export type DutyHistoryItem = {
+    id: string
+    start_date: string
+    end_date: string
+    team_leader_name: string
+    progress: DutyHistoryProgress
+}
+
+export type DutyHistoryResponse = {
+    selected_group_id: string
+    show_group_select: boolean
+    groups: ResidentDutyGroupOption[]
+    duties: DutyHistoryItem[]
 }

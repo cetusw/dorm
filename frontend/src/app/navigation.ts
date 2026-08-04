@@ -4,11 +4,17 @@ const APP_NAVIGATION_EVENT = 'app:navigation'
 const DEFAULT_SETTINGS_RETURN_PATH = '/app/tasks'
 
 type AppHistoryState = {
-    appPathname?: string
-    previousAppPathname?: string
+    appPath?: string
+    previousAppPath?: string
 }
 
-function isSettingsPath(pathname: string): boolean {
+function normalizeAppPath(path: string): string {
+    const [pathname] = path.split('?')
+    return pathname ?? path
+}
+
+function isSettingsPath(path: string): boolean {
+    const pathname = normalizeAppPath(path)
     return pathname === '/app/settings' || pathname === '/app/notifications'
 }
 
@@ -22,71 +28,73 @@ function readAppHistoryState(): AppHistoryState {
     return state as AppHistoryState
 }
 
-function buildAppHistoryState(pathname: string): AppHistoryState {
-    const currentPathname = window.location.pathname
+function buildAppHistoryState(path: string): AppHistoryState {
+    const currentPath = window.location.pathname + window.location.search
     const currentState = readAppHistoryState()
 
-    if (isSettingsPath(pathname)) {
+    if (isSettingsPath(path)) {
         return {
-            appPathname: pathname,
-            previousAppPathname: isSettingsPath(currentPathname)
-                ? currentState.previousAppPathname ?? DEFAULT_SETTINGS_RETURN_PATH
-                : currentPathname,
+            appPath: path,
+            previousAppPath: isSettingsPath(currentPath)
+                ? currentState.previousAppPath ?? DEFAULT_SETTINGS_RETURN_PATH
+                : currentPath,
         }
     }
 
     return {
-        appPathname: pathname,
+        appPath: path,
     }
 }
 
-export function navigateTo(pathname: string) {
-    if (window.location.pathname === pathname) {
+export function navigateTo(path: string) {
+    const currentPath = window.location.pathname + window.location.search
+    if (currentPath === path) {
         return
     }
 
-    window.history.pushState(buildAppHistoryState(pathname), '', pathname)
+    window.history.pushState(buildAppHistoryState(path), '', path)
     window.dispatchEvent(new CustomEvent(APP_NAVIGATION_EVENT))
 }
 
 export function getSettingsReturnPath(): string {
-    const previousAppPathname = readAppHistoryState().previousAppPathname
+    const previousAppPath = readAppHistoryState().previousAppPath
 
-    if (typeof previousAppPathname === 'string' && previousAppPathname.startsWith('/app/')) {
-        return previousAppPathname
+    if (typeof previousAppPath === 'string' && previousAppPath.startsWith('/app/')) {
+        return previousAppPath
     }
 
     return DEFAULT_SETTINGS_RETURN_PATH
 }
 
 export function useAppPathname() {
-    const [pathname, setPathname] = useState(window.location.pathname)
+    const [path, setPath] = useState(window.location.pathname + window.location.search)
 
     useEffect(() => {
         const currentState = readAppHistoryState()
-        if (currentState.appPathname !== window.location.pathname) {
+        const currentPath = window.location.pathname + window.location.search
+        if (currentState.appPath !== currentPath) {
             window.history.replaceState(
                 {
                     ...currentState,
-                    appPathname: window.location.pathname,
+                    appPath: currentPath,
                 } satisfies AppHistoryState,
                 '',
-                window.location.pathname,
+                currentPath,
             )
         }
 
-        function syncPathname() {
-            setPathname(window.location.pathname)
+        function syncPath() {
+            setPath(window.location.pathname + window.location.search)
         }
 
-        window.addEventListener('popstate', syncPathname)
-        window.addEventListener(APP_NAVIGATION_EVENT, syncPathname)
+        window.addEventListener('popstate', syncPath)
+        window.addEventListener(APP_NAVIGATION_EVENT, syncPath)
 
         return () => {
-            window.removeEventListener('popstate', syncPathname)
-            window.removeEventListener(APP_NAVIGATION_EVENT, syncPathname)
+            window.removeEventListener('popstate', syncPath)
+            window.removeEventListener(APP_NAVIGATION_EVENT, syncPath)
         }
     }, [])
 
-    return pathname
+    return path
 }

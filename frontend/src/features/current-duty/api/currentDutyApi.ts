@@ -5,6 +5,7 @@ function normalizeCurrentDuty(duty: ResidentCurrentDuty): ResidentCurrentDuty {
     return {
         ...duty,
         can_manage_duty_settings: Boolean(duty.can_manage_duty_settings),
+        notice_tone: duty.notice_tone === 'warning' || duty.notice_tone === 'info' ? duty.notice_tone : '',
         visible_tabs: Array.isArray(duty.visible_tabs) ? duty.visible_tabs : [],
         groups: Array.isArray(duty.groups) ? duty.groups : [],
         team_members: Array.isArray(duty.team_members) ? duty.team_members : [],

@@ -95,17 +95,21 @@ export function preserveTaskOrder(
     })
 }
 
-export function formatDutyPeriod(startDate: string, endDate: string): string {
-    const formatDate = (value: string) => {
-        const [year, month, day] = value.split('-')
-        if (!year || !month || !day) {
-            return value
-        }
-
-        return `${day}.${month}`
+function formatDutyDate(value: string, includeYear: boolean): string {
+    const [year, month, day] = value.split('-')
+    if (!year || !month || !day) {
+        return value
     }
 
-    return `${formatDate(startDate)} - ${formatDate(endDate)}`
+    return includeYear ? `${day}.${month}.${year}` : `${day}.${month}`
+}
+
+export function formatDutyPeriod(startDate: string, endDate: string): string {
+    return `${formatDutyDate(startDate, false)} – ${formatDutyDate(endDate, false)}`
+}
+
+export function formatDutyPeriodFull(startDate: string, endDate: string): string {
+    return `${formatDutyDate(startDate, true)} – ${formatDutyDate(endDate, true)}`
 }
 
 export function countTasksCompletedByMe(tasks: ResidentDutyTask[]): number {

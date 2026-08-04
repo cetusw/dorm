@@ -21,6 +21,8 @@ var (
 	ErrAssigneeRequired       = errors.New("assignee is required")
 	ErrReviewerRequired       = errors.New("reviewer is required")
 	ErrTaskAccessDenied       = errors.New("duty task access denied")
+	ErrDutyActionsUnavailable = errors.New("duty actions unavailable")
+	ErrDutyPeriodOverlap      = errors.New("duty period overlap")
 )
 
 type Duty struct {
@@ -97,11 +99,28 @@ type DutyRepository interface {
 	CreateWithTasks(ctx context.Context, currentDuty *Duty, tasks []*DutyTask) error
 	FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
 	FindActiveByTeamID(ctx context.Context, teamID uuid.UUID, at time.Time) (*Duty, error)
+	FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Duty, error)
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*Duty, error)
 	FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*Duty, error)
+	FindHistoryByGroupID(ctx context.Context, groupID uuid.UUID) ([]DutyHistoryEntry, error)
 	ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error
 	CountDistinctStartDates(ctx context.Context) (int, error)
 	FindLastByTaskDefID(ctx context.Context, taskDefID uuid.UUID) (*Duty, error)
 	FindAllLatest(ctx context.Context) ([]*Duty, error)
+}
+
+type DutyHistoryEntry struct {
+	DutyID              uuid.UUID
+	TeamID              uuid.UUID
+	Start               time.Time
+	End                 time.Time
+	SequenceNumber      int
+	TeamLeaderName      string
+	TotalCostSum        int
+	TakenCostSum        int
+	TotalTasksCount     int
+	TakenTasksCount     int
+	CompletedTasksCount int
+	VerifiedTasksCount  int
 }
