@@ -388,7 +388,7 @@ export function TaskMobileCard({
                                     <Checkbox
                                         checked={task.status === 'completed'}
                                         disabled={pending}
-                                        size="20px"
+                                        size="25px"
                                         radius="xl"
                                         iconColor="#FFFFFF"
                                         styles={{

@@ -64,8 +64,8 @@
 }
 
 .checkboxWrap {
-    width: 20px;
-    min-width: 20px;
+    width: 25px;
+    min-width: 25px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -89,7 +89,7 @@
 }
 
 .metaRow[data-has-checkbox='true'] {
-    padding-left: 35px;
+    padding-left: 40px;
 }
 
 .assigneeText {
