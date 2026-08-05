@@ -420,13 +420,6 @@ export function ResidentAppShell({
             {hasNavigation ? (
                 <AppShell.Navbar p={0} className={classes.navbar}>
                     <Stack className={classes.navbarContent}>
-                        {showShellControls ? (
-                            <AccountButton
-                                className={classes.accountButtonDark}
-                                user={currentUser}
-                            />
-                        ) : null}
-
                         {sidebarDormitoryControls}
 
                         <div className={classes.navigationList}>
@@ -450,7 +443,10 @@ export function ResidentAppShell({
             ) : null}
 
             <AppShell.Header px={{ base: 'md', md: 'xl' }} className={classes.header}>
-                <div className={classes.headerInner}>
+                <div
+                    className={classes.headerInner}
+                    data-has-navigation={hasNavigation ? 'true' : 'false'}
+                >
                     <div className={classes.headerLeft}>
                         {hasNavigation ? (
                             <>
@@ -464,7 +460,6 @@ export function ResidentAppShell({
 
                                 {showShellControls ? (
                                     <AccountButton
-                                        className={classes.mobileHeaderAccount}
                                         nameClassName={classes.desktopAccountName}
                                         user={currentUser}
                                     />

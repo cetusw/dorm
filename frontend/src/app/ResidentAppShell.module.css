@@ -13,15 +13,17 @@
     pointer-events: auto;
 }
 
+@media (min-width: 48.001em) {
+    .headerInner[data-has-navigation='true'] {
+        padding-left: 280px;
+    }
+}
+
 .headerLeft {
     display: flex;
     align-items: center;
     gap: 12px;
     min-width: 0;
-}
-
-.mobileHeaderAccount {
-    display: none;
 }
 
 .accountButtonWrap {
@@ -207,10 +209,6 @@
 @media (max-width: 48em) {
     .headerInner {
         gap: 12px;
-    }
-
-    .mobileHeaderAccount {
-        display: inline-flex;
     }
 
     .dropdown {
