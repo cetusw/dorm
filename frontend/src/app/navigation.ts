@@ -1,21 +1,9 @@
 import { useEffect, useState } from 'react'
 
 const APP_NAVIGATION_EVENT = 'app:navigation'
-const DEFAULT_SETTINGS_RETURN_PATH = '/app/tasks'
 
 type AppHistoryState = {
     appPath?: string
-    previousAppPath?: string
-}
-
-function normalizeAppPath(path: string): string {
-    const [pathname] = path.split('?')
-    return pathname ?? path
-}
-
-function isSettingsPath(path: string): boolean {
-    const pathname = normalizeAppPath(path)
-    return pathname === '/app/settings' || pathname === '/app/notifications'
 }
 
 function readAppHistoryState(): AppHistoryState {
@@ -29,18 +17,6 @@ function readAppHistoryState(): AppHistoryState {
 }
 
 function buildAppHistoryState(path: string): AppHistoryState {
-    const currentPath = window.location.pathname + window.location.search
-    const currentState = readAppHistoryState()
-
-    if (isSettingsPath(path)) {
-        return {
-            appPath: path,
-            previousAppPath: isSettingsPath(currentPath)
-                ? currentState.previousAppPath ?? DEFAULT_SETTINGS_RETURN_PATH
-                : currentPath,
-        }
-    }
-
     return {
         appPath: path,
     }
@@ -56,14 +32,14 @@ export function navigateTo(path: string) {
     window.dispatchEvent(new CustomEvent(APP_NAVIGATION_EVENT))
 }
 
-export function getSettingsReturnPath(): string {
-    const previousAppPath = readAppHistoryState().previousAppPath
-
-    if (typeof previousAppPath === 'string' && previousAppPath.startsWith('/app/')) {
-        return previousAppPath
+export function replaceTo(path: string) {
+    const currentPath = window.location.pathname + window.location.search
+    if (currentPath === path) {
+        return
     }
 
-    return DEFAULT_SETTINGS_RETURN_PATH
+    window.history.replaceState(buildAppHistoryState(path), '', path)
+    window.dispatchEvent(new CustomEvent(APP_NAVIGATION_EVENT))
 }
 
 export function useAppPathname() {

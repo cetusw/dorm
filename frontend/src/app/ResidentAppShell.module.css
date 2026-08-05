@@ -1,0 +1,236 @@
+.header {
+    background: transparent;
+    border-bottom: 0;
+    pointer-events: none;
+}
+
+.headerInner {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    pointer-events: auto;
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.mobileHeaderAccount {
+    display: none;
+}
+
+.accountButtonWrap {
+    position: relative;
+    display: inline-flex;
+    align-items: flex-start;
+}
+
+.navbar {
+    background: #1f2927;
+    border-right: 1px solid #31403d;
+    padding: 20px 16px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+.navbarContent {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 0;
+    flex: 1;
+}
+
+.accountButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-color-text);
+    cursor: pointer;
+}
+
+.accountButton:hover,
+.accountButton:focus-visible {
+    opacity: 0.88;
+}
+
+.accountButtonDark {
+    color: #f9fafb;
+}
+
+.avatar {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 14px;
+    line-height: 1;
+    font-weight: 500;
+}
+
+.accountName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 1.2;
+}
+
+.desktopAccountName {
+    font-size: 14px;
+}
+
+.dormitoryControls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.navigationList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.iconButton {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--app-color-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.iconButton:hover,
+.iconButton:focus-visible {
+    background: rgba(31, 41, 39, 0.06);
+}
+
+.dropdown {
+    border: 1px solid var(--app-color-border);
+    border-radius: 32px;
+    box-shadow: none;
+    background: #ffffff;
+    padding: 24px 28px;
+}
+
+.accountDropdown {
+    width: auto;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    padding: 0;
+}
+
+.notificationDropdown {
+    width: min(350px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+}
+
+.logoutButton {
+    width: auto;
+    min-height: 32px;
+    height: 32px;
+    padding: 0 15px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--app-color-primary);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    line-height: 1.1;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.logoutButton:hover,
+.logoutButton:focus-visible {
+    background: var(--app-color-primary-hover);
+}
+
+.notificationMessage {
+    font-size: 18px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.notificationToggleRow {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.notificationToggleText {
+    font-size: 18px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.notificationToggleTextDisabled {
+    color: var(--app-color-text-muted);
+}
+
+.notificationSwitch {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 48em) {
+    .headerInner {
+        gap: 12px;
+    }
+
+    .mobileHeaderAccount {
+        display: inline-flex;
+    }
+
+    .dropdown {
+        padding: 24px;
+        border-radius: 28px;
+    }
+
+    .notificationDropdown {
+        width: min(350px, calc(100vw - 24px));
+        max-width: calc(100vw - 24px);
+    }
+
+    .logoutButton {
+        min-height: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .notificationMessage,
+    .notificationToggleText {
+        font-size: 16px;
+    }
+}

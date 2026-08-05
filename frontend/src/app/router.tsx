@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 
 import { Alert } from '@mantine/core'
 
-import { navigateTo, useAppPathname } from './navigation'
+import { navigateTo, replaceTo, useAppPathname } from './navigation'
 import { ResidentAppShell } from './ResidentAppShell'
 import { AreasPage } from '../pages/areas/AreasPage'
 import { useCurrentUserState } from '../features/current-user/model/useCurrentUser'
@@ -15,7 +15,6 @@ import { GroupsPage } from '../pages/groups/GroupsPage'
 import { LoginPage } from '../pages/login/LoginPage'
 import { PenaltiesPage } from '../pages/penalties/PenaltiesPage'
 import { ResidentsPage } from '../pages/residents/ResidentsPage'
-import { SettingsPage } from '../pages/settings/SettingsPage'
 import { TaskCatalogPage } from '../pages/task-catalog/TaskCatalogPage'
 import { GroupTeamsPage } from '../pages/teams/GroupTeamsPage'
 import { PageFrame } from '../shared/ui/PageFrame'
@@ -45,10 +44,6 @@ function renderResidentPage(path: string, currentUser: ReturnType<typeof useCurr
 
     if (dutySettingsGroupId) {
         return <DutySettingsPage groupId={dutySettingsGroupId} />
-    }
-
-    if (pathname === '/app/settings' || pathname === '/app/notifications') {
-        return <SettingsPage />
     }
 
     if (pathname === '/app/penalties') {
@@ -119,8 +114,10 @@ export function AppRouter() {
     const pathname = useAppPathname()
     const shouldRedirectToLogin =
         pathname === '/' || pathname === '/app' || pathname === '/app/'
+    const shouldRedirectLegacySettings =
+        pathname === '/app/settings' || pathname === '/app/notifications'
     const { currentUser, loading, error } = useCurrentUserState(
-        pathname !== '/app/login' && !shouldRedirectToLogin,
+        pathname !== '/app/login' && !shouldRedirectToLogin && !shouldRedirectLegacySettings,
     )
 
     useEffect(() => {
@@ -129,7 +126,17 @@ export function AppRouter() {
         }
     }, [shouldRedirectToLogin])
 
+    useEffect(() => {
+        if (shouldRedirectLegacySettings) {
+            replaceTo('/app/tasks')
+        }
+    }, [shouldRedirectLegacySettings])
+
     if (shouldRedirectToLogin) {
+        return null
+    }
+
+    if (shouldRedirectLegacySettings) {
         return null
     }
 

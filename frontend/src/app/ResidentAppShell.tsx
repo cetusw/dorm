@@ -1,31 +1,33 @@
-import { type ReactNode, useEffect, useRef } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef } from 'react'
 
-import { GearIcon } from '@phosphor-icons/react'
+import { BellIcon, SignOutIcon } from '@phosphor-icons/react'
 import {
-    Alert,
     AppShell,
     Box,
     Burger,
     Button,
     Center,
-    Group,
     Loader,
     NavLink,
-    ActionIcon,
+    Popover,
     ScrollArea,
     Select,
     Stack,
-    Tooltip,
+    Switch,
+    Text,
+    UnstyledButton,
+    Alert,
 } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
+import { useClickOutside, useDisclosure } from '@mantine/hooks'
 
-import logo from '../assets/logo.svg'
-import { getSettingsReturnPath } from './navigation'
+import { logoutResident } from '../features/auth/api/authApi'
 import type { CurrentUser } from '../features/current-user/model/types'
 import { useDormitorySelection } from '../features/dormitories/model/useDormitorySelection'
+import { usePushNotifications } from '../features/manage-push-notifications/model/usePushNotifications'
 import {
     HEADER_HEIGHT_PX,
 } from '../shared/ui/mobileStickyThreshold'
+import classes from './ResidentAppShell.module.css'
 
 type Props = {
     currentPath: string
@@ -55,9 +57,193 @@ function isCurrentPathActive(currentPath: string, href: string): boolean {
     return pathWithoutSearch === href
 }
 
-function isSettingsPath(pathname: string): boolean {
-    const pathWithoutSearch = pathname.split('?')[0] ?? pathname
-    return pathWithoutSearch === '/app/settings' || pathWithoutSearch === '/app/notifications'
+function getUserDisplayName(user: CurrentUser | null): string {
+    if (!user) {
+        return 'Аккаунт'
+    }
+
+    return user.first_name.trim() || user.last_name.trim() || 'Аккаунт'
+}
+
+function getUserInitial(user: CurrentUser | null): string {
+    const source = user?.first_name.trim() || user?.last_name.trim() || 'A'
+    return source.charAt(0).toUpperCase()
+}
+
+function getAvatarColor(user: CurrentUser | null): string {
+    const source = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || 'Dorm User'
+    let hash = 0
+
+    for (const character of source) {
+        hash = (hash * 31 + character.charCodeAt(0)) % 360
+    }
+
+    return `hsl(${hash} 78% 60%)`
+}
+
+async function handleResidentLogout() {
+    try {
+        await logoutResident()
+    } finally {
+        window.location.assign('/app/login')
+    }
+}
+
+function getNotificationMessage(state: ReturnType<typeof usePushNotifications>['state'], error: string | null): string {
+    switch (state) {
+        case 'subscribed':
+        case 'unsubscribing':
+            return 'Уведомления включены'
+        case 'permission-denied':
+            return 'Разрешите уведомления в настройках браузера'
+        case 'unsupported':
+            return 'Ваш браузер не поддерживает уведомления'
+        case 'insecure-context':
+            return 'Для уведомлений требуется защищённое соединение'
+        case 'disabled-by-server':
+            return 'Уведомления временно недоступны'
+        case 'installation-required':
+            return 'Добавьте приложение на экран домой, чтобы включить уведомления'
+        case 'error':
+            return error ?? 'Не удалось обновить настройки уведомлений'
+        default:
+            return 'Включите уведомления, чтобы не забывать о дежурстве'
+    }
+}
+
+function getNotificationChecked(state: ReturnType<typeof usePushNotifications>['state']): boolean {
+    return state === 'subscribed' || state === 'unsubscribing'
+}
+
+function isNotificationToggleDisabled(state: ReturnType<typeof usePushNotifications>['state']): boolean {
+    return state === 'loading'
+        || state === 'subscribing'
+        || state === 'unsubscribing'
+        || state === 'unsupported'
+        || state === 'insecure-context'
+        || state === 'disabled-by-server'
+        || state === 'installation-required'
+        || state === 'permission-denied'
+        || state === 'error'
+}
+
+type AccountButtonProps = {
+    className?: string
+    nameClassName?: string
+    user: CurrentUser | null
+}
+
+function AccountButton({ className, nameClassName, user }: AccountButtonProps) {
+    const avatarColor = useMemo(() => getAvatarColor(user), [user])
+    const [opened, { toggle, close }] = useDisclosure(false)
+    const rootRef = useClickOutside<HTMLDivElement>(() => close())
+
+    return (
+        <div ref={rootRef} className={classes.accountButtonWrap}>
+            <UnstyledButton
+                className={[classes.accountButton, className ?? ''].join(' ').trim()}
+                aria-label="Открыть меню аккаунта"
+                aria-expanded={opened}
+                onClick={() => toggle()}
+            >
+                <span className={classes.avatar} style={{ backgroundColor: avatarColor }}>
+                    {getUserInitial(user)}
+                </span>
+                <span className={[classes.accountName, nameClassName ?? ''].join(' ').trim()}>
+                    {getUserDisplayName(user)}
+                </span>
+            </UnstyledButton>
+
+            {opened ? (
+                <div className={classes.accountDropdown}>
+                    <button
+                        type="button"
+                        className={classes.logoutButton}
+                        onClick={() => void handleResidentLogout()}
+                    >
+                        <SignOutIcon size={24} weight="regular" />
+                        <span>Выйти</span>
+                    </button>
+                </div>
+            ) : null}
+        </div>
+    )
+}
+
+function NotificationsButton() {
+    const { state, error, enable, disable } = usePushNotifications()
+    const checked = getNotificationChecked(state)
+    const disabled = isNotificationToggleDisabled(state)
+    const toggleLabel = checked ? 'Отключить уведомления' : 'Включить уведомления'
+
+    return (
+        <Popover position="bottom-end" offset={14} shadow="none" withArrow={false}>
+            <Popover.Target>
+                <UnstyledButton
+                    className={classes.iconButton}
+                    aria-label="Открыть настройки уведомлений"
+                >
+                    <BellIcon size={32} weight="regular" />
+                </UnstyledButton>
+            </Popover.Target>
+
+            <Popover.Dropdown className={[classes.dropdown, classes.notificationDropdown].join(' ')}>
+                <Stack gap={24}>
+                    <Text className={classes.notificationMessage}>
+                        {getNotificationMessage(state, error)}
+                    </Text>
+
+                    <div className={classes.notificationToggleRow}>
+                        <Switch
+                            className={classes.notificationSwitch}
+                            checked={checked}
+                            disabled={disabled}
+                            withThumbIndicator={false}
+                            aria-label={toggleLabel}
+                            onChange={(event) => {
+                                if (event.currentTarget.checked) {
+                                    void enable()
+                                    return
+                                }
+
+                                void disable()
+                            }}
+                            styles={{
+                                root: {
+                                    '--switch-height': '20px',
+                                    '--switch-width': '40px',
+                                    '--switch-thumb-size': '16px',
+                                    '--switch-track-label-padding': '2px',
+                                    '--switch-radius': '999px',
+                                } as CSSProperties,
+                                track: {
+                                    backgroundColor: checked ? '#0F766E' : '#DDE4E2',
+                                    borderColor: checked ? '#0F766E' : '#DDE4E2',
+                                    height: 20,
+                                    minHeight: 20,
+                                },
+                                thumb: {
+                                    width: 16,
+                                    minWidth: 16,
+                                    height: 16,
+                                    borderWidth: 0,
+                                },
+                            }}
+                        />
+
+                        <Text
+                            className={[
+                                classes.notificationToggleText,
+                                disabled ? classes.notificationToggleTextDisabled : '',
+                            ].join(' ').trim()}
+                        >
+                            {toggleLabel}
+                        </Text>
+                    </div>
+                </Stack>
+            </Popover.Dropdown>
+        </Popover>
+    )
 }
 
 export function ResidentAppShell({
@@ -74,6 +260,7 @@ export function ResidentAppShell({
     const hasManagementNavigation = Boolean(currentUser?.can_manage_dormitories)
     const canManagePenalties = currentUser?.can_manage_penalties === true
     const hasNavigation = hasManagementNavigation || canManagePenalties
+    const showShellControls = currentUser != null && !currentUserLoading && currentUserError == null
     const {
         dormitories,
         loading: dormitoriesLoading,
@@ -143,31 +330,8 @@ export function ResidentAppShell({
         }
     }
 
-    const desktopDormitoryControls = hasManagementNavigation ? (
-        <Group align="center" gap="sm" wrap="nowrap">
-            <Select
-                aria-label="Общежитие"
-                placeholder="Общежитие"
-                data={dormitoryOptions}
-                value={selectedDormitoryId}
-                onChange={(value) => setSelectedDormitoryId(value)}
-                allowDeselect={false}
-                disabled={dormitories.length === 0}
-                w={{ base: '100%', sm: 240 }}
-                loading={dormitoriesLoading}
-            />
-
-            <Button
-                variant="default"
-                onClick={() => onNavigate('/app/dormitories')}
-            >
-                Управление общежитиями
-            </Button>
-        </Group>
-    ) : null
-
-    const mobileDormitoryControls = hasManagementNavigation ? (
-        <Stack gap="sm">
+    const sidebarDormitoryControls = hasManagementNavigation ? (
+        <Stack gap="sm" className={classes.dormitoryControls}>
             <Select
                 aria-label="Общежитие"
                 placeholder="Общежитие"
@@ -191,22 +355,6 @@ export function ResidentAppShell({
             </Button>
         </Stack>
     ) : null
-
-    function handleLogoClick() {
-        closeNavbar()
-        onNavigate('/app/tasks')
-    }
-
-    function handleSettingsClick() {
-        closeNavbar()
-
-        if (isSettingsPath(currentPath)) {
-            onNavigate(getSettingsReturnPath())
-            return
-        }
-
-        onNavigate('/app/settings')
-    }
 
     useEffect(() => {
         pageViewportRef.current?.scrollTo({
@@ -259,86 +407,79 @@ export function ResidentAppShell({
                 navbar: {
                     backgroundColor: '#1F2927',
                     borderRight: '1px solid #31403D',
+                    top: 0,
+                    height: '100dvh',
                 },
                 header: {
-                    backgroundColor: 'var(--app-color-surface)',
-                    borderBottom: '1px solid var(--app-color-border)',
+                    backgroundColor: 'transparent',
+                    borderBottom: 'none',
+                    backdropFilter: 'none',
                 },
             }}
         >
             {hasNavigation ? (
-                <AppShell.Navbar p="md">
-                    <Stack gap="md">
-                        {mobileDormitoryControls ? (
-                            <Stack gap="sm" hiddenFrom="sm">
-                                {mobileDormitoryControls}
-                            </Stack>
+                <AppShell.Navbar p={0} className={classes.navbar}>
+                    <Stack className={classes.navbarContent}>
+                        {showShellControls ? (
+                            <AccountButton
+                                className={classes.accountButtonDark}
+                                user={currentUser}
+                            />
                         ) : null}
 
-                        {navigationItems.map((item) => (
-                            <NavLink
-                                key={item.href}
-                                active={isCurrentPathActive(currentPath, item.href)}
-                                label={item.label}
-                                onClick={() => {
-                                    closeNavbar()
-                                    onNavigate(item.href)
-                                }}
-                                styles={getNavigationItemStyles(
-                                    isCurrentPathActive(currentPath, item.href),
-                                )}
-                            />
-                        ))}
+                        {sidebarDormitoryControls}
+
+                        <div className={classes.navigationList}>
+                            {navigationItems.map((item) => (
+                                <NavLink
+                                    key={item.href}
+                                    active={isCurrentPathActive(currentPath, item.href)}
+                                    label={item.label}
+                                    onClick={() => {
+                                        closeNavbar()
+                                        onNavigate(item.href)
+                                    }}
+                                    styles={getNavigationItemStyles(
+                                        isCurrentPathActive(currentPath, item.href),
+                                    )}
+                                />
+                            ))}
+                        </div>
                     </Stack>
                 </AppShell.Navbar>
             ) : null}
 
-            <AppShell.Header px={{ base: 'md', md: 'xl' }}>
-                <Group align="center" h="100%" justify="space-between" wrap="nowrap">
-                    <Group align="center" wrap="nowrap" gap="md">
+            <AppShell.Header px={{ base: 'md', md: 'xl' }} className={classes.header}>
+                <div className={classes.headerInner}>
+                    <div className={classes.headerLeft}>
                         {hasNavigation ? (
-                            <Burger
-                                opened={navbarOpened}
-                                onClick={toggleNavbar}
-                                hiddenFrom="sm"
-                                size="sm"
-                                aria-label="Открыть навигацию"
+                            <>
+                                <Burger
+                                    opened={navbarOpened}
+                                    onClick={toggleNavbar}
+                                    hiddenFrom="sm"
+                                    size="sm"
+                                    aria-label="Открыть навигацию"
+                                />
+
+                                {showShellControls ? (
+                                    <AccountButton
+                                        className={classes.mobileHeaderAccount}
+                                        nameClassName={classes.desktopAccountName}
+                                        user={currentUser}
+                                    />
+                                ) : null}
+                            </>
+                        ) : showShellControls ? (
+                            <AccountButton
+                                nameClassName={classes.desktopAccountName}
+                                user={currentUser}
                             />
                         ) : null}
+                    </div>
 
-                        <Box
-                            component="img"
-                            src={logo}
-                            alt="Dorm"
-                            h={32}
-                            w="auto"
-                            style={{
-                                display: 'block',
-                                cursor: 'pointer',
-                            }}
-                            onClick={handleLogoClick}
-                        />
-
-                        {desktopDormitoryControls && (
-                            <Group align="center" gap="sm" wrap="nowrap" visibleFrom="sm">
-                                {desktopDormitoryControls}
-                            </Group>
-                        )}
-                    </Group>
-
-                    <Tooltip label="Настройки" withArrow>
-                        <ActionIcon
-                            aria-label="Открыть настройки"
-                            variant="subtle"
-                            color="gray"
-                            size="lg"
-                            radius="xl"
-                            onClick={handleSettingsClick}
-                        >
-                            <GearIcon size={25} />
-                        </ActionIcon>
-                    </Tooltip>
-                </Group>
+                    {showShellControls ? <NotificationsButton /> : null}
+                </div>
             </AppShell.Header>
 
             <AppShell.Main>
