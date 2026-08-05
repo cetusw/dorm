@@ -972,7 +972,7 @@ func (s *Service) resolveCurrentDutyNotice(
 
 	if isOnDutyTeam && periodStatus == dutyPeriodStatusPast && hasOutstandingTasks && currentDuty.activeDutyTeam != nil && currentDuty.activeDuty != nil {
 		return fmt.Sprintf(
-			"На этой неделе дежурит команда %s. Скорее завершите свои задачи, чтобы не получить предупреждение",
+			"На этой неделе ответственный за дежурство — %s. Скорее завершите свои задачи, чтобы не получить предупреждение",
 			s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam),
 		)
 	}
@@ -981,7 +981,7 @@ func (s *Service) resolveCurrentDutyNotice(
 		return ""
 	}
 
-	return fmt.Sprintf("На этой неделе дежурит команда %s", s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam))
+	return fmt.Sprintf("На этой неделе ответственный за дежурство — %s", s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam))
 }
 
 func (s *Service) resolveCurrentDutyNoticeTone(
