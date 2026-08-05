@@ -111,7 +111,7 @@ export function TaskTableRow({
                                 className={classes.checkbox}
                                 checked={checkboxChecked}
                                 disabled={pending}
-                                size="20px"
+                                size="25px"
                                 radius="xl"
                                 iconColor="#FFFFFF"
                                 styles={{

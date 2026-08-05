@@ -2,7 +2,7 @@
     --task-row-hover-action-width: 320px;
     --task-row-score-width: 120px;
     --task-row-assignee-width: 180px;
-    --task-row-checkbox-width: 20px;
+    --task-row-checkbox-width: 25px;
     --task-row-checkbox-gap: 20px;
     border: 0;
 }
