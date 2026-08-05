@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { BookOpenIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
-import { ActionIcon, Alert, Box, Center, Group, Loader, Menu, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import { ActionIcon, Alert, Box, Center, Group, Loader, Menu, Notification, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
 import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 import {
@@ -24,6 +24,7 @@ import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 import { navigateTo } from '../../app/navigation'
+import { HEADER_HEIGHT_PX } from '../../shared/ui/mobileStickyThreshold'
 
 type PlanLegendItem = {
     color: string
@@ -67,6 +68,9 @@ type Props = {
     selectedGroupId?: string
 }
 
+const CURRENT_DUTY_NOTICE_Z_INDEX = 40
+const CURRENT_DUTY_NOTICE_TOP_OFFSET_PX = HEADER_HEIGHT_PX + 8
+
 export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     const {
         selectedGroupId,
@@ -82,6 +86,7 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         handleReopen,
         handleVerify,
         reloadCurrentDuty,
+        enoughTasksNoticeVersion,
         visibleMineTaskIds,
         visibleFreeTaskIds,
     } = useCurrentDuty(initialGroupId)
@@ -89,6 +94,7 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
     const [legendOpened, setLegendOpened] = useState(false)
+    const [showEnoughTasksNotice, setShowEnoughTasksNotice] = useState(false)
     const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
     const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
     const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
@@ -106,6 +112,21 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
             setSelectedFloorPlanId(String(availableFloorPlans[0]?.floor ?? ''))
         }
     }, [availableFloorPlans, selectedFloorPlanId])
+
+    useEffect(() => {
+        if (enoughTasksNoticeVersion === 0) {
+            return
+        }
+
+        setShowEnoughTasksNotice(true)
+        const timeoutId = window.setTimeout(() => {
+            setShowEnoughTasksNotice(false)
+        }, 5000)
+
+        return () => {
+            window.clearTimeout(timeoutId)
+        }
+    }, [enoughTasksNoticeVersion])
 
     if (loading) {
         return (
@@ -332,76 +353,117 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     }
 
     return (
-        <PageFrame
-            title="Дежурство"
-            subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
-            titleActions={titleActions}
-            error={error}
-            notice={duty.notice_message}
-            noticeTone={duty.notice_tone}
-            controls={controls}
-        >
-            {displayMode === 'plan' && activeSelect !== 'team' ? (
+        <>
+            {showEnoughTasksNotice ? (
                 <>
-                    {selectedFloorPlan ? (
-                        <BuildingPlanPanel
-                            key={selectedFloorPlan.floor}
-                            activeSelect={activeSelect}
-                            actionMode={viewOptions.actionMode}
-                            allTasks={duty.tasks}
-                            floorPlan={selectedFloorPlan}
-                            isReadOnly={viewOptions.isReadOnly}
-                            pendingTaskId={pendingTaskId}
-                            tasks={displayedTasks}
-                            onTake={handleTake}
-                            onReturn={handleReturn}
-                            onComplete={handleComplete}
-                            onOpen={handleOpen}
-                            onReopen={handleReopen}
-                            onVerify={handleVerify}
-                        />
-                    ) : (
-                        <Alert color="gray">Для выбранного общежития план здания не настроен.</Alert>
-                    )}
-                    <Box hiddenFrom="md">
-                        <TaskGroups
-                            isReadOnly={viewOptions.isReadOnly}
-                            actionMode={viewOptions.actionMode}
-                            pendingTaskId={pendingTaskId}
-                            tasks={displayedTasks}
-                            emptyMessage={viewOptions.emptyMessage}
-                            onTake={handleTake}
-                            onReturn={handleReturn}
-                            onComplete={handleComplete}
-                            onOpen={handleOpen}
-                            onReopen={handleReopen}
-                            onVerify={handleVerify}
-                        />
+                    <Box
+                        pos="fixed"
+                        top={CURRENT_DUTY_NOTICE_TOP_OFFSET_PX}
+                        right={16}
+                        style={{
+                            zIndex: CURRENT_DUTY_NOTICE_Z_INDEX,
+                            width: 'min(420px, calc(100vw - 32px))',
+                            animation: 'current-duty-notification-enter 220ms ease-out',
+                        }}
+                    >
+                        <Notification
+                            withCloseButton
+                            color="#0369A1"
+                            title="Взято достаточно задач"
+                            onClose={() => setShowEnoughTasksNotice(false)}
+                        >
+                            Оставьте задачи для остальных участников команды
+                        </Notification>
                     </Box>
+                    <style>
+                        {`
+                            @keyframes current-duty-notification-enter {
+                                from {
+                                    opacity: 0;
+                                    transform: translateX(calc(100% + 16px));
+                                }
+
+                                to {
+                                    opacity: 1;
+                                    transform: translateX(0);
+                                }
+                            }
+                        `}
+                    </style>
                 </>
-            ) : activeSelect === 'team' ? (
-                <TeamMemberTaskGroups duty={duty} />
-            ) : (
-                <TaskGroups
-                    isReadOnly={viewOptions.isReadOnly}
-                    actionMode={viewOptions.actionMode}
-                    pendingTaskId={pendingTaskId}
-                    tasks={displayedTasks}
-                    emptyMessage={viewOptions.emptyMessage}
-                    onTake={handleTake}
-                    onReturn={handleReturn}
-                    onComplete={handleComplete}
-                    onOpen={handleOpen}
-                    onReopen={handleReopen}
-                    onVerify={handleVerify}
+            ) : null}
+
+            <PageFrame
+                title="Дежурство"
+                subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
+                titleActions={titleActions}
+                error={error}
+                notice={duty.notice_message}
+                noticeTone={duty.notice_tone}
+                controls={controls}
+            >
+                {displayMode === 'plan' && activeSelect !== 'team' ? (
+                    <>
+                        {selectedFloorPlan ? (
+                            <BuildingPlanPanel
+                                key={selectedFloorPlan.floor}
+                                activeSelect={activeSelect}
+                                actionMode={viewOptions.actionMode}
+                                allTasks={duty.tasks}
+                                floorPlan={selectedFloorPlan}
+                                isReadOnly={viewOptions.isReadOnly}
+                                pendingTaskId={pendingTaskId}
+                                tasks={displayedTasks}
+                                onTake={handleTake}
+                                onReturn={handleReturn}
+                                onComplete={handleComplete}
+                                onOpen={handleOpen}
+                                onReopen={handleReopen}
+                                onVerify={handleVerify}
+                            />
+                        ) : (
+                            <Alert color="gray">Для выбранного общежития план здания не настроен.</Alert>
+                        )}
+                        <Box hiddenFrom="md">
+                            <TaskGroups
+                                isReadOnly={viewOptions.isReadOnly}
+                                actionMode={viewOptions.actionMode}
+                                pendingTaskId={pendingTaskId}
+                                tasks={displayedTasks}
+                                emptyMessage={viewOptions.emptyMessage}
+                                onTake={handleTake}
+                                onReturn={handleReturn}
+                                onComplete={handleComplete}
+                                onOpen={handleOpen}
+                                onReopen={handleReopen}
+                                onVerify={handleVerify}
+                            />
+                        </Box>
+                    </>
+                ) : activeSelect === 'team' ? (
+                    <TeamMemberTaskGroups duty={duty} />
+                ) : (
+                    <TaskGroups
+                        isReadOnly={viewOptions.isReadOnly}
+                        actionMode={viewOptions.actionMode}
+                        pendingTaskId={pendingTaskId}
+                        tasks={displayedTasks}
+                        emptyMessage={viewOptions.emptyMessage}
+                        onTake={handleTake}
+                        onReturn={handleReturn}
+                        onComplete={handleComplete}
+                        onOpen={handleOpen}
+                        onReopen={handleReopen}
+                        onVerify={handleVerify}
+                    />
+                )}
+                <CreateGroupDutyModal
+                    opened={createModalOpened}
+                    groupId={duty.selected_group_id}
+                    onClose={() => setCreateModalOpened(false)}
+                    onCreated={reloadCurrentDuty}
                 />
-            )}
-            <CreateGroupDutyModal
-                opened={createModalOpened}
-                groupId={duty.selected_group_id}
-                onClose={() => setCreateModalOpened(false)}
-                onCreated={reloadCurrentDuty}
-            />
-        </PageFrame>
+            </PageFrame>
+        </>
     )
 }

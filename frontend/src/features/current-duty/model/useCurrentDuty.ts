@@ -44,12 +44,32 @@ function syncGroupIdInUrl(groupId: string) {
     window.history.replaceState(window.history.state, '', `${window.location.pathname}?${suffix}`)
 }
 
+function countTeamMembersBelowGoal(duty: ResidentCurrentDuty): number {
+    const takenCostByMemberId = new Map<string, number>()
+
+    duty.tasks.forEach((task) => {
+        if (!task.assignee_id) {
+            return
+        }
+
+        takenCostByMemberId.set(
+            task.assignee_id,
+            (takenCostByMemberId.get(task.assignee_id) ?? 0) + task.cost,
+        )
+    })
+
+    return duty.team_members.filter(
+        (member) => (takenCostByMemberId.get(member.id) ?? 0) < duty.cost_per_resident_goal,
+    ).length
+}
+
 export function useCurrentDuty(initialGroupId?: string) {
     const [duty, setDuty] = useState<ResidentCurrentDuty | null>(null)
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
+    const [enoughTasksNoticeVersion, setEnoughTasksNoticeVersion] = useState(0)
     const orderedTaskIdsRef = useRef<string[]>([])
     const visibleMineTaskIdsRef = useRef<string[]>([])
     const visibleFreeTaskIdsRef = useRef<string[]>([])
@@ -91,7 +111,7 @@ export function useCurrentDuty(initialGroupId?: string) {
     async function runTaskAction(
         taskId: string,
         action: (currentTaskId: string, groupId?: string) => Promise<ResidentCurrentDuty>,
-    ): Promise<boolean> {
+    ): Promise<ResidentCurrentDuty | null> {
         setPendingTaskId(taskId)
         setError(null)
 
@@ -101,23 +121,33 @@ export function useCurrentDuty(initialGroupId?: string) {
                 ...updatedDuty,
                 tasks: preserveTaskOrder(updatedDuty.tasks, orderedTaskIdsRef.current),
             })
-            return true
+            return updatedDuty
         } catch (currentError) {
             if (currentError instanceof ApiError && currentError.status === 409) {
                 await reload(selectedGroupId ?? undefined)
             }
 
             setError(toErrorMessage(currentError))
-            return false
+            return null
         } finally {
             setPendingTaskId(null)
         }
     }
 
     const handleTake: TaskActionHandler = async (taskId) => {
-        const success = await runTaskAction(taskId, takeTask)
-        if (!success) {
+        const previousDuty = duty
+        const updatedDuty = await runTaskAction(taskId, takeTask)
+        if (!updatedDuty) {
             return false
+        }
+
+        if (
+            previousDuty &&
+            previousDuty.my_taken_cost_sum < previousDuty.cost_per_resident_goal &&
+            updatedDuty.my_taken_cost_sum >= updatedDuty.cost_per_resident_goal &&
+            countTeamMembersBelowGoal(previousDuty) > 1
+        ) {
+            setEnoughTasksNoticeVersion((currentValue) => currentValue + 1)
         }
 
         visibleMineTaskIdsRef.current = appendUniqueTaskId(visibleMineTaskIdsRef.current, taskId)
@@ -125,8 +155,8 @@ export function useCurrentDuty(initialGroupId?: string) {
     }
 
     const handleReturn: TaskActionHandler = async (taskId) => {
-        const success = await runTaskAction(taskId, returnTask)
-        if (!success) {
+        const updatedDuty = await runTaskAction(taskId, returnTask)
+        if (!updatedDuty) {
             return false
         }
 
@@ -147,11 +177,12 @@ export function useCurrentDuty(initialGroupId?: string) {
         selectGroup: (groupId: string) => reload(groupId),
         handleTake,
         handleReturn,
-        handleComplete: ((taskId: string) => runTaskAction(taskId, completeTask)) satisfies TaskActionHandler,
-        handleOpen: ((taskId: string) => runTaskAction(taskId, openTask)) satisfies TaskActionHandler,
-        handleReopen: ((taskId: string) => runTaskAction(taskId, reopenTask)) satisfies TaskActionHandler,
-        handleVerify: ((taskId: string) => runTaskAction(taskId, verifyTask)) satisfies TaskActionHandler,
+        handleComplete: (async (taskId: string) => Boolean(await runTaskAction(taskId, completeTask))) satisfies TaskActionHandler,
+        handleOpen: (async (taskId: string) => Boolean(await runTaskAction(taskId, openTask))) satisfies TaskActionHandler,
+        handleReopen: (async (taskId: string) => Boolean(await runTaskAction(taskId, reopenTask))) satisfies TaskActionHandler,
+        handleVerify: (async (taskId: string) => Boolean(await runTaskAction(taskId, verifyTask))) satisfies TaskActionHandler,
         reloadCurrentDuty: () => reload(selectedGroupId ?? undefined),
+        enoughTasksNoticeVersion,
         visibleMineTaskIds: visibleMineTaskIdsRef.current,
         visibleFreeTaskIds: visibleFreeTaskIdsRef.current,
     }
