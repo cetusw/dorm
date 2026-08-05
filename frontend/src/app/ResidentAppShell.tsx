@@ -1,6 +1,6 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef } from 'react'
 
-import { BellIcon, SignOutIcon } from '@phosphor-icons/react'
+import { BellIcon, CalendarBlankIcon, SignOutIcon, WarningIcon } from '@phosphor-icons/react'
 import {
     AppShell,
     Box,
@@ -40,6 +40,7 @@ type Props = {
 
 type NavigationItem = {
     href: string
+    icon?: ReactNode
     label: string
 }
 
@@ -288,20 +289,24 @@ export function ResidentAppShell({
             },
             {
                 href: '/app/tasks',
+                icon: <CalendarBlankIcon size={24} weight="regular" />,
                 label: 'Дежурство',
             },
             {
                 href: '/app/penalties',
+                icon: <WarningIcon size={24} weight="regular" />,
                 label: 'Предупреждения',
             },
         ]
         : canManagePenalties ? [
             {
                 href: '/app/tasks',
+                icon: <CalendarBlankIcon size={24} weight="regular" />,
                 label: 'Дежурство',
             },
             {
                 href: '/app/penalties',
+                icon: <WarningIcon size={24} weight="regular" />,
                 label: 'Предупреждения',
             },
         ] : []
@@ -310,25 +315,6 @@ export function ResidentAppShell({
         value: String(dormitory.id),
         label: dormitory.name,
     }))
-
-    function getNavigationItemStyles(active: boolean) {
-        return {
-            root: {
-                color: '#f9fafb',
-                borderRadius: 8,
-                backgroundColor: active
-                    ? 'rgba(204, 251, 241, 0.16)'
-                    : 'transparent',
-                border: active
-                    ? '1px solid rgba(204, 251, 241, 0.28)'
-                    : '1px solid transparent',
-            },
-            label: {
-                color: '#f9fafb',
-                fontWeight: 500,
-            },
-        }
-    }
 
     const sidebarDormitoryControls = hasManagementNavigation ? (
         <Stack gap="sm" className={classes.dormitoryControls}>
@@ -405,8 +391,7 @@ export function ResidentAppShell({
                     '--app-shell-header-offset': `${HEADER_HEIGHT_PX}px`,
                 },
                 navbar: {
-                    backgroundColor: '#1F2927',
-                    borderRight: '1px solid #31403D',
+                    backgroundColor: '#FFFFFF',
                     top: 0,
                     height: '100dvh',
                 },
@@ -427,14 +412,18 @@ export function ResidentAppShell({
                                 <NavLink
                                     key={item.href}
                                     active={isCurrentPathActive(currentPath, item.href)}
+                                    leftSection={item.icon}
                                     label={item.label}
                                     onClick={() => {
                                         closeNavbar()
                                         onNavigate(item.href)
                                     }}
-                                    styles={getNavigationItemStyles(
-                                        isCurrentPathActive(currentPath, item.href),
-                                    )}
+                                    classNames={{
+                                        root: classes.navLink,
+                                        label: classes.navLinkLabel,
+                                        section: classes.navLinkSection,
+                                        body: classes.navLinkBody,
+                                    }}
                                 />
                             ))}
                         </div>

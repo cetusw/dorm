@@ -33,12 +33,11 @@
 }
 
 .navbar {
-    background: #1f2927;
-    border-right: 1px solid #31403d;
-    padding: 20px 16px;
+    background: #ffffff;
     height: 100dvh;
     display: flex;
     flex-direction: column;
+    width: 280px;
 }
 
 .navbarContent {
@@ -47,6 +46,10 @@
     gap: 20px;
     min-height: 0;
     flex: 1;
+    padding: 20px 15px;
+    width: 250px;
+    max-width: 250px;
+    box-sizing: content-box;
 }
 
 .accountButton {
@@ -106,7 +109,54 @@
 .navigationList {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
+    width: 250px;
+    max-width: 250px;
+}
+
+.navLink {
+    width: 250px;
+    min-height: 40px;
+    border-radius: 4px;
+    padding: 8px 15px;
+    color: #344a47;
+    background: #ffffff;
+    border: 1px solid transparent;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+.navLink:hover,
+.navLink:focus-visible {
+    background: #eef6f4;
+}
+
+.navLink[data-active='true'] {
+    background: #ddeeeb;
+    color: #0f766e;
+}
+
+.navLink[data-active='true']:hover,
+.navLink[data-active='true']:focus-visible {
+    background: #ddeeeb;
+}
+
+.navLinkLabel {
+    color: inherit;
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 500;
+}
+
+.navLinkSection {
+    color: inherit;
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    margin-inline-end: 7px;
+}
+
+.navLinkBody {
+    gap: 0;
 }
 
 .iconButton {
