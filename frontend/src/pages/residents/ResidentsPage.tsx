@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Alert, Button, Center, Loader } from '@mantine/core'
+import { Alert, Center, Loader } from '@mantine/core'
 
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import { useResidents } from '../../features/residents/model/useResidents'
@@ -9,6 +9,7 @@ import { DeleteResidentModal } from '../../features/residents/ui/DeleteResidentM
 import { ResidentFormModal } from '../../features/residents/ui/ResidentFormModal'
 import { ResidentsTable } from '../../features/residents/ui/ResidentsTable'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
+import { PageActionButton } from '../../shared/ui/PageActionButton'
 
 export function ResidentsPage() {
     const selectedDormitoryId = useSelectedDormitoryId()
@@ -32,9 +33,9 @@ export function ResidentsPage() {
     }
 
     const titleActions = (
-        <Button radius="md" onClick={handleCreate} disabled={selectedDormitoryId === null}>
-            + Создать жителя
-        </Button>
+        <PageActionButton onClick={handleCreate} disabled={selectedDormitoryId === null}>
+            Создать жителя
+        </PageActionButton>
     )
 
     let content = null

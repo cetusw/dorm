@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Alert, Button, Center, Loader } from '@mantine/core'
+import { Alert, Center, Loader } from '@mantine/core'
 
 import { navigateTo } from '../../app/navigation'
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
@@ -10,6 +10,7 @@ import { DeleteGroupModal } from '../../features/groups/ui/DeleteGroupModal'
 import { GroupFormModal } from '../../features/groups/ui/GroupFormModal'
 import { GroupsTable } from '../../features/groups/ui/GroupsTable'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
+import { PageActionButton } from '../../shared/ui/PageActionButton'
 
 export function GroupsPage() {
     const selectedDormitoryId = useSelectedDormitoryId()
@@ -33,9 +34,9 @@ export function GroupsPage() {
     }
 
     const titleActions = (
-        <Button radius="md" onClick={handleCreate} disabled={selectedDormitoryId === null}>
-            + Создать группу
-        </Button>
+        <PageActionButton onClick={handleCreate} disabled={selectedDormitoryId === null}>
+            Создать группу
+        </PageActionButton>
     )
 
     let content = null

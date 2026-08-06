@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { Alert, Button, Center, Loader } from '@mantine/core'
+import { Alert, Center, Loader } from '@mantine/core'
 
 import { getGroup } from '../../features/groups/api/groupsApi'
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
@@ -10,6 +10,7 @@ import { DeleteTeamModal } from '../../features/teams/ui/DeleteTeamModal'
 import { TeamFormModal } from '../../features/teams/ui/TeamFormModal'
 import { TeamsTable } from '../../features/teams/ui/TeamsTable'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
+import { PageActionButton } from '../../shared/ui/PageActionButton'
 
 type Props = {
     groupId: string
@@ -74,9 +75,9 @@ export function GroupTeamsPage({ groupId }: Props) {
     }
 
     const titleActions = (
-        <Button radius="md" onClick={handleCreate} disabled={!selectedDormitoryId}>
-            + Создать команду
-        </Button>
+        <PageActionButton onClick={handleCreate} disabled={!selectedDormitoryId}>
+            Создать команду
+        </PageActionButton>
     )
 
     let content = null

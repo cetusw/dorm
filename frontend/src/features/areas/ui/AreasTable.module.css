@@ -1,0 +1,40 @@
+.actionCell {
+    text-align: center;
+}
+
+.sortButtonLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sortButtonIndicator {
+    color: var(--app-color-text-muted);
+    font-size: 12px;
+    line-height: 1;
+}
+
+.actionCellInner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+}
+
+.actionButton {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.row:hover .actionButton,
+.row[data-menu-open='true'] .actionButton {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (hover: none) {
+    .actionButton {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}

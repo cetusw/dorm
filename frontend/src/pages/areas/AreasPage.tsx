@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Alert, Button, Center, Loader } from '@mantine/core'
+import { Alert, Center, Loader } from '@mantine/core'
 
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import { useAreas } from '../../features/areas/model/useAreas'
@@ -9,6 +9,7 @@ import { AreasTable } from '../../features/areas/ui/AreasTable'
 import { AreaFormModal } from '../../features/areas/ui/AreaFormModal'
 import { DeleteAreaModal } from '../../features/areas/ui/DeleteAreaModal'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
+import { PageActionButton } from '../../shared/ui/PageActionButton'
 
 export function AreasPage() {
     const selectedDormitoryId = useSelectedDormitoryId()
@@ -32,9 +33,9 @@ export function AreasPage() {
     }
 
     const titleActions = (
-        <Button radius="md" onClick={handleCreate} disabled={!selectedDormitoryId}>
-            + Создать территорию
-        </Button>
+        <PageActionButton onClick={handleCreate} disabled={!selectedDormitoryId}>
+            Создать территорию
+        </PageActionButton>
     )
 
     let content = null

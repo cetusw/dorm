@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Alert, Button, Center, Loader } from '@mantine/core'
+import { Alert, Center, Loader } from '@mantine/core'
 
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import { useTaskCatalog } from '../../features/task-catalog/model/useTaskCatalog'
@@ -9,6 +9,7 @@ import { DeleteTaskModal } from '../../features/task-catalog/ui/DeleteTaskModal'
 import { TaskFormModal } from '../../features/task-catalog/ui/TaskFormModal'
 import { TaskCatalogTable } from '../../features/task-catalog/ui/TaskCatalogTable'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
+import { PageActionButton } from '../../shared/ui/PageActionButton'
 
 export function TaskCatalogPage() {
     const selectedDormitoryId = useSelectedDormitoryId()
@@ -32,9 +33,9 @@ export function TaskCatalogPage() {
     }
 
     const titleActions = (
-        <Button radius="md" onClick={handleCreate} disabled={!selectedDormitoryId}>
-            + Создать задачу
-        </Button>
+        <PageActionButton onClick={handleCreate} disabled={!selectedDormitoryId}>
+            Создать задачу
+        </PageActionButton>
     )
 
     let content = null
