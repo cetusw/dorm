@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { BookOpenIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
+import { BookOpenIcon, CalendarXIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
 import { ActionIcon, Alert, Box, Center, Group, Loader, Menu, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
 import type { DutyTaskSelect } from '../../features/current-duty/model/types'
@@ -22,6 +22,7 @@ import { BuildingPlanPanel } from '../../features/current-duty/building-plan/Bui
 import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { PageFrame } from '../../shared/ui/PageFrame'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { FloatingNotification } from '../../shared/ui/FloatingNotification'
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
@@ -368,8 +369,12 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
 
     if (!duty.has_active_duty) {
         return (
-            <PageFrame title="Дежурство" titleActions={titleActions} error={error} controls={controls}>
-                <Alert color="gray">В выбранной группе сейчас нет активного дежурства.</Alert>
+            <PageFrame title="Дежурство" titleActions={titleActions} error={error}>
+                <EmptyState
+                    icon={<CalendarXIcon size={32} />}
+                    title="Дежурство не найдено"
+                    description="В выбранной группе нет активного дежурства."
+                />
                 <CreateGroupDutyModal
                     opened={createModalOpened}
                     groupId={duty.selected_group_id}
