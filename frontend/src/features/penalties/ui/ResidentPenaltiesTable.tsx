@@ -5,7 +5,7 @@ import { ActionIcon, Loader, Menu, Table, Text } from '@mantine/core'
 
 import type { PenaltyItem } from '../model/types'
 import { formatPenaltyDate, formatPenaltyWeight } from '../model/utils'
-import { AppTable } from '../../../shared/ui/AppTable'
+import { ListTable, listTableClasses } from '../../../shared/ui/ListTable'
 import classes from './ResidentPenaltiesTable.module.css'
 
 type Props = {
@@ -22,9 +22,9 @@ export function ResidentPenaltiesTable({
     const [openedMenuId, setOpenedMenuId] = useState<string | null>(null)
 
     return (
-        <AppTable minWidth={720} verticalSpacing="sm">
+        <ListTable minWidth={720} verticalSpacing="sm">
             <Table.Thead>
-                <Table.Tr>
+                <Table.Tr className={listTableClasses.headerRow}>
                     <Table.Th>Причина</Table.Th>
                     <Table.Th w={120}>Вес</Table.Th>
                     <Table.Th w={168}>Дата получения</Table.Th>
@@ -39,7 +39,7 @@ export function ResidentPenaltiesTable({
                     return (
                         <Table.Tr
                             key={penalty.id}
-                            className={classes.row}
+                            className={`${listTableClasses.bodyRow} ${classes.row}`}
                             data-menu-open={menuOpened ? 'true' : undefined}
                         >
                             <Table.Td>
@@ -80,6 +80,6 @@ export function ResidentPenaltiesTable({
                     )
                 })}
             </Table.Tbody>
-        </AppTable>
+        </ListTable>
     )
 }

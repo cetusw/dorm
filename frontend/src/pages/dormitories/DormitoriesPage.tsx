@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Alert, Button, Center, Loader } from '@mantine/core'
+import { Alert, Center, Loader } from '@mantine/core'
 
 import { useDormitories } from '../../features/dormitories/model/useDormitories'
 import type { DormitoryListItem } from '../../features/dormitories/model/types'
@@ -9,6 +9,7 @@ import { DeleteDormitoryModal } from '../../features/dormitories/ui/DeleteDormit
 import { DormitoryFormModal } from '../../features/dormitories/ui/DormitoryFormModal'
 import { DormitoriesTable } from '../../features/dormitories/ui/DormitoriesTable'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
+import { PageActionButton } from '../../shared/ui/PageActionButton'
 
 export function DormitoriesPage() {
     const { dormitories, loading, error, reload } = useDormitories()
@@ -36,9 +37,7 @@ export function DormitoriesPage() {
     }
 
     const titleActions = (
-        <Button radius="md" onClick={handleCreate}>
-            + Создать общежитие
-        </Button>
+        <PageActionButton onClick={handleCreate}>Создать общежитие</PageActionButton>
     )
 
     let content = null

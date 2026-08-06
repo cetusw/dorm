@@ -1,12 +1,12 @@
 import { useState } from 'react'
 
-import { PlusIcon } from '@phosphor-icons/react'
-import { Alert, Button, Center, Loader } from '@mantine/core'
+import { Alert, Center, Loader } from '@mantine/core'
 
 import { usePenalties } from '../../features/penalties/model/usePenalties'
 import { CreatePenaltyDrawer } from '../../features/penalties/ui/CreatePenaltyDrawer'
 import { PenaltiesTable } from '../../features/penalties/ui/PenaltiesTable'
 import { ResidentPenaltiesDrawer } from '../../features/penalties/ui/ResidentPenaltiesDrawer'
+import { PageActionButton } from '../../shared/ui/PageActionButton'
 import { PageFrame } from '../../shared/ui/PageFrame'
 
 export function PenaltiesPage() {
@@ -18,14 +18,9 @@ export function PenaltiesPage() {
         <PageFrame
             title="Предупреждения"
             titleActions={(
-                <Button
-                    radius="md"
-                    h={42}
-                    leftSection={<PlusIcon size={18} />}
-                    onClick={() => setCreateDrawerOpened(true)}
-                >
+                <PageActionButton onClick={() => setCreateDrawerOpened(true)}>
                     Выдать предупреждение
-                </Button>
+                </PageActionButton>
             )}
         >
             {loading ? (

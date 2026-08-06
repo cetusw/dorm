@@ -2,7 +2,7 @@ import { Table, Text } from '@mantine/core'
 
 import type { PenaltyResidentSummary } from '../model/types'
 import { formatPenaltyWeight } from '../model/utils'
-import { AppTable, appTableClasses } from '../../../shared/ui/AppTable'
+import { ListTable, listTableClasses } from '../../../shared/ui/ListTable'
 import classes from './PenaltiesTable.module.css'
 
 type Props = {
@@ -12,9 +12,9 @@ type Props = {
 
 export function PenaltiesTable({ residents, onOpenResident }: Props) {
     return (
-        <AppTable minWidth={520}>
+        <ListTable minWidth={520}>
             <Table.Thead>
-                <Table.Tr>
+                <Table.Tr className={listTableClasses.headerRow}>
                     <Table.Th>Имя</Table.Th>
                     <Table.Th w={180}>Предупреждения</Table.Th>
                 </Table.Tr>
@@ -23,7 +23,7 @@ export function PenaltiesTable({ residents, onOpenResident }: Props) {
                 {residents.map((resident) => (
                     <Table.Tr
                         key={resident.user_id}
-                        className={`${appTableClasses.interactiveRow} ${appTableClasses.compactRow} ${resident.threshold_reached ? classes.thresholdRow : ''}`}
+                        className={`${listTableClasses.interactiveRow} ${listTableClasses.bodyRow} ${resident.threshold_reached ? classes.thresholdRow : ''}`}
                         tabIndex={0}
                         aria-label={`Открыть предупреждения жителя ${resident.full_name}`}
                         onClick={() => onOpenResident(resident.user_id)}
@@ -43,6 +43,6 @@ export function PenaltiesTable({ residents, onOpenResident }: Props) {
                     </Table.Tr>
                 ))}
             </Table.Tbody>
-        </AppTable>
+        </ListTable>
     )
 }

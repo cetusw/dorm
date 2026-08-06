@@ -1,0 +1,12 @@
+.headerRow th {
+    vertical-align: bottom;
+    padding-top: 0;
+    padding-bottom: 8px;
+}
+
+.bodyRow td {
+    vertical-align: middle;
+    min-height: 40px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
