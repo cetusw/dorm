@@ -11,6 +11,7 @@ import (
 	queryports "dorm/pkg/core/ports/query"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -299,7 +300,129 @@ func (s *Service) applyTaskAssignment(ctx context.Context, data *taskActionConte
 	}
 	userID := data.user.ID()
 	s.publishTaskAssigned(ctx, data.task.ID(), &userID)
+	if err := s.assignRemainingFreeTasksToLastUnderGoalMember(ctx, data); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (s *Service) assignRemainingFreeTasksToLastUnderGoalMember(ctx context.Context, data *taskActionContext) error {
+	if !hasOtherFreeTasks(data.duty.Tasks(), data.task.ID()) {
+		return nil
+	}
+
+	refreshedDuty, err := s.loadDuty(ctx, data.task.DutyID())
+	if err != nil {
+		return fmt.Errorf("reload duty after assignment: %w", err)
+	}
+
+	teamMembers, err := s.userRepo.FindByTeamID(ctx, refreshedDuty.TeamID())
+	if err != nil {
+		return fmt.Errorf("load duty team members: %w", err)
+	}
+	if len(teamMembers) == 0 {
+		return nil
+	}
+
+	targetCost, err := s.calculateCostPerResidentGoal(ctx, refreshedDuty.Tasks(), len(teamMembers))
+	if err != nil {
+		return fmt.Errorf("calculate duty cost goal: %w", err)
+	}
+	if targetCost == 0 {
+		return nil
+	}
+
+	memberTakenCost := make(map[uuid.UUID]int, len(teamMembers))
+	freeTasks := make([]*duty.DutyTask, 0)
+	for _, dutyTask := range refreshedDuty.Tasks() {
+		if dutyTask.AssigneeID() == nil {
+			freeTasks = append(freeTasks, dutyTask)
+			continue
+		}
+
+		taskDefinition, err := s.taskRepo.FindByID(ctx, dutyTask.TaskDefID())
+		if err != nil {
+			return fmt.Errorf("load task definition %s: %w", dutyTask.TaskDefID(), err)
+		}
+		if taskDefinition == nil {
+			return fmt.Errorf("task definition %s not found", dutyTask.TaskDefID())
+		}
+
+		memberTakenCost[*dutyTask.AssigneeID()] += taskDefinition.Cost()
+	}
+
+	if len(freeTasks) == 0 {
+		return nil
+	}
+
+	var membersBelowGoal []*user.User
+	for _, teamMember := range teamMembers {
+		if memberTakenCost[teamMember.ID()] < targetCost {
+			membersBelowGoal = append(membersBelowGoal, teamMember)
+		}
+	}
+
+	if len(membersBelowGoal) != 1 {
+		return nil
+	}
+
+	lastMember := membersBelowGoal[0]
+	sort.SliceStable(freeTasks, func(i, j int) bool {
+		return freeTasks[i].ID().String() < freeTasks[j].ID().String()
+	})
+
+	for _, freeTask := range freeTasks {
+		err := s.dutyTaskRepo.Assign(ctx, freeTask.ID(), lastMember.ID(), data.now)
+		if err != nil {
+			if err == duty.ErrTaskAssigned {
+				continue
+			}
+			return fmt.Errorf("auto-assign remaining duty task %s: %w", freeTask.ID(), err)
+		}
+
+		lastMemberID := lastMember.ID()
+		s.publishTaskAssigned(ctx, freeTask.ID(), &lastMemberID)
+	}
+
+	return nil
+}
+
+func hasOtherFreeTasks(tasks []*duty.DutyTask, currentTaskID uuid.UUID) bool {
+	for _, dutyTask := range tasks {
+		if dutyTask.ID() == currentTaskID {
+			continue
+		}
+		if dutyTask.AssigneeID() == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *Service) calculateCostPerResidentGoal(
+	ctx context.Context,
+	tasks []*duty.DutyTask,
+	residentCount int,
+) (int, error) {
+	if len(tasks) == 0 || residentCount == 0 {
+		return 0, nil
+	}
+
+	totalCost := 0
+	for _, dutyTask := range tasks {
+		taskDefinition, err := s.taskRepo.FindByID(ctx, dutyTask.TaskDefID())
+		if err != nil {
+			return 0, fmt.Errorf("load task definition %s: %w", dutyTask.TaskDefID(), err)
+		}
+		if taskDefinition == nil {
+			return 0, fmt.Errorf("task definition %s not found", dutyTask.TaskDefID())
+		}
+
+		totalCost += taskDefinition.Cost()
+	}
+
+	return (totalCost + residentCount - 1) / residentCount, nil
 }
 
 func (s *Service) applyTaskUnassignment(ctx context.Context, data *taskActionContext) error {

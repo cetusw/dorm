@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"dorm/pkg/core/domain/catalog"
 	"dorm/pkg/core/domain/duty"
 	"dorm/pkg/core/domain/events"
 	"dorm/pkg/core/domain/structure"
@@ -249,4 +250,94 @@ func TestAssignTask_WrapsRepositoryError(t *testing.T) {
 	assert.ErrorIs(t, err, repoErr)
 
 	eventBus.AssertNotCalled(t, "Publish", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestAssignTask_AutoAssignsRemainingFreeTasksToLastUnderGoalMember(t *testing.T) {
+	ctx := context.Background()
+	teamID := uuid.New()
+	userAID := uuid.New()
+	userBID := uuid.New()
+
+	takenTaskID := uuid.New()
+	takenTaskDefID := uuid.New()
+	freeTaskID := uuid.New()
+	freeTaskDefID := uuid.New()
+
+	userRepo := new(MockUserRepo)
+	dutyRepo := new(MockDutyRepo)
+	dutyTaskRepo := new(MockDutyTaskRepo)
+	taskRepo := new(MockCatalogRepo)
+	eventBus := new(MockEventBus)
+
+	svc := &Service{
+		userRepo:     userRepo,
+		dutyRepo:     dutyRepo,
+		dutyTaskRepo: dutyTaskRepo,
+		taskRepo:     taskRepo,
+		eventBus:     eventBus,
+	}
+
+	userA, err := user.NewUser("Иван", "Иванов", "ivan", "hash")
+	require.NoError(t, err)
+	userA.JoinTeam(teamID)
+	userA = user.RestoreUser(userAID, userA.Login(), userA.PasswordHash(), userA.FirstName(), userA.MiddleName(), userA.LastName(), userA.TeamID(), userA.RoomNumber(), userA.FloorNumber(), userA.DormitoryID(), userA.CreatedAt())
+
+	userB, err := user.NewUser("Петр", "Петров", "petr", "hash")
+	require.NoError(t, err)
+	userB.JoinTeam(teamID)
+	userB = user.RestoreUser(userBID, userB.Login(), userB.PasswordHash(), userB.FirstName(), userB.MiddleName(), userB.LastName(), userB.TeamID(), userB.RoomNumber(), userB.FloorNumber(), userB.DormitoryID(), userB.CreatedAt())
+
+	currentDuty := duty.NewDuty(teamID, time.Now().Add(-time.Hour), time.Now().Add(time.Hour), 1)
+	currentDuty.AddTask(takenTaskID, takenTaskDefID)
+	currentDuty.AddTask(freeTaskID, freeTaskDefID)
+
+	taskToTake := duty.RestoreDutyTask(duty.RestoreDutyTaskParams{
+		ID: takenTaskID, DutyID: currentDuty.ID(), TaskDefID: takenTaskDefID,
+	})
+
+	assignedToA := userA.ID()
+	refreshedTakenTask := duty.RestoreDutyTask(duty.RestoreDutyTaskParams{
+		ID:         takenTaskID,
+		DutyID:     currentDuty.ID(),
+		TaskDefID:  takenTaskDefID,
+		AssigneeID: &assignedToA,
+	})
+	refreshedFreeTask := duty.RestoreDutyTask(duty.RestoreDutyTaskParams{
+		ID: freeTaskID, DutyID: currentDuty.ID(), TaskDefID: freeTaskDefID,
+	})
+	refreshedDuty := duty.RestoreDuty(
+		currentDuty.ID(),
+		currentDuty.TeamID(),
+		currentDuty.StartDate(),
+		currentDuty.EndDate(),
+		currentDuty.SequenceNumber(),
+		[]*duty.DutyTask{refreshedTakenTask, refreshedFreeTask},
+	)
+
+	taskDef40, err := catalog.NewTaskDefinition(1, "Задача 40", 40, 1, 1)
+	require.NoError(t, err)
+	taskDef40 = catalog.RestoreTaskDefinition(takenTaskDefID, taskDef40.AreaID(), taskDef40.Title(), taskDef40.Cost(), taskDef40.RecurrenceInterval(), taskDef40.StartSequence())
+
+	taskDef20, err := catalog.NewTaskDefinition(1, "Задача 20", 20, 1, 1)
+	require.NoError(t, err)
+	taskDef20 = catalog.RestoreTaskDefinition(freeTaskDefID, taskDef20.AreaID(), taskDef20.Title(), taskDef20.Cost(), taskDef20.RecurrenceInterval(), taskDef20.StartSequence())
+
+	userRepo.On("FindByID", ctx, userA.ID()).Return(userA, nil).Once()
+	userRepo.On("FindByTeamID", ctx, teamID).Return([]*user.User{userA, userB}, nil).Once()
+
+	dutyTaskRepo.On("FindByID", ctx, takenTaskID).Return(taskToTake, nil).Once()
+	dutyTaskRepo.On("Assign", ctx, takenTaskID, userA.ID(), mock.AnythingOfType("time.Time")).Return(nil).Once()
+	dutyTaskRepo.On("Assign", ctx, freeTaskID, userB.ID(), mock.AnythingOfType("time.Time")).Return(nil).Once()
+
+	dutyRepo.On("FindByID", ctx, currentDuty.ID()).Return(currentDuty, nil).Once()
+	dutyRepo.On("FindByID", ctx, currentDuty.ID()).Return(refreshedDuty, nil).Once()
+
+	taskRepo.On("FindByID", ctx, takenTaskDefID).Return(taskDef40, nil).Once()
+	taskRepo.On("FindByID", ctx, takenTaskDefID).Return(taskDef40, nil).Once()
+	taskRepo.On("FindByID", ctx, freeTaskDefID).Return(taskDef20, nil).Once()
+
+	eventBus.On("Publish", ctx, events.TopicTaskAssigned, mock.AnythingOfType("events.TaskAssignedEvent")).Return(nil).Twice()
+
+	err = svc.AssignTask(ctx, takenTaskID, userA.ID())
+	require.NoError(t, err)
 }
