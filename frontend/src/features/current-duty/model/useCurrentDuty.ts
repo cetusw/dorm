@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ApiError } from '../../../shared/api/ApiError'
 import {
@@ -7,10 +7,11 @@ import {
     openTask,
     reopenTask,
     returnTask,
+    TaskAlreadyAssignedError,
     takeTask,
     verifyTask,
 } from '../api/currentDutyApi'
-import type { ResidentCurrentDuty } from './types'
+import type { CurrentDutyNotification, ResidentCurrentDuty, ResidentDutyTask } from './types'
 import {
     preserveTaskOrder,
     sortTasksForInitialDisplay,
@@ -63,16 +64,49 @@ function countTeamMembersBelowGoal(duty: ResidentCurrentDuty): number {
     ).length
 }
 
+const TASK_ASSIGNED_ERROR_MESSAGE = 'эту задачу уже взял другой пользователь'
+
+type TaskActionResult = {
+    updatedDuty: ResidentCurrentDuty | null
+    currentError: unknown | null
+}
+
+function replaceDutyTask(
+    currentDuty: ResidentCurrentDuty,
+    updatedTask: ResidentDutyTask,
+): ResidentCurrentDuty {
+    return {
+        ...currentDuty,
+        tasks: preserveTaskOrder(
+            currentDuty.tasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)),
+            currentDuty.tasks.map((task) => task.id),
+        ),
+    }
+}
+
 export function useCurrentDuty(initialGroupId?: string) {
     const [duty, setDuty] = useState<ResidentCurrentDuty | null>(null)
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
-    const [enoughTasksNoticeVersion, setEnoughTasksNoticeVersion] = useState(0)
+    const [notification, setNotification] = useState<CurrentDutyNotification | null>(null)
     const orderedTaskIdsRef = useRef<string[]>([])
     const visibleMineTaskIdsRef = useRef<string[]>([])
     const visibleFreeTaskIdsRef = useRef<string[]>([])
+    const notificationIdRef = useRef(0)
+
+    function showNotification(payload: Omit<CurrentDutyNotification, 'id'>) {
+        notificationIdRef.current += 1
+        setNotification({
+            id: notificationIdRef.current,
+            ...payload,
+        })
+    }
+
+    const clearNotification = useCallback(() => {
+        setNotification(null)
+    }, [])
 
     function applyLoadedDuty(loadedDuty: ResidentCurrentDuty) {
         orderedTaskIdsRef.current = loadedDuty.tasks.map((task) => task.id)
@@ -111,7 +145,7 @@ export function useCurrentDuty(initialGroupId?: string) {
     async function runTaskAction(
         taskId: string,
         action: (currentTaskId: string, groupId?: string) => Promise<ResidentCurrentDuty>,
-    ): Promise<ResidentCurrentDuty | null> {
+    ): Promise<TaskActionResult> {
         setPendingTaskId(taskId)
         setError(null)
 
@@ -121,14 +155,17 @@ export function useCurrentDuty(initialGroupId?: string) {
                 ...updatedDuty,
                 tasks: preserveTaskOrder(updatedDuty.tasks, orderedTaskIdsRef.current),
             })
-            return updatedDuty
+            return { updatedDuty, currentError: null }
         } catch (currentError) {
-            if (currentError instanceof ApiError && currentError.status === 409) {
+            if (
+                currentError instanceof ApiError &&
+                currentError.status === 409 &&
+                currentError.message !== TASK_ASSIGNED_ERROR_MESSAGE
+            ) {
                 await reload(selectedGroupId ?? undefined)
             }
 
-            setError(toErrorMessage(currentError))
-            return null
+            return { updatedDuty: null, currentError }
         } finally {
             setPendingTaskId(null)
         }
@@ -136,8 +173,29 @@ export function useCurrentDuty(initialGroupId?: string) {
 
     const handleTake: TaskActionHandler = async (taskId) => {
         const previousDuty = duty
-        const updatedDuty = await runTaskAction(taskId, takeTask)
+        const { updatedDuty, currentError } = await runTaskAction(taskId, takeTask)
         if (!updatedDuty) {
+            if (
+                currentError instanceof TaskAlreadyAssignedError &&
+                currentError.message === TASK_ASSIGNED_ERROR_MESSAGE
+            ) {
+                setDuty((currentDuty) => (
+                    currentDuty
+                        ? replaceDutyTask(currentDuty, currentError.task)
+                        : currentDuty
+                ))
+                visibleFreeTaskIdsRef.current = visibleFreeTaskIdsRef.current.filter(
+                    (visibleTaskId) => visibleTaskId !== currentError.task.id,
+                )
+                showNotification({
+                    color: '#991B1B',
+                    title: 'Задача занята',
+                    message: 'Эту задачу уже взял другой участник команды.',
+                })
+                return false
+            }
+
+            setError(toErrorMessage(currentError))
             return false
         }
 
@@ -147,7 +205,11 @@ export function useCurrentDuty(initialGroupId?: string) {
             updatedDuty.my_taken_cost_sum >= updatedDuty.cost_per_resident_goal &&
             countTeamMembersBelowGoal(previousDuty) > 1
         ) {
-            setEnoughTasksNoticeVersion((currentValue) => currentValue + 1)
+            showNotification({
+                color: '#166534',
+                title: 'Взято достаточно задач',
+                message: 'Вы взяли задач на достаточное количество баллов, но можете продолжить брать задачи',
+            })
         }
 
         visibleMineTaskIdsRef.current = appendUniqueTaskId(visibleMineTaskIdsRef.current, taskId)
@@ -155,8 +217,9 @@ export function useCurrentDuty(initialGroupId?: string) {
     }
 
     const handleReturn: TaskActionHandler = async (taskId) => {
-        const updatedDuty = await runTaskAction(taskId, returnTask)
+        const { updatedDuty, currentError } = await runTaskAction(taskId, returnTask)
         if (!updatedDuty) {
+            setError(toErrorMessage(currentError))
             return false
         }
 
@@ -177,12 +240,37 @@ export function useCurrentDuty(initialGroupId?: string) {
         selectGroup: (groupId: string) => reload(groupId),
         handleTake,
         handleReturn,
-        handleComplete: (async (taskId: string) => Boolean(await runTaskAction(taskId, completeTask))) satisfies TaskActionHandler,
-        handleOpen: (async (taskId: string) => Boolean(await runTaskAction(taskId, openTask))) satisfies TaskActionHandler,
-        handleReopen: (async (taskId: string) => Boolean(await runTaskAction(taskId, reopenTask))) satisfies TaskActionHandler,
-        handleVerify: (async (taskId: string) => Boolean(await runTaskAction(taskId, verifyTask))) satisfies TaskActionHandler,
+        handleComplete: (async (taskId: string) => {
+            const { updatedDuty, currentError } = await runTaskAction(taskId, completeTask)
+            if (!updatedDuty) {
+                setError(toErrorMessage(currentError))
+            }
+            return Boolean(updatedDuty)
+        }) satisfies TaskActionHandler,
+        handleOpen: (async (taskId: string) => {
+            const { updatedDuty, currentError } = await runTaskAction(taskId, openTask)
+            if (!updatedDuty) {
+                setError(toErrorMessage(currentError))
+            }
+            return Boolean(updatedDuty)
+        }) satisfies TaskActionHandler,
+        handleReopen: (async (taskId: string) => {
+            const { updatedDuty, currentError } = await runTaskAction(taskId, reopenTask)
+            if (!updatedDuty) {
+                setError(toErrorMessage(currentError))
+            }
+            return Boolean(updatedDuty)
+        }) satisfies TaskActionHandler,
+        handleVerify: (async (taskId: string) => {
+            const { updatedDuty, currentError } = await runTaskAction(taskId, verifyTask)
+            if (!updatedDuty) {
+                setError(toErrorMessage(currentError))
+            }
+            return Boolean(updatedDuty)
+        }) satisfies TaskActionHandler,
         reloadCurrentDuty: () => reload(selectedGroupId ?? undefined),
-        enoughTasksNoticeVersion,
+        notification,
+        clearNotification,
         visibleMineTaskIds: visibleMineTaskIdsRef.current,
         visibleFreeTaskIds: visibleFreeTaskIdsRef.current,
     }

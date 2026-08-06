@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { BookOpenIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
-import { ActionIcon, Alert, Box, Center, Group, Loader, Menu, Notification, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import { ActionIcon, Alert, Box, Center, Group, Loader, Menu, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
 import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 import {
@@ -22,9 +22,9 @@ import { BuildingPlanPanel } from '../../features/current-duty/building-plan/Bui
 import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { PageFrame } from '../../shared/ui/PageFrame'
+import { FloatingNotification } from '../../shared/ui/FloatingNotification'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 import { navigateTo } from '../../app/navigation'
-import { HEADER_HEIGHT_PX } from '../../shared/ui/mobileStickyThreshold'
 
 type PlanLegendItem = {
     color: string
@@ -68,9 +68,6 @@ type Props = {
     selectedGroupId?: string
 }
 
-const CURRENT_DUTY_NOTICE_Z_INDEX = 40
-const CURRENT_DUTY_NOTICE_TOP_OFFSET_PX = HEADER_HEIGHT_PX + 8
-
 export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     const {
         selectedGroupId,
@@ -86,7 +83,8 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         handleReopen,
         handleVerify,
         reloadCurrentDuty,
-        enoughTasksNoticeVersion,
+        notification,
+        clearNotification,
         visibleMineTaskIds,
         visibleFreeTaskIds,
     } = useCurrentDuty(initialGroupId)
@@ -94,7 +92,6 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
     const [legendOpened, setLegendOpened] = useState(false)
-    const [showEnoughTasksNotice, setShowEnoughTasksNotice] = useState(false)
     const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
     const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
     const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
@@ -114,19 +111,18 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     }, [availableFloorPlans, selectedFloorPlanId])
 
     useEffect(() => {
-        if (enoughTasksNoticeVersion === 0) {
+        if (!notification) {
             return
         }
 
-        setShowEnoughTasksNotice(true)
         const timeoutId = window.setTimeout(() => {
-            setShowEnoughTasksNotice(false)
+            clearNotification()
         }, 5000)
 
         return () => {
             window.clearTimeout(timeoutId)
         }
-    }, [enoughTasksNoticeVersion])
+    }, [clearNotification, notification])
 
     if (loading) {
         return (
@@ -354,43 +350,14 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
 
     return (
         <>
-            {showEnoughTasksNotice ? (
-                <>
-                    <Box
-                        pos="fixed"
-                        top={CURRENT_DUTY_NOTICE_TOP_OFFSET_PX}
-                        right={16}
-                        style={{
-                            zIndex: CURRENT_DUTY_NOTICE_Z_INDEX,
-                            width: 'min(420px, calc(100vw - 32px))',
-                            animation: 'current-duty-notification-enter 220ms ease-out',
-                        }}
-                    >
-                        <Notification
-                            withCloseButton
-                            color="#0369A1"
-                            title="Взято достаточно задач"
-                            onClose={() => setShowEnoughTasksNotice(false)}
-                        >
-                            Оставьте задачи для остальных участников команды
-                        </Notification>
-                    </Box>
-                    <style>
-                        {`
-                            @keyframes current-duty-notification-enter {
-                                from {
-                                    opacity: 0;
-                                    transform: translateX(calc(100% + 16px));
-                                }
-
-                                to {
-                                    opacity: 1;
-                                    transform: translateX(0);
-                                }
-                            }
-                        `}
-                    </style>
-                </>
+            {notification ? (
+                <FloatingNotification
+                    key={notification.id}
+                    color={notification.color}
+                    title={notification.title}
+                    message={notification.message}
+                    onClose={clearNotification}
+                />
             ) : null}
 
             <PageFrame

@@ -1,5 +1,42 @@
+import { ApiError } from '../../../shared/api/ApiError'
 import { apiRequest } from '../../../shared/api/apiClient'
-import type { ResidentCurrentDuty } from '../model/types'
+import type { ResidentCurrentDuty, ResidentDutyTask } from '../model/types'
+
+type TaskAssignedConflictPayload = {
+    task?: ResidentDutyTask
+}
+
+export class TaskAlreadyAssignedError extends ApiError {
+    readonly task: ResidentDutyTask
+
+    constructor(message: string, status: number, task: ResidentDutyTask, details?: unknown) {
+        super(message, status, details)
+        this.name = 'TaskAlreadyAssignedError'
+        this.task = task
+    }
+}
+
+function normalizeDutyTask(task: ResidentDutyTask): ResidentDutyTask {
+    return {
+        ...task,
+        is_mine: Boolean(task.is_mine),
+        can_take: Boolean(task.can_take),
+        can_return: Boolean(task.can_return),
+        can_complete: Boolean(task.can_complete),
+        can_open: Boolean(task.can_open),
+        can_verify: Boolean(task.can_verify),
+        can_review_open: Boolean(task.can_review_open),
+    }
+}
+
+function extractTaskAssignedConflictTask(currentError: ApiError): ResidentDutyTask | null {
+    const payload = currentError.details as TaskAssignedConflictPayload | null
+    if (!payload?.task || typeof payload.task !== 'object') {
+        return null
+    }
+
+    return normalizeDutyTask(payload.task)
+}
 
 function normalizeCurrentDuty(duty: ResidentCurrentDuty): ResidentCurrentDuty {
     return {
@@ -43,7 +80,20 @@ async function requestDutyAction(
 }
 
 export async function takeTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {
-    return requestDutyAction(taskId, 'take', groupId)
+    try {
+        return await requestDutyAction(taskId, 'take', groupId)
+    } catch (currentError) {
+        if (!(currentError instanceof ApiError) || currentError.status !== 409) {
+            throw currentError
+        }
+
+        const task = extractTaskAssignedConflictTask(currentError)
+        if (!task) {
+            throw currentError
+        }
+
+        throw new TaskAlreadyAssignedError(currentError.message, currentError.status, task, currentError.details)
+    }
 }
 
 export async function returnTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {

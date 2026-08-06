@@ -24,5 +24,5 @@ export async function apiRequest(path: string, options: ApiRequestOptions = {}):
         window.location.assign('/app/login')
     }
 
-    throw new ApiError(message, response.status)
+    throw new ApiError(message, response.status, body)
 }

@@ -3,6 +3,7 @@ package http
 import (
 	"dorm/pkg/core/domain/duty"
 	"dorm/pkg/core/ports"
+	"dorm/pkg/core/ports/dto"
 	residentuc "dorm/pkg/core/usecase/resident"
 	"errors"
 
@@ -12,6 +13,11 @@ import (
 
 type ResidentAPIHandler struct {
 	residentDutyUC ports.ResidentDutyUseCase
+}
+
+type residentTaskAssignedConflictResponse struct {
+	Error string                `json:"error"`
+	Task  *dto.ResidentDutyTask `json:"task,omitempty"`
 }
 
 func NewResidentAPIHandler(
@@ -100,6 +106,10 @@ func (h *ResidentAPIHandler) HandleTakeTask(c *fiber.Ctx) error {
 	}
 
 	if err := h.residentDutyUC.TakeTask(c.Context(), userID, taskID); err != nil {
+		if errors.Is(err, duty.ErrTaskAssigned) {
+			return h.respondResidentTaskAssignedConflict(c, userID, taskID)
+		}
+
 		return h.respondResidentTaskError(c, err)
 	}
 
@@ -189,6 +199,34 @@ func errorResponse(message string) fiber.Map {
 	return fiber.Map{
 		"error": message,
 	}
+}
+
+func (h *ResidentAPIHandler) respondResidentTaskAssignedConflict(c *fiber.Ctx, userID, taskID uuid.UUID) error {
+	const message = "эту задачу уже взял другой пользователь"
+
+	groupID, err := optionalGroupID(c)
+	if err != nil {
+		return c.Status(fiber.StatusConflict).JSON(errorResponse(message))
+	}
+
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID)
+	if err != nil || currentDuty == nil {
+		return c.Status(fiber.StatusConflict).JSON(errorResponse(message))
+	}
+
+	for _, task := range currentDuty.Tasks {
+		if task.ID != taskID.String() {
+			continue
+		}
+
+		taskCopy := task
+		return c.Status(fiber.StatusConflict).JSON(residentTaskAssignedConflictResponse{
+			Error: message,
+			Task:  &taskCopy,
+		})
+	}
+
+	return c.Status(fiber.StatusConflict).JSON(errorResponse(message))
 }
 
 func (h *ResidentAPIHandler) respondResidentTaskError(c *fiber.Ctx, err error) error {

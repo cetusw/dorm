@@ -32,6 +32,13 @@ export type ResidentDutyTeamMember = {
     name: string
 }
 
+export type CurrentDutyNotification = {
+    id: number
+    color: string
+    title: string
+    message: string
+}
+
 export type ResidentCurrentDuty = {
     dormitory_id: number
     selected_group_id: string
