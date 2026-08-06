@@ -1,11 +1,20 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef } from 'react'
 
-import { BellIcon, CalendarBlankIcon, SignOutIcon, WarningIcon } from '@phosphor-icons/react'
+import {
+    BellIcon,
+    BuildingOfficeIcon,
+    CalendarBlankIcon,
+    CheckSquareOffsetIcon,
+    MapPinAreaIcon,
+    SignOutIcon,
+    UserIcon,
+    UsersFourIcon,
+    WarningIcon,
+} from '@phosphor-icons/react'
 import {
     AppShell,
     Box,
     Burger,
-    Button,
     Center,
     Loader,
     NavLink,
@@ -42,6 +51,13 @@ type NavigationItem = {
     href: string
     icon?: ReactNode
     label: string
+}
+
+type SidebarNavTabProps = {
+    active: boolean
+    icon?: ReactNode
+    label: string
+    onClick: () => void
 }
 
 function isCurrentPathActive(currentPath: string, href: string): boolean {
@@ -247,6 +263,23 @@ function NotificationsButton() {
     )
 }
 
+function SidebarNavTab({ active, icon, label, onClick }: SidebarNavTabProps) {
+    return (
+        <NavLink
+            active={active}
+            leftSection={icon}
+            label={label}
+            onClick={onClick}
+            classNames={{
+                root: classes.navLink,
+                label: classes.navLinkLabel,
+                section: classes.navLinkSection,
+                body: classes.navLinkBody,
+            }}
+        />
+    )
+}
+
 export function ResidentAppShell({
     currentPath,
     currentUser,
@@ -273,18 +306,22 @@ export function ResidentAppShell({
         ? [
             {
                 href: '/app/residents',
+                icon: <UserIcon size={24} weight="regular" />,
                 label: 'Жители',
             },
             {
                 href: '/app/groups',
+                icon: <UsersFourIcon size={24} weight="regular" />,
                 label: 'Группы',
             },
             {
                 href: '/app/areas',
+                icon: <MapPinAreaIcon size={24} weight="regular" />,
                 label: 'Территории',
             },
             {
                 href: '/app/task-definitions',
+                icon: <CheckSquareOffsetIcon size={24} weight="regular" />,
                 label: 'Задачи',
             },
             {
@@ -317,7 +354,7 @@ export function ResidentAppShell({
     }))
 
     const sidebarDormitoryControls = hasManagementNavigation ? (
-        <Stack gap="sm" className={classes.dormitoryControls}>
+        <Stack gap={4} className={classes.dormitoryControls}>
             <Select
                 aria-label="Общежитие"
                 placeholder="Общежитие"
@@ -328,17 +365,24 @@ export function ResidentAppShell({
                 disabled={dormitories.length === 0}
                 comboboxProps={{ withinPortal: false }}
                 loading={dormitoriesLoading}
+                classNames={{
+                    root: classes.dormitorySelectRoot,
+                    input: classes.dormitorySelectInput,
+                    section: classes.dormitorySelectSection,
+                    dropdown: classes.dormitorySelectDropdown,
+                    option: classes.dormitorySelectOption,
+                }}
             />
 
-            <Button
-                variant="default"
+            <SidebarNavTab
+                active={isCurrentPathActive(currentPath, '/app/dormitories')}
+                icon={<BuildingOfficeIcon size={24} weight="regular" />}
+                label="Общежития"
                 onClick={() => {
                     closeNavbar()
                     onNavigate('/app/dormitories')
                 }}
-            >
-                Управление общежитиями
-            </Button>
+            />
         </Stack>
     ) : null
 
@@ -409,20 +453,14 @@ export function ResidentAppShell({
 
                         <div className={classes.navigationList}>
                             {navigationItems.map((item) => (
-                                <NavLink
+                                <SidebarNavTab
                                     key={item.href}
                                     active={isCurrentPathActive(currentPath, item.href)}
-                                    leftSection={item.icon}
+                                    icon={item.icon}
                                     label={item.label}
                                     onClick={() => {
                                         closeNavbar()
                                         onNavigate(item.href)
-                                    }}
-                                    classNames={{
-                                        root: classes.navLink,
-                                        label: classes.navLinkLabel,
-                                        section: classes.navLinkSection,
-                                        body: classes.navLinkBody,
                                     }}
                                 />
                             ))}

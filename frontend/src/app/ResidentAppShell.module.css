@@ -43,7 +43,7 @@
 .navbarContent {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 4px;
     min-height: 0;
     flex: 1;
     padding: 20px 15px;
@@ -103,7 +103,57 @@
 .dormitoryControls {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 4px;
+    width: 250px;
+    max-width: 250px;
+}
+
+.dormitorySelectRoot {
+    width: 250px;
+    max-width: 250px;
+}
+
+.dormitorySelectInput {
+    min-height: 40px;
+    height: 40px;
+    border-radius: 4px;
+    padding: 8px 40px 8px 15px;
+    border: 1px solid transparent;
+    background: #ffffff;
+    color: #344a47;
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 500;
+}
+
+.dormitorySelectInput:hover,
+.dormitorySelectInput:focus-visible,
+.dormitorySelectInput[data-expanded='true'] {
+    background: #eef6f4;
+}
+
+.dormitorySelectInput::placeholder {
+    color: #344a47;
+    opacity: 1;
+}
+
+.dormitorySelectSection {
+    width: 24px;
+    min-width: 24px;
+    color: #344a47;
+    right: 15px;
+}
+
+.dormitorySelectDropdown {
+    border: 1px solid var(--app-color-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.dormitorySelectOption {
+    color: #344a47;
+    font-size: 16px;
+    line-height: 24px;
 }
 
 .navigationList {
