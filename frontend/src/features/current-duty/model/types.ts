@@ -41,6 +41,7 @@ export type CurrentDutyNotification = {
 
 export type ResidentCurrentDuty = {
     dormitory_id: number
+    my_dormitory_id?: number
     selected_group_id: string
     has_active_duty: boolean
     can_manage_tasks: boolean
@@ -52,6 +53,7 @@ export type ResidentCurrentDuty = {
     notice_tone?: 'info' | 'warning' | ''
     period_status: 'past' | 'active' | 'future' | ''
     groups: ResidentDutyGroupOption[]
+    my_group?: ResidentDutyGroupOption
     duty_id: string
     group: string
     team: string

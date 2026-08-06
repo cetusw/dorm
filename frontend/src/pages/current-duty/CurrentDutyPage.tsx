@@ -23,6 +23,7 @@ import { floorPlans } from '../../features/current-duty/building-plan/generated/
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import { FloatingNotification } from '../../shared/ui/FloatingNotification'
+import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 import { navigateTo } from '../../app/navigation'
 
@@ -68,7 +69,10 @@ type Props = {
     selectedGroupId?: string
 }
 
+const MY_GROUP_OPTION_VALUE = '__my_group__'
+
 export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
+    const selectedDormitoryId = useSelectedDormitoryId()
     const {
         selectedGroupId,
         duty,
@@ -82,12 +86,13 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         handleOpen,
         handleReopen,
         handleVerify,
+        selectGroupForDormitory,
         reloadCurrentDuty,
         notification,
         clearNotification,
         visibleMineTaskIds,
         visibleFreeTaskIds,
-    } = useCurrentDuty(initialGroupId)
+    } = useCurrentDuty(initialGroupId, selectedDormitoryId)
     const [createModalOpened, setCreateModalOpened] = useState(false)
     const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
@@ -123,6 +128,26 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
             window.clearTimeout(timeoutId)
         }
     }, [clearNotification, notification])
+
+    const groupSelectOptions = useMemo(() => {
+        if (!duty) {
+            return []
+        }
+
+        const options = duty.groups.map((group) => ({
+            value: group.id,
+            label: group.name,
+        }))
+
+        if (!duty.my_group || duty.my_dormitory_id == null) {
+            return options
+        }
+
+        return [
+            { value: MY_GROUP_OPTION_VALUE, label: 'Моя группа' },
+            ...options,
+        ]
+    }, [duty])
 
     if (loading) {
         return (
@@ -167,49 +192,79 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
 
     const canManageGroupDuty = duty.can_manage_duty_settings
 
-    const titleActions = canManageGroupDuty ? (
-        <Menu shadow="md" width={292} position="bottom-end">
-            <Menu.Target>
-                <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    radius="md"
-                    size={42}
-                    aria-label="Действия дежурства"
-                >
-                    <DotsThreeOutlineIcon size={32} weight="fill" />
-                </ActionIcon>
-            </Menu.Target>
+    const titleActions = duty ? (
+        <Group gap="sm" align="center" wrap="wrap">
+            {duty.show_group_select ? (
+                <Select
+                    aria-label="Группа"
+                    autoComplete="off"
+                    data={groupSelectOptions}
+                    value={selectedGroupId ?? duty.selected_group_id}
+                    allowDeselect={false}
+                    w={{ base: '100%', sm: 280 }}
+                    styles={{
+                        input: {
+                            minHeight: 42,
+                            height: 42,
+                        },
+                    }}
+                    onChange={(value) => {
+                        if (!value) {
+                            return
+                        }
 
-            <Menu.Dropdown>
-                <Menu.Item
-                    leftSection={<PlusIcon size={24} />}
-                    onClick={() => setCreateModalOpened(true)}
-                >
-                    Новое дежурство
-                </Menu.Item>
-                <Menu.Item
-                    leftSection={<BookOpenIcon size={24} />}
-                    onClick={() => navigateTo(`/app/duties/history?group_id=${encodeURIComponent(duty.selected_group_id)}`)}
-                >
-                    История дежурств
-                </Menu.Item>
-                <Menu.Item
-                    leftSection={<GearIcon size={24} />}
-                    onClick={() => navigateTo(`/app/groups/${duty.selected_group_id}/duty-settings`)}
-                >
-                    Настройки дежурства
-                </Menu.Item>
-            </Menu.Dropdown>
-        </Menu>
+                        if (value === MY_GROUP_OPTION_VALUE && duty.my_group && duty.my_dormitory_id != null) {
+                            selectGroupForDormitory(duty.my_group.id, String(duty.my_dormitory_id))
+                            return
+                        }
+
+                        selectGroup(value)
+                    }}
+                />
+            ) : null}
+
+            {canManageGroupDuty ? (
+                <Menu shadow="md" width={292} position="bottom-end">
+                    <Menu.Target>
+                        <ActionIcon
+                            variant="subtle"
+                            color="gray"
+                            radius="md"
+                            size={42}
+                            aria-label="Действия дежурства"
+                        >
+                            <DotsThreeOutlineIcon size={32} weight="fill" />
+                        </ActionIcon>
+                    </Menu.Target>
+
+                    <Menu.Dropdown>
+                        <Menu.Item
+                            leftSection={<PlusIcon size={24} />}
+                            onClick={() => setCreateModalOpened(true)}
+                        >
+                            Новое дежурство
+                        </Menu.Item>
+                        <Menu.Item
+                            leftSection={<BookOpenIcon size={24} />}
+                            onClick={() => navigateTo(`/app/duties/history?group_id=${encodeURIComponent(duty.selected_group_id)}`)}
+                        >
+                            История дежурств
+                        </Menu.Item>
+                        <Menu.Item
+                            leftSection={<GearIcon size={24} />}
+                            onClick={() => navigateTo(`/app/groups/${duty.selected_group_id}/duty-settings`)}
+                        >
+                            Настройки дежурства
+                        </Menu.Item>
+                    </Menu.Dropdown>
+                </Menu>
+            ) : null}
+        </Group>
     ) : null
 
     const dutyControls = viewOptions.showControls ? (
         <DutyTaskSelects
             activeSelect={activeSelect}
-            groups={duty.groups}
-            selectedGroupId={selectedGroupId ?? duty.selected_group_id}
-            showGroupSelect={duty.show_group_select}
             visibleSelects={visibleTabs}
             rightSection={activeSelect === 'team' ? undefined : (
                 <SegmentedControl
@@ -226,7 +281,6 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                     onChange={(value) => setDisplayMode(value as 'list' | 'plan')}
                 />
             )}
-            onGroupChange={selectGroup}
             onChange={setActiveSelect}
         />
     ) : null

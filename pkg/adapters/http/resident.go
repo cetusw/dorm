@@ -53,7 +53,12 @@ func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID)
+	dormitoryID, err := optionalDormitoryID(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID, dormitoryID)
 	if err != nil {
 		return h.respondResidentDutyError(c, err)
 	}
@@ -209,7 +214,12 @@ func (h *ResidentAPIHandler) respondResidentTaskAssignedConflict(c *fiber.Ctx, u
 		return c.Status(fiber.StatusConflict).JSON(errorResponse(message))
 	}
 
-	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID)
+	dormitoryID, err := optionalDormitoryID(c)
+	if err != nil {
+		return c.Status(fiber.StatusConflict).JSON(errorResponse(message))
+	}
+
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID, dormitoryID)
 	if err != nil || currentDuty == nil {
 		return c.Status(fiber.StatusConflict).JSON(errorResponse(message))
 	}
@@ -252,7 +262,12 @@ func (h *ResidentAPIHandler) respondWithCurrentDuty(c *fiber.Ctx, userID uuid.UU
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID)
+	dormitoryID, err := optionalDormitoryID(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
+	}
+
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID, dormitoryID)
 	if err != nil {
 		return h.respondResidentDutyError(c, err)
 	}
@@ -285,4 +300,18 @@ func optionalGroupID(c *fiber.Ctx) (*uuid.UUID, error) {
 	}
 
 	return &groupID, nil
+}
+
+func optionalDormitoryID(c *fiber.Ctx) (*int64, error) {
+	rawDormitoryID := c.Query("dormitory_id")
+	if rawDormitoryID == "" {
+		return nil, nil
+	}
+
+	dormitoryID, err := parseInt64(rawDormitoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dormitoryID, nil
 }

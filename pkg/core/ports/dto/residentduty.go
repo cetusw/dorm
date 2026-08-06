@@ -9,6 +9,7 @@ const (
 
 type ResidentCurrentDutyResponse struct {
 	DormitoryID           int64                     `json:"dormitory_id"`
+	MyDormitoryID         *int64                    `json:"my_dormitory_id,omitempty"`
 	SelectedGroupID       string                    `json:"selected_group_id"`
 	HasActiveDuty         bool                      `json:"has_active_duty"`
 	CanManageTasks        bool                      `json:"can_manage_tasks"`
@@ -20,6 +21,7 @@ type ResidentCurrentDutyResponse struct {
 	NoticeTone            string                    `json:"notice_tone"`
 	PeriodStatus          string                    `json:"period_status"`
 	Groups                []ResidentDutyGroupOption `json:"groups"`
+	MyGroup               *ResidentDutyGroupOption  `json:"my_group,omitempty"`
 	DutyID                string                    `json:"duty_id"`
 	Group                 string                    `json:"group"`
 	Team                  string                    `json:"team"`

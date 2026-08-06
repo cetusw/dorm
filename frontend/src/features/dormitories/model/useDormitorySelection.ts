@@ -20,6 +20,11 @@ function storeDormitoryId(dormitoryId: string | null) {
     window.localStorage.setItem(SELECTED_DORMITORY_STORAGE_KEY, dormitoryId)
 }
 
+export function setStoredDormitoryId(dormitoryId: string | null) {
+    storeDormitoryId(dormitoryId)
+    notifySelectedDormitoryChanged()
+}
+
 export function notifyDormitoriesChanged() {
     window.dispatchEvent(new CustomEvent(DORMITORIES_CHANGED_EVENT))
 }
@@ -59,8 +64,7 @@ export function useDormitorySelection(enabled: boolean) {
 
     const setSelectedDormitoryId = useCallback((dormitoryId: string | null) => {
         setSelectedDormitoryIdState(dormitoryId)
-        storeDormitoryId(dormitoryId)
-        notifySelectedDormitoryChanged()
+        setStoredDormitoryId(dormitoryId)
     }, [])
 
     const reload = useCallback(async () => {

@@ -12,6 +12,7 @@ import {
     verifyTask,
 } from '../api/currentDutyApi'
 import type { CurrentDutyNotification, ResidentCurrentDuty, ResidentDutyTask } from './types'
+import { setStoredDormitoryId } from '../../dormitories/model/useDormitorySelection'
 import {
     preserveTaskOrder,
     sortTasksForInitialDisplay,
@@ -84,7 +85,7 @@ function replaceDutyTask(
     }
 }
 
-export function useCurrentDuty(initialGroupId?: string) {
+export function useCurrentDuty(initialGroupId?: string, selectedDormitoryId?: string | null) {
     const [duty, setDuty] = useState<ResidentCurrentDuty | null>(null)
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
@@ -95,6 +96,7 @@ export function useCurrentDuty(initialGroupId?: string) {
     const visibleMineTaskIdsRef = useRef<string[]>([])
     const visibleFreeTaskIdsRef = useRef<string[]>([])
     const notificationIdRef = useRef(0)
+    const pendingDormitoryChangeRef = useRef<{ dormitoryId: string, groupId?: string } | null>(null)
 
     function showNotification(payload: Omit<CurrentDutyNotification, 'id'>) {
         notificationIdRef.current += 1
@@ -123,13 +125,13 @@ export function useCurrentDuty(initialGroupId?: string) {
         setDuty(loadedDuty)
     }
 
-    async function reload(groupId?: string) {
+    async function reload(groupId?: string, dormitoryId: string | null = selectedDormitoryId ?? null) {
         setLoading(true)
         setError(null)
         setDuty(null)
 
         try {
-            const loadedDuty = applyInitialTaskOrdering(await getCurrentDuty(groupId))
+            const loadedDuty = applyInitialTaskOrdering(await getCurrentDuty(groupId, dormitoryId ?? undefined))
             applyLoadedDuty(loadedDuty)
         } catch (currentError) {
             if (currentError instanceof ApiError && currentError.status === 404) {
@@ -144,13 +146,13 @@ export function useCurrentDuty(initialGroupId?: string) {
 
     async function runTaskAction(
         taskId: string,
-        action: (currentTaskId: string, groupId?: string) => Promise<ResidentCurrentDuty>,
+        action: (currentTaskId: string, groupId?: string, dormitoryId?: string) => Promise<ResidentCurrentDuty>,
     ): Promise<TaskActionResult> {
         setPendingTaskId(taskId)
         setError(null)
 
         try {
-            const updatedDuty = await action(taskId, selectedGroupId ?? undefined)
+            const updatedDuty = await action(taskId, selectedGroupId ?? undefined, selectedDormitoryId ?? undefined)
             applyLoadedDuty({
                 ...updatedDuty,
                 tasks: preserveTaskOrder(updatedDuty.tasks, orderedTaskIdsRef.current),
@@ -228,8 +230,17 @@ export function useCurrentDuty(initialGroupId?: string) {
     }
 
     useEffect(() => {
-        void reload(initialGroupId)
-    }, [initialGroupId])
+        const pendingDormitoryChange = pendingDormitoryChangeRef.current
+        const nextGroupId = pendingDormitoryChange && pendingDormitoryChange.dormitoryId === selectedDormitoryId
+            ? pendingDormitoryChange.groupId
+            : initialGroupId
+
+        if (pendingDormitoryChange && pendingDormitoryChange.dormitoryId === selectedDormitoryId) {
+            pendingDormitoryChangeRef.current = null
+        }
+
+        void reload(nextGroupId)
+    }, [initialGroupId, selectedDormitoryId])
 
     return {
         selectedGroupId,
@@ -238,6 +249,15 @@ export function useCurrentDuty(initialGroupId?: string) {
         loading,
         pendingTaskId,
         selectGroup: (groupId: string) => reload(groupId),
+        selectGroupForDormitory: (groupId: string, dormitoryId: string) => {
+            if (selectedDormitoryId === dormitoryId) {
+                void reload(groupId, dormitoryId)
+                return
+            }
+
+            pendingDormitoryChangeRef.current = { dormitoryId, groupId }
+            setStoredDormitoryId(dormitoryId)
+        },
         handleTake,
         handleReturn,
         handleComplete: (async (taskId: string) => {

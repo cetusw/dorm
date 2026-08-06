@@ -1,18 +1,14 @@
 import type { ReactNode } from 'react'
 
-import { Box, Group, SegmentedControl, Select, Stack } from '@mantine/core'
+import { Box, Group, SegmentedControl, Stack } from '@mantine/core'
 
-import type {DutyTaskSelect, ResidentDutyGroupOption,} from '../model/types'
+import type { DutyTaskSelect } from '../model/types'
 import classes from './SegmentedControl.module.css'
 
 type Props = {
     activeSelect: DutyTaskSelect
-    groups: ResidentDutyGroupOption[]
-    selectedGroupId: string
-    showGroupSelect?: boolean
     visibleSelects: DutyTaskSelect[]
     rightSection?: ReactNode
-    onGroupChange: (groupId: string) => void
     onChange: (select: DutyTaskSelect) => void
 }
 
@@ -29,12 +25,8 @@ const selectOptions: Array<{
 
 export function DutyTaskSelects({
     activeSelect,
-    groups,
-    selectedGroupId,
-    showGroupSelect = true,
     visibleSelects,
     rightSection,
-    onGroupChange,
     onChange,
 }: Props) {
     const visibleSelectOptions = selectOptions.filter((selectOption) =>
@@ -43,25 +35,6 @@ export function DutyTaskSelects({
 
     return (
         <Stack gap="sm">
-            {showGroupSelect && (
-                <Select
-                    aria-label="Группа"
-                    autoComplete="off"
-                    data={groups.map((group) => ({
-                        value: group.id,
-                        label: group.name,
-                    }))}
-                    value={selectedGroupId}
-                    onChange={(value) => {
-                        if (value) {
-                            onGroupChange(value)
-                        }
-                    }}
-                    allowDeselect={false}
-                    style={{ width: '100%' }}
-                />
-            )}
-
             {(visibleSelectOptions.length > 0 || rightSection) && (
                 <Group align="center" justify="space-between" gap="sm" wrap="nowrap">
                     {visibleSelectOptions.length > 0 && (

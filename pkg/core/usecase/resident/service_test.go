@@ -56,7 +56,8 @@ func (s *teamRepositoryStub) Save(context.Context, *structure.Team) error { retu
 func (s *teamRepositoryStub) Delete(context.Context, uuid.UUID) error     { return nil }
 
 type groupRepositoryStub struct {
-	groups []*structure.Group
+	groups            []*structure.Group
+	groupsByDormitory map[int64][]*structure.Group
 }
 
 func (s *groupRepositoryStub) FindAll(context.Context) ([]*structure.Group, error) { return nil, nil }
@@ -68,24 +69,42 @@ func (s *groupRepositoryStub) FindByID(_ context.Context, id uuid.UUID) (*struct
 	}
 	return nil, nil
 }
-func (s *groupRepositoryStub) FindByDormitoryID(context.Context, int64) ([]*structure.Group, error) {
+func (s *groupRepositoryStub) FindByDormitoryID(_ context.Context, dormitoryID int64) ([]*structure.Group, error) {
+	if len(s.groupsByDormitory) > 0 {
+		return s.groupsByDormitory[dormitoryID], nil
+	}
 	return s.groups, nil
 }
 func (s *groupRepositoryStub) Save(context.Context, *structure.Group) error { return nil }
 func (s *groupRepositoryStub) Delete(context.Context, uuid.UUID) error      { return nil }
 
 type dormitoryRepositoryStub struct {
-	dormitory *structure.Dormitory
+	dormitory       *structure.Dormitory
+	dormitoriesByID map[int64]*structure.Dormitory
 }
 
 func (s *dormitoryRepositoryStub) FindAll(context.Context) ([]*structure.Dormitory, error) {
 	return nil, nil
 }
-func (s *dormitoryRepositoryStub) FindByID(context.Context, int64) (*structure.Dormitory, error) {
+func (s *dormitoryRepositoryStub) FindByID(_ context.Context, dormitoryID int64) (*structure.Dormitory, error) {
+	if len(s.dormitoriesByID) > 0 {
+		return s.dormitoriesByID[dormitoryID], nil
+	}
 	return s.dormitory, nil
 }
-func (s *dormitoryRepositoryStub) ExistsByLeaderID(context.Context, uuid.UUID) (bool, error) {
-	return false, nil
+func (s *dormitoryRepositoryStub) ExistsByLeaderID(_ context.Context, leaderID uuid.UUID) (bool, error) {
+	if len(s.dormitoriesByID) > 0 {
+		for _, dormitory := range s.dormitoriesByID {
+			if dormitory.LeaderID() != nil && *dormitory.LeaderID() == leaderID {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	if s.dormitory == nil || s.dormitory.LeaderID() == nil {
+		return false, nil
+	}
+	return *s.dormitory.LeaderID() == leaderID, nil
 }
 func (s *dormitoryRepositoryStub) Save(context.Context, *structure.Dormitory) error { return nil }
 func (s *dormitoryRepositoryStub) Delete(context.Context, int64) error              { return nil }
@@ -243,7 +262,7 @@ func TestGetCurrentDutyFallsBackToObserverViewForResidentWithoutTeam(t *testing.
 	)
 	service.now = func() time.Time { return now }
 
-	response, err := service.GetCurrentDuty(context.Background(), residentID, nil)
+	response, err := service.GetCurrentDuty(context.Background(), residentID, nil, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -254,9 +273,111 @@ func TestGetCurrentDutyFallsBackToObserverViewForResidentWithoutTeam(t *testing.
 	assert.Equal(t, "Group A", response.Group)
 	assert.Equal(t, "Глава команды не назначен", response.Team)
 	assert.Equal(t, []string{"all", "team"}, response.VisibleTabs)
-	assert.Equal(t, "На этой неделе дежурит команда Глава команды не назначен", response.NoticeMessage)
+	assert.Equal(t, "На этой неделе ответственный за дежурство — Глава команды не назначен", response.NoticeMessage)
 	assert.Empty(t, response.Tasks)
 	assert.Len(t, response.TeamMembers, 1)
 	assert.Equal(t, teamMemberID.String(), response.TeamMembers[0].ID)
 	assert.Equal(t, "Petr Petrov", response.TeamMembers[0].Name)
+}
+
+func TestGetCurrentDuty_UsesRequestedDormitoryForDormitoryLeader(t *testing.T) {
+	t.Parallel()
+
+	leaderID := uuid.New()
+	otherMemberID := uuid.New()
+	groupID := uuid.New()
+	teamID := uuid.New()
+	homeDormitoryID := int64(7)
+	selectedDormitoryID := int64(11)
+	now := time.Date(2026, time.August, 1, 12, 0, 0, 0, time.UTC)
+
+	leader := user.RestoreUser(
+		leaderID,
+		"leader",
+		"hash",
+		"Ivan",
+		nil,
+		"Ivanov",
+		nil,
+		nil,
+		nil,
+		&homeDormitoryID,
+		now,
+	)
+	otherMember := user.RestoreUser(
+		otherMemberID,
+		"member",
+		"hash",
+		"Petr",
+		nil,
+		"Petrov",
+		&teamID,
+		nil,
+		nil,
+		&selectedDormitoryID,
+		now,
+	)
+
+	myGroupID := uuid.New()
+	myGroup := structure.RestoreGroup(myGroupID, &leaderID, "My Group", homeDormitoryID)
+	selectedGroup := structure.RestoreGroup(groupID, nil, "Observed Group", selectedDormitoryID)
+	team := structure.RestoreTeam(teamID, "Team A", groupID, nil, "#00AAFF", 1)
+	activeDuty := duty.RestoreDuty(
+		uuid.New(),
+		teamID,
+		now.Add(-24*time.Hour),
+		now.Add(24*time.Hour),
+		1,
+		nil,
+	)
+	homeDormitory := structure.RestoreDormitory(homeDormitoryID, "Home Dorm", &leaderID, "Moscow", "st", "Lenina", "1")
+	selectedDormitory := structure.RestoreDormitory(selectedDormitoryID, "Observed Dorm", nil, "Moscow", "st", "Tverskaya", "2")
+
+	service := NewResidentDutyService(
+		&userRepositoryStub{
+			user:          leader,
+			teamResidents: []*user.User{otherMember},
+		},
+		&teamRepositoryStub{
+			teamsByGroup: map[uuid.UUID][]*structure.Team{
+				groupID:   {team},
+				myGroupID: {},
+			},
+		},
+		&groupRepositoryStub{
+			groupsByDormitory: map[int64][]*structure.Group{
+				homeDormitoryID:     {myGroup},
+				selectedDormitoryID: {selectedGroup},
+			},
+		},
+		&dormitoryRepositoryStub{
+			dormitoriesByID: map[int64]*structure.Dormitory{
+				homeDormitoryID:     homeDormitory,
+				selectedDormitoryID: selectedDormitory,
+			},
+		},
+		&dutyRepositoryStub{
+			activeByTeam: map[uuid.UUID]*duty.Duty{
+				teamID: activeDuty,
+			},
+		},
+		&taskDefinitionRepositoryStub{},
+		&areaRepositoryStub{},
+		nil,
+	)
+	service.now = func() time.Time { return now }
+
+	response, err := service.GetCurrentDuty(context.Background(), leaderID, nil, &selectedDormitoryID)
+
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, selectedDormitoryID, response.DormitoryID)
+	require.NotNil(t, response.MyDormitoryID)
+	assert.Equal(t, homeDormitoryID, *response.MyDormitoryID)
+	assert.Equal(t, selectedGroup.ID().String(), response.SelectedGroupID)
+	assert.Len(t, response.Groups, 1)
+	assert.Equal(t, selectedGroup.ID().String(), response.Groups[0].ID)
+	require.NotNil(t, response.MyGroup)
+	assert.Equal(t, myGroup.ID().String(), response.MyGroup.ID)
+	assert.Equal(t, myGroup.Name(), response.MyGroup.Name)
 }

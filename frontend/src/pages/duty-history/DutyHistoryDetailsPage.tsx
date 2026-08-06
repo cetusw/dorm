@@ -114,9 +114,6 @@ export function DutyHistoryDetailsPage({ dutyId }: Props) {
     const dutyControls = viewOptions.showControls ? (
         <DutyTaskSelects
             activeSelect={activeSelect}
-            groups={duty.groups}
-            selectedGroupId={selectedGroupId}
-            showGroupSelect={false}
             visibleSelects={visibleTabs}
             rightSection={activeSelect === 'team' ? undefined : (
                 <SegmentedControl
@@ -133,7 +130,6 @@ export function DutyHistoryDetailsPage({ dutyId }: Props) {
                     onChange={(value) => setDisplayMode(value as 'list' | 'plan')}
                 />
             )}
-            onGroupChange={() => {}}
             onChange={setActiveSelect}
         />
     ) : undefined

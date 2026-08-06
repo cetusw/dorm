@@ -50,16 +50,21 @@ function normalizeCurrentDuty(duty: ResidentCurrentDuty): ResidentCurrentDuty {
     }
 }
 
-function buildCurrentDutyPath(groupId?: string): string {
-    if (!groupId) {
-        return '/api/v1/resident/current-duty'
+function buildCurrentDutyPath(groupId?: string, dormitoryId?: string): string {
+    const params = new URLSearchParams()
+    if (groupId) {
+        params.set('group_id', groupId)
+    }
+    if (dormitoryId) {
+        params.set('dormitory_id', dormitoryId)
     }
 
-    return `/api/v1/resident/current-duty?group_id=${encodeURIComponent(groupId)}`
+    const suffix = params.toString()
+    return suffix === '' ? '/api/v1/resident/current-duty' : `/api/v1/resident/current-duty?${suffix}`
 }
 
-export async function getCurrentDuty(groupId?: string): Promise<ResidentCurrentDuty> {
-    const response = await apiRequest(buildCurrentDutyPath(groupId))
+export async function getCurrentDuty(groupId?: string, dormitoryId?: string): Promise<ResidentCurrentDuty> {
+    const response = await apiRequest(buildCurrentDutyPath(groupId, dormitoryId))
     return normalizeCurrentDuty(await response.json())
 }
 
@@ -67,10 +72,19 @@ async function requestDutyAction(
     taskId: string,
     action: string,
     groupId?: string,
+    dormitoryId?: string,
 ): Promise<ResidentCurrentDuty> {
-    const path = groupId
-        ? `/api/v1/resident/tasks/${taskId}/${action}?group_id=${encodeURIComponent(groupId)}`
-        : `/api/v1/resident/tasks/${taskId}/${action}`
+    const params = new URLSearchParams()
+    if (groupId) {
+        params.set('group_id', groupId)
+    }
+    if (dormitoryId) {
+        params.set('dormitory_id', dormitoryId)
+    }
+    const suffix = params.toString()
+    const path = suffix === ''
+        ? `/api/v1/resident/tasks/${taskId}/${action}`
+        : `/api/v1/resident/tasks/${taskId}/${action}?${suffix}`
 
     const response = await apiRequest(path, {
         method: 'POST',
@@ -79,9 +93,9 @@ async function requestDutyAction(
     return normalizeCurrentDuty(await response.json())
 }
 
-export async function takeTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {
+export async function takeTask(taskId: string, groupId?: string, dormitoryId?: string): Promise<ResidentCurrentDuty> {
     try {
-        return await requestDutyAction(taskId, 'take', groupId)
+        return await requestDutyAction(taskId, 'take', groupId, dormitoryId)
     } catch (currentError) {
         if (!(currentError instanceof ApiError) || currentError.status !== 409) {
             throw currentError
@@ -96,24 +110,24 @@ export async function takeTask(taskId: string, groupId?: string): Promise<Reside
     }
 }
 
-export async function returnTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {
-    return requestDutyAction(taskId, 'return', groupId)
+export async function returnTask(taskId: string, groupId?: string, dormitoryId?: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'return', groupId, dormitoryId)
 }
 
-export async function completeTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {
-    return requestDutyAction(taskId, 'complete', groupId)
+export async function completeTask(taskId: string, groupId?: string, dormitoryId?: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'complete', groupId, dormitoryId)
 }
 
-export async function openTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {
-    return requestDutyAction(taskId, 'open', groupId)
+export async function openTask(taskId: string, groupId?: string, dormitoryId?: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'open', groupId, dormitoryId)
 }
 
-export async function reopenTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {
-    return requestDutyAction(taskId, 'reopen', groupId)
+export async function reopenTask(taskId: string, groupId?: string, dormitoryId?: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'reopen', groupId, dormitoryId)
 }
 
-export async function verifyTask(taskId: string, groupId?: string): Promise<ResidentCurrentDuty> {
-    return requestDutyAction(taskId, 'verify', groupId)
+export async function verifyTask(taskId: string, groupId?: string, dormitoryId?: string): Promise<ResidentCurrentDuty> {
+    return requestDutyAction(taskId, 'verify', groupId, dormitoryId)
 }
 
 export async function createGroupDuty(
