@@ -269,7 +269,6 @@ export function DutySettingsPage({ groupId }: Props) {
                 </button>
             )}
             title="Настройки дежурства"
-            titleStyle={{ marginBottom: 0 }}
             controls={(
                 <Stack gap="md">
                     <Group justify="space-between" align="center" gap="md" wrap="wrap">

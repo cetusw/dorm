@@ -24,3 +24,9 @@
   white-space: nowrap;
   padding: 5px 20px;
 }
+
+@media (max-width: 48em) {
+  .root {
+    --sc-transition-duration: 0ms;
+  }
+}
