@@ -234,7 +234,7 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                             size={42}
                             aria-label="Действия дежурства"
                         >
-                            <DotsThreeOutlineIcon size={32} weight="fill" />
+                            <DotsThreeOutlineIcon size={24} weight="fill" />
                         </ActionIcon>
                     </Menu.Target>
 
