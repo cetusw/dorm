@@ -256,11 +256,11 @@
 
 .logoutButton {
     width: auto;
-    min-height: 32px;
-    height: 32px;
-    padding: 0 15px;
+    min-height: 0;
+    height: auto;
+    padding: 7px 15px;
     border: 0;
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--app-color-primary);
     color: #ffffff;
     display: inline-flex;
@@ -322,8 +322,8 @@
     }
 
     .logoutButton {
-        min-height: 32px;
-        height: 32px;
+        min-height: 0;
+        height: auto;
         font-size: 14px;
     }
 
