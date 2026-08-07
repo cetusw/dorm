@@ -1,5 +1,5 @@
 import { CaretLeftIcon } from '@phosphor-icons/react'
-import { Alert, Box, Center, Loader, Select, Stack, Table, Text } from '@mantine/core'
+import { Box, Center, Loader, Select, Stack, Table, Text } from '@mantine/core'
 
 import { navigateTo } from '../../app/navigation'
 import { buildReadonlyDutyProgressModel, type DutyAnalytics } from '../../features/current-duty/model/selectors'
@@ -7,6 +7,7 @@ import { formatDutyPeriodFull } from '../../features/current-duty/model/utils'
 import { MemberDutyProgressCard } from '../../features/current-duty/ui/MemberDutyProgressCard'
 import { useDutyHistory } from '../../features/duty-history/model/useDutyHistory'
 import { AppTable, appTableClasses } from '../../shared/ui/AppTable'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import classes from './DutyHistoryPage.module.css'
 
@@ -59,7 +60,10 @@ export function DutyHistoryPage() {
     if (error || !data) {
         return (
             <PageFrame title="История дежурств" error={error ?? 'Не удалось загрузить историю'}>
-                <Alert color="gray">История недоступна</Alert>
+                <EmptyState
+                    title="История не найдена"
+                    description="Не удалось открыть историю дежурств."
+                />
             </PageFrame>
         )
     }

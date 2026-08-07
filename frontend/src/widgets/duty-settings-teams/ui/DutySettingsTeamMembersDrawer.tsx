@@ -35,6 +35,7 @@ import type {
 import { formatDutySettingsLeaderName } from '../../../features/duty-settings/model/utils'
 import { ApiError } from '../../../shared/api/ApiError'
 import { ConfirmActionModal } from '../../../shared/ui/ConfirmActionModal'
+import { EmptyState } from '../../../shared/ui/EmptyState'
 import {
     ResidentSearchCombobox,
     type ResidentSearchOption,
@@ -258,7 +259,10 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                             <Loader size={32} />
                         </Center>
                     ) : members.length === 0 ? (
-                        <Alert color="gray">В этой команде пока нет участников.</Alert>
+                        <EmptyState
+                            title="Участники не найдены"
+                            description="В этой команде пока нет участников."
+                        />
                     ) : (
                         <ScrollArea>
                             <Stack gap={6} pb={4}>

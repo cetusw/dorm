@@ -8,6 +8,7 @@ import type { TaskListItem } from '../../features/task-catalog/model/types'
 import { DeleteTaskModal } from '../../features/task-catalog/ui/DeleteTaskModal'
 import { TaskFormModal } from '../../features/task-catalog/ui/TaskFormModal'
 import { TaskCatalogTable } from '../../features/task-catalog/ui/TaskCatalogTable'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
 import { PageActionButton } from '../../shared/ui/PageActionButton'
 
@@ -42,9 +43,10 @@ export function TaskCatalogPage() {
 
     if (!selectedDormitoryId) {
         content = (
-            <Alert color="gray">
-                Выберите общежитие в верхней панели.
-            </Alert>
+            <EmptyState
+                title="Общежитие не выбрано"
+                description="Выберите общежитие в верхней панели, чтобы посмотреть список задач."
+            />
         )
     } else if (loading) {
         content = (
@@ -60,9 +62,10 @@ export function TaskCatalogPage() {
         )
     } else if (tasks.length === 0) {
         content = (
-            <Alert color="gray">
-                В выбранном общежитии пока нет задач.
-            </Alert>
+            <EmptyState
+                title="Задачи не найдены"
+                description="В выбранном общежитии пока нет задач."
+            />
         )
     } else {
         content = (

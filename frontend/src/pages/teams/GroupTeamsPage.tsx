@@ -9,6 +9,7 @@ import type { TeamListItem } from '../../features/teams/model/types'
 import { DeleteTeamModal } from '../../features/teams/ui/DeleteTeamModal'
 import { TeamFormModal } from '../../features/teams/ui/TeamFormModal'
 import { TeamsTable } from '../../features/teams/ui/TeamsTable'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
 import { PageActionButton } from '../../shared/ui/PageActionButton'
 
@@ -84,9 +85,10 @@ export function GroupTeamsPage({ groupId }: Props) {
 
     if (!selectedDormitoryId) {
         content = (
-            <Alert color="gray">
-                Выберите общежитие в верхней панели.
-            </Alert>
+            <EmptyState
+                title="Общежитие не выбрано"
+                description="Выберите общежитие в верхней панели, чтобы посмотреть список команд."
+            />
         )
     } else if (groupLoading) {
         content = (
@@ -114,11 +116,10 @@ export function GroupTeamsPage({ groupId }: Props) {
         )
     } else if (teams.length === 0) {
         content = (
-            <>
-                <Alert color="gray">
-                    В выбранной группе пока нет команд.
-                </Alert>
-            </>
+            <EmptyState
+                title="Команды не найдены"
+                description="В выбранной группе пока нет команд."
+            />
         )
     } else {
         content = (

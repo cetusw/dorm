@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-import { Alert, Stack, Text } from '@mantine/core'
+import { Stack, Text } from '@mantine/core'
 
 import {
     groupAndSortMemberTasks,
@@ -8,6 +8,7 @@ import {
     selectTasksForTeamMember,
 } from '../model/selectors'
 import type { ResidentCurrentDuty } from '../model/types'
+import { EmptyState } from '../../../shared/ui/EmptyState'
 import { TeamMemberCard } from './TeamMemberCard'
 import { TeamMemberTasksDrawer } from './TeamMemberTasksDrawer'
 
@@ -42,7 +43,12 @@ export function TeamMemberTaskGroups({ duty }: Props) {
     }, [duty, selectedMemberId])
 
     if (teamMembers.length === 0) {
-        return <Alert color="gray">В дежурной команде нет участников</Alert>
+        return (
+            <EmptyState
+                title="Участники не найдены"
+                description="В дежурной команде нет участников."
+            />
+        )
     }
 
     return (

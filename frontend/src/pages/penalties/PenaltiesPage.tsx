@@ -6,6 +6,7 @@ import { usePenalties } from '../../features/penalties/model/usePenalties'
 import { CreatePenaltyDrawer } from '../../features/penalties/ui/CreatePenaltyDrawer'
 import { PenaltiesTable } from '../../features/penalties/ui/PenaltiesTable'
 import { ResidentPenaltiesDrawer } from '../../features/penalties/ui/ResidentPenaltiesDrawer'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { PageActionButton } from '../../shared/ui/PageActionButton'
 import { PageFrame } from '../../shared/ui/PageFrame'
 
@@ -32,9 +33,10 @@ export function PenaltiesPage() {
                     {error}
                 </Alert>
             ) : residents.length === 0 ? (
-                <Alert color="gray">
-                    Нет жителей с предупреждениями
-                </Alert>
+                <EmptyState
+                    title="Предупреждения не найдены"
+                    description="Сейчас нет жителей с предупреждениями."
+                />
             ) : (
                 <PenaltiesTable
                     residents={residents}

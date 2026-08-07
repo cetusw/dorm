@@ -8,6 +8,7 @@ import type { AreaListItem } from '../../features/areas/model/types'
 import { AreasTable } from '../../features/areas/ui/AreasTable'
 import { AreaFormModal } from '../../features/areas/ui/AreaFormModal'
 import { DeleteAreaModal } from '../../features/areas/ui/DeleteAreaModal'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
 import { PageActionButton } from '../../shared/ui/PageActionButton'
 
@@ -42,9 +43,10 @@ export function AreasPage() {
 
     if (!selectedDormitoryId) {
         content = (
-            <Alert color="gray">
-                Выберите общежитие в верхней панели.
-            </Alert>
+            <EmptyState
+                title="Общежитие не выбрано"
+                description="Выберите общежитие в верхней панели, чтобы посмотреть список территорий."
+            />
         )
     } else if (loading) {
         content = (
@@ -60,9 +62,10 @@ export function AreasPage() {
         )
     } else if (areas.length === 0) {
         content = (
-            <Alert color="gray">
-                В выбранном общежитии пока нет территорий.
-            </Alert>
+            <EmptyState
+                title="Территории не найдены"
+                description="В выбранном общежитии пока нет территорий."
+            />
         )
     } else {
         content = (

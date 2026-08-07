@@ -1,5 +1,6 @@
 import { PlusIcon } from '@phosphor-icons/react'
-import { ActionIcon, Alert, Group, Stack, Text } from '@mantine/core'
+import { ActionIcon, Group, Stack, Text } from '@mantine/core'
+import { EmptyState } from '../../../shared/ui/EmptyState'
 import type { DutySettingsArea } from '../model/types'
 import { DutySettingsAreaSection } from './DutySettingsAreaSection'
 
@@ -18,10 +19,14 @@ type Props = {
 export function DutySettingsAreaList(props: Props) {
     if (props.areas.length === 0) {
         return (
-            <Alert color="gray">
+            <Stack gap="md">
+                <EmptyState
+                    title="Задачи не найдены"
+                    description="В доступных территориях пока нет задач."
+                />
                 <Stack gap="md">
                     <Group gap={15} wrap="nowrap" align="center">
-                        <Text>В доступных территориях пока нет задач.</Text>
+                        <Text>Добавьте территорию, чтобы начать настройку задач.</Text>
                         <ActionIcon
                             variant="subtle"
                             color="gray"
@@ -33,7 +38,7 @@ export function DutySettingsAreaList(props: Props) {
                         </ActionIcon>
                     </Group>
                 </Stack>
-            </Alert>
+            </Stack>
         )
     }
 

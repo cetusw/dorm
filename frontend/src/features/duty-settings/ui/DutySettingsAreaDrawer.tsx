@@ -1,8 +1,9 @@
 import { PencilIcon, PlusIcon, RowsPlusBottomIcon, TrashIcon } from '@phosphor-icons/react'
-import { ActionIcon, Alert, Drawer, FocusTrap, Group, ScrollArea, Stack, Text } from '@mantine/core'
+import { ActionIcon, Drawer, FocusTrap, Group, ScrollArea, Stack, Text } from '@mantine/core'
 
 import type { DutySettingsArea } from '../model/types'
 import { formatDutySettingsAreaTitle } from '../model/utils'
+import { EmptyState } from '../../../shared/ui/EmptyState'
 import { DutySettingsTaskCard } from './DutySettingsTaskCard'
 import classes from './DutySettingsAreaDrawer.module.css'
 
@@ -65,7 +66,10 @@ export function DutySettingsAreaDrawer({
 
             {!area ? null : area.tasks.length === 0 ? (
                 <Stack gap="md">
-                    <Alert color="gray">В этой территории пока нет задач.</Alert>
+                    <EmptyState
+                        title="Задачи не найдены"
+                        description="В этой территории пока нет задач."
+                    />
                     <button
                         type="button"
                         className={classes.addTaskLink}

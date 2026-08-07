@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { CaretLeftIcon } from '@phosphor-icons/react'
-import { Alert, Box, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import { Box, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
 import { navigateTo } from '../../app/navigation'
 import { calculateDutyAnalytics, selectDutyViewOptions, selectTasksForActiveSelect } from '../../features/current-duty/model/selectors'
@@ -16,6 +16,7 @@ import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
 import { TeamMemberTaskGroups } from '../../features/current-duty/ui/TeamMemberTaskGroups'
 import { useDutyDetails } from '../../features/duty-history/model/useDutyDetails'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 
@@ -91,7 +92,10 @@ export function DutyHistoryDetailsPage({ dutyId }: Props) {
     if (error || !duty) {
         return (
             <PageFrame title="Дежурство" error={error ?? 'Не удалось загрузить дежурство'}>
-                <Alert color="gray">Дежурство недоступно</Alert>
+                <EmptyState
+                    title="Дежурство не найдено"
+                    description="Не удалось открыть выбранное дежурство."
+                />
             </PageFrame>
         )
     }
@@ -265,7 +269,10 @@ export function DutyHistoryDetailsPage({ dutyId }: Props) {
                             onVerify={noopTaskAction}
                         />
                     ) : (
-                        <Alert color="gray">Для выбранного общежития план здания не настроен.</Alert>
+                        <EmptyState
+                            title="План здания не найден"
+                            description="Для выбранного общежития план здания не настроен."
+                        />
                     )}
                     <Box hiddenFrom="md">
                         <TaskGroups

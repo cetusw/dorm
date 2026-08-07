@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 
-import { Alert, Stack } from '@mantine/core'
+import { Stack } from '@mantine/core'
 
 import type { TaskActionHandler, TaskRowActionMode } from '../model/taskActions'
 import type { ResidentDutyTask } from '../model/types'
+import { EmptyState } from '../../../shared/ui/EmptyState'
 import { groupTasksByArea } from '../model/utils'
 import { TaskGroupSection } from './TaskGroupSection'
 import { TaskMobileGroupSection } from './TaskMobileGroupSection'
@@ -71,7 +72,12 @@ export function TaskGroups({
     }
 
     if (groups.length === 0) {
-        return <Alert color="gray">{emptyMessage}</Alert>
+        return (
+            <EmptyState
+                title="Задачи не найдены"
+                description={emptyMessage}
+            />
+        )
     }
 
     return (

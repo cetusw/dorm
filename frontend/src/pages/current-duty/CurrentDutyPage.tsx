@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { BookOpenIcon, CalendarXIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
+import { BookOpenIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
 import { ActionIcon, Alert, Box, Center, Group, Loader, Menu, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 
 import type { DutyTaskSelect } from '../../features/current-duty/model/types'
@@ -371,7 +371,6 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         return (
             <PageFrame title="Дежурство" titleActions={titleActions} error={error}>
                 <EmptyState
-                    icon={<CalendarXIcon size={32} />}
                     title="Дежурство не найдено"
                     description="В выбранной группе нет активного дежурства."
                 />
@@ -396,7 +395,10 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                 noticeTone={duty.notice_tone}
                 controls={controls}
             >
-                <Alert color="gray">На текущее дежурство не заведены задачи.</Alert>
+                <EmptyState
+                    title="Задачи не найдены"
+                    description="Для текущего дежурства задачи ещё не заведены."
+                />
                 <CreateGroupDutyModal
                     opened={createModalOpened}
                     groupId={duty.selected_group_id}
@@ -448,7 +450,10 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                                 onVerify={handleVerify}
                             />
                         ) : (
-                            <Alert color="gray">Для выбранного общежития план здания не настроен.</Alert>
+                            <EmptyState
+                                title="План здания не найден"
+                                description="Для выбранного общежития план здания не настроен."
+                            />
                         )}
                         <Box hiddenFrom="md">
                             <TaskGroups

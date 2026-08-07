@@ -8,6 +8,7 @@ import { notifyDormitoriesChanged } from '../../features/dormitories/model/useDo
 import { DeleteDormitoryModal } from '../../features/dormitories/ui/DeleteDormitoryModal'
 import { DormitoryFormModal } from '../../features/dormitories/ui/DormitoryFormModal'
 import { DormitoriesTable } from '../../features/dormitories/ui/DormitoriesTable'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
 import { PageActionButton } from '../../shared/ui/PageActionButton'
 
@@ -56,9 +57,10 @@ export function DormitoriesPage() {
         )
     } else if (dormitories.length === 0) {
         content = (
-            <Alert color="gray">
-                Общежития пока не добавлены.
-            </Alert>
+            <EmptyState
+                title="Общежития не найдены"
+                description="Общежития пока не добавлены."
+            />
         )
     } else {
         content = (

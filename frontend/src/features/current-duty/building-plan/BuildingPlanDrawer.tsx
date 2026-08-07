@@ -1,7 +1,8 @@
-import { Alert, Drawer, FocusTrap, ScrollArea, Table } from '@mantine/core'
+import { Drawer, FocusTrap, ScrollArea, Table } from '@mantine/core'
 
 import type { TaskActionHandler, TaskRowActionMode } from '../model/taskActions'
 import type { ResidentDutyTask } from '../model/types'
+import { EmptyState } from '../../../shared/ui/EmptyState'
 import { TaskTableRow } from '../ui/TaskTableRow'
 import type { FloorPlan } from './types'
 import { getFloorLabel } from './utils'
@@ -44,7 +45,10 @@ export function BuildingPlanDrawer({
             <FocusTrap.InitialFocus />
 
             {tasks.length === 0 ? (
-                <Alert color="gray">Для этой территории нет задач.</Alert>
+                <EmptyState
+                    title="Задачи не найдены"
+                    description="Для этой территории нет задач."
+                />
             ) : (
                 <ScrollArea>
                     <Table miw={780}>

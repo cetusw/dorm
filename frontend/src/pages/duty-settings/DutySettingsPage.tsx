@@ -26,6 +26,7 @@ import { DutySettingsTeamsTab } from '../../widgets/duty-settings-teams/ui/DutyS
 import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { ConfirmActionModal } from '../../shared/ui/ConfirmActionModal'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import { navigateTo } from '../../app/navigation'
@@ -163,7 +164,12 @@ export function DutySettingsPage({ groupId }: Props) {
     } else if (error && !data) {
         content = <Alert color="red">{error}</Alert>
     } else if (!data) {
-        content = <Alert color="gray">Не удалось загрузить настройки дежурства.</Alert>
+        content = (
+            <EmptyState
+                title="Настройки не найдены"
+                description="Не удалось загрузить настройки дежурства."
+            />
+        )
     } else if (mainTab === 'teams') {
         content = (
             <DutySettingsTeamsTab
@@ -176,7 +182,12 @@ export function DutySettingsPage({ groupId }: Props) {
     } else if (mainTab !== 'tasks') {
         content = <Box h={120} />
     } else if (data.task_editor_state !== 'active' || !data.active_duty) {
-        content = <Alert color="gray">{data.task_editor_alert}</Alert>
+        content = (
+            <EmptyState
+                title="Дежурство не найдено"
+                description={data.task_editor_alert}
+            />
+        )
     } else {
         const floorAreas = selectedFloorPlan ? data.areas.filter((area) => area.floor === selectedFloorPlan.floor) : []
 

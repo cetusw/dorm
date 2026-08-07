@@ -1,14 +1,12 @@
-import type { ReactNode } from 'react'
-
+import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { Stack, Text, ThemeIcon, Title } from '@mantine/core'
 
 type Props = {
-    icon: ReactNode
     title: string
     description?: string
 }
 
-export function EmptyState({ icon, title, description }: Props) {
+export function EmptyState({ title, description }: Props) {
     return (
         <Stack
             align="center"
@@ -23,7 +21,7 @@ export function EmptyState({ icon, title, description }: Props) {
                 variant="light"
                 color="gray"
             >
-                {icon}
+                <MagnifyingGlassIcon size={32} />
             </ThemeIcon>
 
             <Stack gap={6} align="center">

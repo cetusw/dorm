@@ -9,6 +9,7 @@ import type { GroupListItem } from '../../features/groups/model/types'
 import { DeleteGroupModal } from '../../features/groups/ui/DeleteGroupModal'
 import { GroupFormModal } from '../../features/groups/ui/GroupFormModal'
 import { GroupsTable } from '../../features/groups/ui/GroupsTable'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
 import { PageActionButton } from '../../shared/ui/PageActionButton'
 
@@ -43,9 +44,10 @@ export function GroupsPage() {
 
     if (!selectedDormitoryId) {
         content = (
-            <Alert color="gray">
-                Выберите общежитие в верхней панели.
-            </Alert>
+            <EmptyState
+                title="Общежитие не выбрано"
+                description="Выберите общежитие в верхней панели, чтобы посмотреть список групп."
+            />
         )
     } else if (loading) {
         content = (
@@ -61,9 +63,10 @@ export function GroupsPage() {
         )
     } else if (groups.length === 0) {
         content = (
-            <Alert color="gray">
-                В выбранном общежитии пока нет групп.
-            </Alert>
+            <EmptyState
+                title="Группы не найдены"
+                description="В выбранном общежитии пока нет групп."
+            />
         )
     } else {
         content = (

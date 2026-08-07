@@ -1,10 +1,11 @@
-import { Alert, Drawer, FocusTrap, Stack, Text } from '@mantine/core'
+import { Drawer, FocusTrap, Stack, Text } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 
 import type {
     TeamMemberSummary,
     TeamMemberTaskAreaGroup,
 } from '../model/selectors'
+import { EmptyState } from '../../../shared/ui/EmptyState'
 import { MemberDutyProgressCard } from './MemberDutyProgressCard'
 import { MemberTaskAreaSection } from './MemberTaskAreaSection'
 import classes from './TeamMemberTaskGroups.module.css'
@@ -52,7 +53,10 @@ export function TeamMemberTasksDrawer({
                     </div>
 
                     {taskGroups.length === 0 ? (
-                        <Alert color="gray">Участник не взял ни одной задачи</Alert>
+                        <EmptyState
+                            title="Задачи не найдены"
+                            description="Этот участник ещё не взял ни одной задачи."
+                        />
                     ) : (
                         <Stack gap="lg">
                             {taskGroups.map((group) => (

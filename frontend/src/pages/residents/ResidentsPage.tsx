@@ -8,6 +8,7 @@ import type { ResidentListItem } from '../../features/residents/model/types'
 import { DeleteResidentModal } from '../../features/residents/ui/DeleteResidentModal'
 import { ResidentFormModal } from '../../features/residents/ui/ResidentFormModal'
 import { ResidentsTable } from '../../features/residents/ui/ResidentsTable'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { ManagementPageFrame } from '../../shared/ui/ManagementPageFrame'
 import { PageActionButton } from '../../shared/ui/PageActionButton'
 
@@ -42,9 +43,10 @@ export function ResidentsPage() {
 
     if (!selectedDormitoryId) {
         content = (
-            <Alert color="gray">
-                Выберите общежитие в верхней панели.
-            </Alert>
+            <EmptyState
+                title="Общежитие не выбрано"
+                description="Выберите общежитие в верхней панели, чтобы посмотреть список жителей."
+            />
         )
     } else if (loading) {
         content = (
@@ -60,9 +62,10 @@ export function ResidentsPage() {
         )
     } else if (residents.length === 0) {
         content = (
-            <Alert color="gray">
-                В выбранном общежитии пока нет жителей.
-            </Alert>
+            <EmptyState
+                title="Жители не найдены"
+                description="В выбранном общежитии пока нет жителей."
+            />
         )
     } else {
         content = (
