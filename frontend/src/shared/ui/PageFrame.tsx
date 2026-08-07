@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { InfoIcon, WarningIcon } from '@phosphor-icons/react'
 import { Alert, Box, Group, Stack, Title } from '@mantine/core'
@@ -10,6 +10,7 @@ import {
 type Props = {
     topContent?: ReactNode
     title: string
+    titleStyle?: CSSProperties
     subtitle?: string
     titleActions?: ReactNode
     error?: string | null
@@ -23,6 +24,7 @@ type Props = {
 export function PageFrame({
     topContent,
     title,
+    titleStyle,
     subtitle,
     titleActions,
     error,
@@ -188,7 +190,7 @@ export function PageFrame({
                 {topContent}
 
                 <Group justify="space-between" align="flex-start" gap="md" wrap="wrap">
-                    <Title order={1}>
+                    <Title order={1} style={titleStyle}>
                         <Box component="span">
                             {title}
                         </Box>
