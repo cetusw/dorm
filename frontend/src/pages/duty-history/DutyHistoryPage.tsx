@@ -6,8 +6,8 @@ import { buildReadonlyDutyProgressModel, type DutyAnalytics } from '../../featur
 import { formatDutyPeriodFull } from '../../features/current-duty/model/utils'
 import { MemberDutyProgressCard } from '../../features/current-duty/ui/MemberDutyProgressCard'
 import { useDutyHistory } from '../../features/duty-history/model/useDutyHistory'
-import { AppTable, appTableClasses } from '../../shared/ui/AppTable'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { ListTable, listTableClasses } from '../../shared/ui/ListTable'
 import { PageFrame } from '../../shared/ui/PageFrame'
 import classes from './DutyHistoryPage.module.css'
 
@@ -108,9 +108,9 @@ export function DutyHistoryPage() {
                 />
             ) : undefined}
         >
-            <AppTable minWidth={640}>
+            <ListTable minWidth={640}>
                 <Table.Thead>
-                    <Table.Tr>
+                    <Table.Tr className={listTableClasses.headerRow}>
                         <Table.Th>Период</Table.Th>
                         <Table.Th>Команда</Table.Th>
                         <Table.Th w={320}>Прогресс</Table.Th>
@@ -120,7 +120,7 @@ export function DutyHistoryPage() {
                     {data.duties.map((item) => (
                         <Table.Tr
                             key={item.id}
-                            className={`${appTableClasses.interactiveRow} ${appTableClasses.compactRow}`}
+                            className={`${listTableClasses.interactiveRow} ${listTableClasses.bodyRow}`}
                             tabIndex={0}
                             onClick={() => navigateTo(`/app/duties/${item.id}?group_id=${encodeURIComponent(data.selected_group_id)}`)}
                             onKeyDown={(event) => {
@@ -158,7 +158,7 @@ export function DutyHistoryPage() {
                         </Table.Tr>
                     ))}
                 </Table.Tbody>
-            </AppTable>
+            </ListTable>
         </PageFrame>
     )
 }
