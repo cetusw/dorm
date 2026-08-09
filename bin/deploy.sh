@@ -101,6 +101,10 @@ for attempt in \$(seq 1 30); do
     break
   fi
 
+  if curl --fail https://dormkit.ru/app/ >/dev/null; then
+      break
+  fi
+
   if [ "\$attempt" -eq 30 ]; then
     docker compose \$COMPOSE_FILES logs --tail=200 app
     exit 1
