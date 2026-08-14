@@ -24,6 +24,10 @@ type PenaltyUseCase interface {
 		currentUserID uuid.UUID,
 		residentID uuid.UUID,
 	) (*dto.PenaltyResidentDetailsResponse, error)
+	GetCurrentUserPenalties(
+		ctx context.Context,
+		currentUserID uuid.UUID,
+	) (*dto.CurrentUserPenaltiesResponse, error)
 
 	CreatePenalty(
 		ctx context.Context,

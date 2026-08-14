@@ -1,6 +1,7 @@
 import { apiRequest } from '../../../shared/api/apiClient'
 import type {
     CreatePenaltyRequest,
+    CurrentUserPenaltiesResponse,
     PenaltyItem,
     PenaltyResidentDetailsResponse,
     PenaltyResidentOption,
@@ -77,6 +78,17 @@ export async function getResidentPenalties(
     return {
         user_id: String(payload.user_id ?? ''),
         full_name: String(payload.full_name ?? ''),
+        penalties: Array.isArray(payload.penalties)
+            ? payload.penalties.map((item) => normalizePenaltyItem(item as Record<string, unknown>))
+            : [],
+    }
+}
+
+export async function getCurrentUserPenalties(): Promise<CurrentUserPenaltiesResponse> {
+    const response = await apiRequest('/api/v1/penalties/me')
+    const payload = await response.json() as Record<string, unknown>
+
+    return {
         penalties: Array.isArray(payload.penalties)
             ? payload.penalties.map((item) => normalizePenaltyItem(item as Record<string, unknown>))
             : [],

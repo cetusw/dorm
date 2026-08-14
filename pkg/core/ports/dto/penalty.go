@@ -33,6 +33,10 @@ type PenaltyResidentDetailsResponse struct {
 	Penalties []PenaltyItem `json:"penalties"`
 }
 
+type CurrentUserPenaltiesResponse struct {
+	Penalties []PenaltyItem `json:"penalties"`
+}
+
 type CreatePenaltyRequest struct {
 	UserID   string  `json:"user_id"`
 	Reason   string  `json:"reason"`

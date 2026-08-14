@@ -236,46 +236,9 @@
     padding: 24px 28px;
 }
 
-.accountDropdown {
-    width: auto;
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    z-index: 30;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    background: transparent;
-    padding: 0;
-}
-
 .notificationDropdown {
     width: min(350px, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
-}
-
-.logoutButton {
-    width: auto;
-    min-height: 0;
-    height: auto;
-    padding: 7px 15px;
-    border: 0;
-    border-radius: 10px;
-    background: var(--app-color-primary);
-    color: #ffffff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 14px;
-    line-height: 1.1;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.logoutButton:hover,
-.logoutButton:focus-visible {
-    background: var(--app-color-primary-hover);
 }
 
 .notificationMessage {
@@ -319,12 +282,6 @@
     .notificationDropdown {
         width: min(350px, calc(100vw - 24px));
         max-width: calc(100vw - 24px);
-    }
-
-    .logoutButton {
-        min-height: 0;
-        height: auto;
-        font-size: 14px;
     }
 
     .notificationMessage,

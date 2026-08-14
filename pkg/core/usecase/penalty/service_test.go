@@ -139,6 +139,38 @@ func (s *penaltyQueryServiceStub) ListActivePenaltiesByUser(
 	return s.residentBy, nil
 }
 
+func TestGetCurrentUserPenaltiesReturnsActiveItems(t *testing.T) {
+	t.Parallel()
+
+	currentUserID := uuid.New()
+	dormitoryID := int64(7)
+	now := time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC)
+	currentUser := user.RestoreUser(currentUserID, "resident", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
+	queryService := &penaltyQueryServiceStub{
+		residentBy: []dto.PenaltyItem{
+			{ID: uuid.NewString(), Reason: "Просрочил уборку", Weight: 2, IssuedOn: "2026-08-01"},
+		},
+	}
+
+	service := NewPenaltyService(
+		&penaltyRepositoryStub{byID: map[uuid.UUID]*penaltydomain.Penalty{}},
+		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{
+			currentUserID: currentUser,
+		}},
+		&penaltyTeamRepositoryStub{byID: map[uuid.UUID]*structure.Team{}},
+		&penaltyGroupRepositoryStub{},
+		&penaltyDormitoryRepositoryStub{},
+		queryService,
+		time.UTC,
+	)
+
+	response, err := service.GetCurrentUserPenalties(context.Background(), currentUserID)
+
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, queryService.residentBy, response.Penalties)
+}
+
 func TestCreatePenaltyUsesDormitoryLeaderScopeAndNormalizesData(t *testing.T) {
 	t.Parallel()
 

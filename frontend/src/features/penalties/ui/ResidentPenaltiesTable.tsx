@@ -10,25 +10,30 @@ import classes from './ResidentPenaltiesTable.module.css'
 
 type Props = {
     penalties: PenaltyItem[]
-    pendingPenaltyId: string | null
-    onDelete: (penaltyId: string) => void
+    pendingPenaltyId?: string | null
+    onDelete?: (penaltyId: string) => void
+    dateLabel?: string
+    minWidth?: number
 }
 
 export function ResidentPenaltiesTable({
     penalties,
-    pendingPenaltyId,
+    pendingPenaltyId = null,
     onDelete,
+    dateLabel = 'Дата получения',
+    minWidth = 720,
 }: Props) {
     const [openedMenuId, setOpenedMenuId] = useState<string | null>(null)
+    const hasActions = typeof onDelete === 'function'
 
     return (
-        <ListTable minWidth={720} verticalSpacing="sm">
+        <ListTable minWidth={minWidth} verticalSpacing="sm">
             <Table.Thead>
                 <Table.Tr className={listTableClasses.headerRow}>
-                    <Table.Th>Причина</Table.Th>
-                    <Table.Th w={120}>Вес</Table.Th>
-                    <Table.Th w={168}>Дата получения</Table.Th>
-                    <Table.Th w={68} />
+                    <Table.Th className={classes.reasonColumn}>Причина</Table.Th>
+                    <Table.Th className={classes.weightColumn}>Вес</Table.Th>
+                    <Table.Th className={classes.dateColumn}>{dateLabel}</Table.Th>
+                    {hasActions ? <Table.Th w={68} /> : null}
                 </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -42,40 +47,42 @@ export function ResidentPenaltiesTable({
                             className={`${listTableClasses.bodyRow} ${classes.row}`}
                             data-menu-open={menuOpened ? 'true' : undefined}
                         >
-                            <Table.Td>
+                            <Table.Td className={classes.reasonColumn}>
                                 <Text className={classes.reason}>{penalty.reason}</Text>
                             </Table.Td>
-                            <Table.Td>{formatPenaltyWeight(penalty.weight)}</Table.Td>
-                            <Table.Td>{formatPenaltyDate(penalty.issued_on)}</Table.Td>
-                            <Table.Td>
-                                <Menu
-                                    opened={menuOpened}
-                                    onChange={(opened) => setOpenedMenuId(opened ? penalty.id : null)}
-                                    withinPortal
-                                    position="bottom-end"
-                                >
-                                    <Menu.Target>
-                                        <ActionIcon
-                                            variant="subtle"
-                                            color="gray"
-                                            aria-label={`Действия с предупреждением от ${formatPenaltyDate(penalty.issued_on)}`}
-                                            className={classes.actionButton}
-                                            disabled={deleting}
-                                        >
-                                            {deleting ? <Loader size={16} /> : <DotsThreeVerticalIcon size={18} />}
-                                        </ActionIcon>
-                                    </Menu.Target>
-                                    <Menu.Dropdown>
-                                        <Menu.Item
-                                            color="red"
-                                            leftSection={<TrashIcon size={20} />}
-                                            onClick={() => onDelete(penalty.id)}
-                                        >
-                                            Удалить
-                                        </Menu.Item>
-                                    </Menu.Dropdown>
-                                </Menu>
-                            </Table.Td>
+                            <Table.Td className={classes.weightColumn}>{formatPenaltyWeight(penalty.weight)}</Table.Td>
+                            <Table.Td className={classes.dateColumn}>{formatPenaltyDate(penalty.issued_on)}</Table.Td>
+                            {hasActions ? (
+                                <Table.Td>
+                                    <Menu
+                                        opened={menuOpened}
+                                        onChange={(opened) => setOpenedMenuId(opened ? penalty.id : null)}
+                                        withinPortal
+                                        position="bottom-end"
+                                    >
+                                        <Menu.Target>
+                                            <ActionIcon
+                                                variant="subtle"
+                                                color="gray"
+                                                aria-label={`Действия с предупреждением от ${formatPenaltyDate(penalty.issued_on)}`}
+                                                className={classes.actionButton}
+                                                disabled={deleting}
+                                            >
+                                                {deleting ? <Loader size={16} /> : <DotsThreeVerticalIcon size={18} />}
+                                            </ActionIcon>
+                                        </Menu.Target>
+                                        <Menu.Dropdown>
+                                            <Menu.Item
+                                                color="red"
+                                                leftSection={<TrashIcon size={20} />}
+                                                onClick={() => onDelete?.(penalty.id)}
+                                            >
+                                                Удалить
+                                            </Menu.Item>
+                                        </Menu.Dropdown>
+                                    </Menu>
+                                </Table.Td>
+                            ) : null}
                         </Table.Tr>
                     )
                 })}

@@ -6,7 +6,6 @@ import {
     CalendarBlankIcon,
     CheckSquareOffsetIcon,
     MapPinAreaIcon,
-    SignOutIcon,
     UserIcon,
     UsersFourIcon,
     WarningIcon,
@@ -27,9 +26,9 @@ import {
     UnstyledButton,
     Alert,
 } from '@mantine/core'
-import { useClickOutside, useDisclosure } from '@mantine/hooks'
+import { useDisclosure } from '@mantine/hooks'
 
-import { logoutResident } from '../features/auth/api/authApi'
+import { AccountDrawer } from '../features/account/ui/AccountDrawer'
 import type { CurrentUser } from '../features/current-user/model/types'
 import { useDormitorySelection } from '../features/dormitories/model/useDormitorySelection'
 import { usePushNotifications } from '../features/manage-push-notifications/model/usePushNotifications'
@@ -60,6 +59,10 @@ type SidebarNavTabProps = {
     onClick: () => void
 }
 
+function isMobileViewport(): boolean {
+    return window.matchMedia('(max-width: 48em)').matches
+}
+
 function isCurrentPathActive(currentPath: string, href: string): boolean {
     const pathWithoutSearch = currentPath.split('?')[0] ?? currentPath
 
@@ -74,12 +77,13 @@ function isCurrentPathActive(currentPath: string, href: string): boolean {
     return pathWithoutSearch === href
 }
 
-function getUserDisplayName(user: CurrentUser | null): string {
+function getAccountButtonName(user: CurrentUser | null): string {
     if (!user) {
         return 'Аккаунт'
     }
 
-    return user.first_name.trim() || user.last_name.trim() || 'Аккаунт'
+    const firstName = user.first_name.trim()
+    return firstName !== '' ? firstName : 'Аккаунт'
 }
 
 function getUserInitial(user: CurrentUser | null): string {
@@ -96,14 +100,6 @@ function getAvatarColor(user: CurrentUser | null): string {
     }
 
     return `hsl(${hash} 78% 60%)`
-}
-
-async function handleResidentLogout() {
-    try {
-        await logoutResident()
-    } finally {
-        window.location.assign('/app/login')
-    }
 }
 
 function getNotificationMessage(state: ReturnType<typeof usePushNotifications>['state'], error: string | null): string {
@@ -147,42 +143,27 @@ function isNotificationToggleDisabled(state: ReturnType<typeof usePushNotificati
 type AccountButtonProps = {
     className?: string
     nameClassName?: string
+    onClick: () => void
     user: CurrentUser | null
 }
 
-function AccountButton({ className, nameClassName, user }: AccountButtonProps) {
+function AccountButton({ className, nameClassName, onClick, user }: AccountButtonProps) {
     const avatarColor = useMemo(() => getAvatarColor(user), [user])
-    const [opened, { toggle, close }] = useDisclosure(false)
-    const rootRef = useClickOutside<HTMLDivElement>(() => close())
 
     return (
-        <div ref={rootRef} className={classes.accountButtonWrap}>
+        <div className={classes.accountButtonWrap}>
             <UnstyledButton
                 className={[classes.accountButton, className ?? ''].join(' ').trim()}
-                aria-label="Открыть меню аккаунта"
-                aria-expanded={opened}
-                onClick={() => toggle()}
+                aria-label="Открыть аккаунт"
+                onClick={onClick}
             >
                 <span className={classes.avatar} style={{ backgroundColor: avatarColor }}>
                     {getUserInitial(user)}
                 </span>
                 <span className={[classes.accountName, nameClassName ?? ''].join(' ').trim()}>
-                    {getUserDisplayName(user)}
+                    {getAccountButtonName(user)}
                 </span>
             </UnstyledButton>
-
-            {opened ? (
-                <div className={classes.accountDropdown}>
-                    <button
-                        type="button"
-                        className={classes.logoutButton}
-                        onClick={() => void handleResidentLogout()}
-                    >
-                        <SignOutIcon size={24} weight="regular" />
-                        <span>Выйти</span>
-                    </button>
-                </div>
-            ) : null}
         </div>
     )
 }
@@ -289,7 +270,10 @@ export function ResidentAppShell({
     children,
 }: Props) {
     const pageViewportRef = useRef<HTMLDivElement | null>(null)
+    const currentPathWithoutSearch = currentPath.split('?')[0] ?? currentPath
     const [navbarOpened, { toggle: toggleNavbar, close: closeNavbar }] =
+        useDisclosure(false)
+    const [accountDrawerOpened, { open: openAccountDrawer, close: closeAccountDrawer }] =
         useDisclosure(false)
     const hasManagementNavigation = Boolean(currentUser?.can_manage_dormitories)
     const canManagePenalties = currentUser?.can_manage_penalties === true
@@ -394,6 +378,39 @@ export function ResidentAppShell({
         })
     }, [currentPath])
 
+    useEffect(() => {
+        closeAccountDrawer()
+    }, [closeAccountDrawer, currentPath])
+
+    useEffect(() => {
+        if (currentPathWithoutSearch !== '/app/account') {
+            return
+        }
+
+        if (!isMobileViewport()) {
+            return
+        }
+
+        openAccountDrawer()
+    }, [currentPathWithoutSearch, openAccountDrawer])
+
+    function handleAccountOpen() {
+        if (isMobileViewport()) {
+            openAccountDrawer()
+            return
+        }
+
+        onNavigate('/app/account')
+    }
+
+    function handleAccountDrawerClose() {
+        closeAccountDrawer()
+
+        if (currentPathWithoutSearch === '/app/account' && isMobileViewport()) {
+            onNavigate('/app/tasks')
+        }
+    }
+
     const pageContent = currentUserLoading ? (
         <Center h="100%">
             <Loader />
@@ -488,6 +505,7 @@ export function ResidentAppShell({
                                 {showShellControls ? (
                                     <AccountButton
                                         nameClassName={classes.desktopAccountName}
+                                        onClick={handleAccountOpen}
                                         user={currentUser}
                                     />
                                 ) : null}
@@ -495,6 +513,7 @@ export function ResidentAppShell({
                         ) : showShellControls ? (
                             <AccountButton
                                 nameClassName={classes.desktopAccountName}
+                                onClick={handleAccountOpen}
                                 user={currentUser}
                             />
                         ) : null}
@@ -533,6 +552,12 @@ export function ResidentAppShell({
                     </Box>
                 </ScrollArea>
             </AppShell.Main>
+
+            <AccountDrawer
+                currentUser={currentUser}
+                opened={accountDrawerOpened}
+                onClose={handleAccountDrawerClose}
+            />
         </AppShell>
     )
 }

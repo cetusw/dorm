@@ -110,6 +110,28 @@ func (s *Service) GetResidentPenalties(
 	}, nil
 }
 
+func (s *Service) GetCurrentUserPenalties(
+	ctx context.Context,
+	currentUserID uuid.UUID,
+) (*dto.CurrentUserPenaltiesResponse, error) {
+	currentUser, err := s.userRepo.FindByID(ctx, currentUserID)
+	if err != nil {
+		return nil, fmt.Errorf("load current user for penalties: %w", err)
+	}
+	if currentUser == nil {
+		return nil, penaltydomain.ErrAccessDenied
+	}
+
+	items, err := s.queryService.ListActivePenaltiesByUser(ctx, currentUserID)
+	if err != nil {
+		return nil, fmt.Errorf("list current user penalties: %w", err)
+	}
+
+	return &dto.CurrentUserPenaltiesResponse{
+		Penalties: items,
+	}, nil
+}
+
 func (s *Service) CreatePenalty(
 	ctx context.Context,
 	currentUserID uuid.UUID,

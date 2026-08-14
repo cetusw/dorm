@@ -5,6 +5,7 @@ import { Alert } from '@mantine/core'
 import { navigateTo, replaceTo, useAppPathname } from './navigation'
 import { ResidentAppShell } from './ResidentAppShell'
 import { AreasPage } from '../pages/areas/AreasPage'
+import { AccountPage } from '../pages/account/AccountPage'
 import { useCurrentUserState } from '../features/current-user/model/useCurrentUser'
 import { CurrentDutyPage } from '../pages/current-duty/CurrentDutyPage'
 import { DutyHistoryDetailsPage } from '../pages/duty-history/DutyHistoryDetailsPage'
@@ -58,6 +59,18 @@ function renderResidentPage(path: string, currentUser: ReturnType<typeof useCurr
         }
 
         return <PenaltiesPage />
+    }
+
+    if (pathname === '/app/account') {
+        if (!currentUser) {
+            return (
+                <PageFrame title="Аккаунт">
+                    <Alert color="red">Не удалось загрузить текущего пользователя.</Alert>
+                </PageFrame>
+            )
+        }
+
+        return <AccountPage currentUser={currentUser} />
     }
 
     if (!canManageDormitories) {

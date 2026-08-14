@@ -22,6 +22,7 @@ func NewPenaltyAPIHandler(penaltyUC ports.PenaltyUseCase) *PenaltyAPIHandler {
 func (h *PenaltyAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/penalties", auth)
 	api.Get("", h.HandleListResidents)
+	api.Get("/me", h.HandleGetCurrentUserPenalties)
 	api.Get("/residents", h.HandleSearchResidents)
 	api.Get("/residents/:userId", h.HandleGetResidentPenalties)
 	api.Post("", h.HandleCreatePenalty)
@@ -49,6 +50,20 @@ func (h *PenaltyAPIHandler) HandleSearchResidents(c *fiber.Ctx) error {
 	}
 
 	response, err := h.penaltyUC.SearchResidents(c.Context(), userID, c.Query("q"))
+	if err != nil {
+		return h.respondPenaltyError(c, err)
+	}
+
+	return c.JSON(response)
+}
+
+func (h *PenaltyAPIHandler) HandleGetCurrentUserPenalties(c *fiber.Ctx) error {
+	userID, err := currentUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+	}
+
+	response, err := h.penaltyUC.GetCurrentUserPenalties(c.Context(), userID)
 	if err != nil {
 		return h.respondPenaltyError(c, err)
 	}

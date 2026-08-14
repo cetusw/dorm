@@ -31,6 +31,10 @@ export type PenaltyResidentDetailsResponse = {
     penalties: PenaltyItem[]
 }
 
+export type CurrentUserPenaltiesResponse = {
+    penalties: PenaltyItem[]
+}
+
 export type CreatePenaltyRequest = {
     user_id: string
     reason: string
