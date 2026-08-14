@@ -105,12 +105,18 @@ func (s *Service) GetCurrentUser(ctx context.Context, userID uuid.UUID) (*dto.Cu
 		return nil, fmt.Errorf("check penalty management access: %w", err)
 	}
 
+	canManageWarehouse, err := s.canManageWarehouse(ctx, u)
+	if err != nil {
+		return nil, fmt.Errorf("check warehouse management access: %w", err)
+	}
+
 	return &dto.CurrentUserResponse{
 		ID:                   u.ID().String(),
 		FirstName:            u.FirstName(),
 		LastName:             u.LastName(),
 		CanManageDormitories: canManageDormitories,
 		CanManagePenalties:   canManagePenalties,
+		CanManageWarehouse:   canManageWarehouse,
 	}, nil
 }
 
@@ -130,6 +136,33 @@ func (s *Service) canManagePenalties(ctx context.Context, currentUser *user.User
 	groups, err := s.groupRepo.FindByDormitoryID(ctx, *currentUser.DormitoryID())
 	if err != nil {
 		return false, fmt.Errorf("load dormitory groups for penalties: %w", err)
+	}
+
+	for _, group := range groups {
+		if group.LeaderID() != nil && *group.LeaderID() == currentUser.ID() {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (s *Service) canManageWarehouse(ctx context.Context, currentUser *user.User) (bool, error) {
+	if currentUser.DormitoryID() == nil {
+		return false, nil
+	}
+
+	dormitory, err := s.dormitoryRepo.FindByID(ctx, *currentUser.DormitoryID())
+	if err != nil {
+		return false, fmt.Errorf("load current dormitory for warehouse: %w", err)
+	}
+	if dormitory != nil && dormitory.LeaderID() != nil && *dormitory.LeaderID() == currentUser.ID() {
+		return true, nil
+	}
+
+	groups, err := s.groupRepo.FindByDormitoryID(ctx, *currentUser.DormitoryID())
+	if err != nil {
+		return false, fmt.Errorf("load dormitory groups for warehouse: %w", err)
 	}
 
 	for _, group := range groups {

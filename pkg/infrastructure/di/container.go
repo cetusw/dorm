@@ -10,6 +10,7 @@ import (
 	penaltyuc "dorm/pkg/core/usecase/penalty"
 	residentusecase "dorm/pkg/core/usecase/resident"
 	"dorm/pkg/core/usecase/team"
+	warehouseuc "dorm/pkg/core/usecase/warehouse"
 	"dorm/pkg/infrastructure/mysql/query"
 	notificationinfra "dorm/pkg/infrastructure/notification"
 	"fmt"
@@ -63,6 +64,7 @@ func NewContainer(configPath string) (*Container, error) {
 	pushSubscriptionRepo := repository.NewPushSubscriptionRepository(db)
 	notificationRepo := repository.NewNotificationRepository(db)
 	penaltyRepo := repository.NewPenaltyRepository(db)
+	warehouseRepo := repository.NewWarehouseRepository(db)
 
 	cleaningService := cleaning.NewCleaningService(
 		userRepo,
@@ -80,6 +82,7 @@ func NewContainer(configPath string) (*Container, error) {
 	teamQueryService := query.NewTeamQueryService(db)
 	notificationQueryService := query.NewNotificationQueryService(db)
 	penaltyQueryService := query.NewPenaltyQueryService(db)
+	warehouseQueryService := query.NewWarehouseQueryService(db)
 
 	userService := user.NewUserService(
 		userRepo,
@@ -106,6 +109,14 @@ func NewContainer(configPath string) (*Container, error) {
 		groupRepo,
 		dormitoryRepo,
 		penaltyQueryService,
+		location,
+	)
+	warehouseService := warehouseuc.NewWarehouseService(
+		warehouseRepo,
+		userRepo,
+		groupRepo,
+		dormitoryRepo,
+		warehouseQueryService,
 		location,
 	)
 
@@ -154,6 +165,9 @@ func NewContainer(configPath string) (*Container, error) {
 
 	penaltyAPIHandler := http.NewPenaltyAPIHandler(penaltyService)
 	penaltyAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+
+	warehouseAPIHandler := http.NewWarehouseAPIHandler(warehouseService)
+	warehouseAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	residentDutyService := residentusecase.NewResidentDutyService(
 		userRepo,

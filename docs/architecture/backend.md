@@ -33,6 +33,7 @@ Backend реализован как практическая гексагона�
 - `user`: `User`;
 - `penalty`: `Penalty`;
 - `notification`: `Notification`, `PushSubscription`, `NotificationType`.
+- `warehouse`: `Item`, `Movement`, `MovementType`.
 
 Здесь должны жить инварианты и допустимые переходы. Здесь не должно быть SQL, HTTP-статусов и сериализации API.
 
@@ -53,6 +54,7 @@ Backend реализован как практическая гексагона�
 - `resident.Service`: формирование resident view текущего дежурства и истории;
 - `dutysettings.Service`: настройки группы, команд, территорий и задач;
 - `penalty.Service`: warnings/penalties и scope доступа;
+- `warehouse.Service`: доступ к складу общежития, движения и read-модели истории;
 - `notification.*`: подписки, хранение уведомлений и reminder-сценарии;
 - `user.Service`, `dormitory.Service`, `team.Service`, `catalog.Service`: CRUD и вспомогательные сценарии.
 
@@ -68,6 +70,7 @@ HTTP-адаптеры регистрируются в `pkg/infrastructure/di/con
 - `/api/v1/resident`
 - `/api/v1/notifications`
 - `/api/v1/penalties`
+- `/api/v1/warehouse`
 - `/api/v1/dormitories`
 - `/api/v1/groups`
 - `/api/v1/teams`
