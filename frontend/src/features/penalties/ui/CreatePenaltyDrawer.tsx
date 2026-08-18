@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 import { DatePickerInput } from '@mantine/dates'
-import { Button, Drawer, FocusTrap, Group, NumberInput, Stack, Textarea } from '@mantine/core'
+import { Button, Drawer, Group, NumberInput, Stack, Textarea } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 import { useForm } from '@mantine/form'
 
 import { ApiError } from '../../../shared/api/ApiError'
+import { useOverlayAutofocus } from '../../../shared/ui/useOverlayAutofocus'
 import {
     ResidentSearchCombobox,
     type ResidentSearchOption,
@@ -68,6 +69,7 @@ export function CreatePenaltyDrawer({
     const [submitError, setSubmitError] = useState<string | null>(null)
     const wasOpenedRef = useRef(false)
     const appliedPresetKeyRef = useRef<string | null>(null)
+    const formRef = useRef<HTMLFormElement | null>(null)
 
     const form = useForm<FormValues>({
         initialValues: {
@@ -131,6 +133,8 @@ export function CreatePenaltyDrawer({
     const residentError = typeof errors.residentId === 'string'
         ? errors.residentId
         : searchError
+
+    useOverlayAutofocus(formRef, { enabled: opened })
 
     function resetState() {
         reset()
@@ -255,9 +259,8 @@ export function CreatePenaltyDrawer({
             size={680}
             title="Выдача предупреждения"
         >
-            <FocusTrap.InitialFocus />
-
             <form
+                ref={formRef}
                 className={classes.drawerBody}
                 onSubmit={onSubmit(async (values) => {
                     setSubmitting(true)

@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef } from '
 
 import {
     BellIcon,
+    PackageIcon,
     BuildingOfficeIcon,
     CalendarBlankIcon,
     CheckSquareOffsetIcon,
@@ -277,7 +278,8 @@ export function ResidentAppShell({
         useDisclosure(false)
     const hasManagementNavigation = Boolean(currentUser?.can_manage_dormitories)
     const canManagePenalties = currentUser?.can_manage_penalties === true
-    const hasNavigation = hasManagementNavigation || canManagePenalties
+    const canManageWarehouse = currentUser?.can_manage_warehouse === true
+    const hasNavigation = hasManagementNavigation || canManagePenalties || canManageWarehouse
     const showShellControls = currentUser != null && !currentUserLoading && currentUserError == null
     const {
         dormitories,
@@ -318,19 +320,29 @@ export function ResidentAppShell({
                 icon: <WarningIcon size={24} weight="regular" />,
                 label: 'Предупреждения',
             },
+            {
+                href: '/app/warehouse',
+                icon: <PackageIcon size={24} weight="regular" />,
+                label: 'Склад',
+            },
         ]
-        : canManagePenalties ? [
+        : [
             {
                 href: '/app/tasks',
                 icon: <CalendarBlankIcon size={24} weight="regular" />,
                 label: 'Дежурство',
             },
-            {
+            ...(canManagePenalties ? [{
                 href: '/app/penalties',
                 icon: <WarningIcon size={24} weight="regular" />,
                 label: 'Предупреждения',
-            },
-        ] : []
+            }] : []),
+            ...(canManageWarehouse ? [{
+                href: '/app/warehouse',
+                icon: <PackageIcon size={24} weight="regular" />,
+                label: 'Склад',
+            }] : []),
+        ]
 
     const dormitoryOptions = dormitories.map((dormitory) => ({
         value: String(dormitory.id),

@@ -12,13 +12,14 @@ import (
 var (
 	ErrAccessDenied            = errors.New("warehouse access denied")
 	ErrItemNotFound            = errors.New("warehouse item not found")
+	ErrMovementNotFound        = errors.New("warehouse movement not found")
 	ErrDuplicateItemName       = errors.New("warehouse item name already exists")
 	ErrInvalidItemName         = errors.New("warehouse item name is invalid")
 	ErrInvalidMovementQuantity = errors.New("warehouse movement quantity is invalid")
 	ErrInvalidMovementType     = errors.New("warehouse movement type is invalid")
 	ErrCommentTooLong          = errors.New("warehouse movement comment is too long")
 	ErrInsufficientItems       = errors.New("warehouse item balance is insufficient")
-	ErrItemHasNonZeroBalance   = errors.New("warehouse item has non-zero balance")
+	ErrNegativeBalanceHistory  = errors.New("warehouse movement change would make balance negative")
 )
 
 const (
@@ -152,6 +153,22 @@ func (m *Movement) Comment() *string     { return m.comment }
 func (m *Movement) CreatedBy() uuid.UUID { return m.createdBy }
 func (m *Movement) CreatedAt() time.Time { return m.createdAt }
 
+func (m *Movement) Update(quantity uint32, comment *string) error {
+	if quantity == 0 {
+		return ErrInvalidMovementQuantity
+	}
+
+	normalizedComment, err := normalizeComment(comment)
+	if err != nil {
+		return err
+	}
+
+	m.quantity = quantity
+	m.comment = normalizedComment
+
+	return nil
+}
+
 type Repository interface {
 	CreateItem(ctx context.Context, item *Item, initialMovement *Movement) error
 	FindByID(ctx context.Context, dormitoryID int64, itemID uuid.UUID) (*Item, error)
@@ -159,6 +176,8 @@ type Repository interface {
 	DeleteItem(ctx context.Context, dormitoryID int64, itemID uuid.UUID) error
 	AddMovement(ctx context.Context, dormitoryID int64, movement *Movement) (*Item, int64, error)
 	WriteOffMovement(ctx context.Context, dormitoryID int64, movement *Movement) (*Item, int64, error)
+	UpdateMovement(ctx context.Context, dormitoryID int64, movement *Movement) (*Item, int64, error)
+	DeleteMovement(ctx context.Context, dormitoryID int64, itemID uuid.UUID, movementID uuid.UUID) (*Item, int64, error)
 }
 
 func normalizeItemName(name string) (string, error) {

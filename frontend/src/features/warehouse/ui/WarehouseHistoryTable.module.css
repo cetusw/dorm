@@ -1,0 +1,55 @@
+.commentCell {
+    max-width: 240px;
+}
+
+.commentText {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.movementText {
+    color: inherit;
+}
+
+.dateCell {
+    white-space: nowrap;
+}
+
+.actionCell {
+    text-align: center;
+}
+
+.actionCellInner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+}
+
+.actionButton {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.row:hover .actionButton,
+.row[data-menu-open='true'] .actionButton {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.row[data-movement-type='write-off'] {
+    color: #991b1b;
+}
+
+.row[data-movement-type='add'] {
+    color: #166534;
+}
+
+@media (hover: none) {
+    .actionButton {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}

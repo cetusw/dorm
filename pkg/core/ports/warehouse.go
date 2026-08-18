@@ -15,4 +15,6 @@ type WarehouseUseCase interface {
 	DeleteItem(ctx context.Context, currentUserID uuid.UUID, itemID uuid.UUID) error
 	AddItems(ctx context.Context, currentUserID uuid.UUID, itemID uuid.UUID, request dto.WarehouseMovementRequest) (*dto.WarehouseItem, error)
 	WriteOffItems(ctx context.Context, currentUserID uuid.UUID, itemID uuid.UUID, request dto.WarehouseMovementRequest) (*dto.WarehouseItem, error)
+	UpdateMovement(ctx context.Context, currentUserID uuid.UUID, itemID uuid.UUID, movementID uuid.UUID, request dto.UpdateWarehouseMovementRequest) (*dto.WarehouseItem, error)
+	DeleteMovement(ctx context.Context, currentUserID uuid.UUID, itemID uuid.UUID, movementID uuid.UUID) (*dto.WarehouseItem, error)
 }

@@ -8,6 +8,7 @@ function normalizeCurrentUser(response: Record<string, unknown>): CurrentUser {
         last_name: String(response.last_name ?? ''),
         can_manage_dormitories: Boolean(response.can_manage_dormitories),
         can_manage_penalties: Boolean(response.can_manage_penalties),
+        can_manage_warehouse: Boolean(response.can_manage_warehouse),
     }
 }
 

@@ -28,6 +28,8 @@ func (h *WarehouseAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler)
 	api.Delete("/items/:itemId", h.HandleDeleteItem)
 	api.Post("/items/:itemId/add", h.HandleAddItems)
 	api.Post("/items/:itemId/write-off", h.HandleWriteOffItems)
+	api.Put("/items/:itemId/movements/:movementId", h.HandleUpdateMovement)
+	api.Delete("/items/:itemId/movements/:movementId", h.HandleDeleteMovement)
 }
 
 func (h *WarehouseAPIHandler) HandleGetWarehouse(c *fiber.Ctx) error {
@@ -117,6 +119,38 @@ func (h *WarehouseAPIHandler) HandleWriteOffItems(c *fiber.Ctx) error {
 	return h.handleMovement(c, false)
 }
 
+func (h *WarehouseAPIHandler) HandleUpdateMovement(c *fiber.Ctx) error {
+	userID, itemID, movementID, err := h.parseWarehouseMovementRequest(c)
+	if err != nil {
+		return err
+	}
+
+	var request dto.UpdateWarehouseMovementRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
+	}
+
+	item, err := h.warehouseUC.UpdateMovement(c.Context(), userID, itemID, movementID, request)
+	if err != nil {
+		return h.respondWarehouseError(c, err)
+	}
+
+	return c.JSON(item)
+}
+
+func (h *WarehouseAPIHandler) HandleDeleteMovement(c *fiber.Ctx) error {
+	userID, itemID, movementID, err := h.parseWarehouseMovementRequest(c)
+	if err != nil {
+		return err
+	}
+
+	if _, err := h.warehouseUC.DeleteMovement(c.Context(), userID, itemID, movementID); err != nil {
+		return h.respondWarehouseError(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 func (h *WarehouseAPIHandler) handleMovement(c *fiber.Ctx, isAdd bool) error {
 	userID, itemID, err := h.parseWarehouseItemRequest(c)
 	if err != nil {
@@ -155,6 +189,20 @@ func (h *WarehouseAPIHandler) parseWarehouseItemRequest(c *fiber.Ctx) (uuid.UUID
 	return userID, itemID, nil
 }
 
+func (h *WarehouseAPIHandler) parseWarehouseMovementRequest(c *fiber.Ctx) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
+	userID, itemID, err := h.parseWarehouseItemRequest(c)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, err
+	}
+
+	movementID, err := uuid.Parse(c.Params("movementId"))
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор движения"))
+	}
+
+	return userID, itemID, movementID, nil
+}
+
 func (h *WarehouseAPIHandler) respondWarehouseError(c *fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, warehousedomain.ErrInvalidItemName):
@@ -167,12 +215,14 @@ func (h *WarehouseAPIHandler) respondWarehouseError(c *fiber.Ctx, err error) err
 		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
 	case errors.Is(err, warehousedomain.ErrItemNotFound):
 		return c.Status(fiber.StatusNotFound).JSON(errorResponse("позиция не найдена"))
+	case errors.Is(err, warehousedomain.ErrMovementNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(errorResponse("движение не найдено"))
 	case errors.Is(err, warehousedomain.ErrDuplicateItemName):
 		return c.Status(fiber.StatusConflict).JSON(errorResponse("позиция с таким названием уже существует"))
 	case errors.Is(err, warehousedomain.ErrInsufficientItems):
 		return c.Status(fiber.StatusConflict).JSON(errorResponse("недостаточно предметов для списания"))
-	case errors.Is(err, warehousedomain.ErrItemHasNonZeroBalance):
-		return c.Status(fiber.StatusConflict).JSON(errorResponse("нельзя удалить позицию с ненулевым остатком"))
+	case errors.Is(err, warehousedomain.ErrNegativeBalanceHistory):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("изменение движения приводит к отрицательному остатку в истории"))
 	default:
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось выполнить операцию со складом"))
 	}

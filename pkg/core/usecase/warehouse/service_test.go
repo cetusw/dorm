@@ -22,14 +22,21 @@ type warehouseRepositoryStub struct {
 	updateItem       *warehousedomain.Item
 	addedMovement    *warehousedomain.Movement
 	writeOffMovement *warehousedomain.Movement
+	updatedMovement  *warehousedomain.Movement
+	deleteItemID     uuid.UUID
+	deleteMovementID uuid.UUID
 	addBalance       int64
 	writeOffBalance  int64
+	updateBalance    int64
+	deleteBalance    int64
 	createErr        error
 	findErr          error
 	updateErr        error
 	addErr           error
 	writeOffErr      error
 	deleteErr        error
+	updateMoveErr    error
+	deleteMoveErr    error
 }
 
 func (s *warehouseRepositoryStub) CreateItem(_ context.Context, item *warehousedomain.Item, movement *warehousedomain.Movement) error {
@@ -59,6 +66,17 @@ func (s *warehouseRepositoryStub) AddMovement(_ context.Context, _ int64, moveme
 func (s *warehouseRepositoryStub) WriteOffMovement(_ context.Context, _ int64, movement *warehousedomain.Movement) (*warehousedomain.Item, int64, error) {
 	s.writeOffMovement = movement
 	return s.item, s.writeOffBalance, s.writeOffErr
+}
+
+func (s *warehouseRepositoryStub) UpdateMovement(_ context.Context, _ int64, movement *warehousedomain.Movement) (*warehousedomain.Item, int64, error) {
+	s.updatedMovement = movement
+	return s.item, s.updateBalance, s.updateMoveErr
+}
+
+func (s *warehouseRepositoryStub) DeleteMovement(_ context.Context, _ int64, itemID uuid.UUID, movementID uuid.UUID) (*warehousedomain.Item, int64, error) {
+	s.deleteItemID = itemID
+	s.deleteMovementID = movementID
+	return s.item, s.deleteBalance, s.deleteMoveErr
 }
 
 type warehouseUserRepositoryStub struct {
@@ -212,6 +230,75 @@ func TestGetWarehouseDeniedForResidentWithoutLeadership(t *testing.T) {
 	_, err := service.GetWarehouse(context.Background(), currentUserID)
 
 	assert.ErrorIs(t, err, warehousedomain.ErrAccessDenied)
+}
+
+func TestUpdateMovementNormalizesComment(t *testing.T) {
+	t.Parallel()
+
+	currentUserID := uuid.New()
+	itemID := uuid.New()
+	movementID := uuid.New()
+	dormitoryID := int64(7)
+	now := time.Date(2026, time.August, 14, 12, 0, 0, 0, time.UTC)
+	item := warehousedomain.RestoreItem(itemID, dormitoryID, "Лампа", now)
+	repo := &warehouseRepositoryStub{
+		item:          item,
+		updateBalance: 9,
+	}
+
+	service := NewWarehouseService(
+		repo,
+		&warehouseUserRepositoryStub{user: user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)},
+		&warehouseGroupRepositoryStub{},
+		&warehouseDormitoryRepositoryStub{dormitory: structure.RestoreDormitory(dormitoryID, "Dorm", &currentUserID, "Moscow", "st", "Lenina", "1")},
+		&warehouseQueryServiceStub{},
+		time.UTC,
+	)
+
+	response, err := service.UpdateMovement(context.Background(), currentUserID, itemID, movementID, dto.UpdateWarehouseMovementRequest{
+		Quantity: 9,
+		Comment:  ptrString("  Исправлено "),
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.NotNil(t, repo.updatedMovement)
+	assert.Equal(t, movementID, repo.updatedMovement.ID())
+	assert.Equal(t, int64(9), response.Quantity)
+	require.NotNil(t, repo.updatedMovement.Comment())
+	assert.Equal(t, "Исправлено", *repo.updatedMovement.Comment())
+}
+
+func TestDeleteMovementDelegatesToRepository(t *testing.T) {
+	t.Parallel()
+
+	currentUserID := uuid.New()
+	itemID := uuid.New()
+	movementID := uuid.New()
+	dormitoryID := int64(7)
+	now := time.Date(2026, time.August, 14, 12, 0, 0, 0, time.UTC)
+	item := warehousedomain.RestoreItem(itemID, dormitoryID, "Лампа", now)
+	repo := &warehouseRepositoryStub{
+		item:          item,
+		deleteBalance: 4,
+	}
+
+	service := NewWarehouseService(
+		repo,
+		&warehouseUserRepositoryStub{user: user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)},
+		&warehouseGroupRepositoryStub{},
+		&warehouseDormitoryRepositoryStub{dormitory: structure.RestoreDormitory(dormitoryID, "Dorm", &currentUserID, "Moscow", "st", "Lenina", "1")},
+		&warehouseQueryServiceStub{},
+		time.UTC,
+	)
+
+	response, err := service.DeleteMovement(context.Background(), currentUserID, itemID, movementID)
+
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, itemID, repo.deleteItemID)
+	assert.Equal(t, movementID, repo.deleteMovementID)
+	assert.Equal(t, int64(4), response.Quantity)
 }
 
 func ptrInt64(value int64) *int64 {

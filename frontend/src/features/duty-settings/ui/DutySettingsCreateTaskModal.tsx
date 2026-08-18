@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { Alert, Button, Checkbox, FocusTrap, Group, Loader, Modal, NumberInput, Select, SimpleGrid, Stack, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Loader, Modal, NumberInput, Select, SimpleGrid, Stack, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 import { ApiError } from '../../../shared/api/ApiError'
 import modalClasses from '../../../shared/ui/SettingsModal.module.css'
+import { useOverlayAutofocus } from '../../../shared/ui/useOverlayAutofocus'
 import type { CreateTaskRequest, TaskDetails, UpdateTaskRequest } from '../../task-catalog/model/types'
 import { RECURRENCE_OPTIONS } from '../../task-catalog/model/recurrence'
 import classes from './DutySettingsCreateTaskModal.module.css'
@@ -70,6 +71,7 @@ export function DutySettingsCreateTaskModal({
     const [saving, setSaving] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const formRef = useRef<HTMLFormElement | null>(null)
 
     const form = useForm<FormValues>({
         mode: 'controlled',
@@ -144,6 +146,8 @@ export function DutySettingsCreateTaskModal({
     const title = mode === 'create' ? 'Добавление задачи' : 'Редактирование задачи'
     const submitLabel = mode === 'create' ? 'Добавить' : 'Сохранить'
 
+    useOverlayAutofocus(formRef, { enabled: opened && !loading })
+
     return (
         <Modal
             opened={opened}
@@ -159,9 +163,8 @@ export function DutySettingsCreateTaskModal({
                 content: modalClasses.content,
             }}
         >
-            <FocusTrap.InitialFocus />
-
             <form
+                ref={formRef}
                 onSubmit={form.onSubmit(async (values) => {
                     setSaving(true)
                     setError(null)

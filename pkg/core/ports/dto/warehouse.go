@@ -44,3 +44,8 @@ type WarehouseMovementRequest struct {
 	Quantity int64   `json:"quantity"`
 	Comment  *string `json:"comment"`
 }
+
+type UpdateWarehouseMovementRequest struct {
+	Quantity int64   `json:"quantity"`
+	Comment  *string `json:"comment"`
+}

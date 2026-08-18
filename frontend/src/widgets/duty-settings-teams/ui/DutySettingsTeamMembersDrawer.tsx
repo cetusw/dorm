@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
     CrownSimpleIcon,
@@ -10,7 +10,6 @@ import {
     Alert,
     Center,
     Drawer,
-    FocusTrap,
     Loader,
     Menu,
     ScrollArea,
@@ -36,6 +35,7 @@ import { formatDutySettingsLeaderName } from '../../../features/duty-settings/mo
 import { ApiError } from '../../../shared/api/ApiError'
 import { ConfirmActionModal } from '../../../shared/ui/ConfirmActionModal'
 import { EmptyState } from '../../../shared/ui/EmptyState'
+import { useOverlayAutofocus } from '../../../shared/ui/useOverlayAutofocus'
 import {
     ResidentSearchCombobox,
     type ResidentSearchOption,
@@ -121,6 +121,7 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
     const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
     const [pendingAction, setPendingAction] = useState<PendingMemberAction | null>(null)
     const teamID = team?.id ?? null
+    const contentRef = useRef<HTMLDivElement | null>(null)
 
     const title = useMemo(() => {
         if (!team) {
@@ -246,12 +247,12 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
             : null,
     }))
 
+    useOverlayAutofocus(contentRef, { enabled: opened })
+
     return (
         <>
             <Drawer opened={opened} onClose={onClose} position="right" size={860} title={title}>
-                <FocusTrap.InitialFocus />
-
-                <Stack gap="md">
+                <Stack ref={contentRef} gap="md">
                     {error ? <Alert color="red">{error}</Alert> : null}
 
                     {loading ? (

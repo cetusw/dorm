@@ -1,7 +1,10 @@
+import { useRef } from 'react'
 import type { FormEventHandler, ReactNode } from 'react'
 
 import { Alert, Button, Center, FocusTrap, Group, Loader, Modal, Stack } from '@mantine/core'
 import type { ModalProps } from '@mantine/core'
+
+import { useOverlayAutofocus } from './useOverlayAutofocus'
 
 type Props = {
     opened: boolean
@@ -19,6 +22,7 @@ type Props = {
     submitButtonClassName?: string
     cancelLabel?: string
     submitLabel?: string
+    withInitialFocus?: boolean
     onSubmit: FormEventHandler<HTMLFormElement>
     children: ReactNode
 }
@@ -39,9 +43,13 @@ export function EntityFormModal({
     submitButtonClassName,
     cancelLabel = 'Отменить',
     submitLabel = 'Сохранить',
+    withInitialFocus = false,
     onSubmit,
     children,
 }: Props) {
+    const formRef = useRef<HTMLFormElement | null>(null)
+    useOverlayAutofocus(formRef, { enabled: opened && !loading })
+
     return (
         <Modal
             opened={opened}
@@ -65,14 +73,14 @@ export function EntityFormModal({
                 },
             }}
         >
-            <FocusTrap.InitialFocus />
+            {withInitialFocus ? <FocusTrap.InitialFocus /> : null}
 
             {loading ? (
                 <Center py="xl">
                     <Loader />
                 </Center>
             ) : (
-                <form onSubmit={onSubmit}>
+                <form ref={formRef} onSubmit={onSubmit}>
                     <Stack gap={contentGap}>
                         {error && (
                             <Alert color="red">{error}</Alert>

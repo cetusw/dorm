@@ -162,6 +162,80 @@ func (s *Service) WriteOffItems(ctx context.Context, currentUserID uuid.UUID, it
 	return s.applyMovement(ctx, currentUserID, itemID, request, warehousedomain.MovementTypeWriteOff)
 }
 
+func (s *Service) UpdateMovement(
+	ctx context.Context,
+	currentUserID uuid.UUID,
+	itemID uuid.UUID,
+	movementID uuid.UUID,
+	request dto.UpdateWarehouseMovementRequest,
+) (*dto.WarehouseItem, error) {
+	dormitoryID, err := s.resolveManagedDormitoryID(ctx, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	quantity, err := normalizePositiveQuantity(request.Quantity)
+	if err != nil {
+		return nil, err
+	}
+
+	movement, err := warehousedomain.NewMovement(
+		itemID,
+		warehousedomain.MovementTypeAdd,
+		uint32(quantity),
+		request.Comment,
+		currentUserID,
+		s.now().In(s.location),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	movement = warehousedomain.RestoreMovement(
+		movementID,
+		itemID,
+		movement.Type(),
+		movement.Quantity(),
+		movement.Comment(),
+		movement.CreatedBy(),
+		movement.CreatedAt(),
+	)
+
+	item, balance, err := s.repo.UpdateMovement(ctx, dormitoryID, movement)
+	if err != nil {
+		return nil, fmt.Errorf("update warehouse movement: %w", err)
+	}
+
+	return &dto.WarehouseItem{
+		ID:       item.ID().String(),
+		Name:     item.Name(),
+		Quantity: balance,
+	}, nil
+}
+
+func (s *Service) DeleteMovement(
+	ctx context.Context,
+	currentUserID uuid.UUID,
+	itemID uuid.UUID,
+	movementID uuid.UUID,
+) (*dto.WarehouseItem, error) {
+	dormitoryID, err := s.resolveManagedDormitoryID(ctx, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	item, balance, err := s.repo.DeleteMovement(ctx, dormitoryID, itemID, movementID)
+	if err != nil {
+		return nil, fmt.Errorf("delete warehouse movement: %w", err)
+	}
+
+	return &dto.WarehouseItem{
+		ID:       item.ID().String(),
+		Name:     item.Name(),
+		Quantity: balance,
+	}, nil
+}
+
 func (s *Service) applyMovement(
 	ctx context.Context,
 	currentUserID uuid.UUID,

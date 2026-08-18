@@ -18,6 +18,7 @@ import { PenaltiesPage } from '../pages/penalties/PenaltiesPage'
 import { ResidentsPage } from '../pages/residents/ResidentsPage'
 import { TaskCatalogPage } from '../pages/task-catalog/TaskCatalogPage'
 import { GroupTeamsPage } from '../pages/teams/GroupTeamsPage'
+import { WarehousePage } from '../pages/warehouse/WarehousePage'
 import { PageFrame } from '../shared/ui/PageFrame'
 
 function matchGroupTeamsPath(pathname: string): string | null {
@@ -41,6 +42,7 @@ function renderResidentPage(path: string, currentUser: ReturnType<typeof useCurr
     const selectedGroupId = searchParams.get('group_id') ?? undefined
     const canManageDormitories = Boolean(currentUser?.can_manage_dormitories)
     const canManagePenalties = currentUser?.can_manage_penalties === true
+    const canManageWarehouse = currentUser?.can_manage_warehouse === true
     const dutySettingsGroupId = matchDutySettingsPath(pathname)
 
     if (dutySettingsGroupId) {
@@ -59,6 +61,20 @@ function renderResidentPage(path: string, currentUser: ReturnType<typeof useCurr
         }
 
         return <PenaltiesPage />
+    }
+
+    if (pathname === '/app/warehouse') {
+        if (!canManageWarehouse) {
+            return (
+                <PageFrame title="Склад">
+                    <Alert color="red">
+                        Недостаточно прав для управления складом.
+                    </Alert>
+                </PageFrame>
+            )
+        }
+
+        return <WarehousePage currentUser={currentUser} />
     }
 
     if (pathname === '/app/account') {
