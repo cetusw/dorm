@@ -11,6 +11,8 @@ import './shared/styles/globals.css'
 
 void registerServiceWorker()
 
+document.getElementById('app-preloader')?.remove()
+
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <AppProviders>
