@@ -39,43 +39,31 @@ export function TaskCatalogPage() {
         </PageActionButton>
     )
 
-    let content = null
-
-    if (!selectedDormitoryId) {
-        content = (
+    const content = !selectedDormitoryId ? (
             <EmptyState
                 title="Общежитие не выбрано"
                 description="Выберите общежитие в верхней панели, чтобы посмотреть список задач."
             />
-        )
-    } else if (loading) {
-        content = (
+        ) : loading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (error) {
-        content = (
+        ) : error ? (
             <Alert color="red" title="Ошибка">
                 {error}
             </Alert>
-        )
-    } else if (tasks.length === 0) {
-        content = (
+        ) : tasks.length === 0 ? (
             <EmptyState
                 title="Задачи не найдены"
                 description="В выбранном общежитии пока нет задач."
             />
-        )
-    } else {
-        content = (
+        ) : (
             <TaskCatalogTable
                 tasks={tasks}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
             />
         )
-    }
 
     return (
         <ManagementPageFrame title="Задачи" titleActions={titleActions}>

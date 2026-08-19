@@ -39,43 +39,31 @@ export function AreasPage() {
         </PageActionButton>
     )
 
-    let content = null
-
-    if (!selectedDormitoryId) {
-        content = (
+    const content = !selectedDormitoryId ? (
             <EmptyState
                 title="Общежитие не выбрано"
                 description="Выберите общежитие в верхней панели, чтобы посмотреть список территорий."
             />
-        )
-    } else if (loading) {
-        content = (
+        ) : loading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (error) {
-        content = (
+        ) : error ? (
             <Alert color="red" title="Ошибка">
                 {error}
             </Alert>
-        )
-    } else if (areas.length === 0) {
-        content = (
+        ) : areas.length === 0 ? (
             <EmptyState
                 title="Территории не найдены"
                 description="В выбранном общежитии пока нет территорий."
             />
-        )
-    } else {
-        content = (
+        ) : (
             <AreasTable
                 areas={areas}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
             />
         )
-    }
 
     return (
         <ManagementPageFrame title="Территории" titleActions={titleActions}>

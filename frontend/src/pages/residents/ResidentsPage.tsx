@@ -39,43 +39,31 @@ export function ResidentsPage() {
         </PageActionButton>
     )
 
-    let content = null
-
-    if (!selectedDormitoryId) {
-        content = (
+    const content = !selectedDormitoryId ? (
             <EmptyState
                 title="Общежитие не выбрано"
                 description="Выберите общежитие в верхней панели, чтобы посмотреть список жителей."
             />
-        )
-    } else if (loading) {
-        content = (
+        ) : loading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (error) {
-        content = (
+        ) : error ? (
             <Alert color="red" title="Ошибка">
                 {error}
             </Alert>
-        )
-    } else if (residents.length === 0) {
-        content = (
+        ) : residents.length === 0 ? (
             <EmptyState
                 title="Жители не найдены"
                 description="В выбранном общежитии пока нет жителей."
             />
-        )
-    } else {
-        content = (
+        ) : (
             <ResidentsTable
                 residents={residents}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
             />
         )
-    }
 
     return (
         <ManagementPageFrame title="Жители" titleActions={titleActions}>

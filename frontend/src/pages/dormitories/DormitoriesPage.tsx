@@ -41,36 +41,26 @@ export function DormitoriesPage() {
         <PageActionButton onClick={handleCreate}>Создать общежитие</PageActionButton>
     )
 
-    let content = null
-
-    if (loading) {
-        content = (
+    const content = loading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (error) {
-        content = (
+        ) : error ? (
             <Alert color="red" title="Ошибка">
                 {error}
             </Alert>
-        )
-    } else if (dormitories.length === 0) {
-        content = (
+        ) : dormitories.length === 0 ? (
             <EmptyState
                 title="Общежития не найдены"
                 description="Общежития пока не добавлены."
             />
-        )
-    } else {
-        content = (
+        ) : (
             <DormitoriesTable
                 dormitories={dormitories}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
             />
         )
-    }
 
     return (
         <ManagementPageFrame title="Общежития" titleActions={titleActions}>

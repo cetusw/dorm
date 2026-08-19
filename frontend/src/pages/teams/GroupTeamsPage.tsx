@@ -81,48 +81,33 @@ export function GroupTeamsPage({ groupId }: Props) {
         </PageActionButton>
     )
 
-    let content = null
-
-    if (!selectedDormitoryId) {
-        content = (
+    const content = !selectedDormitoryId ? (
             <EmptyState
                 title="Общежитие не выбрано"
                 description="Выберите общежитие в верхней панели, чтобы посмотреть список команд."
             />
-        )
-    } else if (groupLoading) {
-        content = (
+        ) : groupLoading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (groupError) {
-        content = (
+        ) : groupError ? (
             <Alert color="red" title="Ошибка">
                 {groupError}
             </Alert>
-        )
-    } else if (loading) {
-        content = (
+        ) : loading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (error) {
-        content = (
+        ) : error ? (
             <Alert color="red" title="Ошибка">
                 {error}
             </Alert>
-        )
-    } else if (teams.length === 0) {
-        content = (
+        ) : teams.length === 0 ? (
             <EmptyState
                 title="Команды не найдены"
                 description="В выбранной группе пока нет команд."
             />
-        )
-    } else {
-        content = (
+        ) : (
             <>
                 <TeamsTable
                     teams={teams}
@@ -131,7 +116,6 @@ export function GroupTeamsPage({ groupId }: Props) {
                 />
             </>
         )
-    }
 
     return (
         <ManagementPageFrame title={`Команды группы ${groupName}`} titleActions={titleActions}>

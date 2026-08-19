@@ -15,6 +15,7 @@ frontend/pnpm-debug.log*
 
 # Environment files
 .env
+.env.prod
 .env.local
 .env.*.local
 
@@ -23,3 +24,7 @@ frontend/pnpm-debug.log*
 
 # Certs
 .cert/
+
+# Local Go binaries
+main
+migrate

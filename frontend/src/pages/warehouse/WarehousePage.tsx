@@ -60,29 +60,20 @@ export function WarehousePage({ currentUser }: Props) {
         </PageActionButton>
     )
 
-    let content = null
-
-    if (loading) {
-        content = (
+    const content = loading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (error) {
-        content = (
+        ) : error ? (
             <Alert color="red" title="Ошибка">
                 {error}
             </Alert>
-        )
-    } else if (items.length === 0) {
-        content = (
+        ) : items.length === 0 ? (
             <EmptyState
                 title="На складе пусто"
                 description="Добавьте инвентарь на склад"
             />
-        )
-    } else {
-        content = (
+        ) : (
             <WarehouseTable
                 items={items}
                 onOpenHistory={setHistoryItem}
@@ -92,7 +83,6 @@ export function WarehousePage({ currentUser }: Props) {
                 onWriteOff={setWriteOffItem}
             />
         )
-    }
 
     return (
         <ManagementPageFrame title="Склад" titleActions={titleActions}>

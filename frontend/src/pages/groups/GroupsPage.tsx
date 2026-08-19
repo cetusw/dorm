@@ -40,36 +40,25 @@ export function GroupsPage() {
         </PageActionButton>
     )
 
-    let content = null
-
-    if (!selectedDormitoryId) {
-        content = (
+    const content = !selectedDormitoryId ? (
             <EmptyState
                 title="Общежитие не выбрано"
                 description="Выберите общежитие в верхней панели, чтобы посмотреть список групп."
             />
-        )
-    } else if (loading) {
-        content = (
+        ) : loading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (error) {
-        content = (
+        ) : error ? (
             <Alert color="red" title="Ошибка">
                 {error}
             </Alert>
-        )
-    } else if (groups.length === 0) {
-        content = (
+        ) : groups.length === 0 ? (
             <EmptyState
                 title="Группы не найдены"
                 description="В выбранном общежитии пока нет групп."
             />
-        )
-    } else {
-        content = (
+        ) : (
             <GroupsTable
                 groups={groups}
                 onOpen={(groupId) => navigateTo(`/app/groups/${groupId}/teams`)}
@@ -77,7 +66,6 @@ export function GroupsPage() {
                 onDelete={handleDelete}
             />
         )
-    }
 
     return (
         <ManagementPageFrame title="Группы" titleActions={titleActions}>

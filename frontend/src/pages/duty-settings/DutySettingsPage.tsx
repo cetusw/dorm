@@ -151,47 +151,37 @@ export function DutySettingsPage({ groupId }: Props) {
         setEditingAreaId(null)
     }
 
-    let content = null
-
-    if (loading) {
-        content = (
+    const content = loading ? (
             <Center py="xl">
                 <Loader />
             </Center>
-        )
-    } else if (forbidden) {
-        content = <Alert color="red">{error ?? 'У вас нет доступа к настройкам дежурства этой группы.'}</Alert>
-    } else if (error && !data) {
-        content = <Alert color="red">{error}</Alert>
-    } else if (!data) {
-        content = (
+        ) : forbidden ? (
+            <Alert color="red">{error ?? 'У вас нет доступа к настройкам дежурства этой группы.'}</Alert>
+        ) : error && !data ? (
+            <Alert color="red">{error}</Alert>
+        ) : !data ? (
             <EmptyState
                 title="Настройки не найдены"
                 description="Не удалось загрузить настройки дежурства."
             />
-        )
-    } else if (mainTab === 'teams') {
-        content = (
+        ) : mainTab === 'teams' ? (
             <DutySettingsTeamsTab
                 groupId={groupId}
                 teams={data.teams}
                 activeDutyTeamId={data.active_duty_team_id}
                 onReload={() => reload({ silent: true })}
             />
-        )
-    } else if (mainTab !== 'tasks') {
-        content = <Box h={120} />
-    } else if (data.task_editor_state !== 'active' || !data.active_duty) {
-        content = (
+        ) : mainTab !== 'tasks' ? (
+            <Box h={120} />
+        ) : data.task_editor_state !== 'active' || !data.active_duty ? (
             <EmptyState
                 title="Дежурство не найдено"
                 description={data.task_editor_alert}
             />
-        )
-    } else {
+        ) : (() => {
         const floorAreas = selectedFloorPlan ? data.areas.filter((area) => area.floor === selectedFloorPlan.floor) : []
 
-        content = (
+        return (
             <Stack gap="xl">
                 {viewMode === 'plan' ? (
                     <Group justify="space-between" align="center" gap="md" wrap="wrap">
@@ -241,7 +231,7 @@ export function DutySettingsPage({ groupId }: Props) {
                 )}
             </Stack>
         )
-    }
+        })()
 
     return (
         <PageFrame
