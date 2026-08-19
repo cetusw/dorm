@@ -15,6 +15,7 @@ import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty
 import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
+import { MobileDutyProgress } from '../../features/current-duty/ui/MobileDutyProgress'
 import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
 import { TeamMemberTaskGroups } from '../../features/current-duty/ui/TeamMemberTaskGroups'
 import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
@@ -27,6 +28,7 @@ import { FloatingNotification } from '../../shared/ui/FloatingNotification'
 import { useSelectedDormitoryId } from '../../features/dormitories/model/useDormitorySelection'
 import segmentedControlClasses from '../../features/current-duty/ui/SegmentedControl.module.css'
 import { navigateTo } from '../../app/navigation'
+import { useMobileHeaderContent } from '../../app/MobileHeaderContentContext'
 
 type PlanLegendItem = {
     color: string
@@ -101,6 +103,23 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
     const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
     const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
+    const analytics = duty ? calculateDutyAnalytics(duty.tasks) : null
+    const viewOptions = duty ? selectDutyViewOptions(duty, activeSelect, visibleTabs) : null
+    const mobileHeaderContent =
+        duty
+        && analytics
+        && viewOptions
+        && duty.has_active_duty
+        && duty.tasks.length > 0
+        && (viewOptions.showAnalytics || viewOptions.isReadOnly) ? (
+            <MobileDutyProgress
+                analytics={analytics}
+                isReadOnly={viewOptions.isReadOnly}
+                targetValue={duty.cost_per_resident_goal}
+            />
+        ) : null
+
+    useMobileHeaderContent(mobileHeaderContent)
 
     useEffect(() => {
         if (availableFloorPlans.length === 0) {
@@ -176,7 +195,17 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         )
     }
 
-    const viewOptions = selectDutyViewOptions(duty, activeSelect, visibleTabs)
+    const resolvedAnalytics = analytics
+    const resolvedViewOptions = viewOptions
+
+    if (!resolvedAnalytics || !resolvedViewOptions) {
+        return (
+            <Box px={{ base: 'md', md: 'xl' }} py="xl">
+                <Alert color="gray">Не удалось подготовить данные дежурства</Alert>
+            </Box>
+        )
+    }
+
     const displayedTasks = selectTasksForActiveSelect({
         activeSelect,
         duty,
@@ -184,7 +213,6 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         visibleMineTaskIds,
     })
     const planLegendItems = getPlanLegendItems(activeSelect)
-    const analytics = calculateDutyAnalytics(duty.tasks)
 
     const selectedFloorPlan =
         availableFloorPlans.find((plan) => String(plan.floor) === selectedFloorPlanId) ??
@@ -263,7 +291,7 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         </Group>
     ) : null
 
-    const dutyControls = viewOptions.showControls ? (
+    const dutyControls = resolvedViewOptions.showControls ? (
         <DutyTaskSelects
             activeSelect={activeSelect}
             visibleSelects={visibleTabs}
@@ -351,12 +379,14 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         </Box>
     )
 
-    const analyticsBlock = viewOptions.showAnalytics || viewOptions.isReadOnly ? (
-        <CurrentDutyAnalytics
-            analytics={analytics}
-            isReadOnly={viewOptions.isReadOnly}
-            targetValue={duty.cost_per_resident_goal}
-        />
+    const analyticsBlock = resolvedViewOptions.showAnalytics || resolvedViewOptions.isReadOnly ? (
+        <Box visibleFrom="md">
+            <CurrentDutyAnalytics
+                analytics={resolvedAnalytics}
+                isReadOnly={resolvedViewOptions.isReadOnly}
+                targetValue={duty.cost_per_resident_goal}
+            />
+        </Box>
     ) : undefined
 
     const controls = analyticsBlock || dutyControls || buildingPlanControls ? (
@@ -436,10 +466,10 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                             <BuildingPlanPanel
                                 key={selectedFloorPlan.floor}
                                 activeSelect={activeSelect}
-                                actionMode={viewOptions.actionMode}
+                                actionMode={resolvedViewOptions.actionMode}
                                 allTasks={duty.tasks}
                                 floorPlan={selectedFloorPlan}
-                                isReadOnly={viewOptions.isReadOnly}
+                                isReadOnly={resolvedViewOptions.isReadOnly}
                                 pendingTaskId={pendingTaskId}
                                 tasks={displayedTasks}
                                 onTake={handleTake}
@@ -457,11 +487,11 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                         )}
                         <Box hiddenFrom="md">
                             <TaskGroups
-                                isReadOnly={viewOptions.isReadOnly}
-                                actionMode={viewOptions.actionMode}
+                                isReadOnly={resolvedViewOptions.isReadOnly}
+                                actionMode={resolvedViewOptions.actionMode}
                                 pendingTaskId={pendingTaskId}
                                 tasks={displayedTasks}
-                                emptyMessage={viewOptions.emptyMessage}
+                                emptyMessage={resolvedViewOptions.emptyMessage}
                                 onTake={handleTake}
                                 onReturn={handleReturn}
                                 onComplete={handleComplete}
@@ -475,11 +505,11 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                     <TeamMemberTaskGroups duty={duty} />
                 ) : (
                     <TaskGroups
-                        isReadOnly={viewOptions.isReadOnly}
-                        actionMode={viewOptions.actionMode}
+                        isReadOnly={resolvedViewOptions.isReadOnly}
+                        actionMode={resolvedViewOptions.actionMode}
                         pendingTaskId={pendingTaskId}
                         tasks={displayedTasks}
-                        emptyMessage={viewOptions.emptyMessage}
+                        emptyMessage={resolvedViewOptions.emptyMessage}
                         onTake={handleTake}
                         onReturn={handleReturn}
                         onComplete={handleComplete}

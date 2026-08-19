@@ -142,7 +142,7 @@ export function PageFrame({
     const NoticeIcon = resolvedNoticeTone === 'warning' ? WarningIcon : InfoIcon
 
     return (
-        <Box px={{ base: 'md', md: 'xl' }} py="xl">
+        <Box px={{ base: 'md', md: 'xl' }} py={{ base: 16, md: 'xl' }}>
             <Stack gap="lg" maw={1240} mx="auto">
                 {error && (
                     <Alert color="red" title="Ошибка">

@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
     BellIcon,
@@ -33,6 +33,7 @@ import { AccountDrawer } from '../features/account/ui/AccountDrawer'
 import type { CurrentUser } from '../features/current-user/model/types'
 import { useDormitorySelection } from '../features/dormitories/model/useDormitorySelection'
 import { usePushNotifications } from '../features/manage-push-notifications/model/usePushNotifications'
+import { MobileHeaderContentContext } from './MobileHeaderContentContext'
 import {
     HEADER_HEIGHT_PX,
 } from '../shared/ui/mobileStickyThreshold'
@@ -276,6 +277,7 @@ export function ResidentAppShell({
         useDisclosure(false)
     const [accountDrawerOpened, { open: openAccountDrawer, close: closeAccountDrawer }] =
         useDisclosure(false)
+    const [mobileHeaderContent, setMobileHeaderContent] = useState<ReactNode>(null)
     const hasManagementNavigation = Boolean(currentUser?.can_manage_dormitories)
     const canManagePenalties = currentUser?.can_manage_penalties === true
     const canManageWarehouse = currentUser?.can_manage_warehouse === true
@@ -438,43 +440,44 @@ export function ResidentAppShell({
     )
 
     return (
-        <AppShell
-            style={{
-                height: '100dvh',
-                minHeight: '100vh',
-            }}
-            navbar={hasNavigation ? {
-                width: 280,
-                breakpoint: 'sm',
-                collapsed: {
-                    desktop: false,
-                    mobile: !navbarOpened,
-                },
-            } : undefined}
-            header={{ height: 60 }}
-            padding={0}
-            styles={{
-                main: {
-                    backgroundColor: 'var(--app-color-bg)',
+        <MobileHeaderContentContext.Provider value={setMobileHeaderContent}>
+            <AppShell
+                style={{
                     height: '100dvh',
                     minHeight: '100vh',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    '--app-shell-header-offset': `${HEADER_HEIGHT_PX}px`,
-                },
-                navbar: {
-                    backgroundColor: '#FFFFFF',
-                    top: 0,
-                    height: '100dvh',
-                },
-                header: {
-                    backgroundColor: 'transparent',
-                    borderBottom: 'none',
-                    backdropFilter: 'none',
-                },
-            }}
-        >
+                }}
+                navbar={hasNavigation ? {
+                    width: 280,
+                    breakpoint: 'sm',
+                    collapsed: {
+                        desktop: false,
+                        mobile: !navbarOpened,
+                    },
+                } : undefined}
+                header={{ height: 60 }}
+                padding={0}
+                styles={{
+                    main: {
+                        backgroundColor: 'var(--app-color-bg)',
+                        height: '100dvh',
+                        minHeight: '100vh',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        '--app-shell-header-offset': `${HEADER_HEIGHT_PX}px`,
+                    },
+                    navbar: {
+                        backgroundColor: '#FFFFFF',
+                        top: 0,
+                        height: '100dvh',
+                    },
+                    header: {
+                        backgroundColor: 'transparent',
+                        borderBottom: 'none',
+                        backdropFilter: 'none',
+                    },
+                }}
+            >
             {hasNavigation ? (
                 <AppShell.Navbar p={0} className={classes.navbar}>
                     <Stack className={classes.navbarContent}>
@@ -531,6 +534,12 @@ export function ResidentAppShell({
                         ) : null}
                     </div>
 
+                    {showShellControls && mobileHeaderContent ? (
+                        <div className={classes.mobileHeaderContent}>
+                            {mobileHeaderContent}
+                        </div>
+                    ) : null}
+
                     {showShellControls ? <NotificationsButton /> : null}
                 </div>
             </AppShell.Header>
@@ -570,6 +579,7 @@ export function ResidentAppShell({
                 opened={accountDrawerOpened}
                 onClose={handleAccountDrawerClose}
             />
-        </AppShell>
+            </AppShell>
+        </MobileHeaderContentContext.Provider>
     )
 }

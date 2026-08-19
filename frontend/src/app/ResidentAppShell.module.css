@@ -26,6 +26,10 @@
     min-width: 0;
 }
 
+.mobileHeaderContent {
+    display: none;
+}
+
 .accountButtonWrap {
     position: relative;
     display: inline-flex;
@@ -271,7 +275,13 @@
 
 @media (max-width: 48em) {
     .headerInner {
-        gap: 12px;
+        gap: 20px;
+    }
+
+    .mobileHeaderContent {
+        display: block;
+        flex: 1 1 auto;
+        min-width: 0;
     }
 
     .dropdown {
