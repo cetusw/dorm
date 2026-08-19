@@ -57,7 +57,7 @@
 .areaSection {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0;
 }
 
 .areaTitle {
@@ -67,52 +67,54 @@
 }
 
 .taskCard {
-    background: var(--app-color-surface);
-    border: 1px solid var(--app-color-border);
-    border-radius: 20px;
-    padding: 0;
+    background: transparent;
 }
 
 .taskCardContent {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 268px;
-    align-items: center;
-    column-gap: 12px;
+    position: relative;
     min-height: 72px;
-    padding: 0 20px;
+    padding: 20px 0 10px;
+}
+
+.taskCardContent::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-bottom: 1px solid #DDE4E2;
+}
+
+.taskTitleCell {
+    display: flex;
+    align-items: center;
+    min-width: 0;
 }
 
 .taskTitle {
     min-width: 0;
-    font-weight: 600;
-    line-height: 1.3;
-    overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 24px;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.taskScoreCell {
+.taskMetaRow {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    gap: 10px;
     min-width: 0;
+    margin-top: 4px;
 }
 
-.taskStatusCell {
+.taskMetaRight {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     min-width: 0;
-}
-
-.taskMetaRow {
-    display: grid;
-    grid-template-columns: 100px 156px;
-    align-items: center;
-    column-gap: 12px;
-    min-width: 0;
+    margin-left: auto;
 }
 
 @media (max-width: 48em) {
@@ -136,23 +138,12 @@
     }
 
     .taskCardContent {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
         min-height: 72px;
-        padding: 16px;
-        gap: 12px;
+        padding: 20px 0 10px;
     }
 
     .taskMetaRow {
-        display: flex;
         align-items: center;
         gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    .taskScoreCell,
-    .taskStatusCell {
-        justify-content: flex-start;
     }
 }

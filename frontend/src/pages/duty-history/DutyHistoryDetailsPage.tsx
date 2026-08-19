@@ -5,6 +5,7 @@ import { Box, Center, Group, Loader, Popover, SegmentedControl, Select, Stack, T
 
 import { navigateTo } from '../../app/navigation'
 import { calculateDutyAnalytics, selectDutyViewOptions, selectTasksForActiveSelect } from '../../features/current-duty/model/selectors'
+import { buildInitialVisibleFreeTaskIds, buildInitialVisibleMineTaskIds } from '../../features/current-duty/model/utils'
 import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { BuildingPlanPanel } from '../../features/current-duty/building-plan/BuildingPlanPanel'
@@ -70,6 +71,14 @@ export function DutyHistoryDetailsPage({ dutyId }: Props) {
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
     const [legendOpened, setLegendOpened] = useState(false)
     const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
+    const visibleMineTaskIds = useMemo(
+        () => (duty ? buildInitialVisibleMineTaskIds(duty.tasks) : []),
+        [duty],
+    )
+    const visibleFreeTaskIds = useMemo(
+        () => (duty ? buildInitialVisibleFreeTaskIds(duty.tasks) : []),
+        [duty],
+    )
 
     useEffect(() => {
         if (availableFloorPlans.length === 0) {
@@ -105,8 +114,8 @@ export function DutyHistoryDetailsPage({ dutyId }: Props) {
     const displayedTasks = selectTasksForActiveSelect({
         activeSelect,
         duty,
-        visibleFreeTaskIds: [],
-        visibleMineTaskIds: [],
+        visibleFreeTaskIds,
+        visibleMineTaskIds,
     })
     const analytics = calculateDutyAnalytics(duty.tasks)
     const planLegendItems = getPlanLegendItems(activeSelect)

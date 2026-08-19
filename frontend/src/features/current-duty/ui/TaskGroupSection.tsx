@@ -31,7 +31,7 @@ export function TaskGroupSection({
 }: Props) {
     return (
         <Box>
-            <Text fw={700} size="lg" pb="md">
+            <Text fw={700} size="lg" pb={0}>
                 {group.label}
             </Text>
 

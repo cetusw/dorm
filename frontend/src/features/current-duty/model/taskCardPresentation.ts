@@ -1,7 +1,6 @@
 import type { ResidentDutyTask } from './types'
-import type { TaskRowActionMode } from './taskActions'
 
-export type MobileTaskCardPresentation = {
+export type TaskCardPresentation = {
     showCheckbox: boolean
     showStatus: boolean
     showAssignee: boolean
@@ -10,7 +9,6 @@ export type MobileTaskCardPresentation = {
 
 type Params = {
     isReadOnly: boolean
-    mode: TaskRowActionMode
     task: ResidentDutyTask
 }
 
@@ -22,10 +20,10 @@ function getAssigneeLabel(task: ResidentDutyTask): string | null {
     return task.is_mine ? 'Вы' : task.assignee_name
 }
 
-export function getMobileTaskCardPresentation({
+export function getTaskCardPresentation({
     isReadOnly,
     task,
-}: Params): MobileTaskCardPresentation {
+}: Params): TaskCardPresentation {
     const showCheckbox = !isReadOnly && task.is_mine && (task.can_complete || task.can_open)
     const assigneeLabel = getAssigneeLabel(task)
     const showVerificationMeta = task.status === 'completed' && (task.can_verify || task.can_review_open)
@@ -52,15 +50,17 @@ export function getMobileTaskCardPresentation({
         return {
             showCheckbox,
             showStatus: false,
-            showAssignee: false,
-            assigneeLabel: null,
+            showAssignee: Boolean(assigneeLabel),
+            assigneeLabel,
         }
     }
 
     return {
         showCheckbox,
         showStatus: true,
-        showAssignee: !task.is_mine && Boolean(assigneeLabel),
+        showAssignee: task.status === 'verified'
+            ? Boolean(assigneeLabel)
+            : !task.is_mine && Boolean(assigneeLabel),
         assigneeLabel,
     }
 }

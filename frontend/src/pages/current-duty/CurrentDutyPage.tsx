@@ -238,7 +238,7 @@ export function CurrentDutyPage({ currentUser = null, selectedGroupId: initialGr
         visibleFreeTaskIds,
         visibleMineTaskIds,
     })
-    const mineTasks = selectTasksForMobileMine(duty)
+    const mineTasks = selectTasksForMobileMine(duty, visibleMineTaskIds)
     const planLegendItems = getPlanLegendItems(activeSelect)
 
     const selectedFloorPlan =

@@ -1,4 +1,4 @@
-import { Stack, Text } from '@mantine/core'
+import { Text } from '@mantine/core'
 
 import type { TeamMemberTaskAreaGroup } from '../model/selectors'
 import { TeamMemberTaskCard } from './TeamMemberTaskCard'
@@ -13,11 +13,9 @@ export function MemberTaskAreaSection({ group }: Props) {
         <div className={classes.areaSection}>
             <Text className={classes.areaTitle}>{group.label}</Text>
 
-            <Stack gap="sm">
-                {group.tasks.map((task) => (
-                    <TeamMemberTaskCard key={task.id} task={task} />
-                ))}
-            </Stack>
+            {group.tasks.map((task) => (
+                <TeamMemberTaskCard key={task.id} task={task} />
+            ))}
         </div>
     )
 }

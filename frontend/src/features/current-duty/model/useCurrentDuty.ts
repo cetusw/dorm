@@ -14,6 +14,8 @@ import {
 import type { CurrentDutyNotification, ResidentCurrentDuty, ResidentDutyTask } from './types'
 import { setStoredDormitoryId } from '../../dormitories/model/useDormitorySelection'
 import {
+    buildInitialVisibleFreeTaskIds,
+    buildInitialVisibleMineTaskIds,
     preserveTaskOrder,
     sortTasksForInitialDisplay,
     toErrorMessage,
@@ -112,12 +114,8 @@ export function useCurrentDuty(initialGroupId?: string, selectedDormitoryId?: st
 
     function applyLoadedDuty(loadedDuty: ResidentCurrentDuty) {
         orderedTaskIdsRef.current = loadedDuty.tasks.map((task) => task.id)
-        visibleMineTaskIdsRef.current = loadedDuty.tasks
-            .filter((task) => task.is_mine)
-            .map((task) => task.id)
-        visibleFreeTaskIdsRef.current = loadedDuty.tasks
-            .filter((task) => !task.assignee_id)
-            .map((task) => task.id)
+        visibleMineTaskIdsRef.current = buildInitialVisibleMineTaskIds(loadedDuty.tasks)
+        visibleFreeTaskIdsRef.current = buildInitialVisibleFreeTaskIds(loadedDuty.tasks)
         setSelectedGroupId(loadedDuty.selected_group_id)
         if (loadedDuty.selected_group_id) {
             syncGroupIdInUrl(loadedDuty.selected_group_id)

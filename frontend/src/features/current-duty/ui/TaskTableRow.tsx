@@ -1,6 +1,8 @@
-import { Button, Checkbox, Table, Text } from '@mantine/core'
+import { ArrowBendRightDownIcon, ArrowBendRightUpIcon, CheckIcon, XIcon } from '@phosphor-icons/react'
+import { ActionIcon, Checkbox, Table, Text, Tooltip } from '@mantine/core'
 
 import { DutyTaskStatusBadge } from '../../../entities/duty-task'
+import { getTaskCardPresentation } from '../model/taskCardPresentation'
 import {
     getDrawerActionSpecs,
     type TaskActionHandler,
@@ -25,8 +27,9 @@ type Props = {
 }
 
 type HoverAction = {
+    actionKind: 'take' | 'return' | 'reopen' | 'verify'
     label: string
-    kind?: 'danger' | 'default'
+    tone?: 'danger' | 'default'
     loading: boolean
     onClick: () => Promise<boolean>
 }
@@ -44,33 +47,37 @@ function getHoverActions(
         isReadOnly: false,
         mode,
         task,
-    }).flatMap((action) => {
+    }).flatMap<HoverAction>((action) => {
         switch (action.kind) {
             case 'take':
                 return [{
                     label: action.label,
-                    kind: action.tone,
+                    actionKind: action.kind,
+                    tone: action.tone,
                     loading: pending,
                     onClick: () => onTake(task.id),
                 }]
             case 'return':
                 return [{
                     label: action.label,
-                    kind: action.tone,
+                    actionKind: action.kind,
+                    tone: action.tone,
                     loading: pending,
                     onClick: () => onReturn(task.id),
                 }]
             case 'reopen':
                 return onReopen ? [{
                     label: action.label,
-                    kind: action.tone,
+                    actionKind: action.kind,
+                    tone: action.tone,
                     loading: pending,
                     onClick: () => onReopen(task.id),
                 }] : []
             case 'verify':
                 return onVerify ? [{
                     label: action.label,
-                    kind: action.tone,
+                    actionKind: action.kind,
+                    tone: action.tone,
                     loading: pending,
                     onClick: () => onVerify(task.id),
                 }] : []
@@ -78,6 +85,36 @@ function getHoverActions(
                 return []
         }
     })
+}
+
+function getActionIcon(actionKind: HoverAction['actionKind']) {
+    switch (actionKind) {
+        case 'take':
+            return <ArrowBendRightDownIcon size={20} />
+        case 'return':
+            return <ArrowBendRightUpIcon size={20} />
+        case 'verify':
+            return <CheckIcon size={20} />
+        case 'reopen':
+            return <XIcon size={20} />
+        default:
+            return null
+    }
+}
+
+function getActionTooltip(actionKind: HoverAction['actionKind']) {
+    switch (actionKind) {
+        case 'take':
+            return 'Взять задачу'
+        case 'return':
+            return 'Вернуть задачу'
+        case 'verify':
+            return 'Подтвердить задачу'
+        case 'reopen':
+            return 'Переоткрыть задачу'
+        default:
+            return ''
+    }
 }
 
 export function TaskTableRow({
@@ -93,9 +130,39 @@ export function TaskTableRow({
     onReopen,
     onVerify,
 }: Props) {
-    const hoverActions = isReadOnly ? [] : getHoverActions(mode, task, pending, onTake, onReturn, onReopen, onVerify)
-    const showCheckbox = task.is_mine && (task.can_complete || task.can_open)
-    const checkboxChecked = task.status === 'completed'
+    const hoverActions = isReadOnly
+        ? []
+        : getHoverActions(mode, task, pending, onTake, onReturn, onReopen, onVerify)
+            .sort((left, right) => {
+                const order: Record<HoverAction['actionKind'], number> = {
+                    verify: 0,
+                    reopen: 1,
+                    take: 2,
+                    return: 3,
+                }
+
+                return order[left.actionKind] - order[right.actionKind]
+            })
+    const presentation = getTaskCardPresentation({
+        isReadOnly,
+        task,
+    })
+    const showCheckbox = presentation.showCheckbox
+    const checkboxChecked = task.status === 'completed' || task.status === 'verified'
+    const isCheckboxInteractive = !pending && task.is_mine && (task.can_complete || task.can_open)
+
+    function handleCheckboxToggle() {
+        if (!isCheckboxInteractive) {
+            return
+        }
+
+        if (checkboxChecked) {
+            void onOpen(task.id)
+            return
+        }
+
+        void onComplete(task.id)
+    }
 
     return (
         <Table.Tr className={classes.row}>
@@ -105,92 +172,85 @@ export function TaskTableRow({
                     data-has-checkbox={!isReadOnly && showCheckbox ? 'true' : 'false'}
                     data-layout={layout}
                 >
-                    <div className={classes.checkboxSlot}>
-                        {!isReadOnly && showCheckbox && (
-                            <Checkbox
-                                className={classes.checkbox}
-                                checked={checkboxChecked}
-                                disabled={pending}
-                                size="25px"
-                                radius="xl"
-                                iconColor="#FFFFFF"
-                                styles={{
-                                    input: checkboxChecked
-                                        ? {
-                                            backgroundColor: '#8C8C8C',
-                                            borderColor: '#8C8C8C',
-                                        }
-                                        : undefined,
+                    <div className={classes.main}>
+                        {showCheckbox && (
+                            <div
+                                className={classes.checkboxSlot}
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    handleCheckboxToggle()
                                 }}
-                                aria-label={`${checkboxChecked ? 'Отменить выполнение' : 'Выполнить'} задачу ${task.title}`}
-                                onChange={(event) => {
-                                    if (event.currentTarget.checked) {
-                                        void onComplete(task.id)
-                                        return
-                                    }
-
-                                    void onOpen(task.id)
-                                }}
-                            />
-                        )}
-                    </div>
-
-                    <div className={classes.titleCell}>
-                        <Text fw={600} className={classes.title}>
-                            {task.title}
-                        </Text>
-                    </div>
-
-                    <div className={classes.scoreCell}>
-                        <TaskCostBadge cost={task.cost} />
-                    </div>
-
-                    <div className={classes.assigneeCell}>
-                        {task.assignee_name ? (
-                            <Text className={classes.assigneeText}>
-                                {task.is_mine ? 'Вы' : task.assignee_name}
-                            </Text>
-                        ) : null}
-                    </div>
-
-                    <div className={classes.right}>
-                        <div className={[classes.persistent, hoverActions.length > 0 ? classes.persistentHiddenOnHover : ''].join(' ').trim()}>
-                            <DutyTaskStatusBadge status={task.status} />
-                        </div>
-
-                        {hoverActions.length > 0 && (
-                            <div className={[classes.hoverAction, classes.hoverActionVisible].join(' ')}>
-                                <div className={classes.hoverActionsGroup}>
-                                    {hoverActions.map((action) => (
-                                        <Button
-                                            key={action.label}
-                                            size="sm"
-                                            radius="xl"
-                                            variant="default"
-                                            loading={action.loading}
-                                            styles={{
-                                                root: action.kind === 'danger'
-                                                    ? {
-                                                        backgroundColor: '#FEE2E2',
-                                                        borderColor: '#991B1B',
-                                                        color: 'var(--app-color-text)',
-                                                        fontWeight: 500,
-                                                    }
-                                                    : {
-                                                        backgroundColor: '#FFFFFF',
-                                                        borderColor: '#DDE4E2',
-                                                        color: 'var(--app-color-text)',
-                                                        fontWeight: 500,
-                                                    },
-                                            }}
-                                            onClick={action.onClick}
-                                        >
-                                            {action.label}
-                                        </Button>
-                                    ))}
-                                </div>
+                            >
+                                <Checkbox
+                                    className={classes.checkbox}
+                                    checked={checkboxChecked}
+                                    disabled={pending}
+                                    readOnly={!isCheckboxInteractive}
+                                    size="25px"
+                                    radius="xl"
+                                    iconColor="#FFFFFF"
+                                    styles={{
+                                        input: checkboxChecked
+                                            ? {
+                                                backgroundColor: '#8C8C8C',
+                                                borderColor: '#8C8C8C',
+                                            }
+                                            : undefined,
+                                    }}
+                                    aria-label={`${checkboxChecked ? 'Отменить выполнение' : 'Выполнить'} задачу ${task.title}`}
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                    }}
+                                    onChange={(event) => {
+                                        event.stopPropagation()
+                                        handleCheckboxToggle()
+                                    }}
+                                />
                             </div>
                         )}
+
+                        <div className={classes.content}>
+                            <div className={classes.titleCell}>
+                                <Text fw={400} className={classes.title}>
+                                    {task.title}
+                                </Text>
+
+                                {hoverActions.length > 0 && (
+                                    <div className={[classes.titleActions, classes.titleActionsVisible].join(' ')}>
+                                        {hoverActions.map((action) => (
+                                            <Tooltip key={action.label} label={getActionTooltip(action.actionKind)} position="top">
+                                                <ActionIcon
+                                                    size={30}
+                                                    radius="md"
+                                                    variant="subtle"
+                                                    color="gray"
+                                                    className={classes.titleActionButton}
+                                                    aria-label={getActionTooltip(action.actionKind)}
+                                                    disabled={action.loading}
+                                                    onClick={() => {
+                                                        void action.onClick()
+                                                    }}
+                                                >
+                                                    {getActionIcon(action.actionKind)}
+                                                </ActionIcon>
+                                            </Tooltip>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className={classes.metaRow}>
+                                <TaskCostBadge cost={task.cost} />
+                                <div className={classes.metaRight}>
+                                    {presentation.showStatus && <DutyTaskStatusBadge status={task.status} justify="flex-start" />}
+                                    {presentation.showAssignee && presentation.assigneeLabel ? (
+                                        <Text className={classes.assigneeText}>
+                                            {presentation.assigneeLabel}
+                                        </Text>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </Table.Td>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Stack } from '@mantine/core'
 
@@ -37,28 +37,12 @@ export function TaskGroups({
     onReopen,
     onVerify,
 }: Props) {
-    const groups = groupTasksByArea(tasks)
-    const [activeMobileSwipeTaskId, setActiveMobileSwipeTaskId] = useState<string | null>(null)
+    const groups = useMemo(() => groupTasksByArea(tasks), [tasks])
     const [selectedMobileTaskId, setSelectedMobileTaskId] = useState<string | null>(null)
-    const selectedMobileTask = selectedMobileTaskId
-        ? tasks.find((task) => task.id === selectedMobileTaskId) ?? null
-        : null
-
-    useEffect(() => {
-        if (!activeMobileSwipeTaskId) {
-            return
-        }
-
-        function handleScroll() {
-            setActiveMobileSwipeTaskId(null)
-        }
-
-        window.addEventListener('scroll', handleScroll, { passive: true })
-
-        return () => {
-            window.removeEventListener('scroll', handleScroll)
-        }
-    }, [activeMobileSwipeTaskId])
+    const selectedMobileTask = useMemo(
+        () => (selectedMobileTaskId ? tasks.find((task) => task.id === selectedMobileTaskId) ?? null : null),
+        [selectedMobileTaskId, tasks],
+    )
 
     useEffect(() => {
         if (selectedMobileTaskId && !selectedMobileTask) {
@@ -67,7 +51,6 @@ export function TaskGroups({
     }, [selectedMobileTask, selectedMobileTaskId])
 
     function handleOpenMobileDetails(taskId: string) {
-        setActiveMobileSwipeTaskId(null)
         setSelectedMobileTaskId(taskId)
     }
 
@@ -85,20 +68,13 @@ export function TaskGroups({
             <Stack hiddenFrom="md" gap="sm">
                 {groups.map((group) => (
                     <TaskMobileGroupSection
-                        actionMode={actionMode}
                         isReadOnly={isReadOnly}
                         key={group.key}
                         group={group}
-                        activeSwipeTaskId={activeMobileSwipeTaskId}
                         pendingTaskId={pendingTaskId}
-                        onTake={onTake}
-                        onReturn={onReturn}
                         onComplete={onComplete}
                         onOpen={onOpen}
                         onOpenDetails={handleOpenMobileDetails}
-                        onReopen={onReopen}
-                        onVerify={onVerify}
-                        onSwipeActiveChange={setActiveMobileSwipeTaskId}
                     />
                 ))}
             </Stack>
@@ -116,7 +92,7 @@ export function TaskGroups({
                 onVerify={onVerify ?? (async () => false)}
             />
 
-            <Stack visibleFrom="md" gap="lg">
+            <Stack visibleFrom="md" gap={30}>
                 {groups.map((group) => (
                     <TaskGroupSection
                         actionMode={actionMode}

@@ -1,5 +1,9 @@
 .group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 0;
+}
+
+.group + .group {
+    margin-top: 30px;
 }

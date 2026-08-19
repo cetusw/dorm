@@ -6,6 +6,8 @@ export type TaskAreaGroup = {
     tasks: ResidentDutyTask[]
 }
 
+export type InitialTaskOrderMode = 'all' | 'mine'
+
 export function groupTasksByArea(tasks: ResidentDutyTask[]): TaskAreaGroup[] {
     const groups = new Map<string, TaskAreaGroup>()
 
@@ -48,27 +50,143 @@ function taskStatusPriority(task: ResidentDutyTask): number {
     }
 }
 
-export function sortTasksForInitialDisplay(tasks: ResidentDutyTask[]): ResidentDutyTask[] {
-    return [...tasks].sort((left, right) => {
-        if (left.area_floor !== right.area_floor) {
-            return right.area_floor - left.area_floor
+function compareTaskArea(left: ResidentDutyTask, right: ResidentDutyTask): number {
+    if (left.area_floor !== right.area_floor) {
+        return right.area_floor - left.area_floor
+    }
+
+    if (left.area_name !== right.area_name) {
+        return left.area_name.localeCompare(right.area_name, 'ru')
+    }
+
+    return 0
+}
+
+function compareTaskIdentity(left: ResidentDutyTask, right: ResidentDutyTask): number {
+    if (left.cost !== right.cost) {
+        return right.cost - left.cost
+    }
+
+    const titleDiff = left.title.localeCompare(right.title, 'ru')
+    if (titleDiff !== 0) {
+        return titleDiff
+    }
+
+    return left.id.localeCompare(right.id)
+}
+
+function isDoneMineTask(task: ResidentDutyTask): boolean {
+    return task.status === 'completed' || task.status === 'verified'
+}
+
+function compareTasksForAllDisplay(left: ResidentDutyTask, right: ResidentDutyTask): number {
+    const areaDiff = compareTaskArea(left, right)
+    if (areaDiff !== 0) {
+        return areaDiff
+    }
+
+    const freeDiff = Number(left.status !== 'free') - Number(right.status !== 'free')
+    if (freeDiff !== 0) {
+        return freeDiff
+    }
+
+    const priorityDiff = taskStatusPriority(left) - taskStatusPriority(right)
+    if (priorityDiff !== 0) {
+        return priorityDiff
+    }
+
+    return compareTaskIdentity(left, right)
+}
+
+function compareTasksForMineDisplay(left: ResidentDutyTask, right: ResidentDutyTask): number {
+    const areaDiff = compareTaskArea(left, right)
+    if (areaDiff !== 0) {
+        return areaDiff
+    }
+
+    const doneDiff = Number(isDoneMineTask(left)) - Number(isDoneMineTask(right))
+    if (doneDiff !== 0) {
+        return doneDiff
+    }
+
+    const priorityDiff = taskStatusPriority(left) - taskStatusPriority(right)
+    if (priorityDiff !== 0) {
+        return priorityDiff
+    }
+
+    return compareTaskIdentity(left, right)
+}
+
+function compareAreaPriorityForAll(leftTasks: ResidentDutyTask[], rightTasks: ResidentDutyTask[]): number {
+    const leftHasFree = leftTasks.some((task) => task.status === 'free')
+    const rightHasFree = rightTasks.some((task) => task.status === 'free')
+    if (leftHasFree !== rightHasFree) {
+        return leftHasFree ? -1 : 1
+    }
+
+    return compareTaskArea(leftTasks[0]!, rightTasks[0]!)
+}
+
+function compareAreaPriorityForMine(leftTasks: ResidentDutyTask[], rightTasks: ResidentDutyTask[]): number {
+    const leftHasOpen = leftTasks.some((task) => !isDoneMineTask(task))
+    const rightHasOpen = rightTasks.some((task) => !isDoneMineTask(task))
+    if (leftHasOpen !== rightHasOpen) {
+        return leftHasOpen ? -1 : 1
+    }
+
+    return compareTaskArea(leftTasks[0]!, rightTasks[0]!)
+}
+
+function groupTasksByAreaKey(tasks: ResidentDutyTask[]): ResidentDutyTask[][] {
+    const groups = new Map<string, ResidentDutyTask[]>()
+
+    tasks.forEach((task) => {
+        const key = `${task.area_floor}:${task.area_name}`
+        const existing = groups.get(key)
+
+        if (existing) {
+            existing.push(task)
+            return
         }
 
-        if (left.area_name !== right.area_name) {
-            return left.area_name.localeCompare(right.area_name, 'ru')
-        }
-
-        const priorityDiff = taskStatusPriority(left) - taskStatusPriority(right)
-        if (priorityDiff !== 0) {
-            return priorityDiff
-        }
-
-        if (left.cost !== right.cost) {
-            return right.cost - left.cost
-        }
-
-        return left.title.localeCompare(right.title, 'ru')
+        groups.set(key, [task])
     })
+
+    return Array.from(groups.values())
+}
+
+function sortTasksByGroupedOrder(
+    tasks: ResidentDutyTask[],
+    mode: InitialTaskOrderMode,
+): ResidentDutyTask[] {
+    const groups = groupTasksByAreaKey(tasks)
+    const compareArea = mode === 'mine' ? compareAreaPriorityForMine : compareAreaPriorityForAll
+    const compareTask = mode === 'mine' ? compareTasksForMineDisplay : compareTasksForAllDisplay
+
+    return groups
+        .sort((left, right) => compareArea(left, right))
+        .flatMap((groupTasks) => [...groupTasks].sort(compareTask))
+}
+
+export function sortTasksForInitialDisplay(
+    tasks: ResidentDutyTask[],
+    mode: InitialTaskOrderMode = 'all',
+): ResidentDutyTask[] {
+    return sortTasksByGroupedOrder(tasks, mode)
+}
+
+export function buildInitialVisibleMineTaskIds(tasks: ResidentDutyTask[]): string[] {
+    return sortTasksByGroupedOrder(
+        tasks.filter((task) => task.is_mine),
+        'mine',
+    ).map((task) => task.id)
+}
+
+export function buildInitialVisibleFreeTaskIds(tasks: ResidentDutyTask[]): string[] {
+    return sortTasksByGroupedOrder(
+        tasks.filter((task) => task.status === 'free'),
+        'all',
+    ).map((task) => task.id)
 }
 
 export function preserveTaskOrder(

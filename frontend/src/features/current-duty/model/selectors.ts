@@ -8,6 +8,7 @@ import type {
 import {
     countTasksCompletedByMe,
     countTasksTakenByMe,
+    preserveTaskOrder,
     sumCostCompletedByMe,
     sumCostTakenByMe,
     sumCostVerifiedByMe,
@@ -347,9 +348,15 @@ export function selectTasksForActiveSelect({
 
     switch (activeSelect) {
         case 'mine':
-            return duty.tasks.filter((task) => visibleMineTaskIds.includes(task.id))
+            return preserveTaskOrder(
+                duty.tasks.filter((task) => visibleMineTaskIds.includes(task.id)),
+                visibleMineTaskIds,
+            )
         case 'free':
-            return duty.tasks.filter((task) => visibleFreeTaskIds.includes(task.id))
+            return preserveTaskOrder(
+                duty.tasks.filter((task) => visibleFreeTaskIds.includes(task.id)),
+                visibleFreeTaskIds,
+            )
         case 'verification':
             return duty.tasks.filter((task) => task.status === 'completed')
         case 'team':

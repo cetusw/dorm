@@ -1,4 +1,4 @@
-import { Paper, Text } from '@mantine/core'
+import { Text } from '@mantine/core'
 
 import { DutyTaskStatusBadge, type DutyTaskStatus } from '../../../entities/duty-task'
 import type { ResidentDutyTask } from '../model/types'
@@ -19,22 +19,15 @@ function resolveTaskStatus(task: ResidentDutyTask): DutyTaskStatus {
 
 export function TeamMemberTaskCard({ task }: Props) {
     return (
-        <Paper
-            withBorder
-            radius="lg"
-            p={0}
-            bg="var(--app-color-surface)"
-            className={classes.taskCard}
-        >
+        <div className={classes.taskCard}>
             <div className={classes.taskCardContent}>
-                <Text className={classes.taskTitle}>{task.title}</Text>
+                <div className={classes.taskTitleCell}>
+                    <Text className={classes.taskTitle}>{task.title}</Text>
+                </div>
 
                 <div className={classes.taskMetaRow}>
-                    <div className={classes.taskScoreCell}>
-                        <TaskCostBadge cost={task.cost} />
-                    </div>
-
-                    <div className={classes.taskStatusCell}>
+                    <TaskCostBadge cost={task.cost} />
+                    <div className={classes.taskMetaRight}>
                         <DutyTaskStatusBadge
                             status={resolveTaskStatus(task)}
                             justify="flex-start"
@@ -42,6 +35,6 @@ export function TeamMemberTaskCard({ task }: Props) {
                     </div>
                 </div>
             </div>
-        </Paper>
+        </div>
     )
 }
