@@ -38,7 +38,7 @@ export function TaskMobileGroupSection({
 }: Props) {
     return (
         <div className={classes.group}>
-            <Text fw={700} size="lg" px="xs" pt="xs" pb={2}>
+            <Text fw={700} size="lg" px="xs" pt={0} pb={2}>
                 {group.label}
             </Text>
 

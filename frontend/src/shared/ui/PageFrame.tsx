@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 
 import { InfoIcon, WarningIcon } from '@phosphor-icons/react'
 import { Alert, Box, Group, Stack, Title } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import {
     MOBILE_BREAKPOINT_PX,
     SCROLL_DELTA_THRESHOLD_PX,
@@ -10,8 +11,10 @@ import {
 type Props = {
     topContent?: ReactNode
     title: string
+    mobileTitle?: string
     titleStyle?: CSSProperties
     subtitle?: string
+    mobileSubtitle?: string | null
     titleActions?: ReactNode
     error?: string | null
     notice?: string | null
@@ -24,8 +27,10 @@ type Props = {
 export function PageFrame({
     topContent,
     title,
+    mobileTitle,
     titleStyle,
     subtitle,
+    mobileSubtitle,
     titleActions,
     error,
     notice,
@@ -37,6 +42,7 @@ export function PageFrame({
     const controlsBlockRef = useRef<HTMLDivElement | null>(null)
     const [isStickyCloneVisible, setIsStickyCloneVisible] = useState(false)
     const [isScrollingUp, setIsScrollingUp] = useState(false)
+    const isMobile = useMediaQuery('(max-width: 48em)')
 
     useEffect(() => {
         if (!analytics && !controls) {
@@ -125,7 +131,7 @@ export function PageFrame({
         return (
             <Stack
                 gap="lg"
-                py="sm"
+                py={isMobile ? 0 : 'sm'}
                 bg="var(--app-color-bg)"
             >
                 {analytics}
@@ -136,6 +142,8 @@ export function PageFrame({
 
     const showStickyClone = isScrollingUp && isStickyCloneVisible
     const resolvedNoticeTone = noticeTone === 'warning' ? 'warning' : 'info'
+    const resolvedMobileTitle = mobileTitle ?? title
+    const resolvedMobileSubtitle = mobileSubtitle === undefined ? subtitle : mobileSubtitle
     const noticeColor = resolvedNoticeTone === 'warning'
         ? { backgroundColor: '#FEF3C7', color: '#92400E' }
         : { backgroundColor: '#E0F2FE', color: '#0369A1' }
@@ -143,7 +151,7 @@ export function PageFrame({
 
     return (
         <Box px={{ base: 'md', md: 'xl' }} py={{ base: 16, md: 'xl' }}>
-            <Stack gap="lg" maw={1240} mx="auto">
+            <Stack gap={isMobile ? 20 : 'lg'} maw={1240} mx="auto">
                 {error && (
                     <Alert color="red" title="Ошибка">
                         {error}
@@ -191,30 +199,45 @@ export function PageFrame({
 
                 <Group justify="space-between" align="flex-start" gap="md" wrap="wrap">
                     <Title order={1} style={titleStyle}>
-                        <Box component="span">
+                        <Box component="span" visibleFrom="sm">
                             {title}
                         </Box>
 
+                        <Box component="span" hiddenFrom="sm">
+                            {resolvedMobileTitle}
+                        </Box>
+
                         {subtitle && (
-                            <>
+                            <Box visibleFrom="sm" component="span">
                                 <Box
                                     component="span"
-                                    visibleFrom="sm"
                                 >
                                     {' · '}
                                 </Box>
 
                                 <Box
                                     component="span"
-                                    display={{ base: 'block', sm: 'inline' }}
-                                    mt={{ base: 4, sm: 0 }}
                                     style={{
                                         whiteSpace: 'nowrap',
                                     }}
                                 >
                                     {subtitle}
                                 </Box>
-                            </>
+                            </Box>
+                        )}
+
+                        {resolvedMobileSubtitle && (
+                            <Box
+                                component="span"
+                                hiddenFrom="sm"
+                                display="block"
+                                mt={4}
+                                style={{
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                {resolvedMobileSubtitle}
+                            </Box>
                         )}
                     </Title>
 

@@ -99,7 +99,7 @@ function renderResidentPage(path: string, currentUser: ReturnType<typeof useCurr
             return <DutyHistoryDetailsPage dutyId={dutyId} />
         }
 
-        return <CurrentDutyPage selectedGroupId={selectedGroupId} />
+        return <CurrentDutyPage currentUser={currentUser} selectedGroupId={selectedGroupId} />
     }
 
     if (pathname === '/app/duties/history') {
@@ -136,7 +136,7 @@ function renderResidentPage(path: string, currentUser: ReturnType<typeof useCurr
         return <TaskCatalogPage />
     }
 
-    return <CurrentDutyPage selectedGroupId={selectedGroupId} />
+    return <CurrentDutyPage currentUser={currentUser} selectedGroupId={selectedGroupId} />
 }
 
 export function AppRouter() {

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { BookOpenIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
+import { BookOpenIcon, CalendarXIcon, DotsThreeOutlineIcon, GearIcon, PlusIcon } from '@phosphor-icons/react'
 import { ActionIcon, Alert, Box, Center, Group, Loader, Menu, Popover, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 
+import type { CurrentUser } from '../../features/current-user/model/types'
 import type { DutyTaskSelect } from '../../features/current-duty/model/types'
 import {
     calculateDutyAnalytics,
@@ -10,12 +12,17 @@ import {
     selectDutyViewOptions,
     selectTasksForActiveSelect,
 } from '../../features/current-duty/model/selectors'
+import {
+    isSupportedMobileDutySelect,
+    selectTasksForMobileMine,
+} from '../../features/current-duty/model/mobileSelect'
 import { CreateGroupDutyModal } from '../../features/current-duty/ui/CreateGroupDutyModal'
 import { useCurrentDuty } from '../../features/current-duty/model/useCurrentDuty'
 import { useStoredDutySelect } from '../../features/current-duty/model/useStoredDutySelect'
 import { formatDutyPeriod } from '../../features/current-duty/model/utils'
 import { CurrentDutyAnalytics } from '../../features/current-duty/ui/CurrentDutyAnalytics'
 import { MobileDutyProgress } from '../../features/current-duty/ui/MobileDutyProgress'
+import { MobileDutyBottomNav } from '../../features/current-duty/ui/MobileDutyBottomNav'
 import { DutyTaskSelects } from '../../features/current-duty/ui/DutyTaskSelects'
 import { TeamMemberTaskGroups } from '../../features/current-duty/ui/TeamMemberTaskGroups'
 import { TaskGroups } from '../../features/current-duty/ui/TaskGroups'
@@ -69,12 +76,13 @@ function getPlanLegendItems(activeSelect: DutyTaskSelect): PlanLegendItem[] {
 }
 
 type Props = {
+    currentUser?: CurrentUser | null
     selectedGroupId?: string
 }
 
 const MY_GROUP_OPTION_VALUE = '__my_group__'
 
-export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
+export function CurrentDutyPage({ currentUser = null, selectedGroupId: initialGroupId }: Props) {
     const selectedDormitoryId = useSelectedDormitoryId()
     const {
         selectedGroupId,
@@ -100,17 +108,23 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     const [displayMode, setDisplayMode] = useState<'list' | 'plan'>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
     const [legendOpened, setLegendOpened] = useState(false)
+    const isMobile = useMediaQuery('(max-width: 48em)')
     const visibleTabs = duty ? selectVisibleDutyTabs(duty) : []
-    const [activeSelect, setActiveSelect] = useStoredDutySelect(visibleTabs)
+    const allowedMobileTabs: DutyTaskSelect[] = ['mine', 'all', 'team']
+    const [activeSelect, setActiveSelect] = useStoredDutySelect(isMobile ? allowedMobileTabs : visibleTabs)
     const availableFloorPlans = useMemo(() => [...floorPlans].sort((left, right) => left.floor - right.floor), [])
     const analytics = duty ? calculateDutyAnalytics(duty.tasks) : null
     const viewOptions = duty ? selectDutyViewOptions(duty, activeSelect, visibleTabs) : null
+    const isCurrentUserInDutyTeam = duty != null && currentUser != null
+        ? duty.team_members.some((member) => member.id === currentUser.id)
+        : false
     const mobileHeaderContent =
         duty
         && analytics
         && viewOptions
         && duty.has_active_duty
         && duty.tasks.length > 0
+        && isCurrentUserInDutyTeam
         && (viewOptions.showAnalytics || viewOptions.isReadOnly) ? (
             <MobileDutyProgress
                 analytics={analytics}
@@ -120,6 +134,18 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         ) : null
 
     useMobileHeaderContent(mobileHeaderContent)
+
+    useEffect(() => {
+        if (!isMobile) {
+            return
+        }
+
+        if (isSupportedMobileDutySelect(activeSelect)) {
+            return
+        }
+
+        setActiveSelect('all')
+    }, [activeSelect, isMobile, setActiveSelect])
 
     useEffect(() => {
         if (availableFloorPlans.length === 0) {
@@ -212,6 +238,7 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         visibleFreeTaskIds,
         visibleMineTaskIds,
     })
+    const mineTasks = selectTasksForMobileMine(duty)
     const planLegendItems = getPlanLegendItems(activeSelect)
 
     const selectedFloorPlan =
@@ -292,91 +319,89 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
     ) : null
 
     const dutyControls = resolvedViewOptions.showControls ? (
-        <DutyTaskSelects
-            activeSelect={activeSelect}
-            visibleSelects={visibleTabs}
-            rightSection={activeSelect === 'team' ? undefined : (
-                <SegmentedControl
-                    value={displayMode}
-                    data={[
-                        { label: 'Список', value: 'list' },
-                        { label: 'План', value: 'plan' },
-                    ]}
-                    classNames={{
-                        control: segmentedControlClasses.control,
-                        root: segmentedControlClasses.root,
-                        label: segmentedControlClasses.label,
-                    }}
-                    onChange={(value) => setDisplayMode(value as 'list' | 'plan')}
-                />
-            )}
-            onChange={setActiveSelect}
-        />
+        <Box visibleFrom="md">
+            <DutyTaskSelects
+                activeSelect={activeSelect}
+                visibleSelects={visibleTabs}
+                rightSection={activeSelect === 'team' ? undefined : (
+                    <SegmentedControl
+                        value={displayMode}
+                        data={[
+                            { label: 'Список', value: 'list' },
+                            { label: 'План', value: 'plan' },
+                        ]}
+                        classNames={{
+                            control: segmentedControlClasses.control,
+                            root: segmentedControlClasses.root,
+                            label: segmentedControlClasses.label,
+                        }}
+                        onChange={(value) => setDisplayMode(value as 'list' | 'plan')}
+                    />
+                )}
+                onChange={setActiveSelect}
+            />
+        </Box>
     ) : null
 
-    const buildingPlanControls = activeSelect === 'team' ? null : (
-        <Box>
-            {displayMode === 'plan' && (
-                <Group justify="space-between" align="center" gap="md" wrap="wrap">
-                    <Popover
-                        opened={legendOpened}
-                        position="bottom-start"
-                        withArrow
-                        shadow="md"
+    const buildingPlanControls = activeSelect === 'team' || displayMode !== 'plan' ? null : (
+        <Group justify="space-between" align="center" gap="md" wrap="wrap">
+            <Popover
+                opened={legendOpened}
+                position="bottom-start"
+                withArrow
+                shadow="md"
+            >
+                <Popover.Target>
+                    <Text
+                        span
+                        c="dimmed"
+                        style={{ cursor: 'default' }}
+                        onMouseEnter={() => setLegendOpened(true)}
+                        onMouseLeave={() => setLegendOpened(false)}
                     >
-                        <Popover.Target>
-                            <Text
-                                span
-                                c="dimmed"
-                                style={{ cursor: 'default' }}
-                                onMouseEnter={() => setLegendOpened(true)}
-                                onMouseLeave={() => setLegendOpened(false)}
-                            >
-                                ⓘ Обозначения
-                            </Text>
-                        </Popover.Target>
-                        <Popover.Dropdown
-                            onMouseEnter={() => setLegendOpened(true)}
-                            onMouseLeave={() => setLegendOpened(false)}
-                        >
-                            <Stack gap="xs">
-                                {planLegendItems.map((item) => (
-                                    <Group key={item.label} gap="xs" wrap="nowrap">
-                                        <Box
-                                            style={{
-                                                width: 10,
-                                                height: 10,
-                                                minWidth: 10,
-                                                borderRadius: '50%',
-                                                backgroundColor: item.color,
-                                                border: `1px solid ${item.stroke}`,
-                                            }}
-                                        />
-                                        <Text size="sm">{item.label}</Text>
-                                    </Group>
-                                ))}
-                            </Stack>
-                        </Popover.Dropdown>
-                    </Popover>
+                        ⓘ Обозначения
+                    </Text>
+                </Popover.Target>
+                <Popover.Dropdown
+                    onMouseEnter={() => setLegendOpened(true)}
+                    onMouseLeave={() => setLegendOpened(false)}
+                >
+                    <Stack gap="xs">
+                        {planLegendItems.map((item) => (
+                            <Group key={item.label} gap="xs" wrap="nowrap">
+                                <Box
+                                    style={{
+                                        width: 10,
+                                        height: 10,
+                                        minWidth: 10,
+                                        borderRadius: '50%',
+                                        backgroundColor: item.color,
+                                        border: `1px solid ${item.stroke}`,
+                                    }}
+                                />
+                                <Text size="sm">{item.label}</Text>
+                            </Group>
+                        ))}
+                    </Stack>
+                </Popover.Dropdown>
+            </Popover>
 
-                    <Select
-                        aria-label="Этаж"
-                        value={selectedFloorPlanId}
-                        data={availableFloorPlans.map((plan) => ({
-                            value: String(plan.floor),
-                            label: getFloorLabel(plan.floor),
-                        }))}
-                        allowDeselect={false}
-                        w={220}
-                        onChange={(value) => {
-                            if (value) {
-                                setSelectedFloorPlanId(value)
-                            }
-                        }}
-                    />
-                </Group>
-            )}
-        </Box>
+            <Select
+                aria-label="Этаж"
+                value={selectedFloorPlanId}
+                data={availableFloorPlans.map((plan) => ({
+                    value: String(plan.floor),
+                    label: getFloorLabel(plan.floor),
+                }))}
+                allowDeselect={false}
+                w={220}
+                onChange={(value) => {
+                    if (value) {
+                        setSelectedFloorPlanId(value)
+                    }
+                }}
+            />
+        </Group>
     )
 
     const analyticsBlock = resolvedViewOptions.showAnalytics || resolvedViewOptions.isReadOnly ? (
@@ -396,6 +421,23 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
             {buildingPlanControls}
         </Stack>
     ) : undefined
+    const shouldShowMobileMineEmptyState = activeSelect === 'mine' && mineTasks.length === 0
+    const mobileMineEmptyState = !isCurrentUserInDutyTeam ? (
+        <EmptyState
+            icon={<CalendarXIcon size={32} />}
+            title="Текущее дежурство не Ваше"
+            description="Вам не нужно выбирать задачи на текущее дежурство"
+        />
+    ) : (
+        <EmptyState
+            title="У вас нет взятых задач"
+            description={(
+                <>
+                    Возьмите задачи в разделе <Text component="span" fw={700}>Задачи</Text>
+                </>
+            )}
+        />
+    )
 
     if (!duty.has_active_duty) {
         return (
@@ -418,6 +460,8 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
         return (
             <PageFrame
                 title="Дежурство"
+                mobileTitle={formatDutyPeriod(duty.start_date, duty.end_date)}
+                mobileSubtitle={null}
                 subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
                 titleActions={titleActions}
                 error={error}
@@ -453,6 +497,8 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
 
             <PageFrame
                 title="Дежурство"
+                mobileTitle={formatDutyPeriod(duty.start_date, duty.end_date)}
+                mobileSubtitle={null}
                 subtitle={formatDutyPeriod(duty.start_date, duty.end_date)}
                 titleActions={titleActions}
                 error={error}
@@ -503,12 +549,14 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                     </>
                 ) : activeSelect === 'team' ? (
                     <TeamMemberTaskGroups duty={duty} />
+                ) : shouldShowMobileMineEmptyState ? (
+                    mobileMineEmptyState
                 ) : (
                     <TaskGroups
                         isReadOnly={resolvedViewOptions.isReadOnly}
-                        actionMode={resolvedViewOptions.actionMode}
+                        actionMode={activeSelect === 'mine' ? 'default' : resolvedViewOptions.actionMode}
                         pendingTaskId={pendingTaskId}
-                        tasks={displayedTasks}
+                        tasks={activeSelect === 'mine' ? mineTasks : displayedTasks}
                         emptyMessage={resolvedViewOptions.emptyMessage}
                         onTake={handleTake}
                         onReturn={handleReturn}
@@ -518,6 +566,7 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                         onVerify={handleVerify}
                     />
                 )}
+                <Box hiddenFrom="md" h={198} />
                 <CreateGroupDutyModal
                     opened={createModalOpened}
                     groupId={duty.selected_group_id}
@@ -525,6 +574,11 @@ export function CurrentDutyPage({ selectedGroupId: initialGroupId }: Props) {
                     onCreated={reloadCurrentDuty}
                 />
             </PageFrame>
+
+            <MobileDutyBottomNav
+                activeSelect={activeSelect === 'mine' || activeSelect === 'all' || activeSelect === 'team' ? activeSelect : 'all'}
+                onChange={setActiveSelect}
+            />
         </>
     )
 }
