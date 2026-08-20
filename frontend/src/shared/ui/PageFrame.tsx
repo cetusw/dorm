@@ -165,7 +165,10 @@ export function PageFrame({
                             borderRadius: 16,
                             display: 'flex',
                             alignItems: 'center',
-                            padding: 24,
+                            paddingTop: 24,
+                            paddingBottom: 24,
+                            paddingLeft: 24,
+                            paddingRight: isMobile ? 16 : 24,
                             ...noticeColor,
                         }}
                     >

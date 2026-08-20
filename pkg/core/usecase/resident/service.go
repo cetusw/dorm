@@ -1035,10 +1035,7 @@ func (s *Service) resolveCurrentDutyNotice(
 	}
 
 	if isOnDutyTeam && periodStatus == dutyPeriodStatusPast && hasOutstandingTasks && currentDuty.activeDutyTeam != nil && currentDuty.activeDuty != nil {
-		return fmt.Sprintf(
-			"На этой неделе ответственный за дежурство — %s. Скорее завершите свои задачи, чтобы не получить предупреждение",
-			s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam),
-		)
+		return "Завершите задачи вовремя, чтобы избежать предупреждения."
 	}
 
 	if isOnDutyTeam || currentDuty.activeDutyTeam == nil {
