@@ -293,6 +293,10 @@
 }
 
 @media (max-width: 48em) {
+    .navbar {
+        z-index: 201;
+    }
+
     .headerInner {
         gap: 20px;
     }

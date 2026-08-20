@@ -471,7 +471,6 @@ export function ResidentAppShell({
                         backgroundColor: '#FFFFFF',
                         top: 0,
                         height: '100dvh',
-                        zIndex: 201,
                     },
                     header: {
                         backgroundColor: 'transparent',
