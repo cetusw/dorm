@@ -443,6 +443,7 @@ export function ResidentAppShell({
         <MobileHeaderContentContext.Provider value={setMobileHeaderContent}>
             <AppShell
                 style={{
+                    position: 'relative',
                     height: '100dvh',
                     minHeight: '100vh',
                 }}
@@ -470,6 +471,7 @@ export function ResidentAppShell({
                         backgroundColor: '#FFFFFF',
                         top: 0,
                         height: '100dvh',
+                        zIndex: 201,
                     },
                     header: {
                         backgroundColor: 'transparent',
@@ -478,6 +480,14 @@ export function ResidentAppShell({
                     },
                 }}
             >
+            {hasNavigation && navbarOpened ? (
+                <div
+                    aria-hidden="true"
+                    className={classes.mobileNavbarOverlay}
+                    onClick={closeNavbar}
+                />
+            ) : null}
+
             {hasNavigation ? (
                 <AppShell.Navbar p={0} className={classes.navbar}>
                     <Stack className={classes.navbarContent}>
