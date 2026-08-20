@@ -90,6 +90,20 @@ Feature-level API модули:
   - принимает push payload;
   - показывает notification;
   - по клику открывает только локальные `/app/**` URL.
+  - не содержит `fetch` handler и не реализует offline/cache-first delivery SPA assets.
+
+## Production static delivery
+
+Frontend собирается Vite в `web/app` с hash-based asset именами вида `/app/assets/index-<hash>.css`.
+
+Для production это означает разные требования к кешированию:
+
+- `index.html` и SPA deep links должны revalidate-иться (`Cache-Control: no-cache`), потому что HTML ссылается на конкретные asset hash текущего deploy;
+- `/app/assets/*` могут иметь долгий immutable cache, потому что содержимое привязано к hash в имени файла;
+- `/app/service-worker.js` не должен иметь immutable-cache, чтобы браузер своевременно замечал новую версию Service Worker;
+- отсутствующий `/app/assets/*` должен возвращать настоящий `404`, а не SPA fallback.
+
+Это особенно важно для первой загрузки после deploy: если старый `index.html` или отсутствующий asset ошибочно превращаются в HTML fallback, пользователь может увидеть страницу без актуальных стилей и скриптов.
 
 ## Push notifications на клиенте
 

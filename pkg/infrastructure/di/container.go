@@ -26,6 +26,7 @@ import (
 	"dorm/pkg/infrastructure/mysql"
 	"dorm/pkg/infrastructure/mysql/repository"
 	"dorm/pkg/infrastructure/scheduler"
+	"dorm/pkg/infrastructure/webapp"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -146,16 +147,7 @@ func NewContainer(configPath string) (*Container, error) {
 	}
 
 	app := fiber.New()
-
-	app.Get("/app", func(c *fiber.Ctx) error {
-		return c.Redirect("/app/tasks", fiber.StatusTemporaryRedirect)
-	})
-
-	app.Static("/app", "./web/app")
-
-	app.Get("/app/*", func(c *fiber.Ctx) error {
-		return c.SendFile("./web/app/index.html")
-	})
+	webapp.RegisterRoutes(app, "./web/app")
 
 	residentAuthHandler := http.NewResidentAuthHandler(userService, cfg.AuthSecret)
 	residentAuthHandler.RegisterRoutes(app)

@@ -13,6 +13,21 @@ REMOTE="${SERVER_USER}@${SERVER_IP}"
 COMPOSE_BASE="docker-compose.yml"
 COMPOSE_PROD="docker-compose.prod.yml"
 COMPOSE_FILES="-f ${COMPOSE_BASE} -f ${COMPOSE_PROD}"
+DOCKER_BUILD_PULL=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --pull)
+      DOCKER_BUILD_PULL=1
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      echo "Usage: $0 [--pull]"
+      exit 1
+      ;;
+  esac
+done
 
 required_paths=(
   "Dockerfile"
@@ -36,7 +51,11 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Building image..."
-docker build --pull -t "$IMAGE_NAME" .
+docker_build_args=(-t "$IMAGE_NAME")
+if [ "$DOCKER_BUILD_PULL" -eq 1 ]; then
+  docker_build_args+=(--pull)
+fi
+docker build "${docker_build_args[@]}" .
 
 echo "Saving image..."
 docker save "$IMAGE_NAME" -o "$IMAGE_TAR"
@@ -59,6 +78,13 @@ set -euo pipefail
 cd "$SERVER_DIR"
 
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
+
+disk_usage_percent=\$(df -P / | awk 'NR==2 { gsub("%", "", \$5); print \$5 }')
+if [ "\${disk_usage_percent}" -ge 90 ]; then
+  echo "WARNING: root filesystem usage is \${disk_usage_percent}%."
+elif [ "\${disk_usage_percent}" -ge 85 ]; then
+  echo "Warning: root filesystem usage is \${disk_usage_percent}%."
+fi
 
 echo "Loading image..."
 docker load -i "$IMAGE_TAR"
@@ -97,12 +123,18 @@ docker compose \$COMPOSE_FILES up -d \
 
 echo "Checking application..."
 for attempt in \$(seq 1 30); do
-  if curl --fail --silent http://127.0.0.1:8080/app/ >/dev/null; then
-    break
-  fi
+  app_html=\$(curl --fail --silent http://127.0.0.1:8080/app/ || true)
+  first_asset_path=\$(printf "%s" "\$app_html" | grep -Eo '/app/assets/[^"]+\.(css|js)' | head -n 1 || true)
 
-  if curl --fail https://dormkit.ru/app/ >/dev/null; then
+  if [ -n "\$app_html" ] && [ -n "\$first_asset_path" ]; then
+    asset_headers=\$(curl --head --silent --fail "http://127.0.0.1:8080\$first_asset_path" || true)
+    if printf "%s" "\$asset_headers" | grep -qi '^Content-Type: text/html'; then
+      asset_headers=""
+    fi
+
+    if [ -n "\$asset_headers" ]; then
       break
+    fi
   fi
 
   if [ "\$attempt" -eq 30 ]; then
