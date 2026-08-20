@@ -8,9 +8,6 @@
 }
 
 .weightColumn {
-    width: 3.5em;
-    min-width: 3.5em;
-    max-width: 3.5em;
     white-space: nowrap;
 }
 

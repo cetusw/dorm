@@ -25,13 +25,22 @@ export function ResidentPenaltiesTable({
 }: Props) {
     const [openedMenuId, setOpenedMenuId] = useState<string | null>(null)
     const hasActions = typeof onDelete === 'function'
+    const maxWeightWidthCh = Math.max(
+        'Вес'.length,
+        ...penalties.map((penalty) => formatPenaltyWeight(penalty.weight).length),
+    )
+    const weightColumnStyle = {
+        width: `${maxWeightWidthCh}ch`,
+        minWidth: `${maxWeightWidthCh}ch`,
+        maxWidth: `${maxWeightWidthCh}ch`,
+    }
 
     return (
         <ListTable minWidth={minWidth} verticalSpacing="sm">
             <Table.Thead>
                 <Table.Tr className={listTableClasses.headerRow}>
                     <Table.Th className={classes.reasonColumn}>Причина</Table.Th>
-                    <Table.Th className={classes.weightColumn}>Вес</Table.Th>
+                    <Table.Th className={classes.weightColumn} style={weightColumnStyle}>Вес</Table.Th>
                     <Table.Th className={classes.dateColumn}>{dateLabel}</Table.Th>
                     {hasActions ? <Table.Th w={68} /> : null}
                 </Table.Tr>
@@ -50,7 +59,9 @@ export function ResidentPenaltiesTable({
                             <Table.Td className={classes.reasonColumn}>
                                 <Text className={classes.reason}>{penalty.reason}</Text>
                             </Table.Td>
-                            <Table.Td className={classes.weightColumn}>{formatPenaltyWeight(penalty.weight)}</Table.Td>
+                            <Table.Td className={classes.weightColumn} style={weightColumnStyle}>
+                                {formatPenaltyWeight(penalty.weight)}
+                            </Table.Td>
                             <Table.Td className={classes.dateColumn}>{formatPenaltyDate(penalty.issued_on)}</Table.Td>
                             {hasActions ? (
                                 <Table.Td>
