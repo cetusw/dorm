@@ -183,7 +183,7 @@ function NotificationsButton() {
                     className={classes.iconButton}
                     aria-label="Открыть настройки уведомлений"
                 >
-                    <BellIcon size={32} weight="regular" />
+                    <BellIcon size={32} weight="regular" className={classes.iconButtonIcon} />
                 </UnstyledButton>
             </Popover.Target>
 

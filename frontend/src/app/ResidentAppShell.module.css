@@ -234,9 +234,21 @@
     cursor: pointer;
 }
 
-.iconButton:hover,
+.iconButton:active,
 .iconButton:focus-visible {
     background: rgba(31, 41, 39, 0.06);
+}
+
+.iconButtonIcon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .iconButton:hover {
+        background: rgba(31, 41, 39, 0.06);
+    }
 }
 
 .dropdown {
@@ -304,6 +316,11 @@
     .notificationMessage,
     .notificationToggleText {
         font-size: 16px;
+    }
+
+    .iconButtonIcon {
+        width: 24px;
+        height: 24px;
     }
 }
 
