@@ -246,17 +246,13 @@ func (s *Service) resolveScope(ctx context.Context, currentUserID uuid.UUID) (qu
 		return queryports.PenaltyScope{}, fmt.Errorf("load groups for penalty scope: %w", err)
 	}
 
-	groupIDs := make([]uuid.UUID, 0)
 	for _, group := range groups {
 		if group.LeaderID() != nil && *group.LeaderID() == currentUserID {
-			groupIDs = append(groupIDs, group.ID())
+			return queryports.PenaltyScope{DormitoryIDs: []int64{*currentUser.DormitoryID()}}, nil
 		}
 	}
-	if len(groupIDs) == 0 {
-		return queryports.PenaltyScope{}, penaltydomain.ErrAccessDenied
-	}
 
-	return queryports.PenaltyScope{GroupIDs: groupIDs}, nil
+	return queryports.PenaltyScope{}, penaltydomain.ErrAccessDenied
 }
 
 func (s *Service) loadAccessibleResident(

@@ -259,7 +259,7 @@ func TestCreatePenaltyRejectsFutureDate(t *testing.T) {
 	assert.ErrorIs(t, err, penaltydomain.ErrIssuedOnInFuture)
 }
 
-func TestResolveScopeFallsBackToGroupLeader(t *testing.T) {
+func TestResolveScopeFallsBackToDormitoryScopeForGroupLeader(t *testing.T) {
 	t.Parallel()
 
 	location := time.UTC
@@ -295,11 +295,11 @@ func TestResolveScopeFallsBackToGroupLeader(t *testing.T) {
 	_, err := service.ListResidents(context.Background(), currentUserID)
 
 	require.NoError(t, err)
-	assert.Equal(t, []uuid.UUID{groupID}, queryService.lastScope.GroupIDs)
-	assert.Empty(t, queryService.lastScope.DormitoryIDs)
+	assert.Equal(t, []int64{dormitoryID}, queryService.lastScope.DormitoryIDs)
+	assert.Empty(t, queryService.lastScope.GroupIDs)
 }
 
-func TestGetResidentPenaltiesRejectsResidentOutsideGroupScope(t *testing.T) {
+func TestGetResidentPenaltiesAllowsResidentFromAnotherGroupInSameDormitory(t *testing.T) {
 	t.Parallel()
 
 	location := time.UTC
@@ -313,6 +313,11 @@ func TestGetResidentPenaltiesRejectsResidentOutsideGroupScope(t *testing.T) {
 
 	currentUser := user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
 	resident := user.RestoreUser(residentID, "resident", "hash", "Petr", nil, "Petrov", &teamID, nil, nil, &dormitoryID, now)
+	queryService := &penaltyQueryServiceStub{
+		residentBy: []dto.PenaltyItem{
+			{ID: uuid.NewString(), Reason: "Просрочил уборку", Weight: 2, IssuedOn: "2026-08-01"},
+		},
+	}
 
 	service := NewPenaltyService(
 		&penaltyRepositoryStub{byID: map[uuid.UUID]*penaltydomain.Penalty{}},
@@ -331,12 +336,15 @@ func TestGetResidentPenaltiesRejectsResidentOutsideGroupScope(t *testing.T) {
 			},
 		},
 		&penaltyDormitoryRepositoryStub{},
-		&penaltyQueryServiceStub{},
+		queryService,
 		location,
 	)
 	service.now = func() time.Time { return now }
 
-	_, err := service.GetResidentPenalties(context.Background(), currentUserID, residentID)
+	response, err := service.GetResidentPenalties(context.Background(), currentUserID, residentID)
 
-	assert.ErrorIs(t, err, penaltydomain.ErrAccessDenied)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, residentID.String(), response.UserID)
+	assert.Equal(t, queryService.residentBy, response.Penalties)
 }
