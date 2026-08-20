@@ -18,51 +18,58 @@ const (
 )
 
 type Penalty struct {
-	id         uuid.UUID
-	userID     uuid.UUID
-	weight     float64
-	reason     string
-	issuedOn   time.Time
-	createdAt  time.Time
-	resolvedAt *time.Time
+	id        uuid.UUID
+	userID    uuid.UUID
+	entryType EntryType
+	weight    float64
+	reason    string
+	createdAt time.Time
 }
+
+type EntryType string
+
+const (
+	EntryTypeIssue   EntryType = "ISSUE"
+	EntryTypeResolve EntryType = "RESOLVE"
+)
 
 func NewPenalty(
 	userID uuid.UUID,
+	entryType EntryType,
 	weight float64,
 	reason string,
-	issuedOn time.Time,
 	createdAt time.Time,
 ) (*Penalty, error) {
-	return newPenalty(uuid.New(), userID, weight, reason, issuedOn, createdAt, nil)
+	return newPenalty(uuid.New(), userID, entryType, weight, reason, createdAt)
 }
 
 func RestorePenalty(
 	id uuid.UUID,
 	userID uuid.UUID,
+	entryType EntryType,
 	weight float64,
 	reason string,
-	issuedOn time.Time,
 	createdAt time.Time,
-	resolvedAt *time.Time,
 ) (*Penalty, error) {
-	return newPenalty(id, userID, weight, reason, issuedOn, createdAt, resolvedAt)
+	return newPenalty(id, userID, entryType, weight, reason, createdAt)
 }
 
 func newPenalty(
 	id uuid.UUID,
 	userID uuid.UUID,
+	entryType EntryType,
 	weight float64,
 	reason string,
-	issuedOn time.Time,
 	createdAt time.Time,
-	resolvedAt *time.Time,
 ) (*Penalty, error) {
 	if id == uuid.Nil {
 		return nil, fmt.Errorf("penalty id is required")
 	}
 	if userID == uuid.Nil {
 		return nil, ErrInvalidResidentID
+	}
+	if !entryType.IsValid() {
+		return nil, ErrInvalidPenaltyEntryType
 	}
 
 	normalizedReason, err := normalizeReason(reason)
@@ -76,13 +83,12 @@ func newPenalty(
 	}
 
 	return &Penalty{
-		id:         id,
-		userID:     userID,
-		weight:     normalizedWeight,
-		reason:     normalizedReason,
-		issuedOn:   issuedOn,
-		createdAt:  createdAt,
-		resolvedAt: copyTime(resolvedAt),
+		id:        id,
+		userID:    userID,
+		entryType: entryType,
+		weight:    normalizedWeight,
+		reason:    normalizedReason,
+		createdAt: createdAt,
 	}, nil
 }
 
@@ -111,38 +117,21 @@ func normalizeWeight(weight float64) (float64, error) {
 	return normalizedWeight, nil
 }
 
-func copyTime(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-
-	copied := *value
-	return &copied
+func (t EntryType) IsValid() bool {
+	return t == EntryTypeIssue || t == EntryTypeResolve
 }
 
 func (p *Penalty) ID() uuid.UUID        { return p.id }
 func (p *Penalty) UserID() uuid.UUID    { return p.userID }
+func (p *Penalty) Type() EntryType      { return p.entryType }
 func (p *Penalty) Weight() float64      { return p.weight }
 func (p *Penalty) Reason() string       { return p.reason }
-func (p *Penalty) IssuedOn() time.Time  { return p.issuedOn }
 func (p *Penalty) CreatedAt() time.Time { return p.createdAt }
-func (p *Penalty) ResolvedAt() *time.Time {
-	return copyTime(p.resolvedAt)
-}
-
-func (p *Penalty) IsResolved() bool {
-	return p.resolvedAt != nil
-}
-
-func (p *Penalty) Resolve(at time.Time) {
-	if p.resolvedAt != nil {
-		return
-	}
-
-	p.resolvedAt = copyTime(&at)
-}
 
 type Repository interface {
+	Create(ctx context.Context, penalty *Penalty) error
+	CreateResolve(ctx context.Context, penalty *Penalty) error
 	FindByID(ctx context.Context, id uuid.UUID) (*Penalty, error)
-	Save(ctx context.Context, penalty *Penalty) error
+	Update(ctx context.Context, penalty *Penalty) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }

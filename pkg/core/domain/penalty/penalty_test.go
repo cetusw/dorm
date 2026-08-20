@@ -14,24 +14,20 @@ import (
 func TestNewPenalty(t *testing.T) {
 	t.Parallel()
 
-	issuedOn := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)
 	createdAt := time.Date(2026, time.August, 2, 10, 0, 0, 0, time.UTC)
 
-	entity, err := NewPenalty(uuid.New(), 1.24, " Причина ", issuedOn, createdAt)
+	entity, err := NewPenalty(uuid.New(), EntryTypeIssue, 1.24, " Причина ", createdAt)
 
 	require.NoError(t, err)
 	assert.Equal(t, 1.2, entity.Weight())
 	assert.Equal(t, "Причина", entity.Reason())
-	assert.Equal(t, issuedOn, entity.IssuedOn())
+	assert.Equal(t, EntryTypeIssue, entity.Type())
 	assert.Equal(t, createdAt, entity.CreatedAt())
-	assert.False(t, entity.IsResolved())
-	assert.Nil(t, entity.ResolvedAt())
 }
 
 func TestPenaltyReasonValidation(t *testing.T) {
 	t.Parallel()
 
-	issuedOn := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)
 	createdAt := time.Date(2026, time.August, 2, 10, 0, 0, 0, time.UTC)
 	validReason := strings.Repeat("я", 256)
 
@@ -48,7 +44,7 @@ func TestPenaltyReasonValidation(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			entity, err := NewPenalty(uuid.New(), 1.0, testCase.reason, issuedOn, createdAt)
+			entity, err := NewPenalty(uuid.New(), EntryTypeIssue, 1.0, testCase.reason, createdAt)
 			if testCase.err != nil {
 				assert.ErrorIs(t, err, testCase.err)
 				return
@@ -63,7 +59,6 @@ func TestPenaltyReasonValidation(t *testing.T) {
 func TestPenaltyWeightValidation(t *testing.T) {
 	t.Parallel()
 
-	issuedOn := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)
 	createdAt := time.Date(2026, time.August, 2, 10, 0, 0, 0, time.UTC)
 
 	testCases := []struct {
@@ -83,7 +78,7 @@ func TestPenaltyWeightValidation(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			entity, err := NewPenalty(uuid.New(), testCase.weight, "reason", issuedOn, createdAt)
+			entity, err := NewPenalty(uuid.New(), EntryTypeIssue, testCase.weight, "reason", createdAt)
 			if testCase.err != nil {
 				assert.ErrorIs(t, err, testCase.err)
 				return
@@ -95,23 +90,11 @@ func TestPenaltyWeightValidation(t *testing.T) {
 	}
 }
 
-func TestPenaltyResolveIsIdempotent(t *testing.T) {
+func TestPenaltyEntryTypeValidation(t *testing.T) {
 	t.Parallel()
 
-	issuedOn := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)
 	createdAt := time.Date(2026, time.August, 2, 10, 0, 0, 0, time.UTC)
-	firstResolvedAt := time.Date(2026, time.August, 2, 11, 0, 0, 0, time.UTC)
-	secondResolvedAt := firstResolvedAt.Add(2 * time.Hour)
 
-	entity, err := NewPenalty(uuid.New(), 1.0, "reason", issuedOn, createdAt)
-	require.NoError(t, err)
-
-	entity.Resolve(firstResolvedAt)
-	require.True(t, entity.IsResolved())
-	require.NotNil(t, entity.ResolvedAt())
-	assert.Equal(t, firstResolvedAt, *entity.ResolvedAt())
-
-	entity.Resolve(secondResolvedAt)
-	require.NotNil(t, entity.ResolvedAt())
-	assert.Equal(t, firstResolvedAt, *entity.ResolvedAt())
+	_, err := NewPenalty(uuid.New(), EntryType("INVALID"), 1.0, "reason", createdAt)
+	assert.ErrorIs(t, err, ErrInvalidPenaltyEntryType)
 }

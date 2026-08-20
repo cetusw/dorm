@@ -3,7 +3,42 @@
     color: #991B1B;
 }
 
+.row:hover,
+.thresholdRow:hover {
+    background: #EEF2F1;
+}
+
 .thresholdRow:hover {
     background: #FEE2E2;
     color: #991B1B;
+}
+
+.actionCell {
+    text-align: center;
+}
+
+.actionCellInner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+}
+
+.actionButton {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.row:hover .actionButton,
+.row[data-menu-open='true'] .actionButton,
+.actionButton:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (hover: none) {
+    .actionButton {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }

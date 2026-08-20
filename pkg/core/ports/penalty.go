@@ -33,11 +33,24 @@ type PenaltyUseCase interface {
 		ctx context.Context,
 		currentUserID uuid.UUID,
 		request dto.CreatePenaltyRequest,
-	) (*dto.PenaltyItem, error)
+	) (*dto.PenaltyEntryItem, error)
 
 	ResolvePenalty(
 		ctx context.Context,
 		currentUserID uuid.UUID,
-		penaltyID uuid.UUID,
+		request dto.ResolvePenaltyRequest,
 	) error
+
+	DeletePenaltyEntry(
+		ctx context.Context,
+		currentUserID uuid.UUID,
+		entryID uuid.UUID,
+	) error
+
+	UpdatePenaltyEntry(
+		ctx context.Context,
+		currentUserID uuid.UUID,
+		entryID uuid.UUID,
+		request dto.UpdatePenaltyEntryRequest,
+	) (*dto.PenaltyEntryItem, error)
 }

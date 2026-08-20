@@ -1,3 +1,5 @@
+import type { PenaltyEntryItem } from './types'
+
 import dayjs from 'dayjs'
 
 export function formatPenaltyWeight(value: number): string {
@@ -12,10 +14,11 @@ export function formatPenaltyDate(value: string): string {
     return parsed.isValid() ? parsed.format('DD.MM.YYYY') : value
 }
 
-export function countPenaltyReasonCharacters(value: string): number {
-    return Array.from(value.trim()).length
+export function formatPenaltyEntryWeight(entry: PenaltyEntryItem): string {
+    const prefix = entry.type === 'resolve' ? '-' : '+'
+    return `${prefix}${formatPenaltyWeight(entry.weight)}`
 }
 
-export function getTodayPenaltyDate(): string {
-    return dayjs().format('YYYY-MM-DD')
+export function countPenaltyReasonCharacters(value: string): number {
+    return Array.from(value.trim()).length
 }

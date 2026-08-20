@@ -1,22 +1,30 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import dayjs from 'dayjs'
-import 'dayjs/locale/ru'
-import { DatePickerInput } from '@mantine/dates'
-import { Button, Drawer, Group, NumberInput, Stack, Textarea } from '@mantine/core'
+import { NumberInput, Textarea } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 import { useForm } from '@mantine/form'
 
 import { ApiError } from '../../../shared/api/ApiError'
-import { useOverlayAutofocus } from '../../../shared/ui/useOverlayAutofocus'
+import { EntityFormModal } from '../../../shared/ui/EntityFormModal'
 import {
     ResidentSearchCombobox,
     type ResidentSearchOption,
 } from '../../../shared/ui/ResidentSearchCombobox'
-import { createPenalty, searchPenaltyResidents } from '../api/penaltiesApi'
-import type { CreatePenaltyRequest, PenaltyResidentOption } from '../model/types'
-import { countPenaltyReasonCharacters, getTodayPenaltyDate } from '../model/utils'
-import classes from './CreatePenaltyDrawer.module.css'
+import modalClasses from '../../../shared/ui/SettingsModal.module.css'
+import {
+    createPenalty,
+    resolvePenalty,
+    searchPenaltyResidents,
+    updatePenaltyEntry,
+} from '../api/penaltiesApi'
+import type {
+    CreatePenaltyRequest,
+    PenaltyEntryType,
+    PenaltyResidentOption,
+    ResolvePenaltyRequest,
+    UpdatePenaltyEntryRequest,
+} from '../model/types'
+import { countPenaltyReasonCharacters, formatPenaltyWeight } from '../model/utils'
 
 type Props = {
     opened: boolean
@@ -27,6 +35,12 @@ type Props = {
         name: string
     } | null
     lockResident?: boolean
+    mode?: 'create' | 'edit'
+    entryType?: PenaltyEntryType
+    entryId?: string | null
+    maxWeight?: number
+    initialReason?: string
+    initialWeight?: number | null
 }
 
 type FormValues = {
@@ -34,7 +48,13 @@ type FormValues = {
     residentName: string
     reason: string
     weight: number | string
-    issuedOn: string | null
+}
+
+const emptyValues: FormValues = {
+    residentId: '',
+    residentName: '',
+    reason: '',
+    weight: '',
 }
 
 function toSearchOptions(options: PenaltyResidentOption[]): ResidentSearchOption[] {
@@ -44,13 +64,37 @@ function toSearchOptions(options: PenaltyResidentOption[]): ResidentSearchOption
     }))
 }
 
-function toRequest(values: FormValues): CreatePenaltyRequest {
+function toIssueRequest(values: FormValues): CreatePenaltyRequest {
     return {
         user_id: values.residentId,
         reason: values.reason.trim(),
         weight: Number(values.weight),
-        issued_on: values.issuedOn ?? '',
     }
+}
+
+function toResolveRequest(values: FormValues): ResolvePenaltyRequest {
+    return {
+        user_id: values.residentId,
+        reason: values.reason.trim(),
+        weight: Number(values.weight),
+    }
+}
+
+function toUpdateRequest(values: FormValues): UpdatePenaltyEntryRequest {
+    return {
+        reason: values.reason.trim(),
+        weight: Number(values.weight),
+    }
+}
+
+function resolveTitle(mode: 'create' | 'edit', entryType: PenaltyEntryType): string {
+    if (mode === 'create') {
+        return entryType === 'resolve' ? 'Погашение предупреждения' : 'Выдача предупреждения'
+    }
+
+    return entryType === 'resolve'
+        ? 'Редактирование погашения'
+        : 'Редактирование предупреждения'
 }
 
 export function CreatePenaltyDrawer({
@@ -59,26 +103,28 @@ export function CreatePenaltyDrawer({
     onCreated,
     residentPreset = null,
     lockResident = false,
+    mode = 'create',
+    entryType = 'issue',
+    entryId = null,
+    maxWeight,
+    initialReason = '',
+    initialWeight = null,
 }: Props) {
-    const [submitting, setSubmitting] = useState(false)
+    const isResolveMode = entryType === 'resolve'
+    const isEditMode = mode === 'edit'
+    const residentPresetId = residentPreset?.id ?? ''
+    const residentPresetName = residentPreset?.name ?? ''
+    const [saving, setSaving] = useState(false)
     const [searchValue, setSearchValue] = useState('')
     const [residentOptions, setResidentOptions] = useState<PenaltyResidentOption[]>([])
     const [searchLoading, setSearchLoading] = useState(false)
     const [searchError, setSearchError] = useState<string | null>(null)
     const [debouncedSearch] = useDebouncedValue(searchValue, 300)
     const [submitError, setSubmitError] = useState<string | null>(null)
-    const wasOpenedRef = useRef(false)
-    const appliedPresetKeyRef = useRef<string | null>(null)
-    const formRef = useRef<HTMLFormElement | null>(null)
 
     const form = useForm<FormValues>({
-        initialValues: {
-            residentId: '',
-            residentName: '',
-            reason: '',
-            weight: '',
-            issuedOn: getTodayPenaltyDate(),
-        },
+        mode: 'controlled',
+        initialValues: emptyValues,
         validate: {
             residentId: (value) => value.trim() === '' ? 'Выберите жителя' : null,
             reason: (value) => {
@@ -93,125 +139,61 @@ export function CreatePenaltyDrawer({
             },
             weight: (value) => {
                 if (value === '' || value == null) {
-                    return 'Укажите вес предупреждения'
+                    return 'Укажите вес'
                 }
                 const normalized = Number(value)
                 if (!Number.isFinite(normalized)) {
-                    return 'Укажите вес предупреждения'
+                    return 'Укажите вес'
                 }
                 if (normalized < 0.1) {
                     return 'Минимальный вес — 0,1'
                 }
                 if (normalized > 999999999.9) {
-                    return 'Укажите вес предупреждения'
+                    return 'Укажите вес'
                 }
-                return null
-            },
-            issuedOn: (value) => {
-                if (!value) {
-                    return 'Укажите дату получения'
-                }
-                if (dayjs(value).isAfter(dayjs(getTodayPenaltyDate()), 'day')) {
-                    return 'Дата получения не может быть в будущем'
+                if (!isEditMode && isResolveMode && typeof maxWeight === 'number' && normalized > maxWeight) {
+                    return `Нельзя снять больше ${formatPenaltyWeight(maxWeight)}`
                 }
                 return null
             },
         },
     })
-    const residentPresetId = residentPreset?.id ?? null
-    const residentPresetName = residentPreset?.name ?? null
-    const {
-        clearFieldError,
-        errors,
-        getInputProps,
-        onSubmit,
-        reset,
-        setFieldValue,
-        values,
-    } = form
 
-    const residentError = typeof errors.residentId === 'string'
-        ? errors.residentId
-        : searchError
-
-    useOverlayAutofocus(formRef, { enabled: opened })
-
-    function resetState() {
-        reset()
-        setFieldValue('issuedOn', getTodayPenaltyDate())
-        setSubmitting(false)
-        setResidentOptions([])
-        setSearchLoading(false)
-        setSearchError(null)
-        setSubmitError(null)
-
-        if (residentPresetId == null || residentPresetName == null) {
-            setFieldValue('residentId', '')
-            setFieldValue('residentName', '')
+    useEffect(() => {
+        if (!opened) {
+            form.setValues(emptyValues)
+            form.resetDirty(emptyValues)
+            form.clearErrors()
+            setSaving(false)
+            setSubmitError(null)
+            setSearchLoading(false)
+            setSearchError(null)
+            setResidentOptions([])
             setSearchValue('')
             return
         }
 
-        setFieldValue('residentId', residentPresetId)
-        setFieldValue('residentName', residentPresetName)
-        setSearchValue(residentPresetName)
-    }
-
-    function handleClose() {
-        resetState()
-        onClose()
-    }
-
-    useEffect(() => {
-        if (!opened) {
-            wasOpenedRef.current = false
-            appliedPresetKeyRef.current = null
-            return
+        const nextValues: FormValues = {
+            residentId: residentPresetId,
+            residentName: residentPresetName,
+            reason: initialReason,
+            weight: initialWeight ?? '',
         }
-    }, [opened])
+        form.setValues(nextValues)
+        form.resetDirty(nextValues)
+        form.clearErrors()
+        setSaving(false)
+        setSubmitError(null)
+        setSearchError(null)
+        setSearchValue(nextValues.residentName)
+    }, [initialReason, initialWeight, opened, residentPresetId, residentPresetName])
 
     useEffect(() => {
         if (!opened) {
             return
         }
 
-        const presetKey = residentPresetId == null || residentPresetName == null
-            ? null
-            : `${residentPresetId}:${residentPresetName}`
-        const shouldApplyPreset = !wasOpenedRef.current || appliedPresetKeyRef.current !== presetKey
-
-        wasOpenedRef.current = true
-
-        if (!shouldApplyPreset) {
-            return
-        }
-
-        appliedPresetKeyRef.current = presetKey
-
-        const timeoutId = window.setTimeout(() => {
-            if (residentPresetId == null || residentPresetName == null) {
-                setFieldValue('residentId', '')
-                setFieldValue('residentName', '')
-                setSearchValue('')
-                return
-            }
-
-            setFieldValue('residentId', residentPresetId)
-            setFieldValue('residentName', residentPresetName)
-            setSearchValue(residentPresetName)
-        }, 0)
-
-        return () => {
-            window.clearTimeout(timeoutId)
-        }
-    }, [opened, residentPresetId, residentPresetName, setFieldValue])
-
-    useEffect(() => {
-        if (!opened) {
-            return
-        }
-
-        if (lockResident && residentPreset != null) {
+        if (lockResident && residentPresetId !== '') {
             return
         }
 
@@ -249,114 +231,116 @@ export function CreatePenaltyDrawer({
             cancelled = true
             window.clearTimeout(timeoutId)
         }
-    }, [debouncedSearch, lockResident, opened, residentPreset])
+    }, [debouncedSearch, lockResident, opened, residentPresetId])
+
+    const residentError = typeof form.errors.residentId === 'string'
+        ? form.errors.residentId
+        : searchError
 
     return (
-        <Drawer
+        <EntityFormModal
             opened={opened}
-            onClose={handleClose}
-            position="right"
+            onClose={onClose}
+            title={<span className={modalClasses.title}>{resolveTitle(mode, entryType)}</span>}
+            saving={saving}
+            error={submitError}
             size={680}
-            title="Выдача предупреждения"
-        >
-            <form
-                ref={formRef}
-                className={classes.drawerBody}
-                onSubmit={onSubmit(async (values) => {
-                    setSubmitting(true)
-                    setSubmitError(null)
+            withCloseButton={false}
+            modalClassNames={{
+                header: modalClasses.header,
+                body: modalClasses.body,
+                content: modalClasses.content,
+            }}
+            contentGap={15}
+            actionsClassName={modalClasses.actions}
+            cancelButtonClassName={modalClasses.cancelButton}
+            submitButtonClassName={[modalClasses.submitButton, modalClasses.accentButton].join(' ')}
+            submitLabel={isEditMode ? 'Сохранить' : isResolveMode ? 'Погасить' : 'Выдать'}
+            onSubmit={form.onSubmit(async (values) => {
+                setSaving(true)
+                setSubmitError(null)
 
-                    try {
-                        await createPenalty(toRequest(values))
-                        handleClose()
-                        await onCreated()
-                    } catch (currentError) {
-                        if (currentError instanceof ApiError) {
-                            setSubmitError(currentError.message)
-                        } else {
-                            setSubmitError('Не удалось выполнить запрос')
+                try {
+                    if (isEditMode) {
+                        if (!entryId) {
+                            return
                         }
-                    } finally {
-                        setSubmitting(false)
+                        await updatePenaltyEntry(entryId, toUpdateRequest(values))
+                    } else if (isResolveMode) {
+                        await resolvePenalty(toResolveRequest(values))
+                    } else {
+                        await createPenalty(toIssueRequest(values))
                     }
-                })}
-            >
-                <Stack gap="md">
-                    <ResidentSearchCombobox
-                        searchValue={searchValue}
-                        options={toSearchOptions(residentOptions)}
-                        loading={searchLoading}
-                        error={residentError}
-                        placeholder="Житель"
-                        selectedId={values.residentId || null}
-                        selectedLabel={values.residentName || null}
-                        hideDropdownWhenSelected
-                        disabled={lockResident}
-                        onSearchChange={(value) => {
-                            setSearchValue(value)
-                            if (value !== values.residentName) {
-                                setFieldValue('residentId', '')
-                            }
-                            setFieldValue('residentName', value)
-                            clearFieldError('residentId')
-                        }}
-                        onOptionSelect={(option) => {
-                            setFieldValue('residentId', option.id)
-                            setFieldValue('residentName', option.name)
-                            setSearchValue(option.name)
-                            clearFieldError('residentId')
-                        }}
-                    />
 
-                    <Textarea
-                        minRows={3}
-                        maxLength={256}
-                        placeholder="Причина выдачи предупреждения"
-                        className={classes.field}
-                        {...getInputProps('reason')}
-                    />
+                    await onCreated()
+                    onClose()
+                } catch (currentError) {
+                    if (currentError instanceof ApiError) {
+                        setSubmitError(currentError.message)
+                    } else {
+                        setSubmitError('Не удалось выполнить запрос')
+                    }
+                } finally {
+                    setSaving(false)
+                }
+            })}
+        >
+            <ResidentSearchCombobox
+                overlayOpened={opened}
+                placeholder="Житель*"
+                searchValue={form.values.residentName}
+                selectedId={form.values.residentId === '' ? null : form.values.residentId}
+                selectedLabel={form.values.residentName === '' ? null : form.values.residentName}
+                hideDropdownWhenSelected
+                options={toSearchOptions(residentOptions)}
+                loading={searchLoading}
+                error={residentError}
+                disabled={lockResident || isEditMode}
+                inputClassName={modalClasses.input}
+                onSearchChange={(value: string) => {
+                    setSearchValue(value)
+                    form.setFieldValue('residentName', value)
+                    if (value.trim() === '') {
+                        form.setFieldValue('residentId', '')
+                    }
+                    form.clearFieldError('residentId')
+                }}
+                onOptionSelect={(option: ResidentSearchOption) => {
+                    form.setFieldValue('residentId', option.id)
+                    form.setFieldValue('residentName', option.name)
+                    setSearchValue(option.name)
+                    form.clearFieldError('residentId')
+                }}
+            />
 
-                    <div className={classes.rowFields}>
-                        <NumberInput
-                            min={0.1}
-                            max={999999999.9}
-                            step={0.1}
-                            decimalScale={1}
-                            allowNegative={false}
-                            hideControls
-                            placeholder="Вес предупреждения"
-                            className={classes.field}
-                            value={values.weight}
-                            onChange={(value) => setFieldValue('weight', value)}
-                            error={errors.weight}
-                        />
+            <NumberInput
+                placeholder="Вес*"
+                hideControls
+                decimalScale={1}
+                fixedDecimalScale={false}
+                allowNegative={false}
+                min={0.1}
+                max={!isEditMode && isResolveMode && typeof maxWeight === 'number' ? maxWeight : 999999999.9}
+                clampBehavior="strict"
+                classNames={{
+                    input: modalClasses.input,
+                }}
+                value={form.values.weight}
+                error={form.errors.weight}
+                onChange={(value) => form.setFieldValue('weight', value === '' ? '' : value)}
+            />
 
-                        <DatePickerInput
-                            locale="ru"
-                            valueFormat="DD.MM.YYYY"
-                            placeholder="Дата получения"
-                            className={classes.field}
-                            value={values.issuedOn}
-                            onChange={(value) => setFieldValue('issuedOn', value)}
-                            maxDate={getTodayPenaltyDate()}
-                            error={errors.issuedOn}
-                        />
-                    </div>
-
-                    {submitError ? (
-                        <div className={classes.submitError}>{submitError}</div>
-                    ) : null}
-
-                    <Group justify="flex-end" mt="sm">
-                        <Button type="button" variant="default" onClick={handleClose}>
-                            Отменить
-                        </Button>
-                        <Button type="submit" loading={submitting}>
-                            Выдать
-                        </Button>
-                    </Group>
-                </Stack>
-            </form>
-        </Drawer>
+            <Textarea
+                placeholder="Причина*"
+                minRows={4}
+                autosize
+                maxRows={8}
+                classNames={{
+                    input: modalClasses.input,
+                }}
+                key={form.key('reason')}
+                {...form.getInputProps('reason')}
+            />
+        </EntityFormModal>
     )
 }

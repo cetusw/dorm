@@ -18,26 +18,41 @@ export type PenaltyResidentOptionsResponse = {
     residents: PenaltyResidentOption[]
 }
 
-export type PenaltyItem = {
+export type PenaltyEntryType = 'issue' | 'resolve'
+
+export type PenaltyEntryItem = {
     id: string
+    type: PenaltyEntryType
     reason: string
     weight: number
-    issued_on: string
+    created_at: string
 }
 
 export type PenaltyResidentDetailsResponse = {
     user_id: string
     full_name: string
-    penalties: PenaltyItem[]
+    total_weight: number
+    entries: PenaltyEntryItem[]
 }
 
 export type CurrentUserPenaltiesResponse = {
-    penalties: PenaltyItem[]
+    total_weight: number
+    entries: PenaltyEntryItem[]
 }
 
 export type CreatePenaltyRequest = {
     user_id: string
     reason: string
     weight: number
-    issued_on: string
+}
+
+export type ResolvePenaltyRequest = {
+    user_id: string
+    reason: string
+    weight: number
+}
+
+export type UpdatePenaltyEntryRequest = {
+    reason: string
+    weight: number
 }

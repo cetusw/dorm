@@ -17,17 +17,63 @@ import (
 )
 
 type penaltyRepositoryStub struct {
-	byID  map[uuid.UUID]*penaltydomain.Penalty
-	saved []*penaltydomain.Penalty
+	created          []*penaltydomain.Penalty
+	resolved         []*penaltydomain.Penalty
+	updated          *penaltydomain.Penalty
+	foundByID        map[uuid.UUID]*penaltydomain.Penalty
+	deletedID        uuid.UUID
+	createErr        error
+	createResolveErr error
+	findErr          error
+	updateErr        error
+	deleteErr        error
+}
+
+func (s *penaltyRepositoryStub) Create(_ context.Context, item *penaltydomain.Penalty) error {
+	if s.createErr != nil {
+		return s.createErr
+	}
+
+	s.created = append(s.created, item)
+	return nil
+}
+
+func (s *penaltyRepositoryStub) CreateResolve(_ context.Context, item *penaltydomain.Penalty) error {
+	if s.createResolveErr != nil {
+		return s.createResolveErr
+	}
+
+	s.resolved = append(s.resolved, item)
+	return nil
 }
 
 func (s *penaltyRepositoryStub) FindByID(_ context.Context, id uuid.UUID) (*penaltydomain.Penalty, error) {
-	return s.byID[id], nil
+	if s.findErr != nil {
+		return nil, s.findErr
+	}
+
+	if s.foundByID == nil {
+		return nil, nil
+	}
+
+	return s.foundByID[id], nil
 }
 
-func (s *penaltyRepositoryStub) Save(_ context.Context, item *penaltydomain.Penalty) error {
-	s.byID[item.ID()] = item
-	s.saved = append(s.saved, item)
+func (s *penaltyRepositoryStub) Update(_ context.Context, item *penaltydomain.Penalty) error {
+	if s.updateErr != nil {
+		return s.updateErr
+	}
+
+	s.updated = item
+	return nil
+}
+
+func (s *penaltyRepositoryStub) Delete(_ context.Context, id uuid.UUID) error {
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
+
+	s.deletedID = id
 	return nil
 }
 
@@ -55,22 +101,6 @@ func (s *penaltyUserRepositoryStub) MoveUserToTeam(context.Context, uuid.UUID, *
 	return nil
 }
 func (s *penaltyUserRepositoryStub) SoftDelete(context.Context, uuid.UUID) error { return nil }
-
-type penaltyTeamRepositoryStub struct {
-	byID map[uuid.UUID]*structure.Team
-}
-
-func (s *penaltyTeamRepositoryStub) FindByID(_ context.Context, id uuid.UUID) (*structure.Team, error) {
-	return s.byID[id], nil
-}
-func (s *penaltyTeamRepositoryStub) FindByGroupID(context.Context, uuid.UUID) ([]*structure.Team, error) {
-	return nil, nil
-}
-func (s *penaltyTeamRepositoryStub) UpdateRotationPositions(context.Context, uuid.UUID, []uuid.UUID) error {
-	return nil
-}
-func (s *penaltyTeamRepositoryStub) Save(context.Context, *structure.Team) error { return nil }
-func (s *penaltyTeamRepositoryStub) Delete(context.Context, uuid.UUID) error     { return nil }
 
 type penaltyGroupRepositoryStub struct {
 	byDormitory map[int64][]*structure.Group
@@ -107,14 +137,13 @@ func (s *penaltyDormitoryRepositoryStub) Save(context.Context, *structure.Dormit
 func (s *penaltyDormitoryRepositoryStub) Delete(context.Context, int64) error { return nil }
 
 type penaltyQueryServiceStub struct {
-	residents  []dto.PenaltyResidentSummary
-	residentBy []dto.PenaltyItem
-	options    []dto.PenaltyResidentOption
-	lastScope  queryports.PenaltyScope
-	lastSearch string
+	residents []dto.PenaltyResidentSummary
+	entries   []dto.PenaltyEntryItem
+	options   []dto.PenaltyResidentOption
+	lastScope queryports.PenaltyScope
 }
 
-func (s *penaltyQueryServiceStub) ListResidentsWithActivePenalties(
+func (s *penaltyQueryServiceStub) ListResidentsWithPenaltyBalance(
 	_ context.Context,
 	scope queryports.PenaltyScope,
 ) ([]dto.PenaltyResidentSummary, error) {
@@ -128,18 +157,18 @@ func (s *penaltyQueryServiceStub) SearchEligibleResidents(
 	search string,
 ) ([]dto.PenaltyResidentOption, error) {
 	s.lastScope = scope
-	s.lastSearch = search
+	_ = search
 	return s.options, nil
 }
 
-func (s *penaltyQueryServiceStub) ListActivePenaltiesByUser(
+func (s *penaltyQueryServiceStub) ListPenaltyEntriesByUser(
 	_ context.Context,
 	_ uuid.UUID,
-) ([]dto.PenaltyItem, error) {
-	return s.residentBy, nil
+) ([]dto.PenaltyEntryItem, error) {
+	return s.entries, nil
 }
 
-func TestGetCurrentUserPenaltiesReturnsActiveItems(t *testing.T) {
+func TestGetCurrentUserPenaltiesReturnsBalanceFromEntries(t *testing.T) {
 	t.Parallel()
 
 	currentUserID := uuid.New()
@@ -147,17 +176,17 @@ func TestGetCurrentUserPenaltiesReturnsActiveItems(t *testing.T) {
 	now := time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC)
 	currentUser := user.RestoreUser(currentUserID, "resident", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
 	queryService := &penaltyQueryServiceStub{
-		residentBy: []dto.PenaltyItem{
-			{ID: uuid.NewString(), Reason: "Просрочил уборку", Weight: 2, IssuedOn: "2026-08-01"},
+		entries: []dto.PenaltyEntryItem{
+			{ID: uuid.NewString(), Type: "issue", Reason: "Просрочил уборку", Weight: 1.0, CreatedAt: now.Format(time.RFC3339)},
+			{ID: uuid.NewString(), Type: "resolve", Reason: "Закрыл долг", Weight: 0.5, CreatedAt: now.Format(time.RFC3339)},
 		},
 	}
 
 	service := NewPenaltyService(
-		&penaltyRepositoryStub{byID: map[uuid.UUID]*penaltydomain.Penalty{}},
+		&penaltyRepositoryStub{},
 		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{
 			currentUserID: currentUser,
 		}},
-		&penaltyTeamRepositoryStub{byID: map[uuid.UUID]*structure.Team{}},
 		&penaltyGroupRepositoryStub{},
 		&penaltyDormitoryRepositoryStub{},
 		queryService,
@@ -168,7 +197,8 @@ func TestGetCurrentUserPenaltiesReturnsActiveItems(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, response)
-	assert.Equal(t, queryService.residentBy, response.Penalties)
+	assert.Equal(t, 0.5, response.TotalWeight)
+	assert.Equal(t, queryService.entries, response.Entries)
 }
 
 func TestCreatePenaltyUsesDormitoryLeaderScopeAndNormalizesData(t *testing.T) {
@@ -182,8 +212,7 @@ func TestCreatePenaltyUsesDormitoryLeaderScopeAndNormalizesData(t *testing.T) {
 
 	currentUser := user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
 	resident := user.RestoreUser(residentID, "resident", "hash", "Petr", nil, "Petrov", nil, nil, nil, &dormitoryID, now)
-	penaltyRepo := &penaltyRepositoryStub{byID: map[uuid.UUID]*penaltydomain.Penalty{}}
-	queryService := &penaltyQueryServiceStub{}
+	penaltyRepo := &penaltyRepositoryStub{}
 
 	service := NewPenaltyService(
 		penaltyRepo,
@@ -191,53 +220,6 @@ func TestCreatePenaltyUsesDormitoryLeaderScopeAndNormalizesData(t *testing.T) {
 			currentUserID: currentUser,
 			residentID:    resident,
 		}},
-		&penaltyTeamRepositoryStub{byID: map[uuid.UUID]*structure.Team{}},
-		&penaltyGroupRepositoryStub{},
-		&penaltyDormitoryRepositoryStub{
-			all: []*structure.Dormitory{
-				structure.RestoreDormitory(dormitoryID, "Dorm", &currentUserID, "Moscow", "st", "Lenina", "1"),
-			},
-		},
-		queryService,
-		location,
-	)
-	service.now = func() time.Time { return now }
-
-	item, err := service.CreatePenalty(context.Background(), currentUserID, dto.CreatePenaltyRequest{
-		UserID:   residentID.String(),
-		Reason:   " late cleanup ",
-		Weight:   1.24,
-		IssuedOn: "2026-08-02",
-	})
-
-	require.NoError(t, err)
-	require.NotNil(t, item)
-	require.Len(t, penaltyRepo.saved, 1)
-	assert.Equal(t, "late cleanup", penaltyRepo.saved[0].Reason())
-	assert.Equal(t, 1.2, penaltyRepo.saved[0].Weight())
-	assert.Equal(t, now, penaltyRepo.saved[0].CreatedAt())
-	assert.Equal(t, "2026-08-02", item.IssuedOn)
-}
-
-func TestCreatePenaltyRejectsFutureDate(t *testing.T) {
-	t.Parallel()
-
-	location := time.FixedZone("UTC+3", 3*60*60)
-	now := time.Date(2026, time.August, 2, 12, 0, 0, 0, location)
-	currentUserID := uuid.New()
-	residentID := uuid.New()
-	dormitoryID := int64(7)
-
-	currentUser := user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
-	resident := user.RestoreUser(residentID, "resident", "hash", "Petr", nil, "Petrov", nil, nil, nil, &dormitoryID, now)
-
-	service := NewPenaltyService(
-		&penaltyRepositoryStub{byID: map[uuid.UUID]*penaltydomain.Penalty{}},
-		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{
-			currentUserID: currentUser,
-			residentID:    resident,
-		}},
-		&penaltyTeamRepositoryStub{byID: map[uuid.UUID]*structure.Team{}},
 		&penaltyGroupRepositoryStub{},
 		&penaltyDormitoryRepositoryStub{
 			all: []*structure.Dormitory{
@@ -249,14 +231,136 @@ func TestCreatePenaltyRejectsFutureDate(t *testing.T) {
 	)
 	service.now = func() time.Time { return now }
 
-	_, err := service.CreatePenalty(context.Background(), currentUserID, dto.CreatePenaltyRequest{
-		UserID:   residentID.String(),
-		Reason:   "reason",
-		Weight:   1.0,
-		IssuedOn: "2026-08-03",
+	item, err := service.CreatePenalty(context.Background(), currentUserID, dto.CreatePenaltyRequest{
+		UserID: residentID.String(),
+		Reason: " late cleanup ",
+		Weight: 1.24,
 	})
 
-	assert.ErrorIs(t, err, penaltydomain.ErrIssuedOnInFuture)
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	require.Len(t, penaltyRepo.created, 1)
+	assert.Equal(t, penaltydomain.EntryTypeIssue, penaltyRepo.created[0].Type())
+	assert.Equal(t, "late cleanup", penaltyRepo.created[0].Reason())
+	assert.Equal(t, 1.2, penaltyRepo.created[0].Weight())
+	assert.Equal(t, now, penaltyRepo.created[0].CreatedAt())
+	assert.Equal(t, "issue", item.Type)
+}
+
+func TestResolvePenaltyCreatesResolveEntry(t *testing.T) {
+	t.Parallel()
+
+	location := time.UTC
+	now := time.Date(2026, time.August, 2, 12, 0, 0, 0, location)
+	currentUserID := uuid.New()
+	residentID := uuid.New()
+	dormitoryID := int64(7)
+
+	currentUser := user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
+	resident := user.RestoreUser(residentID, "resident", "hash", "Petr", nil, "Petrov", nil, nil, nil, &dormitoryID, now)
+	penaltyRepo := &penaltyRepositoryStub{}
+
+	service := NewPenaltyService(
+		penaltyRepo,
+		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{
+			currentUserID: currentUser,
+			residentID:    resident,
+		}},
+		&penaltyGroupRepositoryStub{},
+		&penaltyDormitoryRepositoryStub{
+			all: []*structure.Dormitory{
+				structure.RestoreDormitory(dormitoryID, "Dorm", &currentUserID, "Moscow", "st", "Lenina", "1"),
+			},
+		},
+		&penaltyQueryServiceStub{},
+		location,
+	)
+	service.now = func() time.Time { return now }
+
+	err := service.ResolvePenalty(context.Background(), currentUserID, dto.ResolvePenaltyRequest{
+		UserID: residentID.String(),
+		Reason: "Выполнено дополнительное задание",
+		Weight: 0.5,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, penaltyRepo.resolved, 1)
+	assert.Equal(t, penaltydomain.EntryTypeResolve, penaltyRepo.resolved[0].Type())
+	assert.Equal(t, 0.5, penaltyRepo.resolved[0].Weight())
+}
+
+func TestResolvePenaltyPropagatesInsufficientBalance(t *testing.T) {
+	t.Parallel()
+
+	location := time.UTC
+	now := time.Date(2026, time.August, 2, 12, 0, 0, 0, location)
+	currentUserID := uuid.New()
+	residentID := uuid.New()
+	dormitoryID := int64(7)
+
+	currentUser := user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
+	resident := user.RestoreUser(residentID, "resident", "hash", "Petr", nil, "Petrov", nil, nil, nil, &dormitoryID, now)
+
+	service := NewPenaltyService(
+		&penaltyRepositoryStub{createResolveErr: penaltydomain.ErrInsufficientPenaltyBalance},
+		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{
+			currentUserID: currentUser,
+			residentID:    resident,
+		}},
+		&penaltyGroupRepositoryStub{},
+		&penaltyDormitoryRepositoryStub{
+			all: []*structure.Dormitory{
+				structure.RestoreDormitory(dormitoryID, "Dorm", &currentUserID, "Moscow", "st", "Lenina", "1"),
+			},
+		},
+		&penaltyQueryServiceStub{},
+		location,
+	)
+
+	err := service.ResolvePenalty(context.Background(), currentUserID, dto.ResolvePenaltyRequest{
+		UserID: residentID.String(),
+		Reason: "Попытка снять слишком много",
+		Weight: 1.5,
+	})
+
+	assert.ErrorIs(t, err, penaltydomain.ErrInsufficientPenaltyBalance)
+}
+
+func TestResolvePenaltyRejectsInvalidWeight(t *testing.T) {
+	t.Parallel()
+
+	location := time.UTC
+	now := time.Date(2026, time.August, 2, 12, 0, 0, 0, location)
+	currentUserID := uuid.New()
+	residentID := uuid.New()
+	dormitoryID := int64(7)
+
+	currentUser := user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
+	resident := user.RestoreUser(residentID, "resident", "hash", "Petr", nil, "Petrov", nil, nil, nil, &dormitoryID, now)
+
+	service := NewPenaltyService(
+		&penaltyRepositoryStub{},
+		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{
+			currentUserID: currentUser,
+			residentID:    resident,
+		}},
+		&penaltyGroupRepositoryStub{},
+		&penaltyDormitoryRepositoryStub{
+			all: []*structure.Dormitory{
+				structure.RestoreDormitory(dormitoryID, "Dorm", &currentUserID, "Moscow", "st", "Lenina", "1"),
+			},
+		},
+		&penaltyQueryServiceStub{},
+		location,
+	)
+
+	err := service.ResolvePenalty(context.Background(), currentUserID, dto.ResolvePenaltyRequest{
+		UserID: residentID.String(),
+		Reason: "Некорректный вес",
+		Weight: 0,
+	})
+
+	assert.ErrorIs(t, err, penaltydomain.ErrInvalidWeight)
 }
 
 func TestResolveScopeFallsBackToDormitoryScopeForGroupLeader(t *testing.T) {
@@ -274,11 +378,10 @@ func TestResolveScopeFallsBackToDormitoryScopeForGroupLeader(t *testing.T) {
 	}
 
 	service := NewPenaltyService(
-		&penaltyRepositoryStub{byID: map[uuid.UUID]*penaltydomain.Penalty{}},
+		&penaltyRepositoryStub{},
 		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{
 			currentUserID: currentUser,
 		}},
-		&penaltyTeamRepositoryStub{byID: map[uuid.UUID]*structure.Team{}},
 		&penaltyGroupRepositoryStub{
 			byDormitory: map[int64][]*structure.Group{
 				dormitoryID: {
@@ -290,43 +393,36 @@ func TestResolveScopeFallsBackToDormitoryScopeForGroupLeader(t *testing.T) {
 		queryService,
 		location,
 	)
-	service.now = func() time.Time { return now }
 
 	_, err := service.ListResidents(context.Background(), currentUserID)
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{dormitoryID}, queryService.lastScope.DormitoryIDs)
-	assert.Empty(t, queryService.lastScope.GroupIDs)
 }
 
-func TestGetResidentPenaltiesAllowsResidentFromAnotherGroupInSameDormitory(t *testing.T) {
+func TestGetResidentPenaltiesAllowsResidentInSameDormitory(t *testing.T) {
 	t.Parallel()
 
 	location := time.UTC
 	now := time.Date(2026, time.August, 2, 12, 0, 0, 0, location)
 	currentUserID := uuid.New()
 	groupID := uuid.New()
-	otherGroupID := uuid.New()
 	dormitoryID := int64(7)
-	teamID := uuid.New()
 	residentID := uuid.New()
 
 	currentUser := user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &dormitoryID, now)
-	resident := user.RestoreUser(residentID, "resident", "hash", "Petr", nil, "Petrov", &teamID, nil, nil, &dormitoryID, now)
+	resident := user.RestoreUser(residentID, "resident", "hash", "Petr", nil, "Petrov", nil, nil, nil, &dormitoryID, now)
 	queryService := &penaltyQueryServiceStub{
-		residentBy: []dto.PenaltyItem{
-			{ID: uuid.NewString(), Reason: "Просрочил уборку", Weight: 2, IssuedOn: "2026-08-01"},
+		entries: []dto.PenaltyEntryItem{
+			{ID: uuid.NewString(), Type: "issue", Reason: "Просрочил уборку", Weight: 2, CreatedAt: now.Format(time.RFC3339)},
 		},
 	}
 
 	service := NewPenaltyService(
-		&penaltyRepositoryStub{byID: map[uuid.UUID]*penaltydomain.Penalty{}},
+		&penaltyRepositoryStub{},
 		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{
 			currentUserID: currentUser,
 			residentID:    resident,
-		}},
-		&penaltyTeamRepositoryStub{byID: map[uuid.UUID]*structure.Team{
-			teamID: structure.RestoreTeam(teamID, "Team", otherGroupID, nil, "#fff", 1),
 		}},
 		&penaltyGroupRepositoryStub{
 			byDormitory: map[int64][]*structure.Group{
@@ -339,12 +435,59 @@ func TestGetResidentPenaltiesAllowsResidentFromAnotherGroupInSameDormitory(t *te
 		queryService,
 		location,
 	)
-	service.now = func() time.Time { return now }
 
 	response, err := service.GetResidentPenalties(context.Background(), currentUserID, residentID)
 
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Equal(t, residentID.String(), response.UserID)
-	assert.Equal(t, queryService.residentBy, response.Penalties)
+	assert.Equal(t, 2.0, response.TotalWeight)
+	assert.Equal(t, queryService.entries, response.Entries)
+}
+
+func TestPenaltyBalanceFromEntries(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		entries  []dto.PenaltyEntryItem
+		expected float64
+	}{
+		{
+			name:     "single issue",
+			entries:  []dto.PenaltyEntryItem{{Type: "issue", Weight: 1.0}},
+			expected: 1.0,
+		},
+		{
+			name: "two issues",
+			entries: []dto.PenaltyEntryItem{
+				{Type: "issue", Weight: 1.0},
+				{Type: "issue", Weight: 1.0},
+			},
+			expected: 2.0,
+		},
+		{
+			name: "issue issue resolve",
+			entries: []dto.PenaltyEntryItem{
+				{Type: "issue", Weight: 1.0},
+				{Type: "issue", Weight: 1.0},
+				{Type: "resolve", Weight: 0.5},
+			},
+			expected: 1.5,
+		},
+		{
+			name: "issue resolve to zero",
+			entries: []dto.PenaltyEntryItem{
+				{Type: "issue", Weight: 1.0},
+				{Type: "resolve", Weight: 1.0},
+			},
+			expected: 0,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			assert.Equal(t, testCase.expected, penaltyBalanceFromEntries(testCase.entries))
+		})
+	}
 }

@@ -11,12 +11,51 @@ function toErrorMessage(error: unknown): string {
     return 'Не удалось выполнить запрос'
 }
 
+function isSameResident(
+    left: PenaltyResidentSummary,
+    right: PenaltyResidentSummary,
+): boolean {
+    return left.user_id === right.user_id
+        && left.full_name === right.full_name
+        && left.total_weight === right.total_weight
+        && left.threshold_reached === right.threshold_reached
+}
+
+function reconcileResidents(
+    currentResidents: PenaltyResidentSummary[],
+    nextResidents: PenaltyResidentSummary[],
+): PenaltyResidentSummary[] {
+    const currentByID = new Map(currentResidents.map((resident) => [resident.user_id, resident]))
+    const reconciledResidents = nextResidents.map((resident) => {
+        const currentResident = currentByID.get(resident.user_id)
+
+        return currentResident && isSameResident(currentResident, resident)
+            ? currentResident
+            : resident
+    })
+
+    const unchanged = currentResidents.length === reconciledResidents.length
+        && currentResidents.every((resident, index) => resident === reconciledResidents[index])
+
+    return unchanged ? currentResidents : reconciledResidents
+}
+
 export function usePenalties() {
     const [residents, setResidents] = useState<PenaltyResidentSummary[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
-    const reload = useCallback(async () => {
+    const synchronizeResidents = useCallback(async () => {
+        try {
+            const response = await getPenaltyResidents()
+            setResidents((currentResidents) => reconcileResidents(currentResidents, response.residents))
+            setError(null)
+        } catch {
+            // The current list remains usable if background synchronization fails.
+        }
+    }, [])
+
+    const loadInitialResidents = useCallback(async () => {
         setLoading(true)
         setError(null)
 
@@ -33,18 +72,18 @@ export function usePenalties() {
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
-            void reload()
+            void loadInitialResidents()
         }, 0)
 
         return () => {
             window.clearTimeout(timeoutId)
         }
-    }, [reload])
+    }, [loadInitialResidents])
 
     return {
         residents,
         loading,
         error,
-        reload,
+        synchronizeResidents,
     }
 }

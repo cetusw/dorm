@@ -1,12 +1,29 @@
 .content {
     display: flex;
     flex-direction: column;
-    gap: 16px;
 }
 
 .actions {
     display: flex;
+    align-items: center;
     justify-content: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.resolveAction {
+    display: inline-flex;
+    align-items: center;
+}
+
+.balance {
+    font-size: 1rem;
+    line-height: 1.5;
+    font-weight: 600;
+}
+
+.balanceCritical {
+    color: #991B1B;
 }
 
 .addPenaltyLink {
@@ -21,9 +38,19 @@
     transition: color 140ms ease;
 }
 
+.addPenaltyLink:disabled {
+    color: var(--mantine-color-gray-4);
+    cursor: default;
+}
+
 .addPenaltyLink:hover,
 .addPenaltyLink:focus-visible {
     color: var(--app-color-text);
+}
+
+.addPenaltyLink:disabled:hover,
+.addPenaltyLink:disabled:focus-visible {
+    color: var(--mantine-color-gray-4);
 }
 
 .addPenaltyText {

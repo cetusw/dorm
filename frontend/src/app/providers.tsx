@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { createTheme, MantineProvider } from '@mantine/core'
+import { createTheme, Drawer, MantineProvider, Menu, Modal, Popover } from '@mantine/core'
 
 type Props = {
     children: ReactNode
@@ -40,6 +40,20 @@ const theme = createTheme({
             '#36423F',
             '#1F2927',
         ],
+    },
+    components: {
+        Modal: Modal.extend({
+            defaultProps: { returnFocus: false },
+        }),
+        Drawer: Drawer.extend({
+            defaultProps: { returnFocus: false },
+        }),
+        Menu: Menu.extend({
+            defaultProps: { returnFocus: false },
+        }),
+        Popover: Popover.extend({
+            defaultProps: { returnFocus: false },
+        }),
     },
 })
 

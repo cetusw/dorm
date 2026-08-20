@@ -2,12 +2,14 @@ import { apiRequest } from '../../../shared/api/apiClient'
 import type {
     CreatePenaltyRequest,
     CurrentUserPenaltiesResponse,
-    PenaltyItem,
+    PenaltyEntryItem,
     PenaltyResidentDetailsResponse,
     PenaltyResidentOption,
     PenaltyResidentOptionsResponse,
     PenaltyResidentSummary,
     PenaltyResidentsResponse,
+    ResolvePenaltyRequest,
+    UpdatePenaltyEntryRequest,
 } from '../model/types'
 
 function normalizePenaltyResidentSummary(item: Record<string, unknown>): PenaltyResidentSummary {
@@ -26,12 +28,13 @@ function normalizePenaltyResidentOption(item: Record<string, unknown>): PenaltyR
     }
 }
 
-function normalizePenaltyItem(item: Record<string, unknown>): PenaltyItem {
+function normalizePenaltyEntryItem(item: Record<string, unknown>): PenaltyEntryItem {
     return {
         id: String(item.id ?? ''),
+        type: item.type === 'resolve' ? 'resolve' : 'issue',
         reason: String(item.reason ?? ''),
         weight: Number(item.weight ?? 0),
-        issued_on: String(item.issued_on ?? ''),
+        created_at: String(item.created_at ?? ''),
     }
 }
 
@@ -78,8 +81,9 @@ export async function getResidentPenalties(
     return {
         user_id: String(payload.user_id ?? ''),
         full_name: String(payload.full_name ?? ''),
-        penalties: Array.isArray(payload.penalties)
-            ? payload.penalties.map((item) => normalizePenaltyItem(item as Record<string, unknown>))
+        total_weight: Number(payload.total_weight ?? 0),
+        entries: Array.isArray(payload.entries)
+            ? payload.entries.map((item) => normalizePenaltyEntryItem(item as Record<string, unknown>))
             : [],
     }
 }
@@ -89,15 +93,16 @@ export async function getCurrentUserPenalties(): Promise<CurrentUserPenaltiesRes
     const payload = await response.json() as Record<string, unknown>
 
     return {
-        penalties: Array.isArray(payload.penalties)
-            ? payload.penalties.map((item) => normalizePenaltyItem(item as Record<string, unknown>))
+        total_weight: Number(payload.total_weight ?? 0),
+        entries: Array.isArray(payload.entries)
+            ? payload.entries.map((item) => normalizePenaltyEntryItem(item as Record<string, unknown>))
             : [],
     }
 }
 
 export async function createPenalty(
     request: CreatePenaltyRequest,
-): Promise<PenaltyItem> {
+): Promise<PenaltyEntryItem> {
     const response = await apiRequest('/api/v1/penalties', {
         method: 'POST',
         headers: {
@@ -106,13 +111,38 @@ export async function createPenalty(
         body: JSON.stringify(request),
     })
 
-    return normalizePenaltyItem(await response.json() as Record<string, unknown>)
+    return normalizePenaltyEntryItem(await response.json() as Record<string, unknown>)
 }
 
 export async function resolvePenalty(
-    penaltyId: string,
+    request: ResolvePenaltyRequest,
 ): Promise<void> {
-    await apiRequest(`/api/v1/penalties/${encodeURIComponent(penaltyId)}`, {
+    await apiRequest('/api/v1/penalties/resolve', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+    })
+}
+
+export async function deletePenaltyEntry(entryId: string): Promise<void> {
+    await apiRequest(`/api/v1/penalties/${encodeURIComponent(entryId)}`, {
         method: 'DELETE',
     })
+}
+
+export async function updatePenaltyEntry(
+    entryId: string,
+    request: UpdatePenaltyEntryRequest,
+): Promise<PenaltyEntryItem> {
+    const response = await apiRequest(`/api/v1/penalties/${encodeURIComponent(entryId)}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+    })
+
+    return normalizePenaltyEntryItem(await response.json() as Record<string, unknown>)
 }

@@ -9,11 +9,10 @@ import (
 
 type PenaltyScope struct {
 	DormitoryIDs []int64
-	GroupIDs     []uuid.UUID
 }
 
 type PenaltyQueryService interface {
-	ListResidentsWithActivePenalties(
+	ListResidentsWithPenaltyBalance(
 		ctx context.Context,
 		scope PenaltyScope,
 	) ([]dto.PenaltyResidentSummary, error)
@@ -24,8 +23,8 @@ type PenaltyQueryService interface {
 		search string,
 	) ([]dto.PenaltyResidentOption, error)
 
-	ListActivePenaltiesByUser(
+	ListPenaltyEntriesByUser(
 		ctx context.Context,
 		userID uuid.UUID,
-	) ([]dto.PenaltyItem, error)
+	) ([]dto.PenaltyEntryItem, error)
 }

@@ -26,7 +26,9 @@ func (h *PenaltyAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api.Get("/residents", h.HandleSearchResidents)
 	api.Get("/residents/:userId", h.HandleGetResidentPenalties)
 	api.Post("", h.HandleCreatePenalty)
-	api.Delete("/:penaltyId", h.HandleResolvePenalty)
+	api.Post("/resolve", h.HandleResolvePenalty)
+	api.Put("/:entryId", h.HandleUpdatePenaltyEntry)
+	api.Delete("/:entryId", h.HandleDeletePenaltyEntry)
 }
 
 func (h *PenaltyAPIHandler) HandleListResidents(c *fiber.Ctx) error {
@@ -115,16 +117,58 @@ func (h *PenaltyAPIHandler) HandleResolvePenalty(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	penaltyID, err := uuid.Parse(c.Params("penaltyId"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор предупреждения"))
+	var request dto.ResolvePenaltyRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	if err := h.penaltyUC.ResolvePenalty(c.Context(), userID, penaltyID); err != nil {
+	if err := h.penaltyUC.ResolvePenalty(c.Context(), userID, request); err != nil {
 		return h.respondPenaltyError(c, err)
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *PenaltyAPIHandler) HandleDeletePenaltyEntry(c *fiber.Ctx) error {
+	userID, err := currentUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+	}
+
+	entryID, err := uuid.Parse(c.Params("entryId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор предупреждения"))
+	}
+
+	if err := h.penaltyUC.DeletePenaltyEntry(c.Context(), userID, entryID); err != nil {
+		return h.respondPenaltyError(c, err)
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *PenaltyAPIHandler) HandleUpdatePenaltyEntry(c *fiber.Ctx) error {
+	userID, err := currentUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+	}
+
+	entryID, err := uuid.Parse(c.Params("entryId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор предупреждения"))
+	}
+
+	var request dto.UpdatePenaltyEntryRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
+	}
+
+	item, err := h.penaltyUC.UpdatePenaltyEntry(c.Context(), userID, entryID, request)
+	if err != nil {
+		return h.respondPenaltyError(c, err)
+	}
+
+	return c.JSON(item)
 }
 
 func (h *PenaltyAPIHandler) respondPenaltyError(c *fiber.Ctx, err error) error {
@@ -135,16 +179,16 @@ func (h *PenaltyAPIHandler) respondPenaltyError(c *fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректная причина предупреждения"))
 	case errors.Is(err, penaltydomain.ErrInvalidWeight):
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный вес предупреждения"))
-	case errors.Is(err, penaltydomain.ErrInvalidIssuedOn):
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректная дата предупреждения"))
-	case errors.Is(err, penaltydomain.ErrIssuedOnInFuture):
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("дата предупреждения не может быть в будущем"))
+	case errors.Is(err, penaltydomain.ErrInsufficientPenaltyBalance):
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("нельзя снять больше предупреждений, чем есть у жителя"))
+	case errors.Is(err, penaltydomain.ErrNegativePenaltyHistory):
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("изменение записи приведёт к отрицательной сумме предупреждений"))
 	case errors.Is(err, penaltydomain.ErrAccessDenied):
 		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
 	case errors.Is(err, penaltydomain.ErrResidentNotFound):
 		return c.Status(fiber.StatusNotFound).JSON(errorResponse("житель не найден"))
-	case errors.Is(err, penaltydomain.ErrPenaltyNotFound):
-		return c.Status(fiber.StatusNotFound).JSON(errorResponse("предупреждение не найдено"))
+	case errors.Is(err, penaltydomain.ErrPenaltyEntryNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(errorResponse("запись предупреждения не найдена"))
 	default:
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось выполнить операцию с предупреждениями"))
 	}

@@ -106,7 +106,6 @@ func NewContainer(configPath string) (*Container, error) {
 	penaltyService := penaltyuc.NewPenaltyService(
 		penaltyRepo,
 		userRepo,
-		teamRepo,
 		groupRepo,
 		dormitoryRepo,
 		penaltyQueryService,

@@ -1,33 +1,36 @@
 import { useState } from 'react'
 
-import { DotsThreeVerticalIcon, TrashIcon } from '@phosphor-icons/react'
+import { DotsThreeVerticalIcon, PencilIcon, TrashIcon } from '@phosphor-icons/react'
 import { ActionIcon, Loader, Menu, Table, Text } from '@mantine/core'
 
-import type { PenaltyItem } from '../model/types'
-import { formatPenaltyDate, formatPenaltyWeight } from '../model/utils'
+import type { PenaltyEntryItem } from '../model/types'
+import { formatPenaltyDate, formatPenaltyEntryWeight } from '../model/utils'
 import { ListTable, listTableClasses } from '../../../shared/ui/ListTable'
 import classes from './ResidentPenaltiesTable.module.css'
 
 type Props = {
-    penalties: PenaltyItem[]
-    pendingPenaltyId?: string | null
-    onDelete?: (penaltyId: string) => void
+    entries: PenaltyEntryItem[]
+    pendingEntryId?: string | null
+    onDelete?: (entry: PenaltyEntryItem) => void
+    onEdit?: (entry: PenaltyEntryItem) => void
     dateLabel?: string
     minWidth?: number
 }
 
 export function ResidentPenaltiesTable({
-    penalties,
-    pendingPenaltyId = null,
+    entries,
+    pendingEntryId = null,
     onDelete,
-    dateLabel = 'Дата получения',
+    onEdit,
+    dateLabel = 'Дата',
     minWidth = 720,
 }: Props) {
     const [openedMenuId, setOpenedMenuId] = useState<string | null>(null)
-    const hasActions = typeof onDelete === 'function'
+    const hasActions = typeof onDelete === 'function' || typeof onEdit === 'function'
     const maxWeightWidthCh = Math.max(
+        4,
         'Вес'.length,
-        ...penalties.map((penalty) => formatPenaltyWeight(penalty.weight).length),
+        ...entries.map((entry) => formatPenaltyEntryWeight(entry).length),
     )
     const weightColumnStyle = {
         width: `${maxWeightWidthCh}ch`,
@@ -46,28 +49,31 @@ export function ResidentPenaltiesTable({
                 </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-                {penalties.map((penalty) => {
-                    const menuOpened = openedMenuId === penalty.id
-                    const deleting = pendingPenaltyId === penalty.id
+                {entries.map((entry) => {
+                    const menuOpened = openedMenuId === entry.id
+                    const pending = pendingEntryId === entry.id
 
                     return (
                         <Table.Tr
-                            key={penalty.id}
+                            key={entry.id}
                             className={`${listTableClasses.bodyRow} ${classes.row}`}
+                            data-entry-type={entry.type}
                             data-menu-open={menuOpened ? 'true' : undefined}
                         >
                             <Table.Td className={classes.reasonColumn}>
-                                <Text className={classes.reason}>{penalty.reason}</Text>
+                                <Text className={classes.reason}>{entry.reason}</Text>
                             </Table.Td>
                             <Table.Td className={classes.weightColumn} style={weightColumnStyle}>
-                                {formatPenaltyWeight(penalty.weight)}
+                                <Text className={classes.weightValue}>
+                                    {formatPenaltyEntryWeight(entry)}
+                                </Text>
                             </Table.Td>
-                            <Table.Td className={classes.dateColumn}>{formatPenaltyDate(penalty.issued_on)}</Table.Td>
+                            <Table.Td className={classes.dateColumn}>{formatPenaltyDate(entry.created_at)}</Table.Td>
                             {hasActions ? (
                                 <Table.Td>
                                     <Menu
                                         opened={menuOpened}
-                                        onChange={(opened) => setOpenedMenuId(opened ? penalty.id : null)}
+                                        onChange={(opened) => setOpenedMenuId(opened ? entry.id : null)}
                                         withinPortal
                                         position="bottom-end"
                                     >
@@ -75,21 +81,31 @@ export function ResidentPenaltiesTable({
                                             <ActionIcon
                                                 variant="subtle"
                                                 color="gray"
-                                                aria-label={`Действия с предупреждением от ${formatPenaltyDate(penalty.issued_on)}`}
+                                                aria-label={`Действия с предупреждением от ${formatPenaltyDate(entry.created_at)}`}
                                                 className={classes.actionButton}
-                                                disabled={deleting}
+                                                disabled={pending}
                                             >
-                                                {deleting ? <Loader size={16} /> : <DotsThreeVerticalIcon size={18} />}
+                                                {pending ? <Loader size={16} /> : <DotsThreeVerticalIcon size={18} />}
                                             </ActionIcon>
                                         </Menu.Target>
                                         <Menu.Dropdown>
-                                            <Menu.Item
-                                                color="red"
-                                                leftSection={<TrashIcon size={20} />}
-                                                onClick={() => onDelete?.(penalty.id)}
-                                            >
-                                                Удалить
-                                            </Menu.Item>
+                                            {typeof onEdit === 'function' ? (
+                                                <Menu.Item
+                                                    leftSection={<PencilIcon size={18} />}
+                                                    onClick={() => onEdit(entry)}
+                                                >
+                                                    Редактировать
+                                                </Menu.Item>
+                                            ) : null}
+                                            {typeof onDelete === 'function' ? (
+                                                <Menu.Item
+                                                    color="red"
+                                                    leftSection={<TrashIcon size={18} />}
+                                                    onClick={() => onDelete(entry)}
+                                                >
+                                                    Удалить
+                                                </Menu.Item>
+                                            ) : null}
                                         </Menu.Dropdown>
                                     </Menu>
                                 </Table.Td>

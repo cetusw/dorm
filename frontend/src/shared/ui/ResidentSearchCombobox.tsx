@@ -18,6 +18,7 @@ export type ResidentSearchOption = {
 }
 
 type Props = {
+    overlayOpened?: boolean
     label?: string
     withAsterisk?: boolean
     disabled?: boolean
@@ -32,9 +33,11 @@ type Props = {
     onSearchChange: (value: string) => void
     onOptionSelect: (option: ResidentSearchOption) => void
     onFocus?: () => void
+    inputClassName?: string
 }
 
 export function ResidentSearchCombobox({
+    overlayOpened = true,
     label,
     withAsterisk = false,
     disabled = false,
@@ -49,6 +52,7 @@ export function ResidentSearchCombobox({
     onSearchChange,
     onOptionSelect,
     onFocus,
+    inputClassName,
 }: Props) {
     const combobox = useCombobox()
     const [focused, setFocused] = useState(false)
@@ -58,7 +62,7 @@ export function ResidentSearchCombobox({
         && searchValue.trim() === selectedLabel.trim()
 
     useEffect(() => {
-        if (!focused) {
+        if (!overlayOpened || !focused) {
             combobox.closeDropdown()
             return
         }
@@ -69,7 +73,7 @@ export function ResidentSearchCombobox({
         }
 
         combobox.openDropdown()
-    }, [combobox, disabled, focused, hasCommittedSelection])
+    }, [combobox, disabled, focused, hasCommittedSelection, overlayOpened])
 
     const normalizedOptions = useMemo(
         () => options.map((option) => (
@@ -100,7 +104,7 @@ export function ResidentSearchCombobox({
                 onOptionSelect(option)
                 combobox.closeDropdown()
             }}
-            withinPortal={false}
+            withinPortal
         >
             <Combobox.Target>
                 <InputBase
@@ -134,20 +138,23 @@ export function ResidentSearchCombobox({
                     aria-autocomplete="list"
                     autoComplete="off"
                     data-selected-id={selectedId ?? undefined}
+                    classNames={inputClassName ? { input: inputClassName } : undefined}
                 />
             </Combobox.Target>
 
-            <Combobox.Dropdown>
-                <Combobox.Options>
-                    {normalizedOptions.length > 0 ? (
-                        normalizedOptions
-                    ) : (
-                        <Combobox.Empty>
-                            {loading ? 'Загрузка...' : 'Ничего не найдено'}
-                        </Combobox.Empty>
-                    )}
-                </Combobox.Options>
-            </Combobox.Dropdown>
+            {overlayOpened ? (
+                <Combobox.Dropdown>
+                    <Combobox.Options>
+                        {normalizedOptions.length > 0 ? (
+                            normalizedOptions
+                        ) : (
+                            <Combobox.Empty>
+                                {loading ? 'Загрузка...' : 'Ничего не найдено'}
+                            </Combobox.Empty>
+                        )}
+                    </Combobox.Options>
+                </Combobox.Dropdown>
+            ) : null}
         </Combobox>
     )
 }

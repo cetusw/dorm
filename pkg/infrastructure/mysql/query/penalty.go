@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"dorm/pkg/core/ports/dto"
 	queryports "dorm/pkg/core/ports/query"
@@ -20,11 +21,11 @@ func NewPenaltyQueryService(db *sql.DB) *PenaltyQueryService {
 	return &PenaltyQueryService{db: db}
 }
 
-func (q *PenaltyQueryService) ListResidentsWithActivePenalties(
+func (q *PenaltyQueryService) ListResidentsWithPenaltyBalance(
 	ctx context.Context,
 	scope queryports.PenaltyScope,
 ) ([]dto.PenaltyResidentSummary, error) {
-	baseArgs, scopeJoin, scopeWhere, err := buildPenaltyScopeFilter(scope)
+	baseArgs, scopeWhere, err := buildPenaltyScopeFilter(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -40,15 +41,19 @@ func (q *PenaltyQueryService) ListResidentsWithActivePenalties(
 					ELSE CONCAT(' ', u.middle_name)
 				END
 			)) AS full_name,
-			COALESCE(SUM(p.weight), 0) AS total_weight
-		FROM penalty p
-		JOIN user u ON u.id = p.user_id
-	` + scopeJoin + `
-		WHERE p.resolved_at IS NULL
-		  AND u.deleted_at IS NULL
+			COALESCE(SUM(
+				CASE
+					WHEN pe.type = 'ISSUE' THEN pe.weight
+					WHEN pe.type = 'RESOLVE' THEN -pe.weight
+					ELSE 0
+				END
+			), 0) AS total_weight
+		FROM penalty_entry pe
+		JOIN user u ON u.id = pe.user_id
+		WHERE u.deleted_at IS NULL
 		  AND ` + scopeWhere + `
 		GROUP BY u.id, u.last_name, u.first_name, u.middle_name
-		HAVING SUM(p.weight) > 0
+		HAVING total_weight > 0
 		ORDER BY total_weight DESC, u.last_name ASC, u.first_name ASC, u.middle_name ASC, u.id ASC
 	`
 
@@ -88,7 +93,7 @@ func (q *PenaltyQueryService) SearchEligibleResidents(
 	scope queryports.PenaltyScope,
 	search string,
 ) ([]dto.PenaltyResidentOption, error) {
-	baseArgs, scopeJoin, scopeWhere, err := buildPenaltyScopeFilter(scope)
+	baseArgs, scopeWhere, err := buildPenaltyScopeFilter(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +110,6 @@ func (q *PenaltyQueryService) SearchEligibleResidents(
 				END
 			)) AS full_name
 		FROM user u
-	` + scopeJoin + `
 		WHERE u.deleted_at IS NULL
 		  AND ` + scopeWhere
 
@@ -168,16 +172,15 @@ func (q *PenaltyQueryService) SearchEligibleResidents(
 	return items, nil
 }
 
-func (q *PenaltyQueryService) ListActivePenaltiesByUser(
+func (q *PenaltyQueryService) ListPenaltyEntriesByUser(
 	ctx context.Context,
 	userID uuid.UUID,
-) ([]dto.PenaltyItem, error) {
+) ([]dto.PenaltyEntryItem, error) {
 	const query = `
-		SELECT id, reason, weight, DATE_FORMAT(issued_on, '%Y-%m-%d')
-		FROM penalty
+		SELECT id, type, reason, weight, created_at
+		FROM penalty_entry
 		WHERE user_id = ?
-		  AND resolved_at IS NULL
-		ORDER BY issued_on DESC, created_at DESC, id ASC
+		ORDER BY created_at DESC, id ASC
 	`
 
 	userIDBytes, err := userID.MarshalBinary()
@@ -187,41 +190,39 @@ func (q *PenaltyQueryService) ListActivePenaltiesByUser(
 
 	rows, err := q.db.QueryContext(ctx, query, userIDBytes)
 	if err != nil {
-		return nil, fmt.Errorf("list active penalties by user: %w", err)
+		return nil, fmt.Errorf("list penalty entries by user: %w", err)
 	}
 	defer rows.Close()
 
-	items := make([]dto.PenaltyItem, 0)
+	items := make([]dto.PenaltyEntryItem, 0)
 	for rows.Next() {
 		var idBytes []byte
-		var item dto.PenaltyItem
-		var issuedOn string
-		if err := rows.Scan(&idBytes, &item.Reason, &item.Weight, &issuedOn); err != nil {
-			return nil, fmt.Errorf("scan active penalty: %w", err)
+		var entryType string
+		var item dto.PenaltyEntryItem
+		var createdAt time.Time
+		if err := rows.Scan(&idBytes, &entryType, &item.Reason, &item.Weight, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan penalty entry: %w", err)
 		}
 
-		penaltyID, err := uuid.FromBytes(idBytes)
+		entryID, err := uuid.FromBytes(idBytes)
 		if err != nil {
-			return nil, fmt.Errorf("decode active penalty id: %w", err)
+			return nil, fmt.Errorf("decode penalty entry id: %w", err)
 		}
 
-		item.ID = penaltyID.String()
-		item.IssuedOn = issuedOn
+		item.ID = entryID.String()
+		item.Type = strings.ToLower(entryType)
+		item.CreatedAt = createdAt.Format(time.RFC3339)
 		items = append(items, item)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate active penalties: %w", err)
+		return nil, fmt.Errorf("iterate penalty entries: %w", err)
 	}
 
 	return items, nil
 }
 
-func buildPenaltyScopeFilter(scope queryports.PenaltyScope) ([]interface{}, string, string, error) {
-	if len(scope.DormitoryIDs) > 0 && len(scope.GroupIDs) > 0 {
-		return nil, "", "", fmt.Errorf("penalty scope cannot mix dormitory and group filters")
-	}
-
+func buildPenaltyScopeFilter(scope queryports.PenaltyScope) ([]interface{}, string, error) {
 	if len(scope.DormitoryIDs) > 0 {
 		placeholders := make([]string, len(scope.DormitoryIDs))
 		args := make([]interface{}, 0, len(scope.DormitoryIDs))
@@ -229,25 +230,8 @@ func buildPenaltyScopeFilter(scope queryports.PenaltyScope) ([]interface{}, stri
 			placeholders[index] = "?"
 			args = append(args, dormitoryID)
 		}
-		return args, "", "u.dormitory_id IN (" + strings.Join(placeholders, ", ") + ")", nil
+		return args, "u.dormitory_id IN (" + strings.Join(placeholders, ", ") + ")", nil
 	}
 
-	if len(scope.GroupIDs) > 0 {
-		placeholders := make([]string, len(scope.GroupIDs))
-		args := make([]interface{}, 0, len(scope.GroupIDs))
-		for index, groupID := range scope.GroupIDs {
-			groupIDBytes, err := groupID.MarshalBinary()
-			if err != nil {
-				return nil, "", "", fmt.Errorf("marshal scope group id: %w", err)
-			}
-			placeholders[index] = "?"
-			args = append(args, groupIDBytes)
-		}
-		return args,
-			"JOIN team t ON t.id = u.team_id",
-			"t.group_id IN (" + strings.Join(placeholders, ", ") + ")",
-			nil
-	}
-
-	return nil, "", "", fmt.Errorf("penalty scope is empty")
+	return nil, "", fmt.Errorf("penalty scope is empty")
 }

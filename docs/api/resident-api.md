@@ -184,7 +184,7 @@
 
 ### `GET /api/v1/penalties`
 
-- Назначение: список жителей с активными предупреждениями в доступном scope.
+- Назначение: список жителей с положительным балансом предупреждений в доступном scope.
 - Auth: обязательна.
 - Permissions:
   - глава общежития или глава группы своего текущего общежития
@@ -202,11 +202,12 @@
 
 ### `GET /api/v1/penalties/residents/:userId`
 
-- Назначение: активные предупреждения конкретного жителя.
+- Назначение: история изменений предупреждений конкретного жителя и его текущий баланс.
 - Response:
   - `user_id`
   - `full_name`
-  - `penalties[]`
+  - `total_weight`
+  - `entries[]` с `id`, `type`, `reason`, `weight`, `created_at`
 
 ### `POST /api/v1/penalties`
 
@@ -215,13 +216,36 @@
   - `user_id`
   - `reason`
   - `weight`
-  - `issued_on` (`YYYY-MM-DD`)
 - Response `201`:
-  - `id`, `reason`, `weight`, `issued_on`
+  - `id`, `type`, `reason`, `weight`, `created_at`
 
-### `DELETE /api/v1/penalties/:penaltyId`
+### `POST /api/v1/penalties/resolve`
 
-- Назначение: закрыть предупреждение.
+- Назначение: снять часть текущего баланса предупреждений жителя.
+- Body:
+  - `user_id`
+  - `reason`
+  - `weight`
+
+### `PUT /api/v1/penalties/:entryId`
+
+- Назначение: изменить причину или вес записи предупреждения.
+- Body:
+  - `reason`
+  - `weight`
+- Response `200`:
+  - `id`, `type`, `reason`, `weight`, `created_at`
+- Ошибки:
+  - `400` некорректные данные или изменение приведёт к отрицательному балансу
+  - `404` запись не найдена
+
+### `DELETE /api/v1/penalties/:entryId`
+
+- Назначение: удалить запись предупреждения.
+- Response: `204`.
+- Ошибки:
+  - `400` удаление приведёт к отрицательному балансу
+  - `404` запись не найдена
 
 ## Склад
 

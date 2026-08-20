@@ -294,6 +294,7 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                     )}
 
                     <ResidentSearchCombobox
+                        overlayOpened={opened}
                         searchValue={searchValue}
                         options={searchOptions}
                         loading={searchLoading}

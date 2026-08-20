@@ -119,19 +119,18 @@
 
 Это одноразовая настройка ближайшего включения/исключения задачи.
 
-### `penalty`
+### `penalty_entry`
 
 - `id`
 - `user_id`
+- `type ENUM('ISSUE', 'RESOLVE')`
 - `weight DECIMAL(10,1)`
 - `reason VARCHAR(256)`
-- `issued_on DATE`
 - `created_at`
-- `resolved_at NULL`
 
 Индекс:
 
-- `idx_penalty_user_resolved (user_id, resolved_at)`
+- `idx_penalty_entry_user_created (user_id, created_at, id)`
 
 ### `push_subscription`
 
@@ -192,7 +191,7 @@ erDiagram
     user o|--o{ duty_task : assigned_to
     user o|--o{ duty_task : reviewed_by
 
-    user ||--o{ penalty : receives
+    user ||--o{ penalty_entry : receives
     user ||--o{ push_subscription : owns
     user ||--o{ notification : receives
 ```

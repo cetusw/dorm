@@ -2,7 +2,6 @@ package penalty
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,7 +18,6 @@ import (
 type Service struct {
 	penaltyRepo   penaltydomain.Repository
 	userRepo      user.Repository
-	teamRepo      structure.TeamRepository
 	groupRepo     structure.GroupRepository
 	dormitoryRepo structure.DormitoryRepository
 	queryService  queryports.PenaltyQueryService
@@ -30,7 +28,6 @@ type Service struct {
 func NewPenaltyService(
 	penaltyRepo penaltydomain.Repository,
 	userRepo user.Repository,
-	teamRepo structure.TeamRepository,
 	groupRepo structure.GroupRepository,
 	dormitoryRepo structure.DormitoryRepository,
 	queryService queryports.PenaltyQueryService,
@@ -39,7 +36,6 @@ func NewPenaltyService(
 	return &Service{
 		penaltyRepo:   penaltyRepo,
 		userRepo:      userRepo,
-		teamRepo:      teamRepo,
 		groupRepo:     groupRepo,
 		dormitoryRepo: dormitoryRepo,
 		queryService:  queryService,
@@ -57,7 +53,7 @@ func (s *Service) ListResidents(
 		return dto.PenaltyResidentsResponse{}, err
 	}
 
-	items, err := s.queryService.ListResidentsWithActivePenalties(ctx, scope)
+	items, err := s.queryService.ListResidentsWithPenaltyBalance(ctx, scope)
 	if err != nil {
 		return dto.PenaltyResidentsResponse{}, fmt.Errorf("list residents with penalties: %w", err)
 	}
@@ -98,15 +94,16 @@ func (s *Service) GetResidentPenalties(
 		return nil, err
 	}
 
-	items, err := s.queryService.ListActivePenaltiesByUser(ctx, resident.ID())
+	items, err := s.queryService.ListPenaltyEntriesByUser(ctx, resident.ID())
 	if err != nil {
 		return nil, fmt.Errorf("list resident penalties: %w", err)
 	}
 
 	return &dto.PenaltyResidentDetailsResponse{
-		UserID:    resident.ID().String(),
-		FullName:  buildUserFullName(resident),
-		Penalties: items,
+		UserID:      resident.ID().String(),
+		FullName:    buildUserFullName(resident),
+		TotalWeight: penaltyBalanceFromEntries(items),
+		Entries:     items,
 	}, nil
 }
 
@@ -122,13 +119,14 @@ func (s *Service) GetCurrentUserPenalties(
 		return nil, penaltydomain.ErrAccessDenied
 	}
 
-	items, err := s.queryService.ListActivePenaltiesByUser(ctx, currentUserID)
+	items, err := s.queryService.ListPenaltyEntriesByUser(ctx, currentUserID)
 	if err != nil {
 		return nil, fmt.Errorf("list current user penalties: %w", err)
 	}
 
 	return &dto.CurrentUserPenaltiesResponse{
-		Penalties: items,
+		TotalWeight: penaltyBalanceFromEntries(items),
+		Entries:     items,
 	}, nil
 }
 
@@ -136,7 +134,7 @@ func (s *Service) CreatePenalty(
 	ctx context.Context,
 	currentUserID uuid.UUID,
 	request dto.CreatePenaltyRequest,
-) (*dto.PenaltyItem, error) {
+) (*dto.PenaltyEntryItem, error) {
 	scope, err := s.resolveScope(ctx, currentUserID)
 	if err != nil {
 		return nil, err
@@ -152,27 +150,19 @@ func (s *Service) CreatePenalty(
 		return nil, err
 	}
 
-	issuedOn, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(request.IssuedOn), s.location)
-	if err != nil {
-		return nil, penaltydomain.ErrInvalidIssuedOn
-	}
-	if isDateInFuture(issuedOn, s.now().In(s.location), s.location) {
-		return nil, penaltydomain.ErrIssuedOnInFuture
-	}
-
 	createdAt := s.now().In(s.location)
 	entity, err := penaltydomain.NewPenalty(
 		resident.ID(),
+		penaltydomain.EntryTypeIssue,
 		request.Weight,
 		request.Reason,
-		issuedOn,
 		createdAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.penaltyRepo.Save(ctx, entity); err != nil {
+	if err := s.penaltyRepo.Create(ctx, entity); err != nil {
 		return nil, fmt.Errorf("create penalty: %w", err)
 	}
 
@@ -182,35 +172,110 @@ func (s *Service) CreatePenalty(
 func (s *Service) ResolvePenalty(
 	ctx context.Context,
 	currentUserID uuid.UUID,
-	penaltyID uuid.UUID,
+	request dto.ResolvePenaltyRequest,
 ) error {
 	scope, err := s.resolveScope(ctx, currentUserID)
 	if err != nil {
 		return err
 	}
 
-	entity, err := s.penaltyRepo.FindByID(ctx, penaltyID)
+	residentID, err := uuid.Parse(strings.TrimSpace(request.UserID))
 	if err != nil {
-		return fmt.Errorf("find penalty: %w", err)
-	}
-	if entity == nil {
-		return penaltydomain.ErrPenaltyNotFound
+		return penaltydomain.ErrInvalidResidentID
 	}
 
-	if _, err := s.loadAccessibleResident(ctx, scope, entity.UserID()); err != nil {
+	resident, err := s.loadAccessibleResident(ctx, scope, residentID)
+	if err != nil {
 		return err
 	}
 
-	if entity.IsResolved() {
-		return nil
+	entity, err := penaltydomain.NewPenalty(
+		resident.ID(),
+		penaltydomain.EntryTypeResolve,
+		request.Weight,
+		request.Reason,
+		s.now().In(s.location),
+	)
+	if err != nil {
+		return err
 	}
 
-	entity.Resolve(s.now().In(s.location))
-	if err := s.penaltyRepo.Save(ctx, entity); err != nil {
+	if err := s.penaltyRepo.CreateResolve(ctx, entity); err != nil {
 		return fmt.Errorf("resolve penalty: %w", err)
 	}
 
 	return nil
+}
+
+func (s *Service) DeletePenaltyEntry(
+	ctx context.Context,
+	currentUserID uuid.UUID,
+	entryID uuid.UUID,
+) error {
+	scope, err := s.resolveScope(ctx, currentUserID)
+	if err != nil {
+		return err
+	}
+
+	entry, err := s.penaltyRepo.FindByID(ctx, entryID)
+	if err != nil {
+		return fmt.Errorf("find penalty entry: %w", err)
+	}
+	if entry == nil {
+		return penaltydomain.ErrPenaltyEntryNotFound
+	}
+
+	if _, err := s.loadAccessibleResident(ctx, scope, entry.UserID()); err != nil {
+		return err
+	}
+
+	if err := s.penaltyRepo.Delete(ctx, entryID); err != nil {
+		return fmt.Errorf("delete penalty entry: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) UpdatePenaltyEntry(
+	ctx context.Context,
+	currentUserID uuid.UUID,
+	entryID uuid.UUID,
+	request dto.UpdatePenaltyEntryRequest,
+) (*dto.PenaltyEntryItem, error) {
+	scope, err := s.resolveScope(ctx, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := s.penaltyRepo.FindByID(ctx, entryID)
+	if err != nil {
+		return nil, fmt.Errorf("find penalty entry: %w", err)
+	}
+	if entry == nil {
+		return nil, penaltydomain.ErrPenaltyEntryNotFound
+	}
+
+	if _, err := s.loadAccessibleResident(ctx, scope, entry.UserID()); err != nil {
+		return nil, err
+	}
+
+	updatedEntry, err := penaltydomain.RestorePenalty(
+		entry.ID(),
+		entry.UserID(),
+		entry.Type(),
+		request.Weight,
+		request.Reason,
+		entry.CreatedAt(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.penaltyRepo.Update(ctx, updatedEntry); err != nil {
+		return nil, fmt.Errorf("update penalty entry: %w", err)
+	}
+
+	return penaltyItemFromDomain(updatedEntry), nil
 }
 
 func (s *Service) resolveScope(ctx context.Context, currentUserID uuid.UUID) (queryports.PenaltyScope, error) {
@@ -280,20 +345,12 @@ func (s *Service) loadAccessibleResident(
 		return nil, penaltydomain.ErrAccessDenied
 	}
 
-	if resident.TeamID() == nil {
+	if resident.DormitoryID() == nil {
 		return nil, penaltydomain.ErrAccessDenied
 	}
 
-	team, err := s.teamRepo.FindByID(ctx, *resident.TeamID())
-	if err != nil {
-		return nil, fmt.Errorf("load resident team for penalty: %w", err)
-	}
-	if team == nil {
-		return nil, penaltydomain.ErrAccessDenied
-	}
-
-	for _, groupID := range scope.GroupIDs {
-		if team.GroupID() == groupID {
+	for _, dormitoryID := range scope.DormitoryIDs {
+		if *resident.DormitoryID() == dormitoryID {
 			return resident, nil
 		}
 	}
@@ -301,12 +358,13 @@ func (s *Service) loadAccessibleResident(
 	return nil, penaltydomain.ErrAccessDenied
 }
 
-func penaltyItemFromDomain(entity *penaltydomain.Penalty) *dto.PenaltyItem {
-	return &dto.PenaltyItem{
-		ID:       entity.ID().String(),
-		Reason:   entity.Reason(),
-		Weight:   entity.Weight(),
-		IssuedOn: entity.IssuedOn().Format("2006-01-02"),
+func penaltyItemFromDomain(entity *penaltydomain.Penalty) *dto.PenaltyEntryItem {
+	return &dto.PenaltyEntryItem{
+		ID:        entity.ID().String(),
+		Type:      strings.ToLower(string(entity.Type())),
+		Reason:    entity.Reason(),
+		Weight:    entity.Weight(),
+		CreatedAt: entity.CreatedAt().Format(time.RFC3339),
 	}
 }
 
@@ -318,12 +376,15 @@ func buildUserFullName(resident *user.User) string {
 	return strings.Join(parts, " ")
 }
 
-func isDateInFuture(value time.Time, now time.Time, location *time.Location) bool {
-	issuedDate := time.Date(value.In(location).Year(), value.In(location).Month(), value.In(location).Day(), 0, 0, 0, 0, location)
-	currentDate := time.Date(now.In(location).Year(), now.In(location).Month(), now.In(location).Day(), 0, 0, 0, 0, location)
-	return issuedDate.After(currentDate)
-}
-
-func IsAccessError(err error) bool {
-	return errors.Is(err, penaltydomain.ErrAccessDenied)
+func penaltyBalanceFromEntries(entries []dto.PenaltyEntryItem) float64 {
+	balance := 0.0
+	for _, entry := range entries {
+		switch entry.Type {
+		case "resolve":
+			balance -= entry.Weight
+		default:
+			balance += entry.Weight
+		}
+	}
+	return balance
 }

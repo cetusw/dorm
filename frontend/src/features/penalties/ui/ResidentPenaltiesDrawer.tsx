@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { RowsPlusBottomIcon } from '@phosphor-icons/react'
-import { Alert, Center, Drawer, FocusTrap, Loader, Stack } from '@mantine/core'
+import { RowsPlusBottomIcon, ScalesIcon } from '@phosphor-icons/react'
+import { Alert, Center, Drawer, FocusTrap, Loader, Stack, Tooltip } from '@mantine/core'
 import { Text } from '@mantine/core'
 
 import { ApiError } from '../../../shared/api/ApiError'
-import { getResidentPenalties, resolvePenalty } from '../api/penaltiesApi'
-import type { PenaltyResidentDetailsResponse } from '../model/types'
+import { deletePenaltyEntry, getResidentPenalties } from '../api/penaltiesApi'
+import { formatPenaltyWeight } from '../model/utils'
+import type { PenaltyEntryItem, PenaltyResidentDetailsResponse } from '../model/types'
 import { CreatePenaltyDrawer } from './CreatePenaltyDrawer'
 import { ResidentPenaltiesTable } from './ResidentPenaltiesTable'
 import classes from './ResidentPenaltiesDrawer.module.css'
@@ -17,6 +18,11 @@ type Props = {
     onClose: () => void
     onChanged: () => Promise<void> | void
 }
+
+type ActionModalState =
+    | { mode: 'create'; entryType: 'issue' | 'resolve'; entry: null }
+    | { mode: 'edit'; entryType: 'issue' | 'resolve'; entry: PenaltyEntryItem }
+    | null
 
 function toErrorMessage(error: unknown): string {
     if (error instanceof ApiError) {
@@ -45,26 +51,30 @@ export function ResidentPenaltiesDrawer({
     const [data, setData] = useState<PenaltyResidentDetailsResponse | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [pendingPenaltyId, setPendingPenaltyId] = useState<string | null>(null)
-    const [createDrawerOpened, setCreateDrawerOpened] = useState(false)
-    const [hasChanges, setHasChanges] = useState(false)
+    const [actionModalState, setActionModalState] = useState<ActionModalState>(null)
+    const [pendingEntryId, setPendingEntryId] = useState<string | null>(null)
+
+    const reloadResidentPenalties = useCallback(async () => {
+        if (!residentId) {
+            return
+        }
+
+        const response = await getResidentPenalties(residentId)
+        setData(response)
+    }, [residentId])
 
     const resetState = useCallback(() => {
         setData(null)
         setLoading(false)
         setError(null)
-        setPendingPenaltyId(null)
-        setCreateDrawerOpened(false)
-        setHasChanges(false)
+        setActionModalState(null)
+        setPendingEntryId(null)
     }, [])
 
     const handleClose = useCallback(() => {
-        if (hasChanges) {
-            void onChanged()
-        }
         resetState()
         onClose()
-    }, [hasChanges, onChanged, onClose, resetState])
+    }, [onClose, resetState])
 
     useEffect(() => {
         if (!opened || !residentId) {
@@ -83,18 +93,10 @@ export function ResidentPenaltiesDrawer({
                         setData(response)
                     }
                 })
-                .catch(async (currentError) => {
-                    if (cancelled) {
-                        return
+                .catch((currentError) => {
+                    if (!cancelled) {
+                        setError(toErrorMessage(currentError))
                     }
-
-                    if (currentError instanceof ApiError && currentError.status === 404) {
-                        setHasChanges(true)
-                        handleClose()
-                        return
-                    }
-
-                    setError(toErrorMessage(currentError))
                 })
                 .finally(() => {
                     if (!cancelled) {
@@ -107,45 +109,29 @@ export function ResidentPenaltiesDrawer({
             cancelled = true
             window.clearTimeout(timeoutId)
         }
-    }, [handleClose, onChanged, opened, residentId])
+    }, [opened, residentId])
 
-    async function handleDelete(penaltyId: string) {
-        setPendingPenaltyId(penaltyId)
+    async function handleDelete(entry: PenaltyEntryItem) {
+        setPendingEntryId(entry.id)
         setError(null)
 
         try {
-            await resolvePenalty(penaltyId)
-            let shouldClose = false
-
-            setData((currentData) => {
-                if (currentData == null) {
-                    return currentData
-                }
-
-                const penalties = currentData.penalties.filter((penalty) => penalty.id !== penaltyId)
-                shouldClose = penalties.length === 0
-
-                return {
-                    ...currentData,
-                    penalties,
-                }
-            })
-            setHasChanges(true)
-
-            if (shouldClose) {
-                handleClose()
-            }
+            await deletePenaltyEntry(entry.id)
+            await reloadResidentPenalties()
+            await onChanged()
         } catch (currentError) {
-            if (currentError instanceof ApiError && currentError.status === 404) {
-                setHasChanges(true)
-                handleClose()
-                return
-            }
-
             setError(toErrorMessage(currentError))
         } finally {
-            setPendingPenaltyId(null)
+            setPendingEntryId(null)
         }
+    }
+
+    function handleEdit(entry: PenaltyEntryItem) {
+        setActionModalState({
+            mode: 'edit',
+            entryType: entry.type,
+            entry,
+        })
     }
 
     return (
@@ -155,12 +141,13 @@ export function ResidentPenaltiesDrawer({
             position="right"
             size={760}
             title={data?.full_name ?? 'Предупреждения'}
+            closeOnEscape={actionModalState === null}
         >
             <FocusTrap.InitialFocus />
 
-            <Stack gap="md" className={classes.content}>
+            <Stack gap={0} className={classes.content}>
                 {error ? (
-                    <Alert color="red">{error}</Alert>
+                    <Alert color="red" mb="md">{error}</Alert>
                 ) : null}
 
                 {loading ? (
@@ -168,11 +155,23 @@ export function ResidentPenaltiesDrawer({
                         <Loader />
                     </Center>
                 ) : data ? (
-                    <ResidentPenaltiesTable
-                        penalties={data.penalties}
-                        pendingPenaltyId={pendingPenaltyId}
-                        onDelete={handleDelete}
-                    />
+                    <>
+                        <Text
+                            mb="md"
+                            className={[
+                                classes.balance,
+                                data.total_weight >= 6 ? classes.balanceCritical : '',
+                            ].join(' ').trim()}
+                        >
+                            Сумма предупреждений: {formatPenaltyWeight(data.total_weight)}
+                        </Text>
+                        <ResidentPenaltiesTable
+                            entries={data.entries}
+                            pendingEntryId={pendingEntryId}
+                            onDelete={handleDelete}
+                            onEdit={handleEdit}
+                        />
+                    </>
                 ) : null}
 
                 {!loading && data ? (
@@ -180,33 +179,66 @@ export function ResidentPenaltiesDrawer({
                         <button
                             type="button"
                             className={classes.addPenaltyLink}
-                            onClick={() => setCreateDrawerOpened(true)}
+                            onClick={() => {
+                                setActionModalState({
+                                    mode: 'create',
+                                    entryType: 'issue',
+                                    entry: null,
+                                })
+                            }}
                         >
                             <RowsPlusBottomIcon size={25} />
                             <Text className={classes.addPenaltyText}>Выдать предупреждение</Text>
                         </button>
+
+                        <Tooltip
+                            label="У жителя погашены все предупреждения"
+                            disabled={data.total_weight > 0}
+                            withArrow
+                        >
+                            <span className={classes.resolveAction}>
+                                <button
+                                    type="button"
+                                    className={classes.addPenaltyLink}
+                                    onClick={() => {
+                                        setActionModalState({
+                                            mode: 'create',
+                                            entryType: 'resolve',
+                                            entry: null,
+                                        })
+                                    }}
+                                    disabled={data.total_weight <= 0}
+                                >
+                                    <ScalesIcon size={25} />
+                                    <Text className={classes.addPenaltyText}>Погасить предупреждение</Text>
+                                </button>
+                            </span>
+                        </Tooltip>
                     </div>
                 ) : null}
             </Stack>
 
             {data ? (
                 <CreatePenaltyDrawer
-                    opened={createDrawerOpened}
-                    onClose={() => setCreateDrawerOpened(false)}
+                    opened={actionModalState !== null}
+                    onClose={() => {
+                        setActionModalState(null)
+                    }}
                     onCreated={async () => {
-                        if (!residentId) {
-                            return
-                        }
-
-                        const response = await getResidentPenalties(residentId)
-                        setData(response)
-                        setHasChanges(true)
+                        await reloadResidentPenalties()
+                        await onChanged()
                     }}
                     residentPreset={{
                         id: data.user_id,
                         name: data.full_name,
                     }}
-                    lockResident
+                    lockResident={actionModalState?.mode === 'edit'}
+                    mode={actionModalState?.mode ?? 'create'}
+                    entryType={actionModalState?.entryType ?? 'issue'}
+                    entryId={actionModalState?.entry?.id ?? null}
+                    maxWeight={data.total_weight}
+                    initialWeight={actionModalState?.entry?.weight ?? null}
+                    initialReason={actionModalState?.entry?.reason ?? ''}
                 />
             ) : null}
         </Drawer>

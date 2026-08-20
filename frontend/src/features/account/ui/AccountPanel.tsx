@@ -13,7 +13,7 @@ import { navigateTo } from '../../../app/navigation'
 import { logoutResident } from '../../auth/api/authApi'
 import type { CurrentUser } from '../../current-user/model/types'
 import { getCurrentUserPenalties } from '../../penalties/api/penaltiesApi'
-import type { PenaltyItem } from '../../penalties/model/types'
+import type { PenaltyEntryItem } from '../../penalties/model/types'
 import { formatPenaltyWeight } from '../../penalties/model/utils'
 import { ResidentPenaltiesTable } from '../../penalties/ui/ResidentPenaltiesTable'
 import classes from './AccountPanel.module.css'
@@ -61,10 +61,6 @@ function toErrorMessage(error: unknown): string {
     return 'Не удалось загрузить предупреждения'
 }
 
-function getPenaltyTotalWeight(penalties: PenaltyItem[]): number {
-    return penalties.reduce((sum, penalty) => sum + penalty.weight, 0)
-}
-
 function getPenaltyNoun(value: number): string {
     if (!Number.isInteger(value)) {
         return 'предупреждения'
@@ -99,11 +95,11 @@ function handleBack() {
 }
 
 export function AccountPanel({ currentUser, variant, onClose }: Props) {
-    const [penalties, setPenalties] = useState<PenaltyItem[]>([])
+    const [penalties, setPenalties] = useState<PenaltyEntryItem[]>([])
+    const [penaltyTotalWeight, setPenaltyTotalWeight] = useState(0)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const avatarColor = useMemo(() => getAvatarColor(currentUser), [currentUser])
-    const penaltyTotalWeight = useMemo(() => getPenaltyTotalWeight(penalties), [penalties])
     const hasPenalties = penaltyTotalWeight > 0
 
     useEffect(() => {
@@ -119,7 +115,8 @@ export function AccountPanel({ currentUser, variant, onClose }: Props) {
                     return
                 }
 
-                setPenalties(response.penalties)
+                setPenalties(response.entries)
+                setPenaltyTotalWeight(response.total_weight)
             } catch (currentError) {
                 if (!active) {
                     return
@@ -236,10 +233,10 @@ export function AccountPanel({ currentUser, variant, onClose }: Props) {
                             </div>
                         </div>
 
-                        {hasPenalties ? (
+                        {penalties.length > 0 ? (
                             <div className={pageLayout ? undefined : classes.mobilePenaltyTable}>
                                 <ResidentPenaltiesTable
-                                    penalties={penalties}
+                                    entries={penalties}
                                     dateLabel="Дата"
                                     minWidth={pageLayout ? 720 : 0}
                                 />

@@ -20,26 +20,39 @@ type PenaltyResidentOptionsResponse struct {
 	Residents []PenaltyResidentOption `json:"residents"`
 }
 
-type PenaltyItem struct {
-	ID       string  `json:"id"`
-	Reason   string  `json:"reason"`
-	Weight   float64 `json:"weight"`
-	IssuedOn string  `json:"issued_on"`
+type PenaltyEntryItem struct {
+	ID        string  `json:"id"`
+	Type      string  `json:"type"`
+	Reason    string  `json:"reason"`
+	Weight    float64 `json:"weight"`
+	CreatedAt string  `json:"created_at"`
 }
 
 type PenaltyResidentDetailsResponse struct {
-	UserID    string        `json:"user_id"`
-	FullName  string        `json:"full_name"`
-	Penalties []PenaltyItem `json:"penalties"`
+	UserID      string             `json:"user_id"`
+	FullName    string             `json:"full_name"`
+	TotalWeight float64            `json:"total_weight"`
+	Entries     []PenaltyEntryItem `json:"entries"`
 }
 
 type CurrentUserPenaltiesResponse struct {
-	Penalties []PenaltyItem `json:"penalties"`
+	TotalWeight float64            `json:"total_weight"`
+	Entries     []PenaltyEntryItem `json:"entries"`
 }
 
 type CreatePenaltyRequest struct {
-	UserID   string  `json:"user_id"`
-	Reason   string  `json:"reason"`
-	Weight   float64 `json:"weight"`
-	IssuedOn string  `json:"issued_on"`
+	UserID string  `json:"user_id"`
+	Reason string  `json:"reason"`
+	Weight float64 `json:"weight"`
+}
+
+type ResolvePenaltyRequest struct {
+	UserID string  `json:"user_id"`
+	Reason string  `json:"reason"`
+	Weight float64 `json:"weight"`
+}
+
+type UpdatePenaltyEntryRequest struct {
+	Reason string  `json:"reason"`
+	Weight float64 `json:"weight"`
 }
