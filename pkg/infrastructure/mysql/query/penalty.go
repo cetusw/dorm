@@ -48,12 +48,16 @@ func (q *PenaltyQueryService) ListResidentsWithPenaltyBalance(
 					ELSE 0
 				END
 			), 0) AS total_weight
-		FROM penalty_entry pe
-		JOIN user u ON u.id = pe.user_id
+		FROM user u
+		LEFT JOIN penalty_entry pe ON pe.user_id = u.id
 		WHERE u.deleted_at IS NULL
 		  AND ` + scopeWhere + `
 		GROUP BY u.id, u.last_name, u.first_name, u.middle_name
 		HAVING total_weight > 0
+		   OR EXISTS (
+				SELECT 1 FROM individual_task it
+				WHERE it.resident_id = u.id AND it.deleted_at IS NULL
+			)
 		ORDER BY total_weight DESC, u.last_name ASC, u.first_name ASC, u.middle_name ASC, u.id ASC
 	`
 

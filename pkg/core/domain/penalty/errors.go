@@ -12,4 +12,5 @@ var (
 	ErrInvalidPenaltyEntryType    = errors.New("invalid penalty entry type")
 	ErrInsufficientPenaltyBalance = errors.New("penalty balance is insufficient")
 	ErrNegativePenaltyHistory     = errors.New("penalty history would become negative")
+	ErrPenaltyBalanceReserved     = errors.New("penalty balance is reserved by individual tasks")
 )

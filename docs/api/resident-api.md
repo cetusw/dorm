@@ -182,6 +182,18 @@
 
 ## Предупреждения
 
+## Индивидуальные задания
+
+Все маршруты требуют resident authentication:
+
+- `GET /api/v1/individual-tasks/residents?q=` — жители management scope с балансом, резервом и доступным весом;
+- `GET /api/v1/individual-tasks/areas?dormitory_id=` — территории доступного общежития;
+- `GET /api/v1/individual-tasks/residents/:residentId`, `/me`, `/review`, `/:taskId`;
+- `POST /api/v1/individual-tasks`, `PUT`/`DELETE /:taskId`;
+- `POST /:taskId/complete`, `/reject`, `/verify`.
+
+Изменение принимает `version`; устаревшая версия и недопустимые переходы возвращают `409`. Ответ задачи включает server-authoritative permission flags.
+
 ### `GET /api/v1/penalties`
 
 - Назначение: список жителей с положительным балансом предупреждений в доступном scope.

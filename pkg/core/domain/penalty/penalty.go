@@ -14,7 +14,7 @@ import (
 const (
 	minWeight         = 0.1
 	maxWeight         = 999999999.9
-	maxReasonRuneSize = 256
+	maxReasonRuneSize = 512
 )
 
 type Penalty struct {

@@ -6,6 +6,7 @@ import (
 	"dorm/pkg/core/domain/events"
 	"dorm/pkg/core/usecase/dormitory"
 	dutysettingsuc "dorm/pkg/core/usecase/dutysettings"
+	individualtaskuc "dorm/pkg/core/usecase/individualtask"
 	notificationuc "dorm/pkg/core/usecase/notification"
 	penaltyuc "dorm/pkg/core/usecase/penalty"
 	residentusecase "dorm/pkg/core/usecase/resident"
@@ -65,6 +66,7 @@ func NewContainer(configPath string) (*Container, error) {
 	pushSubscriptionRepo := repository.NewPushSubscriptionRepository(db)
 	notificationRepo := repository.NewNotificationRepository(db)
 	penaltyRepo := repository.NewPenaltyRepository(db)
+	individualTaskRepo := repository.NewIndividualTaskRepository(db)
 	warehouseRepo := repository.NewWarehouseRepository(db)
 
 	cleaningService := cleaning.NewCleaningService(
@@ -83,6 +85,7 @@ func NewContainer(configPath string) (*Container, error) {
 	teamQueryService := query.NewTeamQueryService(db)
 	notificationQueryService := query.NewNotificationQueryService(db)
 	penaltyQueryService := query.NewPenaltyQueryService(db)
+	individualTaskQueryService := query.NewIndividualTaskQueryService(db)
 	warehouseQueryService := query.NewWarehouseQueryService(db)
 
 	userService := user.NewUserService(
@@ -97,6 +100,7 @@ func NewContainer(configPath string) (*Container, error) {
 		return nil, fmt.Errorf("load app timezone: %w", err)
 	}
 	cleaningService.SetLocation(location)
+	individualTaskQueryService.SetLocation(location)
 
 	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo, groupRepo, teamRepo, userRepo)
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
@@ -111,6 +115,7 @@ func NewContainer(configPath string) (*Container, error) {
 		penaltyQueryService,
 		location,
 	)
+	individualTaskService := individualtaskuc.NewService(individualTaskRepo, userRepo, groupRepo, dormitoryRepo, areaRepo, individualTaskQueryService, location)
 	warehouseService := warehouseuc.NewWarehouseService(
 		warehouseRepo,
 		userRepo,
@@ -156,6 +161,9 @@ func NewContainer(configPath string) (*Container, error) {
 
 	penaltyAPIHandler := http.NewPenaltyAPIHandler(penaltyService)
 	penaltyAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+
+	individualTaskAPIHandler := http.NewIndividualTaskAPIHandler(individualTaskService)
+	individualTaskAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	warehouseAPIHandler := http.NewWarehouseAPIHandler(warehouseService)
 	warehouseAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))

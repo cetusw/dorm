@@ -73,6 +73,15 @@ func (r *PenaltyRepository) CreateResolve(ctx context.Context, penalty *penaltyd
 		_ = tx.Rollback()
 		return penaltydomain.ErrInsufficientPenaltyBalance
 	}
+	reserved, err := reservedWeight(ctx, tx, penalty.UserID())
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if balance-penalty.Weight() < reserved {
+		_ = tx.Rollback()
+		return penaltydomain.ErrPenaltyBalanceReserved
+	}
 
 	if err := insertPenaltyEntry(ctx, tx, penalty); err != nil {
 		_ = tx.Rollback()
@@ -406,7 +415,6 @@ func validatePenaltyBalanceAfterReplace(
 		} else {
 			balance += weight
 		}
-
 	}
 
 	if err := rows.Err(); err != nil {
@@ -418,6 +426,13 @@ func validatePenaltyBalanceAfterReplace(
 	}
 	if balance < 0 {
 		return penaltydomain.ErrNegativePenaltyHistory
+	}
+	reserved, err := reservedWeight(ctx, tx, target.UserID())
+	if err != nil {
+		return err
+	}
+	if balance < reserved {
+		return penaltydomain.ErrPenaltyBalanceReserved
 	}
 
 	return nil

@@ -29,7 +29,7 @@ func TestPenaltyReasonValidation(t *testing.T) {
 	t.Parallel()
 
 	createdAt := time.Date(2026, time.August, 2, 10, 0, 0, 0, time.UTC)
-	validReason := strings.Repeat("я", 256)
+	validReason := strings.Repeat("я", 512)
 
 	testCases := []struct {
 		name   string
@@ -38,8 +38,8 @@ func TestPenaltyReasonValidation(t *testing.T) {
 	}{
 		{name: "trim spaces", reason: "  ok  "},
 		{name: "empty reason", reason: "   ", err: ErrInvalidReason},
-		{name: "256 runes", reason: validReason},
-		{name: "257 runes", reason: validReason + "я", err: ErrInvalidReason},
+		{name: "512 runes", reason: validReason},
+		{name: "513 runes", reason: validReason + "я", err: ErrInvalidReason},
 	}
 
 	for _, testCase := range testCases {

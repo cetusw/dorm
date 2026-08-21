@@ -183,6 +183,8 @@ func (h *PenaltyAPIHandler) respondPenaltyError(c *fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("нельзя снять больше предупреждений, чем есть у жителя"))
 	case errors.Is(err, penaltydomain.ErrNegativePenaltyHistory):
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("изменение записи приведёт к отрицательной сумме предупреждений"))
+	case errors.Is(err, penaltydomain.ErrPenaltyBalanceReserved):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("часть предупреждений зарезервирована индивидуальными задачами"))
 	case errors.Is(err, penaltydomain.ErrAccessDenied):
 		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
 	case errors.Is(err, penaltydomain.ErrResidentNotFound):

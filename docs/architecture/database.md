@@ -132,6 +132,17 @@
 
 - `idx_penalty_entry_user_created (user_id, created_at, id)`
 
+`reason` имеет длину `VARCHAR(512)`, чтобы сохранить полное название подтверждённого индивидуального задания.
+
+### `individual_task`
+
+- `id`, `dormitory_id`, `resident_id`, `area_id NULL`
+- `title`, `redemption_weight`, `status`, `deadline NULL`
+- `completed_at NULL`, `verified_at NULL`, timestamps soft delete и `version`
+- индексы по `(resident_id, status, deleted_at)` и `(dormitory_id, status, deleted_at)`
+
+`dormitory_id` — исторический scope задачи; при удалении территории `area_id` становится `NULL`.
+
 ### `push_subscription`
 
 - `id`
@@ -192,6 +203,9 @@ erDiagram
     user o|--o{ duty_task : reviewed_by
 
     user ||--o{ penalty_entry : receives
+    dormitory ||--o{ individual_task : owns_historically
+    user ||--o{ individual_task : receives
+    area o|--o{ individual_task : located_at
     user ||--o{ push_subscription : owns
     user ||--o{ notification : receives
 ```
