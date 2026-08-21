@@ -24,7 +24,7 @@ func (q *IndividualTaskQueryService) SetLocation(location *time.Location) {
 	q.location = location
 }
 
-const taskRead = `SELECT it.id,it.dormitory_id,it.title,it.redemption_weight,it.status,it.deadline,it.completed_at,it.verified_at,it.created_at,it.updated_at,u.id,TRIM(CONCAT(u.last_name,' ',u.first_name,CASE WHEN u.middle_name IS NULL OR u.middle_name='' THEN '' ELSE CONCAT(' ',u.middle_name) END)),a.id,a.name,a.floor FROM individual_task it JOIN user u ON u.id=it.resident_id LEFT JOIN area a ON a.id=it.area_id`
+const taskRead = `SELECT it.id,it.dormitory_id,it.title,it.redemption_weight,it.status,it.deadline,it.completed_at,it.verified_at,it.created_at,it.updated_at,it.version,u.id,TRIM(CONCAT(u.last_name,' ',u.first_name,CASE WHEN u.middle_name IS NULL OR u.middle_name='' THEN '' ELSE CONCAT(' ',u.middle_name) END)),a.id,a.name,a.floor FROM individual_task it JOIN user u ON u.id=it.resident_id LEFT JOIN area a ON a.id=it.area_id`
 
 func (q *IndividualTaskQueryService) Get(c context.Context, id uuid.UUID) (*dto.IndividualTaskItem, error) {
 	x, e := q.list(c, taskRead+` WHERE it.id=? AND it.deleted_at IS NULL`, mustBinary(id))
@@ -37,7 +37,7 @@ func (q *IndividualTaskQueryService) ListMine(c context.Context, id uuid.UUID) (
 	return q.list(c, taskRead+` WHERE it.resident_id=? AND it.deleted_at IS NULL ORDER BY it.created_at DESC,it.id ASC`, mustBinary(id))
 }
 func (q *IndividualTaskQueryService) ListResident(c context.Context, id uuid.UUID, scope []int64) ([]dto.IndividualTaskItem, error) {
-	a, w, e := scopeArgs(scope)
+	a, w, e := scopeArgs(scope, "it.dormitory_id")
 	if e != nil {
 		return nil, e
 	}
@@ -45,7 +45,7 @@ func (q *IndividualTaskQueryService) ListResident(c context.Context, id uuid.UUI
 	return q.list(c, taskRead+` WHERE it.resident_id=? AND it.deleted_at IS NULL AND `+w+` ORDER BY it.created_at DESC,it.id ASC`, a...)
 }
 func (q *IndividualTaskQueryService) ListReview(c context.Context, scope []int64) ([]dto.IndividualTaskItem, error) {
-	a, w, e := scopeArgs(scope)
+	a, w, e := scopeArgs(scope, "it.dormitory_id")
 	if e != nil {
 		return nil, e
 	}
@@ -66,7 +66,7 @@ func (q *IndividualTaskQueryService) list(c context.Context, s string, args ...a
 		var an sql.NullString
 		var floor sql.NullInt64
 		var st string
-		if e = rows.Scan(&id, &x.DormitoryID, &x.Title, &x.RedemptionWeight, &st, &dl, &co, &ve, &x.CreatedAt, &x.UpdatedAt, &rid, &x.Resident.Name, &aid, &an, &floor); e != nil {
+		if e = rows.Scan(&id, &x.DormitoryID, &x.Title, &x.RedemptionWeight, &st, &dl, &co, &ve, &x.CreatedAt, &x.UpdatedAt, &x.Version, &rid, &x.Resident.Name, &aid, &an, &floor); e != nil {
 			return nil, e
 		}
 		uid, e := uuid.FromBytes(id)
@@ -101,7 +101,7 @@ func (q *IndividualTaskQueryService) list(c context.Context, s string, args ...a
 	return out, rows.Err()
 }
 func (q *IndividualTaskQueryService) SearchResidents(c context.Context, scope []int64, search string) ([]dto.IndividualTaskResidentOption, error) {
-	a, w, e := scopeArgs(scope)
+	a, w, e := scopeArgs(scope, "u.dormitory_id")
 	if e != nil {
 		return nil, e
 	}
@@ -138,7 +138,7 @@ func (q *IndividualTaskQueryService) SearchResidents(c context.Context, scope []
 	return out, rows.Err()
 }
 func (q *IndividualTaskQueryService) ListAreas(c context.Context, dorm int64) ([]dto.IndividualTaskArea, error) {
-	rows, e := q.db.QueryContext(c, "SELECT a.id,a.name,a.floor FROM area a JOIN `group` g ON g.id=a.group_id WHERE g.dormitory_id=? ORDER BY a.floor,a.name,a.id", dorm)
+	rows, e := q.db.QueryContext(c, "SELECT a.id,a.name,a.floor FROM area a LEFT JOIN `group` g ON g.id=a.group_id WHERE a.group_id IS NULL OR g.dormitory_id=? ORDER BY a.floor,a.name,a.id", dorm)
 	if e != nil {
 		return nil, e
 	}
@@ -158,7 +158,7 @@ func (q *IndividualTaskQueryService) ListAreas(c context.Context, dorm int64) ([
 	}
 	return out, rows.Err()
 }
-func scopeArgs(scope []int64) ([]any, string, error) {
+func scopeArgs(scope []int64, column string) ([]any, string, error) {
 	if len(scope) == 0 {
 		return nil, "", fmt.Errorf("empty individual task scope")
 	}
@@ -168,7 +168,7 @@ func scopeArgs(scope []int64) ([]any, string, error) {
 		a[i] = v
 		p[i] = "?"
 	}
-	return a, "it.dormitory_id IN (" + strings.Join(p, ",") + ")", nil
+	return a, column + " IN (" + strings.Join(p, ",") + ")", nil
 }
 func mustBinary(id uuid.UUID) []byte { b, _ := id.MarshalBinary(); return b }
 func timePtr(v sql.NullTime) *string {

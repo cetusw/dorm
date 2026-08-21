@@ -279,7 +279,7 @@ func (s *Service) validateArea(c context.Context, id *int, dorm int64) error {
 		return individual.ErrInvalidArea
 	}
 	if a.GroupID() == nil {
-		return individual.ErrInvalidArea
+		return nil
 	}
 	g, e := s.groups.FindByID(c, *a.GroupID())
 	if e != nil {

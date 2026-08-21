@@ -79,7 +79,7 @@ Feature-level API модули:
 - `DutyHistoryPage`, `DutyHistoryDetailsPage` — история группы;
 - `DutySettingsPage` — настройка команд, территорий и задач для группы;
 - `DormitoriesPage`, `GroupsPage`, `ResidentsPage`, `AreasPage`, `TaskCatalogPage` — управление структурой;
-- `PenaltiesPage` — warnings/penalties;
+- `PenaltiesPage` — warnings/penalties и управление индивидуальными задачами жителей через формы и адаптивный Drawer;
 - `LoginPage` — вход по логину и паролю.
 
 ## PWA и Service Worker

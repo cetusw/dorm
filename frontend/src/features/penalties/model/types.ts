@@ -2,6 +2,7 @@ export type PenaltyResidentSummary = {
     user_id: string
     full_name: string
     total_weight: number
+    individual_task_count: number
     threshold_reached: boolean
 }
 

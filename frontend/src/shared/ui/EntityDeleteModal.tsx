@@ -60,7 +60,7 @@ export function EntityDeleteModal({
 
                 <Text className={classes.description}>
                     Вы уверены, что хотите удалить {entityLabel}
-                    {entityName ? ` «${entityName}»` : ''}?
+                    {entityName ? <> <strong>«{entityName}»</strong></> : ''}?
                 </Text>
 
                 <Group justify="flex-end" gap="15" className={classes.actions}>

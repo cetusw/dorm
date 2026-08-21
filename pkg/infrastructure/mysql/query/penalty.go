@@ -48,16 +48,21 @@ func (q *PenaltyQueryService) ListResidentsWithPenaltyBalance(
 					ELSE 0
 				END
 			), 0) AS total_weight
+			,COALESCE((
+				SELECT COUNT(*) FROM individual_task task_count
+				WHERE task_count.resident_id = u.id AND task_count.deleted_at IS NULL
+			), 0) AS individual_task_count
 		FROM user u
 		LEFT JOIN penalty_entry pe ON pe.user_id = u.id
+		LEFT JOIN (
+			SELECT DISTINCT resident_id
+			FROM individual_task
+			WHERE deleted_at IS NULL
+		) active_task ON active_task.resident_id = u.id
 		WHERE u.deleted_at IS NULL
 		  AND ` + scopeWhere + `
 		GROUP BY u.id, u.last_name, u.first_name, u.middle_name
-		HAVING total_weight > 0
-		   OR EXISTS (
-				SELECT 1 FROM individual_task it
-				WHERE it.resident_id = u.id AND it.deleted_at IS NULL
-			)
+		HAVING total_weight > 0 OR MAX(active_task.resident_id IS NOT NULL) = 1
 		ORDER BY total_weight DESC, u.last_name ASC, u.first_name ASC, u.middle_name ASC, u.id ASC
 	`
 
@@ -71,7 +76,7 @@ func (q *PenaltyQueryService) ListResidentsWithPenaltyBalance(
 	for rows.Next() {
 		var idBytes []byte
 		var item dto.PenaltyResidentSummary
-		if err := rows.Scan(&idBytes, &item.FullName, &item.TotalWeight); err != nil {
+		if err := rows.Scan(&idBytes, &item.FullName, &item.TotalWeight, &item.IndividualTaskCount); err != nil {
 			return nil, fmt.Errorf("scan resident with penalties: %w", err)
 		}
 

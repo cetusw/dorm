@@ -1,3 +1,4 @@
+import { forwardRef } from 'react'
 import type { MouseEventHandler, ReactNode } from 'react'
 
 import { PlusIcon } from '@phosphor-icons/react'
@@ -9,9 +10,10 @@ type Props = {
     onClick?: MouseEventHandler<HTMLButtonElement>
 }
 
-export function PageActionButton({ children, disabled = false, onClick }: Props) {
+export const PageActionButton = forwardRef<HTMLButtonElement, Props>(function PageActionButton({ children, disabled = false, onClick }, ref) {
     return (
         <Button
+            ref={ref}
             radius="md"
             h={42}
             leftSection={<PlusIcon size={18} />}
@@ -21,4 +23,4 @@ export function PageActionButton({ children, disabled = false, onClick }: Props)
             {children}
         </Button>
     )
-}
+})

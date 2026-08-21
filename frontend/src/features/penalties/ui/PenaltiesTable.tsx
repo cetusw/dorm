@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { ArrowUUpLeftIcon, BookOpenIcon, DotsThreeVerticalIcon, WarningIcon } from '@phosphor-icons/react'
+import { ArrowUUpLeftIcon, BookOpenIcon, CheckCircleIcon, DotsThreeVerticalIcon, ListIcon, WarningIcon } from '@phosphor-icons/react'
 import { ActionIcon, Menu, Table, Text } from '@mantine/core'
 
 import type { PenaltyResidentSummary } from '../model/types'
@@ -13,6 +13,8 @@ type Props = {
     onOpenResident: (residentId: string) => void
     onIssuePenalty: (resident: PenaltyResidentSummary) => void
     onResolvePenalty: (resident: PenaltyResidentSummary) => void
+    onIssueIndividualTask: (resident: PenaltyResidentSummary) => void
+    onOpenIndividualTasks: (resident: PenaltyResidentSummary) => void
 }
 
 export function PenaltiesTable({
@@ -20,6 +22,8 @@ export function PenaltiesTable({
     onOpenResident,
     onIssuePenalty,
     onResolvePenalty,
+    onIssueIndividualTask,
+    onOpenIndividualTasks,
 }: Props) {
     const [openedMenuId, setOpenedMenuId] = useState<string | null>(null)
 
@@ -29,6 +33,7 @@ export function PenaltiesTable({
                 <Table.Tr className={listTableClasses.headerRow}>
                     <Table.Th>Имя</Table.Th>
                     <Table.Th w={180}>Предупреждения</Table.Th>
+                    <Table.Th w={180}>Индивидуальные задачи</Table.Th>
                     <Table.Th w={68} />
                 </Table.Tr>
             </Table.Thead>
@@ -56,6 +61,9 @@ export function PenaltiesTable({
                             </Table.Td>
                             <Table.Td>
                                 <Text inherit>{formatPenaltyWeight(resident.total_weight)}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text inherit>{resident.individual_task_count}</Text>
                             </Table.Td>
                             <Table.Td className={classes.actionCell}>
                                 <div className={classes.actionCellInner}>
@@ -86,7 +94,7 @@ export function PenaltiesTable({
                                                     onIssuePenalty(resident)
                                                 }}
                                             >
-                                                Выдать
+                                                Выдать предупреждение
                                             </Menu.Item>
                                             <Menu.Item
                                                 leftSection={<ArrowUUpLeftIcon size={24} />}
@@ -95,7 +103,7 @@ export function PenaltiesTable({
                                                     onResolvePenalty(resident)
                                                 }}
                                             >
-                                                Погасить
+                                                Погасить предупреждение
                                             </Menu.Item>
                                             <Menu.Item
                                                 leftSection={<BookOpenIcon size={24} />}
@@ -104,7 +112,14 @@ export function PenaltiesTable({
                                                     onOpenResident(resident.user_id)
                                                 }}
                                             >
-                                                История
+                                                Предупреждения
+                                            </Menu.Item>
+                                            <Menu.Divider />
+                                            <Menu.Item leftSection={<CheckCircleIcon size={24} />} onClick={(event) => { event.stopPropagation(); onIssueIndividualTask(resident) }}>
+                                                Выдать индивидуальную задачу
+                                            </Menu.Item>
+                                            <Menu.Item leftSection={<ListIcon size={24} />} onClick={(event) => { event.stopPropagation(); onOpenIndividualTasks(resident) }}>
+                                                Индивидуальные задачи
                                             </Menu.Item>
                                         </Menu.Dropdown>
                                     </Menu>

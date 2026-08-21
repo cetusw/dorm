@@ -18,6 +18,7 @@ function isSameResident(
     return left.user_id === right.user_id
         && left.full_name === right.full_name
         && left.total_weight === right.total_weight
+		&& left.individual_task_count === right.individual_task_count
         && left.threshold_reached === right.threshold_reached
 }
 

@@ -1,10 +1,11 @@
 package dto
 
 type PenaltyResidentSummary struct {
-	UserID           string  `json:"user_id"`
-	FullName         string  `json:"full_name"`
-	TotalWeight      float64 `json:"total_weight"`
-	ThresholdReached bool    `json:"threshold_reached"`
+	UserID              string  `json:"user_id"`
+	FullName            string  `json:"full_name"`
+	TotalWeight         float64 `json:"total_weight"`
+	IndividualTaskCount int     `json:"individual_task_count"`
+	ThresholdReached    bool    `json:"threshold_reached"`
 }
 
 type PenaltyResidentsResponse struct {

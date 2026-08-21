@@ -17,6 +17,7 @@ function normalizePenaltyResidentSummary(item: Record<string, unknown>): Penalty
         user_id: String(item.user_id ?? ''),
         full_name: String(item.full_name ?? ''),
         total_weight: Number(item.total_weight ?? 0),
+        individual_task_count: Number(item.individual_task_count ?? 0),
         threshold_reached: Boolean(item.threshold_reached),
     }
 }
