@@ -7,7 +7,7 @@ export type IndividualTask = {
     area: IndividualTaskArea | null; redemption_weight: number; deadline: string | null
     status: IndividualTaskStatus; is_overdue: boolean; completed_at: string | null
     verified_at: string | null; created_at: string; updated_at: string; version: number
-    can_edit: boolean; can_delete: boolean; can_complete: boolean; can_verify: boolean; can_reject: boolean
+    can_edit: boolean; can_delete: boolean; can_complete: boolean; can_open: boolean; can_verify: boolean; can_reject: boolean
 }
 export type IndividualTaskResidentOption = IndividualTaskResident & {
     dormitory_id: number; penalty_balance: number; reserved_redemption_weight: number; available_redemption_weight: number

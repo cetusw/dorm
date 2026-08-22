@@ -192,6 +192,8 @@
 - `POST /api/v1/individual-tasks`, `PUT`/`DELETE /:taskId`;
 - `POST /:taskId/complete`, `/reject`, `/verify`.
 
+Житель может отменить собственное завершение через `POST /api/v1/individual-tasks/:taskId/open`; маршрут доступен только для его задачи в статусе `completed`.
+
 Изменение принимает `version`; устаревшая версия и недопустимые переходы возвращают `409`. Ответ задачи включает server-authoritative permission flags.
 
 ### `GET /api/v1/penalties`

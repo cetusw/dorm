@@ -1,0 +1,28 @@
+.section {
+    margin-top: 12px;
+}
+
+.heading {
+    margin: 0 0 2px;
+    color: #66736F;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+:global(.individual-task-mobile-weight) {
+    display: none;
+}
+
+@media (max-width: 48em) {
+    .heading {
+        font-size: 17px;
+    }
+
+    :global(.individual-task-mobile-weight) {
+        display: inline;
+    }
+
+    :global(.individual-task-desktop-weight) {
+        display: none;
+    }
+}

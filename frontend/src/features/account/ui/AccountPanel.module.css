@@ -164,6 +164,17 @@
     width: 100%;
 }
 
+.penaltiesSection {
+    margin-top: 12px;
+}
+
+.sectionHeading {
+    margin: 0 0 2px;
+    color: #66736F;
+    font-size: 18px;
+    font-weight: 600;
+}
+
 .mobilePenaltyTable :global(table) {
     width: 100%;
 }
@@ -205,5 +216,9 @@
 
     .noticeText {
         line-height: 1.5;
+    }
+
+    .sectionHeading {
+        font-size: 17px;
     }
 }

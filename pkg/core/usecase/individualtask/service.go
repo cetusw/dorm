@@ -2,7 +2,6 @@ package individualtask
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -43,7 +42,10 @@ func (s *Service) Create(c context.Context, actor uuid.UUID, req dto.IndividualT
 	if e != nil {
 		return nil, e
 	}
-	if resident == nil || resident.DormitoryID() == nil || !in(*resident.DormitoryID(), scope) {
+	if resident == nil {
+		return nil, individual.ErrResidentNotFound
+	}
+	if resident.DormitoryID() == nil || !in(*resident.DormitoryID(), scope) {
 		return nil, individual.ErrAccessDenied
 	}
 	dl, e := s.deadline(req.Deadline)
@@ -86,7 +88,10 @@ func (s *Service) Update(c context.Context, actor, id uuid.UUID, req dto.Individ
 		if e != nil {
 			return nil, e
 		}
-		if u == nil || u.DormitoryID() == nil || *u.DormitoryID() != t.DormitoryID {
+		if u == nil {
+			return nil, individual.ErrResidentNotFound
+		}
+		if u.DormitoryID() == nil || *u.DormitoryID() != t.DormitoryID {
 			return nil, individual.ErrAccessDenied
 		}
 	}
@@ -111,7 +116,7 @@ func (s *Service) Update(c context.Context, actor, id uuid.UUID, req dto.Individ
 	t.RedemptionWeight = w
 	t.Deadline = dl
 	t.UpdatedAt = s.now().In(s.location)
-	if e = s.repo.Update(c, t, req.Version, true); e != nil {
+	if e = s.repo.Update(c, t, req.Version); e != nil {
 		return nil, e
 	}
 	return s.item(c, id, actor, scope)
@@ -128,10 +133,17 @@ func (s *Service) Delete(c context.Context, actor, id uuid.UUID) error {
 	if !in(t.DormitoryID, scope) {
 		return individual.ErrAccessDenied
 	}
-	return s.repo.Delete(c, id, t.DormitoryID)
+	return s.repo.Delete(c, id)
 }
 func (s *Service) Complete(c context.Context, actor, id uuid.UUID) (*dto.IndividualTaskItem, error) {
-	t, e := s.repo.Complete(c, id, actor, 0)
+	t, e := s.repo.Complete(c, id, actor)
+	if e != nil {
+		return nil, e
+	}
+	return s.item(c, t.ID, actor, nil)
+}
+func (s *Service) Open(c context.Context, actor, id uuid.UUID) (*dto.IndividualTaskItem, error) {
+	t, e := s.repo.Open(c, id, actor)
 	if e != nil {
 		return nil, e
 	}
@@ -149,7 +161,7 @@ func (s *Service) Reject(c context.Context, actor, id uuid.UUID) (*dto.Individua
 	if !in(t.DormitoryID, scope) {
 		return nil, individual.ErrAccessDenied
 	}
-	t, e = s.repo.Reject(c, id, t.DormitoryID)
+	t, e = s.repo.Reject(c, id)
 	if e != nil {
 		return nil, e
 	}
@@ -167,7 +179,7 @@ func (s *Service) Verify(c context.Context, actor, id uuid.UUID) (*dto.Individua
 	if !in(t.DormitoryID, scope) {
 		return nil, individual.ErrAccessDenied
 	}
-	t, e = s.repo.Verify(c, id, t.DormitoryID)
+	t, e = s.repo.Verify(c, id)
 	if e != nil {
 		return nil, e
 	}
@@ -190,7 +202,8 @@ func (s *Service) ListMine(c context.Context, actor uuid.UUID) (dto.IndividualTa
 		return dto.IndividualTaskListResponse{}, e
 	}
 	for i := range x {
-		x[i].CanComplete = x[i].Status == "issued" || x[i].Status == "completed"
+		x[i].CanComplete = x[i].Status == "issued"
+		x[i].CanOpen = x[i].Status == "completed"
 	}
 	return dto.IndividualTaskListResponse{Tasks: x}, nil
 }
@@ -198,6 +211,13 @@ func (s *Service) ListResident(c context.Context, actor, resident uuid.UUID) (dt
 	scope, e := s.scope(c, actor)
 	if e != nil {
 		return dto.IndividualTaskListResponse{}, e
+	}
+	u, e := s.users.FindByID(c, resident)
+	if e != nil {
+		return dto.IndividualTaskListResponse{}, e
+	}
+	if u == nil {
+		return dto.IndividualTaskListResponse{}, individual.ErrResidentNotFound
 	}
 	x, e := s.query.ListResident(c, resident, scope)
 	if e != nil {
@@ -250,20 +270,19 @@ func (s *Service) scope(c context.Context, actor uuid.UUID) ([]int64, error) {
 			out = append(out, d.ID())
 		}
 	}
+	if u.DormitoryID() != nil {
+		gs, e := s.groups.FindByDormitoryID(c, *u.DormitoryID())
+		if e != nil {
+			return nil, e
+		}
+		for _, g := range gs {
+			if g.LeaderID() != nil && *g.LeaderID() == actor && !in(*u.DormitoryID(), out) {
+				out = append(out, *u.DormitoryID())
+			}
+		}
+	}
 	if len(out) > 0 {
 		return out, nil
-	}
-	if u.DormitoryID() == nil {
-		return nil, individual.ErrAccessDenied
-	}
-	gs, e := s.groups.FindByDormitoryID(c, *u.DormitoryID())
-	if e != nil {
-		return nil, e
-	}
-	for _, g := range gs {
-		if g.LeaderID() != nil && *g.LeaderID() == actor {
-			return []int64{*u.DormitoryID()}, nil
-		}
 	}
 	return nil, individual.ErrAccessDenied
 }
@@ -323,7 +342,8 @@ func (s *Service) permissions(xs []dto.IndividualTaskItem, actor uuid.UUID, scop
 		xs[i].CanDelete = m && xs[i].Status != "verified"
 		xs[i].CanVerify = m && xs[i].Status == "completed"
 		xs[i].CanReject = xs[i].CanVerify
-		xs[i].CanComplete = xs[i].Resident.ID == actor.String() && (xs[i].Status == "issued" || xs[i].Status == "completed")
+		xs[i].CanComplete = xs[i].Resident.ID == actor.String() && xs[i].Status == "issued"
+		xs[i].CanOpen = xs[i].Resident.ID == actor.String() && xs[i].Status == "completed"
 	}
 	return xs
 }
@@ -335,5 +355,3 @@ func in(id int64, x []int64) bool {
 	}
 	return false
 }
-
-var _ = fmt.Sprintf

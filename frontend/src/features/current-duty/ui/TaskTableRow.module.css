@@ -1,6 +1,6 @@
 .row {
-    --task-row-checkbox-width: 25px;
-    --task-row-checkbox-gap: 15px;
+	--task-title-line-height: 24px;
+    --task-checkbox-center-adjustment: 2px;
     border: 0;
 }
 
@@ -36,7 +36,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: calc(20px + var(--task-checkbox-center-adjustment) - 10px);
     margin-left: 0;
     cursor: pointer;
 }
@@ -61,10 +61,6 @@
     border-bottom: 1px solid #DDE4E2;
 }
 
-.surface[data-has-checkbox='true'] .content {
-    padding-left: var(--task-row-checkbox-gap);
-}
-
 .titleCell {
     display: flex;
     align-items: center;
@@ -78,7 +74,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 16px;
-    line-height: 24px;
+    line-height: var(--task-title-line-height);
 }
 
 .surface[data-layout='drawer'] .title {

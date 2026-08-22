@@ -298,26 +298,33 @@ func (s *Service) resolveScope(ctx context.Context, currentUserID uuid.UUID) (qu
 			dormitoryIDs = append(dormitoryIDs, dormitory.ID())
 		}
 	}
+	if currentUser.DormitoryID() != nil {
+		groups, err := s.groupRepo.FindByDormitoryID(ctx, *currentUser.DormitoryID())
+		if err != nil {
+			return queryports.PenaltyScope{}, fmt.Errorf("load groups for penalty scope: %w", err)
+		}
+
+		for _, group := range groups {
+			if group.LeaderID() != nil && *group.LeaderID() == currentUserID && !containsDormitory(dormitoryIDs, *currentUser.DormitoryID()) {
+				dormitoryIDs = append(dormitoryIDs, *currentUser.DormitoryID())
+			}
+		}
+	}
+
 	if len(dormitoryIDs) > 0 {
 		return queryports.PenaltyScope{DormitoryIDs: dormitoryIDs}, nil
 	}
 
-	if currentUser.DormitoryID() == nil {
-		return queryports.PenaltyScope{}, penaltydomain.ErrAccessDenied
-	}
+	return queryports.PenaltyScope{}, penaltydomain.ErrAccessDenied
+}
 
-	groups, err := s.groupRepo.FindByDormitoryID(ctx, *currentUser.DormitoryID())
-	if err != nil {
-		return queryports.PenaltyScope{}, fmt.Errorf("load groups for penalty scope: %w", err)
-	}
-
-	for _, group := range groups {
-		if group.LeaderID() != nil && *group.LeaderID() == currentUserID {
-			return queryports.PenaltyScope{DormitoryIDs: []int64{*currentUser.DormitoryID()}}, nil
+func containsDormitory(ids []int64, id int64) bool {
+	for _, candidate := range ids {
+		if candidate == id {
+			return true
 		}
 	}
-
-	return queryports.PenaltyScope{}, penaltydomain.ErrAccessDenied
+	return false
 }
 
 func (s *Service) loadAccessibleResident(

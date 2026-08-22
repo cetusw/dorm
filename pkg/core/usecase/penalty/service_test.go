@@ -247,6 +247,35 @@ func TestCreatePenaltyUsesDormitoryLeaderScopeAndNormalizesData(t *testing.T) {
 	assert.Equal(t, "issue", item.Type)
 }
 
+func TestListResidentsCombinesDormitoryAndGroupLeaderScopes(t *testing.T) {
+	t.Parallel()
+
+	currentUserID := uuid.New()
+	groupDormitoryID := int64(7)
+	dormitoryLeaderScopeID := int64(8)
+	now := time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC)
+	currentUser := user.RestoreUser(currentUserID, "leader", "hash", "Ivan", nil, "Ivanov", nil, nil, nil, &groupDormitoryID, now)
+	queryService := &penaltyQueryServiceStub{}
+
+	service := NewPenaltyService(
+		&penaltyRepositoryStub{},
+		&penaltyUserRepositoryStub{byID: map[uuid.UUID]*user.User{currentUserID: currentUser}},
+		&penaltyGroupRepositoryStub{byDormitory: map[int64][]*structure.Group{
+			groupDormitoryID: {structure.RestoreGroup(uuid.New(), &currentUserID, "Group A", groupDormitoryID)},
+		}},
+		&penaltyDormitoryRepositoryStub{all: []*structure.Dormitory{
+			structure.RestoreDormitory(dormitoryLeaderScopeID, "Dorm A", &currentUserID, "Moscow", "st", "Lenina", "1"),
+		}},
+		queryService,
+		time.UTC,
+	)
+
+	_, err := service.ListResidents(context.Background(), currentUserID)
+
+	require.NoError(t, err)
+	assert.Equal(t, []int64{dormitoryLeaderScopeID, groupDormitoryID}, queryService.lastScope.DormitoryIDs)
+}
+
 func TestResolvePenaltyCreatesResolveEntry(t *testing.T) {
 	t.Parallel()
 

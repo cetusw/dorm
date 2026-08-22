@@ -106,7 +106,25 @@ func (q *IndividualTaskQueryService) SearchResidents(c context.Context, scope []
 		return nil, e
 	}
 	search = strings.TrimSpace(strings.ToLower(search))
-	s := `SELECT u.id,TRIM(CONCAT(u.last_name,' ',u.first_name,CASE WHEN u.middle_name IS NULL OR u.middle_name='' THEN '' ELSE CONCAT(' ',u.middle_name) END)),u.dormitory_id,COALESCE((SELECT SUM(CASE WHEN pe.type='ISSUE' THEN pe.weight ELSE -pe.weight END) FROM penalty_entry pe WHERE pe.user_id=u.id),0),COALESCE((SELECT SUM(it.redemption_weight) FROM individual_task it WHERE it.resident_id=u.id AND it.deleted_at IS NULL AND it.status IN ('ISSUED','COMPLETED')),0) FROM user u WHERE u.deleted_at IS NULL AND ` + w
+	s := `SELECT
+		u.id,
+		TRIM(CONCAT(u.last_name,' ',u.first_name,CASE WHEN u.middle_name IS NULL OR u.middle_name='' THEN '' ELSE CONCAT(' ',u.middle_name) END)),
+		u.dormitory_id,
+		COALESCE(penalties.balance, 0),
+		COALESCE(reservations.weight, 0)
+		FROM user u
+		LEFT JOIN (
+			SELECT user_id, SUM(CASE WHEN type='ISSUE' THEN weight ELSE -weight END) AS balance
+			FROM penalty_entry
+			GROUP BY user_id
+		) penalties ON penalties.user_id=u.id
+		LEFT JOIN (
+			SELECT resident_id, SUM(redemption_weight) AS weight
+			FROM individual_task
+			WHERE deleted_at IS NULL AND status IN ('ISSUED','COMPLETED')
+			GROUP BY resident_id
+		) reservations ON reservations.resident_id=u.id
+		WHERE u.deleted_at IS NULL AND ` + w
 	if search != "" {
 		s += ` AND LOWER(CONCAT_WS(' ',u.last_name,u.first_name,u.middle_name)) LIKE ?`
 		a = append(a, "%"+search+"%")

@@ -35,6 +35,7 @@ type IndividualTaskItem struct {
 	CanEdit          bool                   `json:"can_edit"`
 	CanDelete        bool                   `json:"can_delete"`
 	CanComplete      bool                   `json:"can_complete"`
+	CanOpen          bool                   `json:"can_open"`
 	CanVerify        bool                   `json:"can_verify"`
 	CanReject        bool                   `json:"can_reject"`
 }

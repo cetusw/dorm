@@ -47,22 +47,21 @@ func (q *PenaltyQueryService) ListResidentsWithPenaltyBalance(
 					WHEN pe.type = 'RESOLVE' THEN -pe.weight
 					ELSE 0
 				END
-			), 0) AS total_weight
-			,COALESCE((
-				SELECT COUNT(*) FROM individual_task task_count
-				WHERE task_count.resident_id = u.id AND task_count.deleted_at IS NULL
-			), 0) AS individual_task_count
+			), 0) AS total_weight,
+			MAX(COALESCE(individual_tasks.task_count, 0)) AS individual_task_count
 		FROM user u
 		LEFT JOIN penalty_entry pe ON pe.user_id = u.id
 		LEFT JOIN (
-			SELECT DISTINCT resident_id
+			SELECT resident_id, COUNT(*) AS task_count
 			FROM individual_task
 			WHERE deleted_at IS NULL
-		) active_task ON active_task.resident_id = u.id
+			  AND status IN ('ISSUED', 'COMPLETED')
+			GROUP BY resident_id
+		) individual_tasks ON individual_tasks.resident_id = u.id
 		WHERE u.deleted_at IS NULL
 		  AND ` + scopeWhere + `
 		GROUP BY u.id, u.last_name, u.first_name, u.middle_name
-		HAVING total_weight > 0 OR MAX(active_task.resident_id IS NOT NULL) = 1
+		HAVING total_weight > 0 OR MAX(COALESCE(individual_tasks.task_count, 0)) > 0
 		ORDER BY total_weight DESC, u.last_name ASC, u.first_name ASC, u.middle_name ASC, u.id ASC
 	`
 

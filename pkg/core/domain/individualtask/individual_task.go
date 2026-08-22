@@ -20,6 +20,7 @@ var (
 	ErrInvalidDeadline   = errors.New("invalid individual task deadline")
 	ErrInvalidArea       = errors.New("invalid individual task area")
 	ErrInvalidResident   = errors.New("invalid individual task resident")
+	ErrResidentNotFound  = errors.New("individual task resident not found")
 	ErrInvalidTransition = errors.New("invalid individual task transition")
 	ErrVersionConflict   = errors.New("individual task version conflict")
 	ErrCapacityExceeded  = errors.New("individual task redemption capacity exceeded")

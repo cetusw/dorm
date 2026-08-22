@@ -28,6 +28,7 @@ func (h *IndividualTaskAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Han
 	a.Put("/:taskId", h.update)
 	a.Delete("/:taskId", h.delete)
 	a.Post("/:taskId/complete", h.complete)
+	a.Post("/:taskId/open", h.open)
 	a.Post("/:taskId/reject", h.reject)
 	a.Post("/:taskId/verify", h.verify)
 }
@@ -82,6 +83,7 @@ func (h *IndividualTaskAPIHandler) delete(c *fiber.Ctx) error {
 	return c.SendStatus(204)
 }
 func (h *IndividualTaskAPIHandler) complete(c *fiber.Ctx) error { return h.action(c, h.uc.Complete) }
+func (h *IndividualTaskAPIHandler) open(c *fiber.Ctx) error     { return h.action(c, h.uc.Open) }
 func (h *IndividualTaskAPIHandler) reject(c *fiber.Ctx) error   { return h.action(c, h.uc.Reject) }
 func (h *IndividualTaskAPIHandler) verify(c *fiber.Ctx) error   { return h.action(c, h.uc.Verify) }
 func (h *IndividualTaskAPIHandler) action(c *fiber.Ctx, f func(context.Context, uuid.UUID, uuid.UUID) (*dto.IndividualTaskItem, error)) error {
@@ -183,6 +185,8 @@ func (h *IndividualTaskAPIHandler) err(c *fiber.Ctx, e error) error {
 		return c.Status(403).JSON(errorResponse("доступ запрещен"))
 	case errors.Is(e, individual.ErrNotFound):
 		return c.Status(404).JSON(errorResponse("задача не найдена"))
+	case errors.Is(e, individual.ErrResidentNotFound):
+		return c.Status(404).JSON(errorResponse("житель не найден"))
 	case errors.Is(e, individual.ErrInvalidTitle), errors.Is(e, individual.ErrInvalidWeight), errors.Is(e, individual.ErrInvalidDeadline), errors.Is(e, individual.ErrInvalidArea), errors.Is(e, individual.ErrInvalidResident):
 		return c.Status(400).JSON(errorResponse("некорректные данные индивидуальной задачи"))
 	case errors.Is(e, individual.ErrCapacityExceeded):

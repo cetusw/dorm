@@ -36,7 +36,7 @@ func (r *IndividualTaskRepository) Create(ctx context.Context, t *individual.Ind
 		return insertTask(ctx, tx, t)
 	})
 }
-func (r *IndividualTaskRepository) Update(ctx context.Context, t *individual.IndividualTask, expected uint64, checkCapacity bool) error {
+func (r *IndividualTaskRepository) Update(ctx context.Context, t *individual.IndividualTask, expected uint64) error {
 	return r.withTx(ctx, func(tx *sql.Tx) error {
 		cur, e := loadTaskForUpdate(ctx, tx, t.ID)
 		if e != nil {
@@ -55,20 +55,18 @@ func (r *IndividualTaskRepository) Update(ctx context.Context, t *individual.Ind
 		if e = lockUsers(ctx, tx, ids); e != nil {
 			return e
 		}
-		if checkCapacity {
-			own := 0.0
-			if cur.ResidentID == t.ResidentID {
-				own = cur.RedemptionWeight
-			}
-			if e = validateCapacity(ctx, tx, t.ResidentID, t.RedemptionWeight, own); e != nil {
-				return e
-			}
+		own := 0.0
+		if cur.ResidentID == t.ResidentID {
+			own = cur.RedemptionWeight
+		}
+		if e = validateCapacity(ctx, tx, t.ResidentID, t.RedemptionWeight, own); e != nil {
+			return e
 		}
 		_, e = tx.ExecContext(ctx, `UPDATE individual_task SET resident_id=?, area_id=?, title=?, redemption_weight=?, deadline=?, updated_at=?, version=version+1 WHERE id=? AND version=?`, mustUUID(t.ResidentID), nullableInt(t.AreaID), t.Title, fmt.Sprintf("%.1f", t.RedemptionWeight), nullableTime(t.Deadline), t.UpdatedAt, mustUUID(t.ID), expected)
 		return e
 	})
 }
-func (r *IndividualTaskRepository) Complete(ctx context.Context, id, resident uuid.UUID, _ int64) (*individual.IndividualTask, error) {
+func (r *IndividualTaskRepository) Complete(ctx context.Context, id, resident uuid.UUID) (*individual.IndividualTask, error) {
 	var out *individual.IndividualTask
 	e := r.withTx(ctx, func(tx *sql.Tx) error {
 		t, e := loadTaskForUpdate(ctx, tx, id)
@@ -81,10 +79,11 @@ func (r *IndividualTaskRepository) Complete(ctx context.Context, id, resident uu
 		if t.ResidentID != resident {
 			return individual.ErrAccessDenied
 		}
+		before := t.Version
 		if e = t.Complete(time.Now()); e != nil {
 			return e
 		}
-		if t.Status == individual.StatusCompleted {
+		if t.Version != before {
 			if _, e = tx.ExecContext(ctx, `UPDATE individual_task SET status=?, completed_at=?, updated_at=?, version=? WHERE id=?`, t.Status, t.CompletedAt, t.UpdatedAt, t.Version, mustUUID(id)); e != nil {
 				return e
 			}
@@ -94,10 +93,18 @@ func (r *IndividualTaskRepository) Complete(ctx context.Context, id, resident uu
 	})
 	return out, e
 }
-func (r *IndividualTaskRepository) Reject(ctx context.Context, id uuid.UUID, _ int64) (*individual.IndividualTask, error) {
+func (r *IndividualTaskRepository) Open(ctx context.Context, id, resident uuid.UUID) (*individual.IndividualTask, error) {
+	return r.transition(ctx, id, func(t *individual.IndividualTask) error {
+		if t.ResidentID != resident {
+			return individual.ErrAccessDenied
+		}
+		return t.Reject(time.Now())
+	})
+}
+func (r *IndividualTaskRepository) Reject(ctx context.Context, id uuid.UUID) (*individual.IndividualTask, error) {
 	return r.transition(ctx, id, func(t *individual.IndividualTask) error { return t.Reject(time.Now()) })
 }
-func (r *IndividualTaskRepository) Verify(ctx context.Context, id uuid.UUID, _ int64) (*individual.IndividualTask, error) {
+func (r *IndividualTaskRepository) Verify(ctx context.Context, id uuid.UUID) (*individual.IndividualTask, error) {
 	var out *individual.IndividualTask
 	e := r.withTx(ctx, func(tx *sql.Tx) error {
 		t, e := loadTaskForUpdate(ctx, tx, id)
@@ -138,7 +145,7 @@ func (r *IndividualTaskRepository) Verify(ctx context.Context, id uuid.UUID, _ i
 	})
 	return out, e
 }
-func (r *IndividualTaskRepository) Delete(ctx context.Context, id uuid.UUID, _ int64) error {
+func (r *IndividualTaskRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.withTx(ctx, func(tx *sql.Tx) error {
 		t, e := loadTaskForUpdate(ctx, tx, id)
 		if e != nil {

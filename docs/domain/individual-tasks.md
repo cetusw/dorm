@@ -4,7 +4,7 @@
 
 ## Состояния
 
-`ISSUED → COMPLETED → VERIFIED`; из `COMPLETED` руководитель может вернуть задачу в `ISSUED`. `VERIFIED` терминально. Повторные complete, reject и verify целевого состояния идемпотентны. Удаление soft-delete допустимо для `ISSUED` и `COMPLETED`.
+`ISSUED → COMPLETED → VERIFIED`; из `COMPLETED` руководитель или сам исполнитель может вернуть задачу в `ISSUED`. `VERIFIED` терминально. Повторные complete, reject и verify целевого состояния идемпотентны. Удаление soft-delete допустимо для `ISSUED` и `COMPLETED`.
 
 ## Погашение предупреждений
 

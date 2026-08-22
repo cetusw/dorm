@@ -169,7 +169,6 @@ export function TaskTableRow({
             <Table.Td className={classes.cell} colSpan={1}>
                 <div
                     className={classes.surface}
-                    data-has-checkbox={!isReadOnly && showCheckbox ? 'true' : 'false'}
                     data-layout={layout}
                 >
                     <div className={classes.main}>

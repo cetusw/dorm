@@ -1,4 +1,6 @@
 .cardRoot {
+	--task-title-line-height: 24px;
+	--task-checkbox-center-adjustment: -0.5px;
     position: relative;
 }
 
@@ -44,7 +46,7 @@
     align-items: center;
     justify-content: center;
     margin-left: 0;
-    padding-top: 15px;
+    padding-top: calc(15px + var(--task-checkbox-center-adjustment));
 }
 
 .title {
@@ -53,7 +55,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 16px;
-    line-height: 24px;
+    line-height: var(--task-title-line-height);
 }
 
 .metaRow {

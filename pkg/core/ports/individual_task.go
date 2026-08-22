@@ -13,6 +13,7 @@ type IndividualTaskUseCase interface {
 	Update(context.Context, uuid.UUID, uuid.UUID, dto.IndividualTaskRequest) (*dto.IndividualTaskItem, error)
 	Delete(context.Context, uuid.UUID, uuid.UUID) error
 	Complete(context.Context, uuid.UUID, uuid.UUID) (*dto.IndividualTaskItem, error)
+	Open(context.Context, uuid.UUID, uuid.UUID) (*dto.IndividualTaskItem, error)
 	Reject(context.Context, uuid.UUID, uuid.UUID) (*dto.IndividualTaskItem, error)
 	Verify(context.Context, uuid.UUID, uuid.UUID) (*dto.IndividualTaskItem, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (*dto.IndividualTaskItem, error)

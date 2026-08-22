@@ -28,7 +28,7 @@ export function IndividualTaskCard({ task, pending, onEdit, onDelete, onVerify, 
         <div className={classes.meta}>
             {task.status === 'completed' ? <SettingsBadge color="success">Выполнено</SettingsBadge> : null}
             {task.redemption_weight > 0 ? <SettingsBadge>- {formatRedemptionWeight(task.redemption_weight)}</SettingsBadge> : null}
-            {task.area ? <SettingsBadge>{formatArea(task.area)}</SettingsBadge> : null}
+            {task.area ? <SettingsBadge color="area">{formatArea(task.area)}</SettingsBadge> : null}
             {task.deadline ? <Text className={`${classes.deadline} ${task.is_overdue ? classes.overdue : ''}`}>{formatDeadline(task.deadline)}</Text> : null}
         </div>
     </div>
