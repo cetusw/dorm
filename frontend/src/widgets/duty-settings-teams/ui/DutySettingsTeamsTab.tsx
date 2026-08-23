@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { RowsPlusBottomIcon } from '@phosphor-icons/react'
-import { Alert, Stack } from '@mantine/core'
+import { RowsPlusBottomIcon, UsersIcon } from '@phosphor-icons/react'
+import { Alert, Box, Group, Stack, Text } from '@mantine/core'
 
 import {
     assignDutySettingsActiveTeam,
@@ -93,6 +93,13 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
     )
 
     const orderedIds = useMemo(() => orderedTeams.map((team) => team.id), [orderedTeams])
+    const membersPerTeam = useMemo(() => {
+        if (orderedTeams.length === 0) {
+            return 0
+        }
+
+        return Math.floor(orderedTeams.reduce((total, team) => total + team.members_count, 0) / orderedTeams.length)
+    }, [orderedTeams])
 
     function handleCreate() {
         setFormOpened(true)
@@ -132,6 +139,15 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
             {error ? (
                 <Alert color="red">{error}</Alert>
             ) : null}
+
+            <Group gap="xs" wrap="nowrap" align="center">
+                <Box component="span" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <UsersIcon size={20} />
+                </Box>
+                <Text fw={500} style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1.25 }}>
+                    {membersPerTeam} исполнителей на команду
+                </Text>
+            </Group>
 
             {orderedTeams.length > 0 ? (
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}>

@@ -9,12 +9,10 @@ import {
     TrashIcon,
     UsersThreeIcon,
 } from '@phosphor-icons/react'
-import { ActionIcon, Menu, Text } from '@mantine/core'
+import { ActionIcon, Menu, Text, Tooltip } from '@mantine/core'
 
 import type { DutySettingsTeam } from '../../../features/duty-settings/model/types'
 import { formatDutySettingsLeaderName } from '../../../features/duty-settings/model/utils'
-import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
-import { SettingsCardSurface } from '../../../shared/ui/SettingsCardSurface'
 import classes from './DutySettingsTeamCard.module.css'
 
 type Props = {
@@ -24,19 +22,6 @@ type Props = {
     onOpenMembers: (team: DutySettingsTeam) => void
     onAssignDuty: (team: DutySettingsTeam) => void
     onDelete: (team: DutySettingsTeam) => void
-}
-
-function formatMembersCount(count: number): string {
-    const remainder10 = count % 10
-    const remainder100 = count % 100
-
-    if (remainder10 === 1 && remainder100 !== 11) {
-        return `${count} участник`
-    }
-    if (remainder10 >= 2 && remainder10 <= 4 && (remainder100 < 12 || remainder100 > 14)) {
-        return `${count} участника`
-    }
-    return `${count} участников`
 }
 
 export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpenMembers, onAssignDuty, onDelete }: Props) {
@@ -61,99 +46,93 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpe
             data-menu-open={menuOpened ? 'true' : undefined}
             data-dragging={isDragging ? 'true' : undefined}
         >
-            <SettingsCardSurface dragging={isDragging} menuOpen={menuOpened}>
-                <div className={classes.content} onClick={() => onOpenMembers(team)}>
-                    <div className={classes.handleCell}>
+            <div
+                className={classes.card}
+                data-menu-open={menuOpened ? 'true' : undefined}
+                data-dragging={isDragging ? 'true' : undefined}
+            >
+                <div className={classes.content}>
+                    <button
+                        ref={setActivatorNodeRef}
+                        type="button"
+                        className={classes.handleButton}
+                        aria-label="Изменить порядок команды"
+                        data-dragging={isDragging ? 'true' : undefined}
+                        disabled={disabled}
+                        onClick={(event) => event.stopPropagation()}
+                        {...attributes}
+                        {...listeners}
+                    >
+                        <DotsSixVerticalIcon size={24} />
+                    </button>
+
+                    <Tooltip label={`${team.members_count} исполнителей`} withArrow>
                         <button
-                            ref={setActivatorNodeRef}
                             type="button"
-                            className={classes.handleButton}
-                            aria-label="Изменить порядок команды"
-                            data-dragging={isDragging ? 'true' : undefined}
-                            disabled={disabled}
-                            onClick={(event) => event.stopPropagation()}
-                            {...attributes}
-                            {...listeners}
+                            className={classes.mainArea}
+                            onClick={() => onOpenMembers(team)}
                         >
-                            <DotsSixVerticalIcon size={25} />
+                            <Text component="span" fw={500} className={classes.positionText}>{team.rotation_position}</Text>
+                            <Text component="span" fw={500} className={classes.leaderText} c={team.leader ? undefined : 'dimmed'}>
+                                {formatDutySettingsLeaderName(team.leader)}
+                            </Text>
+                            {isDutyTeam ? <span className={classes.dutyBadge}>Дежурная</span> : null}
                         </button>
-                    </div>
+                    </Tooltip>
 
-                    <div className={classes.positionCell}>
-                        <Text fw={500}>{team.rotation_position}</Text>
-                    </div>
-
-                    <div className={classes.leaderCell}>
-                        <Text fw={500} className={classes.leaderText} c={team.leader ? undefined : 'dimmed'}>
-                            {formatDutySettingsLeaderName(team.leader)}
-                        </Text>
-                    </div>
-
-                    <div className={classes.membersCell}>
-                        <SettingsBadge>{formatMembersCount(team.members_count)}</SettingsBadge>
-                    </div>
-
-                    <div className={classes.statusCell}>
-                        {isDutyTeam ? <SettingsBadge color="success">Дежурная</SettingsBadge> : null}
-                    </div>
-
-                    <div />
-
-                    <div className={classes.actionsCell}>
-                        <Menu
-                            opened={menuOpened}
-                            onChange={setMenuOpened}
-                            withinPortal
-                            position="bottom-end"
-                        >
-                            <Menu.Target>
-                                <ActionIcon
-                                    variant="subtle"
-                                    color="gray"
-                                    aria-label="Действия с командой"
-                                    className={classes.actionButton}
-                                    onPointerDown={(event) => event.stopPropagation()}
-                                    onClick={(event) => event.stopPropagation()}
-                                >
-                                    <DotsThreeVerticalIcon size={25} />
-                                </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
+                    <Menu
+                        opened={menuOpened}
+                        onChange={setMenuOpened}
+                        withinPortal
+                        position="bottom-end"
+                    >
+                        <Menu.Target>
+                            <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                aria-label="Действия с командой"
+                                className={classes.actionButton}
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onClick={(event) => event.stopPropagation()}
+                            >
+                                <DotsThreeVerticalIcon size={24} />
+                            </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                            <Menu.Item
+                                leftSection={<UsersThreeIcon size={25} />}
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    onOpenMembers(team)
+                                }}
+                            >
+                                Участники
+                            </Menu.Item>
+                            {!isDutyTeam ? (
                                 <Menu.Item
-                                    leftSection={<UsersThreeIcon size={25} />}
+                                    leftSection={<SprayBottleIcon size={25} />}
                                     onClick={(event) => {
                                         event.stopPropagation()
-                                        onOpenMembers(team)
+                                        onAssignDuty(team)
                                     }}
                                 >
-                                    Участники
+                                    Назначить дежурной
                                 </Menu.Item>
-                                {!isDutyTeam ? (
-                                    <Menu.Item
-                                        leftSection={<SprayBottleIcon size={25} />}
-                                        onClick={(event) => {
-                                            event.stopPropagation()
-                                            onAssignDuty(team)
-                                        }}
-                                    >
-                                        Назначить дежурной
-                                    </Menu.Item>
-                                ) : null}
-                                <Menu.Item
-                                    color="red"
-                                    leftSection={<TrashIcon size={25} />}
-                                    onClick={(event) => {
-                                        event.stopPropagation()
-                                        onDelete(team)
-                                    }}
-                                >
-                                    Удалить
-                                </Menu.Item>
-                            </Menu.Dropdown>
-                        </Menu>
-                    </div>
+                            ) : null}
+                            <Menu.Item
+                                color="red"
+                                leftSection={<TrashIcon size={25} />}
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    onDelete(team)
+                                }}
+                            >
+                                Удалить
+                            </Menu.Item>
+                        </Menu.Dropdown>
+                    </Menu>
                 </div>
-            </SettingsCardSurface>
+            </div>
         </div>
     )
 }
