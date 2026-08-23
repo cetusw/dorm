@@ -77,16 +77,21 @@ type currentDutyLookups struct {
 }
 
 type Service struct {
-	userRepo   user.Repository
-	teamRepo   structure.TeamRepository
-	groupRepo  structure.GroupRepository
-	dormRepo   structure.DormitoryRepository
-	dutyRepo   dutydomain.DutyRepository
-	taskRepo   catalog.TaskDefinitionRepository
-	areaRepo   catalog.AreaRepository
-	cleaningUC ports.CleaningUseCase
-	now        func() time.Time
-	location   *time.Location
+	userRepo        user.Repository
+	teamRepo        structure.TeamRepository
+	groupRepo       structure.GroupRepository
+	dormRepo        structure.DormitoryRepository
+	dutyRepo        dutydomain.DutyRepository
+	participantRepo dutydomain.ParticipantRepository
+	taskRepo        catalog.TaskDefinitionRepository
+	areaRepo        catalog.AreaRepository
+	cleaningUC      ports.CleaningUseCase
+	now             func() time.Time
+	location        *time.Location
+}
+
+func (s *Service) SetParticipantRepository(repo dutydomain.ParticipantRepository) {
+	s.participantRepo = repo
 }
 
 func NewResidentDutyService(
@@ -146,7 +151,7 @@ func (s *Service) GetCurrentDuty(
 		return buildResidentCurrentDutyResponse(currentDuty, view, nil, nil, 0, s.currentTime()), nil
 	}
 
-	lookups, err := s.loadCurrentDutyLookups(ctx, currentDuty.dutyTeam.ID())
+	lookups, err := s.loadCurrentDutyLookups(ctx, currentDuty.duty.ID(), currentDuty.dutyTeam.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +269,7 @@ func (s *Service) GetDutyDetails(
 		groups:        access.availableGroups,
 	}
 
-	lookups, err := s.loadCurrentDutyLookups(ctx, dutyTeam.ID())
+	lookups, err := s.loadCurrentDutyLookups(ctx, selectedDuty.ID(), dutyTeam.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -626,6 +631,7 @@ func (s *Service) loadLatestUnfinishedPastDutyForTeam(
 
 func (s *Service) loadCurrentDutyLookups(
 	ctx context.Context,
+	dutyID uuid.UUID,
 	teamID uuid.UUID,
 ) (*currentDutyLookups, error) {
 	taskDefinitions, err := s.taskDefinitionsByID(ctx)
@@ -638,7 +644,7 @@ func (s *Service) loadCurrentDutyLookups(
 		return nil, err
 	}
 
-	userNames, err := s.userNamesByID(ctx, teamID)
+	userNames, err := s.userNamesByDutyID(ctx, dutyID, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -649,6 +655,27 @@ func (s *Service) loadCurrentDutyLookups(
 		userNames:       userNames,
 		teamMembers:     teamMembersFromNames(userNames),
 	}, nil
+}
+
+func (s *Service) userNamesByDutyID(ctx context.Context, dutyID, teamID uuid.UUID) (map[uuid.UUID]string, error) {
+	if s.participantRepo == nil {
+		return s.userNamesByID(ctx, teamID)
+	}
+	participants, err := s.participantRepo.List(ctx, dutyID, false)
+	if err != nil {
+		return nil, fmt.Errorf("load duty participants: %w", err)
+	}
+	result := make(map[uuid.UUID]string, len(participants))
+	for _, participant := range participants {
+		resident, err := s.userRepo.FindByID(ctx, participant.ParticipantID)
+		if err != nil {
+			return nil, fmt.Errorf("load duty participant: %w", err)
+		}
+		if resident != nil {
+			result[resident.ID()] = formatUserName(resident)
+		}
+	}
+	return result, nil
 }
 
 func buildResidentDutyTasks(
@@ -949,12 +976,20 @@ func (s *Service) resolveResidentDutyView(
 		return residentDutyView{}, nil
 	}
 
-	isOnDutyTeam := currentDuty.duty != nil &&
-		currentDuty.dutyTeam != nil &&
-		currentDuty.resident.TeamID() != nil &&
-		*currentDuty.resident.TeamID() == currentDuty.dutyTeam.ID()
+	isOnDutyTeam := false
+	if currentDuty.duty != nil {
+		if s.participantRepo != nil {
+			active, err := s.participantRepo.IsActive(ctx, currentDuty.duty.ID(), currentDuty.resident.ID())
+			if err != nil {
+				return residentDutyView{}, fmt.Errorf("check duty participant: %w", err)
+			}
+			isOnDutyTeam = active
+		} else {
+			isOnDutyTeam = currentDuty.dutyTeam != nil && currentDuty.resident.TeamID() != nil && *currentDuty.resident.TeamID() == currentDuty.dutyTeam.ID()
+		}
+	}
 
-	isTeamLeader := isTeamLeader(currentDuty.residentTeam, currentDuty.resident.ID())
+	isTeamLeader := currentDuty.duty != nil && currentDuty.duty.LeaderID() != nil && *currentDuty.duty.LeaderID() == currentDuty.resident.ID()
 	canManageTasks := false
 	canVerifyTasks := false
 	readOnly := true
@@ -1058,10 +1093,18 @@ func (s *Service) resolveCurrentDutyNoticeTone(
 }
 
 func (s *Service) canInteractWithDuty(ctx context.Context, currentDuty *currentDutyContext) (bool, error) {
-	if currentDuty == nil || currentDuty.duty == nil || currentDuty.dutyTeam == nil || currentDuty.resident.TeamID() == nil {
+	if currentDuty == nil || currentDuty.duty == nil || currentDuty.dutyTeam == nil {
 		return false, nil
 	}
-	if *currentDuty.resident.TeamID() != currentDuty.dutyTeam.ID() {
+	if s.participantRepo != nil {
+		active, err := s.participantRepo.IsActive(ctx, currentDuty.duty.ID(), currentDuty.resident.ID())
+		if err != nil {
+			return false, err
+		}
+		if !active {
+			return false, nil
+		}
+	} else if currentDuty.resident.TeamID() == nil || *currentDuty.resident.TeamID() != currentDuty.dutyTeam.ID() {
 		return false, nil
 	}
 

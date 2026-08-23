@@ -102,6 +102,19 @@ func (q *NotificationQueryService) FindUserIDsByTeamID(ctx context.Context, team
 	return scanUUIDRows(rows, "scan team member id")
 }
 
+func (q *NotificationQueryService) FindActiveParticipantIDsByDutyID(ctx context.Context, dutyID uuid.UUID) ([]uuid.UUID, error) {
+	dutyIDBytes, err := dutyID.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("marshal duty id: %w", err)
+	}
+	rows, err := q.db.QueryContext(ctx, `SELECT p.participant_id FROM duty_participants p JOIN user u ON u.id = p.participant_id WHERE p.duty_id = ? AND p.excluded_at IS NULL AND u.deleted_at IS NULL`, dutyIDBytes)
+	if err != nil {
+		return nil, fmt.Errorf("find active duty participant ids: %w", err)
+	}
+	defer rows.Close()
+	return scanUUIDRows(rows, "scan duty participant id")
+}
+
 func (q *NotificationQueryService) GetByDutyID(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) (queryports.DutyFinishReminderState, error) {
 	dutyIDBytes, err := dutyID.MarshalBinary()
 	if err != nil {
@@ -117,7 +130,7 @@ func (q *NotificationQueryService) GetByDutyID(ctx context.Context, dutyID uuid.
 		return queryports.DutyFinishReminderState{}, err
 	}
 
-	memberIDs, err := q.FindUserIDsByTeamID(ctx, teamID)
+	memberIDs, err := q.FindActiveParticipantIDsByDutyID(ctx, dutyID)
 	if err != nil {
 		return queryports.DutyFinishReminderState{}, err
 	}
@@ -197,19 +210,9 @@ func (q *NotificationQueryService) getUsersBelowAssignedGoal(
 		FROM (
 			SELECT team_users.user_id AS user_id, COALESCE(SUM(task.cost), 0) AS assigned_cost
 			FROM (
-				SELECT u.id AS user_id
-				FROM user u
-				WHERE u.team_id = ?
-				  AND u.deleted_at IS NULL
-
-				UNION
-
-				SELECT t.leader_id AS user_id
-				FROM team t
-				JOIN user u ON u.id = t.leader_id
-				WHERE t.id = ?
-				  AND t.leader_id IS NOT NULL
-				  AND u.deleted_at IS NULL
+			SELECT participant_id AS user_id
+			FROM duty_participants
+			WHERE duty_id = ? AND excluded_at IS NULL
 			) AS team_users
 			LEFT JOIN duty_task dt
 				ON dt.duty_id = ?
@@ -221,7 +224,7 @@ func (q *NotificationQueryService) getUsersBelowAssignedGoal(
 		WHERE assigned_cost < ?
 	`
 
-	rows, err := q.db.QueryContext(ctx, query, teamID, teamID, dutyID, requiredGoal)
+	rows, err := q.db.QueryContext(ctx, query, dutyID, dutyID, requiredGoal)
 	if err != nil {
 		return nil, fmt.Errorf("find users below assigned goal: %w", err)
 	}

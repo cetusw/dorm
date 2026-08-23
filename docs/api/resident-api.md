@@ -149,6 +149,25 @@
 - Permissions:
   - только глава команды
 
+## Состав дежурства
+
+Все маршруты ниже требуют resident authentication и используют `dutyId`:
+
+- `GET /api/v1/resident/duties/:dutyId/participants` — список active и excluded
+  участников с `participant_id`, `full_name`, `type`, `excluded_at`, `is_leader`;
+- `GET /api/v1/resident/duties/:dutyId/participant-candidates` — жители той же
+  группы, пригодные для временного добавления;
+- `POST /api/v1/resident/duties/:dutyId/participants` body
+  `{ "participant_id": "..." }` — добавляет `TEMPORARY`;
+- `POST /api/v1/resident/duties/:dutyId/participants/:participantId/exclude` body
+  `{ "replacement_leader_id": "..." }` — soft-exclusion; замена обязательна
+  при исключении текущего лидера;
+- `POST /api/v1/resident/duties/:dutyId/participants/:participantId/restore`;
+- `PATCH /api/v1/resident/duties/:dutyId/leader` body `{ "leader_id": "..." }`.
+
+Редактирование состава участников доступно только для календарно текущего Duty. Конфликты
+участия и недопустимые переходы возвращают `409`.
+
 ## Push notifications
 
 ### `GET /api/v1/notifications/config`

@@ -18,18 +18,23 @@ import (
 )
 
 type Service struct {
-	userRepo     user.Repository
-	teamRepo     structure.TeamRepository
-	groupRepo    structure.GroupRepository
-	dutyRepo     duty.DutyRepository
-	dutyTaskRepo duty.DutyTaskRepository
-	taskRepo     catalog.TaskDefinitionRepository
-	overrideRepo catalog.DutyTaskOverrideRepository
-	areaRepo     catalog.AreaRepository
-	eventBus     ports.EventBus
-	now          func() time.Time
-	location     *time.Location
+	userRepo        user.Repository
+	teamRepo        structure.TeamRepository
+	groupRepo       structure.GroupRepository
+	dutyRepo        duty.DutyRepository
+	dutyTaskRepo    duty.DutyTaskRepository
+	participantRepo duty.ParticipantRepository
+	taskRepo        catalog.TaskDefinitionRepository
+	overrideRepo    catalog.DutyTaskOverrideRepository
+	areaRepo        catalog.AreaRepository
+	eventBus        ports.EventBus
+	now             func() time.Time
+	location        *time.Location
 }
+
+// SetParticipantRepository enables duty-specific membership checks. It is kept
+// separate from construction to preserve the existing scheduler/test wiring.
+func (s *Service) SetParticipantRepository(repo duty.ParticipantRepository) { s.participantRepo = repo }
 
 func NewCleaningService(
 	userRepo user.Repository,
@@ -233,11 +238,21 @@ func (s *Service) canReopenTask(ctx context.Context, data *taskActionContext) er
 }
 
 func (s *Service) requireActionableTeamDuty(ctx context.Context, data *taskActionContext) error {
-	if data.user.TeamID() == nil {
-		return duty.ErrTaskAccessDenied
-	}
-	if !data.duty.BelongsToTeam(*data.user.TeamID()) {
-		return duty.ErrTaskAccessDenied
+	if s.participantRepo != nil {
+		active, err := s.participantRepo.IsActive(ctx, data.duty.ID(), data.user.ID())
+		if err != nil {
+			return fmt.Errorf("check duty participant: %w", err)
+		}
+		if !active {
+			return duty.ErrTaskAccessDenied
+		}
+	} else {
+		if data.user.TeamID() == nil {
+			return duty.ErrTaskAccessDenied
+		}
+		if !data.duty.BelongsToTeam(*data.user.TeamID()) {
+			return duty.ErrTaskAccessDenied
+		}
 	}
 
 	at := s.currentTime()
@@ -258,11 +273,7 @@ func (s *Service) requireTaskReviewer(ctx context.Context, data *taskActionConte
 	if err := s.requireActionableTeamDuty(ctx, data); err != nil {
 		return err
 	}
-	team, err := s.teamRepo.FindByID(ctx, data.duty.TeamID())
-	if err != nil {
-		return fmt.Errorf("load duty team: %w", err)
-	}
-	if team == nil || team.LeaderID() == nil || *team.LeaderID() != data.user.ID() {
+	if data.duty.LeaderID() == nil || *data.duty.LeaderID() != data.user.ID() {
 		return duty.ErrTaskAccessDenied
 	}
 	return nil
@@ -316,9 +327,9 @@ func (s *Service) assignRemainingFreeTasksToLastUnderGoalMember(ctx context.Cont
 		return fmt.Errorf("reload duty after assignment: %w", err)
 	}
 
-	teamMembers, err := s.userRepo.FindByTeamID(ctx, refreshedDuty.TeamID())
+	teamMembers, err := s.dutyMembers(ctx, refreshedDuty)
 	if err != nil {
-		return fmt.Errorf("load duty team members: %w", err)
+		return err
 	}
 	if len(teamMembers) == 0 {
 		return nil
@@ -385,6 +396,27 @@ func (s *Service) assignRemainingFreeTasksToLastUnderGoalMember(ctx context.Cont
 	}
 
 	return nil
+}
+
+func (s *Service) dutyMembers(ctx context.Context, currentDuty *duty.Duty) ([]*user.User, error) {
+	if s.participantRepo == nil {
+		return s.userRepo.FindByTeamID(ctx, currentDuty.TeamID())
+	}
+	participants, err := s.participantRepo.List(ctx, currentDuty.ID(), false)
+	if err != nil {
+		return nil, fmt.Errorf("load duty participants: %w", err)
+	}
+	members := make([]*user.User, 0, len(participants))
+	for _, participant := range participants {
+		member, err := s.userRepo.FindByID(ctx, participant.ParticipantID)
+		if err != nil {
+			return nil, fmt.Errorf("load duty participant: %w", err)
+		}
+		if member != nil {
+			members = append(members, member)
+		}
+	}
+	return members, nil
 }
 
 func hasOtherFreeTasks(tasks []*duty.DutyTask, currentTaskID uuid.UUID) bool {
@@ -504,20 +536,15 @@ func (s *Service) publishTasksReadyForReviewIfNeeded(ctx context.Context, data *
 		return
 	}
 
-	team, err := s.teamRepo.FindByID(ctx, currentDuty.TeamID())
-	if err != nil {
-		log.Printf("load team for tasks ready event: %v", err)
-		return
-	}
-	if team == nil || team.LeaderID() == nil {
-		log.Printf("skip tasks ready notification: team %s has no leader", currentDuty.TeamID())
+	if currentDuty.LeaderID() == nil {
+		log.Printf("skip tasks ready notification: duty %s has no leader", currentDuty.ID())
 		return
 	}
 
 	_ = s.eventBus.Publish(ctx, events.TopicTasksReadyForReview, events.TasksReadyForReviewEvent{
 		DutyID:     currentDuty.ID(),
 		TeamID:     currentDuty.TeamID(),
-		TeamHeadID: *team.LeaderID(),
+		TeamHeadID: *currentDuty.LeaderID(),
 		OccurredAt: data.now,
 	})
 }

@@ -61,7 +61,15 @@ func (r *DutyRepository) createDutyData(
 	tasks []*duty.DutyTask,
 	groupIDBytes []byte,
 ) error {
+	leaderID, err := dutyTeamLeaderID(ctx, tx, currentDuty.TeamID())
+	if err != nil {
+		return err
+	}
+	currentDuty.SetLeaderID(leaderID)
 	if err := insertDuty(ctx, tx, currentDuty, groupIDBytes); err != nil {
+		return err
+	}
+	if err := insertDutyParticipants(ctx, tx, currentDuty.ID(), currentDuty.TeamID(), leaderID); err != nil {
 		return err
 	}
 	return insertDutyTasks(ctx, tx, currentDuty.ID(), tasks)
@@ -69,8 +77,8 @@ func (r *DutyRepository) createDutyData(
 
 func insertDuty(ctx context.Context, tx *sql.Tx, d *duty.Duty, groupIDBytes []byte) error {
 	const dutyQuery = `
-		INSERT INTO duty (id, team_id, group_id, start_date, end_date, sequence_number)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO duty (id, team_id, leader_id, group_id, start_date, end_date, sequence_number)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 	dIDBytes, err := marshalUUID(d.ID(), "duty id")
 	if err != nil {
@@ -80,9 +88,61 @@ func insertDuty(ctx context.Context, tx *sql.Tx, d *duty.Duty, groupIDBytes []by
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, dutyQuery, dIDBytes, tIDBytes, groupIDBytes, d.Start(), d.End(), d.SequenceNumber())
+	leaderID, err := nullableUUIDBytes(d.LeaderID(), "duty leader id")
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, dutyQuery, dIDBytes, tIDBytes, leaderID, groupIDBytes, d.Start(), d.End(), d.SequenceNumber())
 	if err != nil {
 		return fmt.Errorf("failed to save duty root: %w", err)
+	}
+	return nil
+}
+
+func dutyTeamLeaderID(ctx context.Context, tx *sql.Tx, teamID uuid.UUID) (*uuid.UUID, error) {
+	teamIDBytes, err := marshalUUID(teamID, "team id")
+	if err != nil {
+		return nil, err
+	}
+	var raw []byte
+	if err := tx.QueryRowContext(ctx, `SELECT leader_id FROM team WHERE id = ?`, teamIDBytes).Scan(&raw); err != nil {
+		return nil, fmt.Errorf("load duty team leader: %w", err)
+	}
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	id, err := uuid.FromBytes(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parse duty team leader: %w", err)
+	}
+	return &id, nil
+}
+
+func insertDutyParticipants(ctx context.Context, tx *sql.Tx, dutyID, teamID uuid.UUID, leaderID *uuid.UUID) error {
+	dutyIDBytes, err := marshalUUID(dutyID, "duty id")
+	if err != nil {
+		return err
+	}
+	teamIDBytes, err := marshalUUID(teamID, "team id")
+	if err != nil {
+		return err
+	}
+	const query = `
+		INSERT IGNORE INTO duty_participants (duty_id, participant_id, type, excluded_at)
+		SELECT ?, id, 'REGULAR', NULL FROM user WHERE team_id = ? AND deleted_at IS NULL
+	`
+	if _, err := tx.ExecContext(ctx, query, dutyIDBytes, teamIDBytes); err != nil {
+		return fmt.Errorf("snapshot duty members: %w", err)
+	}
+	if leaderID == nil {
+		return nil
+	}
+	leaderIDBytes, err := marshalUUID(*leaderID, "leader id")
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO duty_participants (duty_id, participant_id, type, excluded_at) VALUES (?, ?, 'REGULAR', NULL)`, dutyIDBytes, leaderIDBytes); err != nil {
+		return fmt.Errorf("snapshot duty leader: %w", err)
 	}
 	return nil
 }
@@ -316,7 +376,7 @@ func (r *DutyRepository) FindActiveByTeamID(
 	at time.Time,
 ) (*duty.Duty, error) {
 	const query = `
-		SELECT id, team_id, start_date, end_date, sequence_number
+		SELECT id, team_id, leader_id, start_date, end_date, sequence_number
 		FROM duty
 		WHERE team_id = ?
 		  AND start_date <= ?
@@ -332,11 +392,11 @@ func (r *DutyRepository) FindActiveByTeamID(
 
 	row := r.db.QueryRowContext(ctx, query, teamIDBytes, at, at)
 
-	var dutyIDBytes, teamIDResultBytes []byte
+	var dutyIDBytes, teamIDResultBytes, leaderIDBytes []byte
 	var startDate, endDate time.Time
 	var sequenceNumber int
 
-	if err := row.Scan(&dutyIDBytes, &teamIDResultBytes, &startDate, &endDate, &sequenceNumber); err != nil {
+	if err := row.Scan(&dutyIDBytes, &teamIDResultBytes, &leaderIDBytes, &startDate, &endDate, &sequenceNumber); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -358,7 +418,15 @@ func (r *DutyRepository) FindActiveByTeamID(
 		return nil, err
 	}
 
-	return duty.RestoreDuty(dutyID, teamIDResult, startDate, endDate, sequenceNumber, tasks), nil
+	result := duty.RestoreDuty(dutyID, teamIDResult, startDate, endDate, sequenceNumber, tasks)
+	if len(leaderIDBytes) > 0 {
+		leaderID, err := uuid.FromBytes(leaderIDBytes)
+		if err != nil {
+			return nil, fmt.Errorf("find active duty: parse leader id: %w", err)
+		}
+		result.SetLeaderID(&leaderID)
+	}
+	return result, nil
 }
 
 func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
@@ -395,16 +463,16 @@ func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUI
 }
 
 func (r *DutyRepository) FindByID(ctx context.Context, id uuid.UUID) (*duty.Duty, error) {
-	const dutyQuery = `SELECT id, team_id, start_date, end_date, sequence_number FROM duty WHERE id = ?`
+	const dutyQuery = `SELECT id, team_id, leader_id, start_date, end_date, sequence_number FROM duty WHERE id = ?`
 
 	idBytes, _ := id.MarshalBinary()
 	row := r.db.QueryRowContext(ctx, dutyQuery, idBytes)
 
-	var dID, tID []byte
+	var dID, tID, leaderIDBytes []byte
 	var start, end time.Time
 	var sequenceNumber int
 
-	err := row.Scan(&dID, &tID, &start, &end, &sequenceNumber)
+	err := row.Scan(&dID, &tID, &leaderIDBytes, &start, &end, &sequenceNumber)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -420,7 +488,15 @@ func (r *DutyRepository) FindByID(ctx context.Context, id uuid.UUID) (*duty.Duty
 		return nil, err
 	}
 
-	return duty.RestoreDuty(dutyID, teamID, start, end, sequenceNumber, tasks), nil
+	result := duty.RestoreDuty(dutyID, teamID, start, end, sequenceNumber, tasks)
+	if len(leaderIDBytes) > 0 {
+		leaderID, err := uuid.FromBytes(leaderIDBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse duty leader: %w", err)
+		}
+		result.SetLeaderID(&leaderID)
+	}
+	return result, nil
 }
 
 func (r *DutyRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*duty.Duty, error) {

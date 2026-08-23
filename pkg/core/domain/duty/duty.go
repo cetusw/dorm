@@ -28,6 +28,7 @@ var (
 type Duty struct {
 	id             uuid.UUID
 	teamID         uuid.UUID
+	leaderID       *uuid.UUID
 	start          time.Time
 	end            time.Time
 	sequenceNumber int
@@ -68,8 +69,10 @@ func (d *Duty) AddTask(taskID, taskDefID uuid.UUID) {
 	}
 }
 
-func (d *Duty) ID() uuid.UUID     { return d.id }
-func (d *Duty) TeamID() uuid.UUID { return d.teamID }
+func (d *Duty) ID() uuid.UUID                   { return d.id }
+func (d *Duty) TeamID() uuid.UUID               { return d.teamID }
+func (d *Duty) LeaderID() *uuid.UUID            { return copyUUID(d.leaderID) }
+func (d *Duty) SetLeaderID(leaderID *uuid.UUID) { d.leaderID = copyUUID(leaderID) }
 func (d *Duty) SequenceNumber() int {
 	return d.sequenceNumber
 }

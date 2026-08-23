@@ -88,6 +88,7 @@
 - `start_date`
 - `end_date`
 - `sequence_number`
+- `leader_id NULL` — фактический лидер конкретного дежурства
 
 Ограничения и индексы:
 
@@ -96,6 +97,15 @@
 - `idx_duty_team_sequence (team_id, sequence_number)`
 
 `sequence_number` уникален только внутри группы.
+
+### `duty_participants`
+
+- `duty_id`, `participant_id` — составной primary key;
+- `type` — `REGULAR` (snapshot команды) или `TEMPORARY` (ручное добавление);
+- `excluded_at NULL` — soft-exclusion, не удаляющий историческую запись.
+
+`duty_id` каскадно удаляется вместе с Duty; ссылка на `user` имеет `RESTRICT`,
+что согласуется с soft delete жителей и не стирает историю участия.
 
 ### `duty_task`
 
@@ -196,6 +206,8 @@ erDiagram
     area ||--o{ task : contains
 
     duty ||--o{ duty_task : expands
+    duty ||--o{ duty_participants : has_snapshot
+    user ||--o{ duty_participants : participates_in
     task ||--o{ duty_task : scheduled_as
     task ||--|| duty_task_override : overridden_by
 

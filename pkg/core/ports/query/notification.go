@@ -29,6 +29,12 @@ type DutyTeamMembersQuery interface {
 	FindUserIDsByTeamID(ctx context.Context, teamID uuid.UUID) ([]uuid.UUID, error)
 }
 
+// DutyParticipantsQuery is deliberately separate so older adapters/tests can
+// retain the legacy team lookup while production uses the duty snapshot.
+type DutyParticipantsQuery interface {
+	FindActiveParticipantIDsByDutyID(ctx context.Context, dutyID uuid.UUID) ([]uuid.UUID, error)
+}
+
 type DutyFinishReminderQuery interface {
 	GetByDutyID(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) (DutyFinishReminderState, error)
 }

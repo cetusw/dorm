@@ -5,6 +5,7 @@ import (
 	"dorm/pkg/adapters/http"
 	"dorm/pkg/core/domain/events"
 	"dorm/pkg/core/usecase/dormitory"
+	participantsuc "dorm/pkg/core/usecase/dutyparticipants"
 	dutysettingsuc "dorm/pkg/core/usecase/dutysettings"
 	individualtaskuc "dorm/pkg/core/usecase/individualtask"
 	notificationuc "dorm/pkg/core/usecase/notification"
@@ -59,6 +60,7 @@ func NewContainer(configPath string) (*Container, error) {
 	groupRepo := repository.NewGroupRepository(db)
 	dutyRepo := repository.NewDutyRepository(db)
 	dutyTaskRepo := repository.NewDutyTaskRepository(db)
+	dutyParticipantRepo := repository.NewDutyParticipantRepository(db)
 	areaRepo := repository.NewAreaRepository(db)
 	taskRepo := repository.NewTaskRepository(db)
 	taskOverrideRepo := repository.NewDutyTaskOverrideRepository(db)
@@ -80,6 +82,7 @@ func NewContainer(configPath string) (*Container, error) {
 		areaRepo,
 		bus,
 	)
+	cleaningService.SetParticipantRepository(dutyParticipantRepo)
 
 	userQueryService := query.NewUserQueryService(db)
 	teamQueryService := query.NewTeamQueryService(db)
@@ -179,9 +182,14 @@ func NewContainer(configPath string) (*Container, error) {
 		cleaningService,
 	)
 	residentDutyService.SetLocation(location)
+	residentDutyService.SetParticipantRepository(dutyParticipantRepo)
+	participantsService := participantsuc.NewService(userRepo, teamRepo, groupRepo, dormitoryRepo, dutyRepo, dutyParticipantRepo)
+	participantsService.SetLocation(location)
 
 	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService)
 	residentAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	dutyParticipantsAPIHandler := http.NewDutyParticipantsAPIHandler(participantsService)
+	dutyParticipantsAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
 	dormitoryAPIHandler := http.NewDormitoryAPIHandler(dormitoryService)
 	dormitoryAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))

@@ -137,7 +137,7 @@ func (s *DutyReminderService) SendSundayFinishTaskReminders(ctx context.Context,
 
 func (s *DutyReminderService) NotifyDutyStartedForDuties(ctx context.Context, duties []domainevents.StartedDuty) error {
 	for _, startedDuty := range duties {
-		userIDs, err := s.dutyTeamMembersQuery.FindUserIDsByTeamID(ctx, startedDuty.TeamID)
+		userIDs, err := s.dutyUsers(ctx, startedDuty.DutyID, startedDuty.TeamID)
 		if err != nil {
 			log.Printf("notification reminder: load team members for started duty %s: %v", startedDuty.DutyID, err)
 			continue
@@ -171,7 +171,7 @@ func (s *DutyReminderService) notifyForActiveDutyMembers(
 	}
 
 	for _, activeDuty := range activeDuties {
-		userIDs, err := s.dutyTeamMembersQuery.FindUserIDsByTeamID(ctx, activeDuty.TeamID)
+		userIDs, err := s.dutyUsers(ctx, activeDuty.ID, activeDuty.TeamID)
 		if err != nil {
 			log.Printf("notification reminder: load team members for duty %s: %v", activeDuty.ID, err)
 			continue
@@ -181,6 +181,13 @@ func (s *DutyReminderService) notifyForActiveDutyMembers(
 	}
 
 	return nil
+}
+
+func (s *DutyReminderService) dutyUsers(ctx context.Context, dutyID, teamID uuid.UUID) ([]uuid.UUID, error) {
+	if participants, ok := s.dutyTeamMembersQuery.(queryports.DutyParticipantsQuery); ok {
+		return participants.FindActiveParticipantIDsByDutyID(ctx, dutyID)
+	}
+	return s.dutyTeamMembersQuery.FindUserIDsByTeamID(ctx, teamID)
 }
 
 func (s *DutyReminderService) notifyDutyUsers(
