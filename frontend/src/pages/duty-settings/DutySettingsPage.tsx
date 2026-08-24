@@ -37,7 +37,18 @@ type Props = {
 }
 
 export function DutySettingsPage({ groupId }: Props) {
-    const { data, error, forbidden, loading, reload, changeTeamMembersCount } = useDutySettings(groupId)
+    const {
+        data,
+        error,
+        forbidden,
+        loading,
+        reload,
+        participants,
+        participantsLoading,
+        participantsError,
+        reloadParticipants,
+        changeTeamMembersCount,
+    } = useDutySettings(groupId)
     const [mainTab, setMainTab] = useState<DutySettingsMainTab>('tasks')
     const [viewMode, setViewMode] = useState<DutySettingsViewMode>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
@@ -176,7 +187,10 @@ export function DutySettingsPage({ groupId }: Props) {
                 groupId={groupId}
                 teams={data.teams}
                 activeDutyTeamId={data.active_duty_team_id}
-                onReload={() => reload({ silent: true })}
+                onReload={async () => {
+                    await reload({ silent: true })
+                    await reloadParticipants()
+                }}
                 onMemberCountChange={changeTeamMembersCount}
             />
         ) : mainTab === 'participants' ? (
@@ -187,8 +201,17 @@ export function DutySettingsPage({ groupId }: Props) {
                 />
             ) : (
                 <DutySettingsParticipantsTab
+                    groupId={groupId}
                     activeDuty={data.active_duty}
-                    onReload={() => reload({ silent: true })}
+                    teams={data.teams}
+                    activeDutyTeamId={data.active_duty_team_id}
+                    participants={participants}
+                    loading={participantsLoading}
+                    participantsError={participantsError}
+                    onParticipantsChanged={async () => {
+                        await reload({ silent: true })
+                        await reloadParticipants()
+                    }}
                 />
             )
         ) : data.task_editor_state !== 'active' || !data.active_duty ? (

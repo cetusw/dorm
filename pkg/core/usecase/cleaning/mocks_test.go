@@ -68,8 +68,8 @@ func (m *MockDutyRepo) FindHistoryByGroupID(ctx context.Context, id uuid.UUID) (
 	}
 	return args.Get(0).([]duty.DutyHistoryEntry), args.Error(1)
 }
-func (m *MockDutyRepo) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error {
-	return m.Called(ctx, dutyID, teamID).Error(0)
+func (m *MockDutyRepo) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID, reassignedAt time.Time) error {
+	return m.Called(ctx, dutyID, teamID, reassignedAt).Error(0)
 }
 func (m *MockDutyRepo) CountDistinctStartDates(ctx context.Context) (int, error) {
 	args := m.Called(ctx)

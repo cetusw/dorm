@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { CrownSimpleIcon, HandCoinsIcon, UserMinusIcon, UsersIcon } from '@phosphor-icons/react'
-import { ActionIcon, Alert, Button, Center, FocusTrap, Group, Loader, Modal, Stack, Text, Tooltip } from '@mantine/core'
+import { CrownSimpleIcon, HandCoinsIcon, UserMinusIcon, UsersIcon, UserSwitchIcon } from '@phosphor-icons/react'
+import { ActionIcon, Alert, Button, Center, FocusTrap, Group, Loader, Menu, Modal, Stack, Text, Tooltip } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 
 import {
@@ -9,19 +9,26 @@ import {
     changeDutyLeader,
     excludeDutyParticipant,
     getDutyParticipantCandidates,
-    getDutyParticipants,
     restoreDutyParticipant,
+    assignDutySettingsActiveTeam,
 } from '../../../features/duty-settings/api/dutySettingsApi'
-import type { DutyParticipant, DutyParticipantCandidate, DutySettingsActiveDuty } from '../../../features/duty-settings/model/types'
+import type { DutyParticipant, DutyParticipantCandidate, DutySettingsActiveDuty, DutySettingsTeam } from '../../../features/duty-settings/model/types'
 import { ApiError } from '../../../shared/api/ApiError'
+import { ConfirmActionModal } from '../../../shared/ui/ConfirmActionModal'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { ResidentSearchCombobox, type ResidentSearchOption } from '../../../shared/ui/ResidentSearchCombobox'
 import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
 import classes from './DutySettingsParticipantsTab.module.css'
 
 type Props = {
+    groupId: string
     activeDuty: DutySettingsActiveDuty
-    onReload: () => Promise<void>
+    teams: DutySettingsTeam[]
+    activeDutyTeamId: string | null
+    participants: DutyParticipant[]
+    loading: boolean
+    participantsError: string | null
+    onParticipantsChanged: () => Promise<void>
 }
 
 type PendingExclusion = { participant: DutyParticipant }
@@ -32,22 +39,6 @@ function formatPeriod(startDate: string, endDate: string): string {
         return parts.length === 3 ? `${parts[2]}.${parts[1]}` : value
     }
     return `${format(startDate)} - ${format(endDate)}`
-}
-
-function reconcileParticipants(current: DutyParticipant[], next: DutyParticipant[]): DutyParticipant[] {
-    const previous = new Map(current.map((participant) => [participant.participant_id, participant]))
-    return next.map((participant) => {
-        const saved = previous.get(participant.participant_id)
-        return saved
-            && saved.full_name === participant.full_name
-            && saved.type === participant.type
-            && saved.excluded_at === participant.excluded_at
-            && saved.is_leader === participant.is_leader
-            && saved.team_id === participant.team_id
-            && saved.team_name === participant.team_name
-            ? saved
-            : participant
-    })
 }
 
 function ParticipantCard({
@@ -109,9 +100,16 @@ function ParticipantCard({
     )
 }
 
-export function DutySettingsParticipantsTab({ activeDuty, onReload }: Props) {
-    const [participants, setParticipants] = useState<DutyParticipant[]>([])
-    const [loading, setLoading] = useState(true)
+export function DutySettingsParticipantsTab({
+    groupId,
+    activeDuty,
+    teams,
+    activeDutyTeamId,
+    participants,
+    loading,
+    participantsError,
+    onParticipantsChanged,
+}: Props) {
     const [error, setError] = useState<string | null>(null)
     const [searchValue, setSearchValue] = useState('')
     const [searchFocused, setSearchFocused] = useState(false)
@@ -124,22 +122,8 @@ export function DutySettingsParticipantsTab({ activeDuty, onReload }: Props) {
     const [excluding, setExcluding] = useState(false)
     const [changingLeaderID, setChangingLeaderID] = useState<string | null>(null)
     const [adding, setAdding] = useState(false)
+    const [pendingDutyTeam, setPendingDutyTeam] = useState<DutySettingsTeam | null>(null)
     const [debouncedSearch] = useDebouncedValue(searchValue, 300)
-
-    const loadParticipants = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const response = await getDutyParticipants(activeDuty.id)
-            setParticipants((current) => reconcileParticipants(current, response))
-        } catch (currentError) {
-            setError(currentError instanceof Error ? currentError.message : 'Не удалось загрузить исполнителей')
-        } finally {
-            setLoading(false)
-        }
-    }, [activeDuty.id])
-
-    useEffect(() => { void loadParticipants() }, [loadParticipants])
 
     useEffect(() => {
         if (!searchFocused) {
@@ -181,7 +165,7 @@ export function DutySettingsParticipantsTab({ activeDuty, onReload }: Props) {
     }, [activeParticipants, pendingExclusion?.participant.participant_id, replacementSearch])
 
     async function refreshAfterMutation() {
-        await Promise.all([loadParticipants(), onReload()])
+        await onParticipantsChanged()
     }
 
     async function addOrRestore(option: ResidentSearchOption) {
@@ -197,7 +181,7 @@ export function DutySettingsParticipantsTab({ activeDuty, onReload }: Props) {
             await refreshAfterMutation()
         } catch (currentError) {
             setError(currentError instanceof ApiError ? currentError.message : 'Не удалось добавить исполнителя')
-            void loadParticipants()
+            void onParticipantsChanged()
         } finally {
             setAdding(false)
         }
@@ -213,6 +197,7 @@ export function DutySettingsParticipantsTab({ activeDuty, onReload }: Props) {
     const pointsPerParticipant = activeParticipants.length === 0
         ? 0
         : Math.floor(activeDuty.summary.total_cost / activeParticipants.length)
+    const nextDutyTeams = teams.filter((team) => team.id !== (activeDutyTeamId ?? activeDuty.team_id))
 
     return (
         <>
@@ -221,22 +206,48 @@ export function DutySettingsParticipantsTab({ activeDuty, onReload }: Props) {
                 <div className={classes.summaryItem}><HandCoinsIcon size={20} />{pointsPerParticipant} баллов на исполнителя</div>
             </div>
             <div className={classes.search}>
-                <ResidentSearchCombobox
-                    overlayOpened={searchFocused}
-                    searchValue={searchValue}
-                    options={searchOptions}
-                    loading={candidateLoading || adding}
-                    placeholder="Добавить исполнителя"
-                    selectedId={null}
-                    onSearchChange={setSearchValue}
-                    onFocus={() => {
-                        setSearchFocused(true)
-                        if (candidates.length === 0) setCandidateLoading(true)
-                    }}
-                    onOptionSelect={(option) => { void addOrRestore(option) }}
-                />
+                <div className={classes.searchRow}>
+                    <div className={classes.searchField}>
+                        <ResidentSearchCombobox
+                            overlayOpened={searchFocused}
+                            searchValue={searchValue}
+                            options={searchOptions}
+                            loading={candidateLoading || adding}
+                            placeholder="Добавить исполнителя"
+                            selectedId={null}
+                            inputClassName={classes.addParticipantInput}
+                            onSearchChange={setSearchValue}
+                            onFocus={() => {
+                                setSearchFocused(true)
+                                if (candidates.length === 0) setCandidateLoading(true)
+                            }}
+                            onOptionSelect={(option) => { void addOrRestore(option) }}
+                        />
+                    </div>
+                    {teams.length > 0 ? (
+                        <Menu position="bottom-end" shadow="sm" width="target">
+                            <Menu.Target>
+                                <Button
+                                    variant="default"
+                                    className={classes.switchTeamButton}
+                                    leftSection={<UserSwitchIcon size={20} />}
+                                    disabled={nextDutyTeams.length === 0}
+                                >
+                                    Сменить команду
+                                </Button>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                                {nextDutyTeams.map((team) => (
+                                    <Menu.Item key={team.id} onClick={() => setPendingDutyTeam(team)}>
+                                        {team.leader.name}
+                                    </Menu.Item>
+                                ))}
+                            </Menu.Dropdown>
+                        </Menu>
+                    ) : null}
+                </div>
             </div>
-            {error ? <Alert mt="sm" color="red">{error}</Alert> : null}
+            {participantsError ?? error ? <Alert mt="sm" color="red">{participantsError ?? error}</Alert> : null}
             {loading ? <Center py="xl"><Loader /></Center> : activeParticipants.length === 0 ? (
                 <EmptyState title="Исполнители не найдены" description="Добавьте исполнителя в это дежурство." />
             ) : (
@@ -253,7 +264,7 @@ export function DutySettingsParticipantsTab({ activeDuty, onReload }: Props) {
                                     .then(refreshAfterMutation)
                                     .catch((currentError) => {
                                         setError(currentError instanceof ApiError ? currentError.message : 'Не удалось назначить главу дежурства')
-                                        void loadParticipants()
+                                        void onParticipantsChanged()
                                     })
                                     .finally(() => setChangingLeaderID(null))
                             }}
@@ -301,12 +312,26 @@ export function DutySettingsParticipantsTab({ activeDuty, onReload }: Props) {
                                 await refreshAfterMutation()
                             } catch (currentError) {
                                 setMutationError(currentError instanceof ApiError ? currentError.message : 'Не удалось исключить исполнителя')
-                                void loadParticipants()
+                                void onParticipantsChanged()
                             } finally { setExcluding(false) }
                         }}>Исключить</Button>
                     </Group>
                 </Stack>
             </Modal>
+            <ConfirmActionModal
+                opened={pendingDutyTeam !== null}
+                title="Назначить дежурной"
+                description={`Вы уверены, что хотите назначить команду ${pendingDutyTeam?.leader.name ?? ''} дежурной? Прогресс по задачам текущей дежурной команды будет утерян.`}
+                confirmLabel="Назначить"
+                onClose={() => setPendingDutyTeam(null)}
+                onConfirm={async () => {
+                    if (!pendingDutyTeam) return
+                    await assignDutySettingsActiveTeam(groupId, pendingDutyTeam.id)
+                    setPendingDutyTeam(null)
+                    await onParticipantsChanged()
+                }}
+                errorMessage="Не удалось назначить дежурную команду"
+            />
         </>
     )
 }

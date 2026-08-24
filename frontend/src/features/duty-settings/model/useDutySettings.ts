@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ApiError } from '../../../shared/api/ApiError'
-import { getDutySettings } from '../api/dutySettingsApi'
-import type { DutySettingsArea, DutySettingsResponse, DutySettingsTask, DutySettingsTeam } from './types'
+import { getDutyParticipants, getDutySettings } from '../api/dutySettingsApi'
+import type { DutyParticipant, DutySettingsArea, DutySettingsResponse, DutySettingsTask, DutySettingsTeam } from './types'
 
 function sortAreas(areas: DutySettingsArea[]): DutySettingsArea[] {
     return [...areas].sort((left, right) => {
@@ -60,11 +60,54 @@ function toError(error: unknown): string {
     return 'Не удалось загрузить настройки дежурства'
 }
 
+function reconcileParticipants(currentParticipants: DutyParticipant[], nextParticipants: DutyParticipant[]): DutyParticipant[] {
+    const currentByID = new Map(currentParticipants.map((participant) => [participant.participant_id, participant]))
+    const participants = nextParticipants.map((participant) => {
+        const current = currentByID.get(participant.participant_id)
+        return current
+            && current.full_name === participant.full_name
+            && current.type === participant.type
+            && current.excluded_at === participant.excluded_at
+            && current.is_leader === participant.is_leader
+            && current.team_id === participant.team_id
+            && current.team_name === participant.team_name
+            ? current
+            : participant
+    })
+    return currentParticipants.length === participants.length
+        && currentParticipants.every((participant, index) => participant === participants[index])
+        ? currentParticipants
+        : participants
+}
+
 export function useDutySettings(groupId: string) {
     const [data, setData] = useState<DutySettingsResponse | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [forbidden, setForbidden] = useState(false)
+    const participantsDutyIDRef = useRef<string | null>(null)
+    const [participants, setParticipants] = useState<DutyParticipant[]>([])
+    const [participantsLoading, setParticipantsLoading] = useState(false)
+    const [participantsError, setParticipantsError] = useState<string | null>(null)
+
+    const reloadParticipants = useCallback(async (dutyID?: string | null) => {
+        const resolvedDutyID = dutyID ?? participantsDutyIDRef.current
+        if (!resolvedDutyID) {
+            setParticipants([])
+            return
+        }
+
+        setParticipantsLoading(true)
+        setParticipantsError(null)
+        try {
+            const response = await getDutyParticipants(resolvedDutyID)
+            setParticipants((current) => reconcileParticipants(current, response))
+        } catch (currentError) {
+            setParticipantsError(toError(currentError))
+        } finally {
+            setParticipantsLoading(false)
+        }
+    }, [])
 
     const reload = useCallback(async (options?: { silent?: boolean }) => {
         if (!options?.silent) {
@@ -83,6 +126,14 @@ export function useDutySettings(groupId: string) {
                     tasks: sortTasks(area.tasks),
                 }))),
             }))
+            const activeDutyID = response.active_duty?.id ?? null
+            if (activeDutyID !== participantsDutyIDRef.current) {
+                participantsDutyIDRef.current = activeDutyID
+                setParticipants([])
+                if (activeDutyID) {
+                    void reloadParticipants(activeDutyID)
+                }
+            }
         } catch (error) {
             if (error instanceof ApiError && error.status === 403) {
                 setForbidden(true)
@@ -96,7 +147,7 @@ export function useDutySettings(groupId: string) {
                 setLoading(false)
             }
         }
-    }, [groupId])
+    }, [groupId, reloadParticipants])
 
     useEffect(() => {
         void reload()
@@ -108,6 +159,10 @@ export function useDutySettings(groupId: string) {
         error,
         forbidden,
         reload,
+        participants,
+        participantsLoading,
+        participantsError,
+        reloadParticipants,
         changeTeamMembersCount: useCallback((teamId: string, delta: number) => {
             setData((current) => {
                 if (!current) {

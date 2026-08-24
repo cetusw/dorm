@@ -17,6 +17,34 @@
     margin-top: 25px;
 }
 
+.searchRow {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.searchField {
+    min-width: 0;
+    flex: 1;
+}
+
+.addParticipantInput {
+    min-height: 48px;
+    height: 48px;
+}
+
+.switchTeamButton {
+    height: 48px;
+    border: 1px solid #DDE4E2;
+    background: #FFFFFF;
+    color: #000000;
+    white-space: nowrap;
+}
+
+.switchTeamButton:hover {
+    background: #FFFFFF;
+}
+
 .participantList {
     margin-top: 6px;
 }

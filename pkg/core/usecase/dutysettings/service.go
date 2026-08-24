@@ -498,7 +498,7 @@ func (s *Service) AssignActiveDutyTeam(ctx context.Context, currentUserID uuid.U
 		return nil
 	}
 
-	if err := s.dutyRepo.ReassignTeamAndResetTasks(ctx, activeDuty.ID(), team.ID()); err != nil {
+	if err := s.dutyRepo.ReassignTeamAndResetTasks(ctx, activeDuty.ID(), team.ID(), s.now()); err != nil {
 		return fmt.Errorf("assign active duty team: %w", err)
 	}
 

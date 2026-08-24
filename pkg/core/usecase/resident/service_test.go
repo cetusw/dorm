@@ -147,7 +147,7 @@ func (s *dutyRepositoryStub) FindLatestByGroupID(context.Context, uuid.UUID) (*d
 func (s *dutyRepositoryStub) FindHistoryByGroupID(context.Context, uuid.UUID) ([]duty.DutyHistoryEntry, error) {
 	return nil, nil
 }
-func (s *dutyRepositoryStub) ReassignTeamAndResetTasks(context.Context, uuid.UUID, uuid.UUID) error {
+func (s *dutyRepositoryStub) ReassignTeamAndResetTasks(context.Context, uuid.UUID, uuid.UUID, time.Time) error {
 	return nil
 }
 func (s *dutyRepositoryStub) CountDistinctStartDates(context.Context) (int, error) { return 0, nil }

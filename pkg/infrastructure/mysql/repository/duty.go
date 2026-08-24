@@ -304,13 +304,24 @@ func (r *DutyRepository) FindCurrentByTeamID(ctx context.Context, teamID uuid.UU
 	return duty.RestoreDuty(dutyID, teamID, start, end, sequenceNumber, tasks), nil
 }
 
-func (r *DutyRepository) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID) error {
+func (r *DutyRepository) ReassignTeamAndResetTasks(ctx context.Context, dutyID uuid.UUID, teamID uuid.UUID, reassignedAt time.Time) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin reassign duty transaction: %w", err)
 	}
 
-	if err := reassignDutyTeam(ctx, tx, dutyID, teamID); err != nil {
+	leaderID, err := dutyTeamLeaderID(ctx, tx, teamID)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := reassignDutyTeam(ctx, tx, dutyID, teamID, leaderID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := replaceDutyParticipantsWithTeamSnapshot(ctx, tx, dutyID, teamID, leaderID, reassignedAt); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -323,10 +334,11 @@ func (r *DutyRepository) ReassignTeamAndResetTasks(ctx context.Context, dutyID u
 	return commitDutyTransaction(tx)
 }
 
-func reassignDutyTeam(ctx context.Context, tx *sql.Tx, dutyID uuid.UUID, teamID uuid.UUID) error {
+func reassignDutyTeam(ctx context.Context, tx *sql.Tx, dutyID uuid.UUID, teamID uuid.UUID, leaderID *uuid.UUID) error {
 	const query = `
 		UPDATE duty
 		SET team_id = ?,
+			leader_id = ?,
 			group_id = (SELECT group_id FROM team WHERE id = ?)
 		WHERE id = ?
 	`
@@ -340,10 +352,63 @@ func reassignDutyTeam(ctx context.Context, tx *sql.Tx, dutyID uuid.UUID, teamID 
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, query, teamIDBytes, teamIDBytes, dutyIDBytes); err != nil {
+	leaderIDBytes, err := nullableUUIDBytes(leaderID, "duty leader id")
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, query, teamIDBytes, leaderIDBytes, teamIDBytes, dutyIDBytes); err != nil {
 		return fmt.Errorf("reassign duty team: %w", err)
 	}
 
+	return nil
+}
+
+// Reassigning the duty team replaces its current roster snapshot. Historical
+// participant rows are retained as exclusions, while the new team's members
+// become active REGULAR participants in the same transaction as the duty move.
+func replaceDutyParticipantsWithTeamSnapshot(
+	ctx context.Context,
+	tx *sql.Tx,
+	dutyID, teamID uuid.UUID,
+	leaderID *uuid.UUID,
+	reassignedAt time.Time,
+) error {
+	dutyIDBytes, err := marshalUUID(dutyID, "duty id")
+	if err != nil {
+		return err
+	}
+	teamIDBytes, err := marshalUUID(teamID, "team id")
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, `UPDATE duty_participants SET excluded_at = ? WHERE duty_id = ? AND excluded_at IS NULL`, reassignedAt, dutyIDBytes); err != nil {
+		return fmt.Errorf("exclude previous duty participants: %w", err)
+	}
+
+	const membersQuery = `
+		INSERT INTO duty_participants (duty_id, participant_id, type, excluded_at)
+		SELECT ?, id, 'REGULAR', NULL FROM user WHERE team_id = ? AND deleted_at IS NULL
+		ON DUPLICATE KEY UPDATE type = 'REGULAR', excluded_at = NULL
+	`
+	if _, err := tx.ExecContext(ctx, membersQuery, dutyIDBytes, teamIDBytes); err != nil {
+		return fmt.Errorf("snapshot reassigned duty members: %w", err)
+	}
+	if leaderID == nil {
+		return nil
+	}
+	leaderIDBytes, err := marshalUUID(*leaderID, "leader id")
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO duty_participants (duty_id, participant_id, type, excluded_at)
+		VALUES (?, ?, 'REGULAR', NULL)
+		ON DUPLICATE KEY UPDATE type = 'REGULAR', excluded_at = NULL
+	`, dutyIDBytes, leaderIDBytes); err != nil {
+		return fmt.Errorf("snapshot reassigned duty leader: %w", err)
+	}
 	return nil
 }
 
