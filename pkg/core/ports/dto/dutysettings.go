@@ -38,7 +38,6 @@ type DutySettingsActiveDuty struct {
 
 type DutySettingsTeam struct {
 	ID               string       `json:"id"`
-	Name             string       `json:"name"`
 	RotationPosition int          `json:"rotation_position"`
 	Leader           *UserSummary `json:"leader"`
 	MembersCount     int          `json:"members_count"`

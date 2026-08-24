@@ -4,7 +4,6 @@ import "github.com/google/uuid"
 
 type TeamResponseItem struct {
 	ID           string       `json:"id"`
-	Name         string       `json:"name"`
 	Leader       *UserSummary `json:"leader"`
 	MembersCount int          `json:"members_count"`
 }
@@ -15,7 +14,6 @@ type TeamListResponse struct {
 
 type TeamDetails struct {
 	ID        string       `json:"id"`
-	Name      string       `json:"name"`
 	GroupID   string       `json:"group_id"`
 	GroupName string       `json:"group_name"`
 	Leader    *UserSummary `json:"leader"`
@@ -28,6 +26,7 @@ type TeamMemberOptionItem struct {
 	CurrentTeamID   *string `json:"current_team_id"`
 	CurrentTeamName string  `json:"current_team_name"`
 	IsInCurrentTeam bool    `json:"is_in_current_team"`
+	IsTeamLeader    bool    `json:"is_team_leader"`
 }
 
 type TeamMemberOptionsResponse struct {
@@ -35,16 +34,14 @@ type TeamMemberOptionsResponse struct {
 }
 
 type CreateResidentTeamRequest struct {
-	Name      string   `json:"name"`
 	GroupID   string   `json:"group_id"`
-	LeaderID  *string  `json:"leader_id"`
+	LeaderID  string   `json:"leader_id"`
 	MemberIDs []string `json:"member_ids"`
 }
 
 type UpdateResidentTeamRequest struct {
-	Name      string   `json:"name"`
 	GroupID   string   `json:"group_id"`
-	LeaderID  *string  `json:"leader_id"`
+	LeaderID  string   `json:"leader_id"`
 	MemberIDs []string `json:"member_ids"`
 }
 
@@ -54,4 +51,5 @@ type TeamMemberItem struct {
 	CurrentTeamID   *uuid.UUID
 	CurrentTeamName string
 	IsInCurrentTeam bool
+	IsTeamLeader    bool
 }

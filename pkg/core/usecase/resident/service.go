@@ -824,7 +824,7 @@ func buildResidentCurrentDutyResponse(
 		MyGroup:               response.MyGroup,
 		DutyID:                currentDuty.duty.ID().String(),
 		Group:                 currentDuty.selectedGroup.Name(),
-		Team:                  currentDuty.dutyTeam.Name(),
+		Team:                  teamLeaderName(currentDuty.dutyTeam.LeaderID(), teamMembers),
 		StartDate:             currentDuty.duty.Start().Format("2006-01-02"),
 		EndDate:               currentDuty.duty.End().Format("2006-01-02"),
 		CostPerResidentGoal:   calculateCostPerResidentGoal(tasks, residentCount),
@@ -832,6 +832,15 @@ func buildResidentCurrentDutyResponse(
 		TeamMembers:           response.TeamMembers,
 		Tasks:                 response.Tasks,
 	}
+}
+
+func teamLeaderName(leaderID uuid.UUID, members []dto.ResidentDutyTeamMember) string {
+	for _, member := range members {
+		if member.ID == leaderID.String() {
+			return member.Name
+		}
+	}
+	return "Глава команды не назначен"
 }
 
 func buildResidentDutyGroupOptions(groups []*structure.Group, enabled bool) []dto.ResidentDutyGroupOption {
@@ -1194,11 +1203,11 @@ func dutyIsLaterThan(left *dutydomain.Duty, right *dutydomain.Duty) bool {
 }
 
 func (s *Service) loadTeamLeaderName(ctx context.Context, dutyTeam *structure.Team) string {
-	if dutyTeam == nil || dutyTeam.LeaderID() == nil {
+	if dutyTeam == nil {
 		return "Глава команды не назначен"
 	}
 
-	leader, err := s.userRepo.FindByID(ctx, *dutyTeam.LeaderID())
+	leader, err := s.userRepo.FindByID(ctx, dutyTeam.LeaderID())
 	if err != nil || leader == nil {
 		return "Глава команды не назначен"
 	}
@@ -1215,7 +1224,7 @@ func isGroupLeader(group *structure.Group, userID uuid.UUID) bool {
 }
 
 func isTeamLeader(team *structure.Team, userID uuid.UUID) bool {
-	return team != nil && team.LeaderID() != nil && *team.LeaderID() == userID
+	return team != nil && team.LeaderID() == userID
 }
 
 func countMyTakenCost(tasks []dto.ResidentDutyTask) int {

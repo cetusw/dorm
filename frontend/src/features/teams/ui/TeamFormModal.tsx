@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { Select, Stack, TextInput } from '@mantine/core'
+import { Select, Stack } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 import { ApiError } from '../../../shared/api/ApiError'
 import { EntityFormModal } from '../../../shared/ui/EntityFormModal'
+import { ResidentSearchCombobox, type ResidentSearchOption } from '../../../shared/ui/ResidentSearchCombobox'
 import {
     createTeam,
     getTeam,
@@ -19,7 +20,6 @@ import type {
     TeamMemberOptionsResponse,
     UpdateTeamRequest,
 } from '../model/types'
-import { teamFormValidation } from '../model/validation'
 import { TeamMembersSelection } from './TeamMembersSelection'
 
 type Props = {
@@ -28,7 +28,10 @@ type Props = {
     teamId: string | null
     groupId: string
     onClose: () => void
-    onSaved: () => Promise<void> | void
+    onSaved: (team: TeamDetails) => Promise<void> | void
+    createTitle?: string
+    simpleCreate?: boolean
+    leaderLabel?: string
     loadTeamRequest?: (teamId: string) => Promise<TeamDetails>
     loadTeamMemberOptionsRequest?: (groupId: string, teamId?: string | null) => Promise<TeamMemberOptionsResponse>
     createTeamRequest?: (request: CreateTeamRequest) => Promise<TeamDetails>
@@ -36,16 +39,14 @@ type Props = {
 }
 
 const initialValues: TeamFormValues = {
-    name: '',
     leaderId: null,
     memberIds: [],
 }
 
 function toCreateRequest(values: TeamFormValues, groupId: string): CreateTeamRequest {
     return {
-        name: values.name.trim(),
         group_id: groupId,
-        leader_id: values.leaderId,
+        leader_id: values.leaderId ?? '',
         member_ids: values.memberIds,
     }
 }
@@ -69,6 +70,9 @@ export function TeamFormModal({
     groupId,
     onClose,
     onSaved,
+    createTitle = 'Создание команды',
+    simpleCreate = false,
+    leaderLabel = 'Глава',
     loadTeamRequest = getTeam,
     loadTeamMemberOptionsRequest = getTeamMemberOptions,
     createTeamRequest = createTeam,
@@ -78,12 +82,13 @@ export function TeamFormModal({
     const [saving, setSaving] = useState(false)
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [members, setMembers] = useState<TeamMemberOption[]>([])
+    const [leaderSearch, setLeaderSearch] = useState('')
 
     const form = useForm<TeamFormValues>({
         mode: 'controlled',
         initialValues,
         validate: {
-            name: teamFormValidation.name,
+            leaderId: (value) => value ? null : 'Выберите главу команды',
         },
     })
 
@@ -96,6 +101,7 @@ export function TeamFormModal({
             setLoading(false)
             setSaving(false)
             setMembers([])
+            setLeaderSearch('')
             return
         }
 
@@ -121,9 +127,8 @@ export function TeamFormModal({
 
                 const values: TeamFormValues = team
                     ? {
-                        name: team.name,
-                        leaderId: team.leader?.id ?? null,
-                        memberIds: ensureLeaderIncluded(team.member_ids, team.leader?.id ?? null),
+                        leaderId: team.leader.id,
+                        memberIds: ensureLeaderIncluded(team.member_ids, team.leader.id),
                     }
                     : initialValues
 
@@ -159,11 +164,23 @@ export function TeamFormModal({
             members.map((member) => ({
                 value: member.id,
                 label: member.name,
+                disabled: mode === 'create' && member.is_team_leader,
             })),
         [members],
     )
+    const leaderSearchOptions = useMemo<ResidentSearchOption[]>(() => {
+        const query = leaderSearch.trim().toLowerCase()
+        return members
+            .filter((member) => !member.is_team_leader)
+            .filter((member) => query === '' || member.name.toLowerCase().includes(query))
+            .map((member) => ({
+                id: member.id,
+                name: member.name,
+                description: member.current_team_name ? `В команде ${member.current_team_name}` : null,
+            }))
+    }, [leaderSearch, members])
 
-    const title = mode === 'create' ? 'Создание команды' : 'Редактирование команды'
+    const title = mode === 'create' ? createTitle : 'Редактирование команды'
 
     function toggleMember(memberId: string) {
         if (form.values.memberIds.includes(memberId)) {
@@ -190,6 +207,7 @@ export function TeamFormModal({
             saving={saving}
             error={submitError}
             size={760}
+            submitLabel={simpleCreate && mode === 'create' ? 'Добавить' : undefined}
             onSubmit={form.onSubmit(async (values) => {
                 setSubmitError(null)
                 setSaving(true)
@@ -201,12 +219,12 @@ export function TeamFormModal({
 
                 try {
                     if (mode === 'create') {
-                        await createTeamRequest(toCreateRequest(normalizedValues, groupId))
+                        const created = await createTeamRequest(toCreateRequest(normalizedValues, groupId))
+                        await onSaved(created)
                     } else if (teamId !== null) {
-                        await updateTeamRequest(teamId, toUpdateRequest(normalizedValues, groupId))
+                        const updated = await updateTeamRequest(teamId, toUpdateRequest(normalizedValues, groupId))
+                        await onSaved(updated)
                     }
-
-                    await onSaved()
                     onClose()
                 } catch (error) {
                     if (error instanceof ApiError) {
@@ -219,36 +237,51 @@ export function TeamFormModal({
                 }
             })}
         >
-            <TextInput
-                label="Название"
-                placeholder="Название"
-                withAsterisk
-                maxLength={255}
-                key={form.key('name')}
-                {...form.getInputProps('name')}
-            />
-
-            <Select
-                label="Глава"
-                placeholder="Выберите главу"
-                searchable
-                clearable
-                data={leaderOptions}
-                nothingFoundMessage="Житель не найден"
-                value={form.values.leaderId}
-                onChange={(value) => {
-                    form.setFieldValue('leaderId', value)
-                    form.setFieldValue('memberIds', ensureLeaderIncluded(form.values.memberIds, value))
-                }}
-            />
-
-            <Stack gap="xs">
-                <TeamMembersSelection
-                    members={members}
-                    selectedMemberIds={form.values.memberIds}
-                    onToggleMember={toggleMember}
+            {simpleCreate ? (
+                <ResidentSearchCombobox
+                    overlayOpened={opened}
+                    searchValue={leaderSearch}
+                    options={leaderSearchOptions}
+                    loading={loading}
+                    placeholder={leaderLabel}
+                    selectedId={form.values.leaderId}
+                    selectedLabel={leaderSearch}
+                    hideDropdownWhenSelected
+                    onSearchChange={(value) => {
+                        setLeaderSearch(value)
+                        form.setFieldValue('leaderId', null)
+                    }}
+                    onOptionSelect={(option) => {
+                        setLeaderSearch(option.name)
+                        form.setFieldValue('leaderId', option.id)
+                        form.setFieldValue('memberIds', ensureLeaderIncluded(form.values.memberIds, option.id))
+                    }}
                 />
-            </Stack>
+            ) : (
+                <Select
+                    label={leaderLabel}
+                    placeholder={leaderLabel}
+                    searchable
+                    clearable
+                    data={leaderOptions}
+                    nothingFoundMessage="Житель не найден"
+                    value={form.values.leaderId}
+                    onChange={(value) => {
+                        form.setFieldValue('leaderId', value)
+                        form.setFieldValue('memberIds', ensureLeaderIncluded(form.values.memberIds, value))
+                    }}
+                />
+            )}
+
+            {!simpleCreate ? (
+                <Stack gap="xs">
+                    <TeamMembersSelection
+                        members={members}
+                        selectedMemberIds={form.values.memberIds}
+                        onToggleMember={toggleMember}
+                    />
+                </Stack>
+            ) : null}
         </EntityFormModal>
     )
 }

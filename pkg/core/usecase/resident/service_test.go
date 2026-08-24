@@ -52,8 +52,9 @@ func (s *teamRepositoryStub) FindByGroupID(_ context.Context, groupID uuid.UUID)
 func (s *teamRepositoryStub) UpdateRotationPositions(context.Context, uuid.UUID, []uuid.UUID) error {
 	return nil
 }
-func (s *teamRepositoryStub) Save(context.Context, *structure.Team) error { return nil }
-func (s *teamRepositoryStub) Delete(context.Context, uuid.UUID) error     { return nil }
+func (s *teamRepositoryStub) Save(context.Context, *structure.Team) error             { return nil }
+func (s *teamRepositoryStub) CreateWithLeader(context.Context, *structure.Team) error { return nil }
+func (s *teamRepositoryStub) Delete(context.Context, uuid.UUID) error                 { return nil }
 func (s *teamRepositoryStub) ReplaceLeaderAndRemoveMember(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error {
 	return nil
 }
@@ -227,7 +228,7 @@ func TestGetCurrentDutyFallsBackToObserverViewForResidentWithoutTeam(t *testing.
 		now,
 	)
 	group := structure.RestoreGroup(groupID, nil, "Group A", dormitoryID)
-	team := structure.RestoreTeam(teamID, "Team A", groupID, nil, "#00AAFF", 1)
+	team := structure.RestoreTeam(teamID, groupID, teamMemberID, "#00AAFF", 1)
 	activeDuty := duty.RestoreDuty(
 		uuid.New(),
 		teamID,
@@ -274,9 +275,9 @@ func TestGetCurrentDutyFallsBackToObserverViewForResidentWithoutTeam(t *testing.
 	assert.False(t, response.ShowGroupSelect)
 	assert.Equal(t, groupID.String(), response.SelectedGroupID)
 	assert.Equal(t, "Group A", response.Group)
-	assert.Equal(t, "Глава команды не назначен", response.Team)
+	assert.Equal(t, "Ivan Ivanov", response.Team)
 	assert.Equal(t, []string{"all", "team"}, response.VisibleTabs)
-	assert.Equal(t, "На этой неделе ответственный за дежурство — Глава команды не назначен", response.NoticeMessage)
+	assert.Equal(t, "На этой неделе ответственный за дежурство — Ivan Ivanov", response.NoticeMessage)
 	assert.Empty(t, response.Tasks)
 	assert.Len(t, response.TeamMembers, 1)
 	assert.Equal(t, teamMemberID.String(), response.TeamMembers[0].ID)
@@ -324,7 +325,7 @@ func TestGetCurrentDuty_UsesRequestedDormitoryForDormitoryLeader(t *testing.T) {
 	myGroupID := uuid.New()
 	myGroup := structure.RestoreGroup(myGroupID, &leaderID, "My Group", homeDormitoryID)
 	selectedGroup := structure.RestoreGroup(groupID, nil, "Observed Group", selectedDormitoryID)
-	team := structure.RestoreTeam(teamID, "Team A", groupID, nil, "#00AAFF", 1)
+	team := structure.RestoreTeam(teamID, groupID, leaderID, "#00AAFF", 1)
 	activeDuty := duty.RestoreDuty(
 		uuid.New(),
 		teamID,

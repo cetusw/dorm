@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 
 import { CSS } from '@dnd-kit/utilities'
 import { useSortable } from '@dnd-kit/sortable'
@@ -24,7 +24,7 @@ type Props = {
     onDelete: (team: DutySettingsTeam) => void
 }
 
-export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpenMembers, onAssignDuty, onDelete }: Props) {
+export const DutySettingsTeamCard = memo(function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpenMembers, onAssignDuty, onDelete }: Props) {
     const [menuOpened, setMenuOpened] = useState(false)
     const {
         attributes,
@@ -73,7 +73,7 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpe
                             onClick={() => onOpenMembers(team)}
                         >
                             <Text component="span" fw={500} className={classes.positionText}>{team.rotation_position}</Text>
-                            <Text component="span" fw={500} className={classes.leaderText} c={team.leader ? undefined : 'dimmed'}>
+                            <Text component="span" fw={500} className={classes.leaderText}>
                                 {formatDutySettingsLeaderName(team.leader)}
                             </Text>
                             {isDutyTeam ? <span className={classes.dutyBadge}>Дежурная</span> : null}
@@ -103,7 +103,8 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpe
                                 leftSection={<UsersThreeIcon size={25} />}
                                 onClick={(event) => {
                                     event.stopPropagation()
-                                    onOpenMembers(team)
+                                    setMenuOpened(false)
+                                    window.requestAnimationFrame(() => onOpenMembers(team))
                                 }}
                             >
                                 Участники
@@ -135,4 +136,4 @@ export function DutySettingsTeamCard({ team, isDutyTeam, disabled = false, onOpe
             </div>
         </div>
     )
-}
+})

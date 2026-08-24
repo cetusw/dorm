@@ -195,7 +195,7 @@ func TestCompleteTask_PublishesTasksReadyForReviewEvent(t *testing.T) {
 	)
 
 	leaderID := uuid.New()
-	team := structure.RestoreTeam(teamID, "Команда 1", uuid.New(), &leaderID, "blue", 1)
+	team := structure.RestoreTeam(teamID, uuid.New(), leaderID, "blue", 1)
 
 	userRepo.On("FindByID", ctx, userID).Return(resident, nil).Once()
 	dutyTaskRepo.On("FindByID", ctx, taskID).Return(task, nil).Once()

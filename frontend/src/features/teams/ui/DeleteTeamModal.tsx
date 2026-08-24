@@ -17,7 +17,7 @@ export function DeleteTeamModal({ opened, team, onClose, onDeleted, deleteTeamRe
             onClose={onClose}
             title="Удаление команды"
             entityLabel="команду"
-            entityName={team?.name ?? null}
+            entityName={team?.leader.name ?? null}
             errorMessage="Не удалось удалить команду"
             onConfirm={async () => {
                 if (!team) {

@@ -5,8 +5,7 @@ export type TeamLeader = {
 
 export type TeamListItem = {
     id: string
-    name: string
-    leader: TeamLeader | null
+    leader: TeamLeader
     members_count: number
     rotation_position?: number
 }
@@ -17,10 +16,9 @@ export type TeamListResponse = {
 
 export type TeamDetails = {
     id: string
-    name: string
     group_id: string
     group_name: string
-    leader: TeamLeader | null
+    leader: TeamLeader
     member_ids: string[]
 }
 
@@ -29,7 +27,8 @@ export type TeamMemberOption = {
     name: string
     current_team_id: string | null
     current_team_name: string
-    is_in_current_team: boolean
+	is_in_current_team: boolean
+	is_team_leader: boolean
 }
 
 export type TeamMemberOptionsResponse = {
@@ -37,15 +36,13 @@ export type TeamMemberOptionsResponse = {
 }
 
 export type TeamFormValues = {
-    name: string
-    leaderId: string | null
+	leaderId: string | null
     memberIds: string[]
 }
 
 export type CreateTeamRequest = {
-    name: string
-    group_id: string
-    leader_id: string | null
+	group_id: string
+	leader_id: string
     member_ids: string[]
 }
 

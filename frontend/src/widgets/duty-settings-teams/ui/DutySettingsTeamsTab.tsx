@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { RowsPlusBottomIcon, UsersIcon } from '@phosphor-icons/react'
+import { PlusIcon, UsersIcon } from '@phosphor-icons/react'
 import { Alert, Box, Group, Stack, Text } from '@mantine/core'
 
 import {
@@ -19,6 +19,7 @@ import type { TeamListItem } from '../../../features/teams/model/types'
 import { ConfirmActionModal } from '../../../shared/ui/ConfirmActionModal'
 import { DeleteTeamModal } from '../../../features/teams/ui/DeleteTeamModal'
 import { TeamFormModal } from '../../../features/teams/ui/TeamFormModal'
+import { EmptyState } from '../../../shared/ui/EmptyState'
 import { SettingsAddAction } from '../../../shared/ui/SettingsAddAction'
 import { DutySettingsTeamCard } from './DutySettingsTeamCard'
 import { DutySettingsTeamMembersDrawer } from './DutySettingsTeamMembersDrawer'
@@ -28,6 +29,7 @@ type Props = {
     teams: DutySettingsTeam[]
     activeDutyTeamId: string | null
     onReload: () => Promise<void>
+    onMemberCountChange: (teamId: string, delta: number) => void
 }
 
 function sortTeams(teams: DutySettingsTeam[]): DutySettingsTeam[] {
@@ -44,7 +46,6 @@ function renumberTeams(teams: DutySettingsTeam[]): DutySettingsTeam[] {
 function toTeamListItem(team: DutySettingsTeam): TeamListItem {
     return {
         id: team.id,
-        name: team.name,
         leader: team.leader,
         members_count: team.members_count,
         rotation_position: team.rotation_position,
@@ -56,10 +57,10 @@ function getDutyTeamWarningName(team: DutySettingsTeam | null): string {
 		return ""
 	}
 
-	return team.leader?.name ?? team.name
+	return team.leader.name
 }
 
-export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReload }: Props) {
+export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReload, onMemberCountChange }: Props) {
     const [orderedTeams, setOrderedTeams] = useState<DutySettingsTeam[]>(() => sortTeams(teams))
     const [savingOrder, setSavingOrder] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -77,8 +78,10 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
             return
         }
 
-        const nextSelectedTeam = teams.find((team) => team.id === selectedTeam.id) ?? null
-        setSelectedTeam(nextSelectedTeam)
+        const nextSelectedTeam = teams.find((team) => team.id === selectedTeam.id)
+        if (nextSelectedTeam) {
+            setSelectedTeam(nextSelectedTeam)
+        }
     }, [selectedTeam, teams])
 
     const sensors = useSensors(
@@ -167,9 +170,14 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
                         </Stack>
                     </SortableContext>
                 </DndContext>
-            ) : null}
+            ) : (
+                <EmptyState
+                    title="В группе нет команд"
+                    description="Добавьте команду и заполните её исполнителями"
+                />
+            )}
 
-            <SettingsAddAction icon={<RowsPlusBottomIcon size={25} />} onClick={handleCreate}>
+            <SettingsAddAction icon={<PlusIcon size={25} />} onClick={handleCreate}>
                 Добавить команду
             </SettingsAddAction>
 
@@ -185,7 +193,20 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
                 onClose={() => {
                     setFormOpened(false)
                 }}
-                onSaved={onReload}
+                createTitle="Добавление команды"
+                simpleCreate
+                leaderLabel="Глава команды"
+                onSaved={(createdTeam) => {
+                    setSelectedTeam({
+                        id: createdTeam.id,
+                        leader: createdTeam.leader,
+                        members_count: 1,
+                        rotation_position: orderedTeams.length + 1,
+                    })
+                    void onReload().catch((currentError) => {
+                        setError(currentError instanceof Error ? currentError.message : 'Не удалось обновить список команд')
+                    })
+                }}
             />
 
             <DeleteTeamModal
@@ -223,6 +244,7 @@ export function DutySettingsTeamsTab({ groupId, teams, activeDutyTeamId, onReloa
                 groupId={groupId}
                 onClose={() => setSelectedTeam(null)}
                 onUpdated={onReload}
+                onMemberCountChange={onMemberCountChange}
             />
         </Stack>
     )

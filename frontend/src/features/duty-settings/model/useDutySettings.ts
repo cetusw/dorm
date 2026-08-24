@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { ApiError } from '../../../shared/api/ApiError'
 import { getDutySettings } from '../api/dutySettingsApi'
-import type { DutySettingsArea, DutySettingsResponse, DutySettingsTask } from './types'
+import type { DutySettingsArea, DutySettingsResponse, DutySettingsTask, DutySettingsTeam } from './types'
 
 function sortAreas(areas: DutySettingsArea[]): DutySettingsArea[] {
     return [...areas].sort((left, right) => {
@@ -31,6 +31,27 @@ function sortTasks(tasks: DutySettingsTask[]): DutySettingsTask[] {
     })
 }
 
+function isSameTeam(left: DutySettingsTeam, right: DutySettingsTeam): boolean {
+    return left.id === right.id
+        && left.rotation_position === right.rotation_position
+        && left.members_count === right.members_count
+        && left.leader.id === right.leader.id
+        && left.leader.name === right.leader.name
+}
+
+function reconcileTeams(currentTeams: DutySettingsTeam[], nextTeams: DutySettingsTeam[]): DutySettingsTeam[] {
+    const currentByID = new Map(currentTeams.map((team) => [team.id, team]))
+    const reconciledTeams = nextTeams.map((team) => {
+        const current = currentByID.get(team.id)
+        return current && isSameTeam(current, team) ? current : team
+    })
+
+    const unchanged = currentTeams.length === reconciledTeams.length
+        && currentTeams.every((team, index) => team === reconciledTeams[index])
+
+    return unchanged ? currentTeams : reconciledTeams
+}
+
 function toError(error: unknown): string {
     if (error instanceof Error) {
         return error.message
@@ -54,13 +75,14 @@ export function useDutySettings(groupId: string) {
 
         try {
             const response = await getDutySettings(groupId)
-            setData({
+            setData((current) => ({
                 ...response,
+                teams: reconcileTeams(current?.teams ?? [], response.teams),
                 areas: sortAreas(response.areas.map((area) => ({
                     ...area,
                     tasks: sortTasks(area.tasks),
                 }))),
-            })
+            }))
         } catch (error) {
             if (error instanceof ApiError && error.status === 403) {
                 setForbidden(true)
@@ -86,6 +108,20 @@ export function useDutySettings(groupId: string) {
         error,
         forbidden,
         reload,
+        changeTeamMembersCount: useCallback((teamId: string, delta: number) => {
+            setData((current) => {
+                if (!current) {
+                    return current
+                }
+
+                return {
+                    ...current,
+                    teams: current.teams.map((team) => team.id === teamId
+                        ? { ...team, members_count: Math.max(0, team.members_count + delta) }
+                        : team),
+                }
+            })
+        }, []),
         appendArea: useCallback((area: DutySettingsArea) => {
             setData((current) => {
                 if (!current) {

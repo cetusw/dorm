@@ -68,8 +68,8 @@ func TestDetermineNextTeam_UsesLastDutyRotationPosition(t *testing.T) {
 	firstTeamID := uuid.New()
 	secondTeamID := uuid.New()
 	teams := []*structure.Team{
-		structure.RestoreTeam(secondTeamID, "Second Team", groupID, nil, "pink", 20),
-		structure.RestoreTeam(firstTeamID, "First Team", groupID, nil, "blue", 10),
+		structure.RestoreTeam(secondTeamID, groupID, uuid.New(), "pink", 20),
+		structure.RestoreTeam(firstTeamID, groupID, uuid.New(), "blue", 10),
 	}
 
 	selectedTeam, err := determineNextTeam(teams, nil)
@@ -306,8 +306,8 @@ func createFixtures() *testFixtures {
 			structure.RestoreGroup(groupID1, &leaderID1, "Boys", 1),
 			structure.RestoreGroup(groupID2, &leaderID2, "Girls", 1),
 		},
-		teams1: []*structure.Team{structure.RestoreTeam(teamID1, "Boys Team", groupID1, &leaderID1, "blue", 1)},
-		teams2: []*structure.Team{structure.RestoreTeam(teamID2, "Girls Team", groupID2, &leaderID2, "pink", 2)},
+		teams1: []*structure.Team{structure.RestoreTeam(teamID1, groupID1, leaderID1, "blue", 1)},
+		teams2: []*structure.Team{structure.RestoreTeam(teamID2, groupID2, leaderID2, "pink", 2)},
 		areas:  []*catalog.Area{areaBoys, areaKit, areaGirls},
 		tasks:  []*catalog.TaskDefinition{taskPrivate, taskPublic, taskOtherGroup},
 	}

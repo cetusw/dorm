@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
     CrownSimpleIcon,
@@ -52,6 +52,7 @@ type Props = {
     opened: boolean
     onClose: () => void
     onUpdated: () => Promise<void>
+    onMemberCountChange: (teamId: string, delta: number) => void
 }
 
 type PendingMove = {
@@ -61,7 +62,7 @@ type PendingMove = {
 type PendingMemberAction =
     { member: DutySettingsTeamMember }
 
-function TeamMemberCard({
+const TeamMemberCard = memo(function TeamMemberCard({
     member,
     onlyLeader,
     assigningLeader,
@@ -71,8 +72,8 @@ function TeamMemberCard({
     member: DutySettingsTeamMember
     onlyLeader: boolean
     assigningLeader: boolean
-    onAssignLeader: () => void
-    onRemove: () => void
+    onAssignLeader: (memberID: string) => void
+    onRemove: (member: DutySettingsTeamMember) => void
 }) {
     const removeDisabled = onlyLeader && member.is_leader
     const removeTooltip = removeDisabled ? 'Нельзя исключить единственного главу' : 'Исключить из команды'
@@ -95,7 +96,7 @@ function TeamMemberCard({
                                 className={classes.actionButton}
                                 loading={assigningLeader}
                                 disabled={assigningLeader}
-                                onClick={onAssignLeader}
+                                onClick={() => onAssignLeader(member.id)}
                             >
                                 <CrownSimpleIcon size={20} />
                             </ActionIcon>
@@ -109,7 +110,7 @@ function TeamMemberCard({
                                 aria-label={`Исключить ${member.name} из команды`}
                                 className={classes.actionButton}
                                 disabled={removeDisabled}
-                                onClick={onRemove}
+                                onClick={() => onRemove(member)}
                             >
                                 <UserMinusIcon size={20} />
                             </ActionIcon>
@@ -119,9 +120,37 @@ function TeamMemberCard({
             </div>
         </div>
     )
+})
+
+function reconcileMembers(
+    current: DutySettingsTeamMembersResponse | null,
+    next: DutySettingsTeamMembersResponse,
+): DutySettingsTeamMembersResponse {
+    if (!current) {
+        return next
+    }
+
+    const currentByID = new Map(current.members.map((member) => [member.id, member]))
+    const members = next.members.map((member) => {
+        const previous = currentByID.get(member.id)
+        return previous && previous.name === member.name && previous.is_leader === member.is_leader
+            ? previous
+            : member
+    })
+    const membersUnchanged = current.members.length === members.length
+        && current.members.every((member, index) => member === members[index])
+
+    if (membersUnchanged
+        && current.team_name === next.team_name
+        && current.leader?.id === next.leader?.id
+        && current.leader?.name === next.leader?.name) {
+        return current
+    }
+
+    return { ...next, members }
 }
 
-export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, onUpdated }: Props) {
+export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, onUpdated, onMemberCountChange }: Props) {
     const [data, setData] = useState<DutySettingsTeamMembersResponse | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -155,7 +184,7 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
 
         try {
             const response = await getDutySettingsTeamMembers(groupId, team.id)
-            setData(response)
+            setData((current) => reconcileMembers(current, response))
         } catch (currentError) {
             setError(currentError instanceof Error ? currentError.message : 'Не удалось загрузить участников команды')
         } finally {
@@ -233,6 +262,9 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
         await onUpdated()
     }
 
+    const refreshAfterMutationRef = useRef(refreshAfterMutation)
+    refreshAfterMutationRef.current = refreshAfterMutation
+
     function resetMemberSearch() {
         setSearchValue('')
         setSearchItems([])
@@ -259,7 +291,16 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
         try {
             await addDutySettingsTeamMember(groupId, teamID, user.id)
             resetMemberSearch()
-            await refreshAfterMutation()
+            setData((current) => current
+                ? {
+                    ...current,
+                    members: [...current.members, { id: user.id, name: user.name, is_leader: false }],
+                }
+                : current)
+            onMemberCountChange(teamID, 1)
+            if (user.current_team_id && user.current_team_id !== teamID) {
+                onMemberCountChange(user.current_team_id, -1)
+            }
         } catch (currentError) {
             if (currentError instanceof ApiError) {
                 setError(currentError.message)
@@ -270,6 +311,29 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
     }
 
     const members = useMemo(() => data?.members ?? [], [data])
+    const assignLeader = useCallback((memberID: string) => {
+        if (!teamID) {
+            return
+        }
+
+        setAssigningLeaderId(memberID)
+        void assignDutySettingsTeamLeader(groupId, teamID, memberID)
+            .then(() => refreshAfterMutationRef.current())
+            .catch((currentError) => {
+                if (currentError instanceof ApiError) {
+                    setError(currentError.message)
+                } else {
+                    setError('Не удалось назначить главу команды')
+                }
+            })
+            .finally(() => setAssigningLeaderId(null))
+    }, [groupId, teamID])
+    const openRemovalModal = useCallback((member: DutySettingsTeamMember) => {
+        setPendingAction({ member })
+        setReplacementLeaderId(null)
+        setReplacementSearch('')
+        setRemoveError(null)
+    }, [])
     const pendingMemberIsLeader = pendingAction?.member.is_leader ?? false
     const replacementOptions = useMemo(() => {
         const query = replacementSearch.trim().toLocaleLowerCase()
@@ -312,29 +376,8 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                                         member={member}
                                         onlyLeader={members.length === 1}
                                         assigningLeader={assigningLeaderId === member.id}
-                                        onAssignLeader={() => {
-                                            if (!teamID) {
-                                                return
-                                            }
-
-                                            setAssigningLeaderId(member.id)
-                                            void assignDutySettingsTeamLeader(groupId, teamID, member.id)
-                                                .then(refreshAfterMutation)
-                                                .catch((currentError) => {
-                                                    if (currentError instanceof ApiError) {
-                                                        setError(currentError.message)
-                                                    } else {
-                                                        setError('Не удалось назначить главу команды')
-                                                    }
-                                                })
-                                                .finally(() => setAssigningLeaderId(null))
-                                        }}
-                                        onRemove={() => {
-                                            setPendingAction({ member })
-                                            setReplacementLeaderId(null)
-                                            setReplacementSearch('')
-                                            setRemoveError(null)
-                                        }}
+                                        onAssignLeader={assignLeader}
+                                        onRemove={openRemovalModal}
                                     />
                                 ))}
                             </Stack>

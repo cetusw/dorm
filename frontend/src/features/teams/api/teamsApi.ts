@@ -16,7 +16,6 @@ function normalizeTeamListResponse(response: TeamListResponse): TeamListResponse
 function normalizeTeamDetails(team: Record<string, unknown>): TeamDetails {
     return {
         id: String(team.id ?? ''),
-        name: String(team.name ?? ''),
         group_id: String(team.group_id ?? ''),
         group_name: String(team.group_name ?? ''),
         leader: team.leader && typeof team.leader === 'object'
@@ -24,7 +23,7 @@ function normalizeTeamDetails(team: Record<string, unknown>): TeamDetails {
                 id: String((team.leader as Record<string, unknown>).id ?? ''),
                 name: String((team.leader as Record<string, unknown>).name ?? ''),
             }
-            : null,
+            : { id: '', name: '' },
         member_ids: Array.isArray(team.member_ids)
             ? team.member_ids.map((memberId) => String(memberId))
             : [],

@@ -32,8 +32,7 @@
 
 - `id` `BINARY(16)`
 - `group_id`
-- `leader_id NULL`
-- `name`
+- `leader_id BINARY(16) NOT NULL`
 - `color NULL`
 - `rotation_position INT NOT NULL`
 
@@ -41,6 +40,8 @@
 
 - `UNIQUE (group_id, rotation_position)` — текущая модель ротации.
 - `idx_team_group_rotation (group_id, rotation_position)`
+- `fk_team_leader` использует `ON DELETE RESTRICT`, поэтому команда не может
+  остаться без главы.
 
 ### `user`
 

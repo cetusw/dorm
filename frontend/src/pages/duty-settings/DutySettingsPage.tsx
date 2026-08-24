@@ -36,7 +36,7 @@ type Props = {
 }
 
 export function DutySettingsPage({ groupId }: Props) {
-    const { data, error, forbidden, loading, reload } = useDutySettings(groupId)
+    const { data, error, forbidden, loading, reload, changeTeamMembersCount } = useDutySettings(groupId)
     const [mainTab, setMainTab] = useState<DutySettingsMainTab>('tasks')
     const [viewMode, setViewMode] = useState<DutySettingsViewMode>('list')
     const [selectedFloorPlanId, setSelectedFloorPlanId] = useState('')
@@ -170,6 +170,7 @@ export function DutySettingsPage({ groupId }: Props) {
                 teams={data.teams}
                 activeDutyTeamId={data.active_duty_team_id}
                 onReload={() => reload({ silent: true })}
+                onMemberCountChange={changeTeamMembersCount}
             />
         ) : mainTab !== 'tasks' ? (
             <Box h={120} />

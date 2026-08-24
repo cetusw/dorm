@@ -56,9 +56,8 @@ export type DutySettingsTeamSearchResponse = {
 
 export type DutySettingsTeam = {
     id: string
-    name: string
     rotation_position: number
-    leader: DutySettingsTeamLeader | null
+    leader: DutySettingsTeamLeader
     members_count: number
 }
 

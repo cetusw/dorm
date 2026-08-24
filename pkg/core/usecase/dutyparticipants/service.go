@@ -63,8 +63,10 @@ func (s *Service) GetParticipants(ctx context.Context, actorID, dutyID uuid.UUID
 			id := u.TeamID().String()
 			item.TeamID = &id
 			if t, _ := s.teams.FindByID(ctx, *u.TeamID()); t != nil {
-				name := t.Name()
-				item.TeamName = &name
+				if leader, _ := s.users.FindByID(ctx, t.LeaderID()); leader != nil {
+					name := fullName(leader)
+					item.TeamName = &name
+				}
 			}
 		}
 		result = append(result, item)
@@ -90,8 +92,10 @@ func (s *Service) GetCandidates(ctx context.Context, actorID, dutyID uuid.UUID) 
 			continue
 		}
 		id := u.TeamID().String()
-		name := t.Name()
-		out = append(out, dto.DutyParticipantCandidateResponse{ParticipantID: u.ID().String(), FullName: fullName(u), TeamID: &id, TeamName: &name})
+		if leader, _ := s.users.FindByID(ctx, t.LeaderID()); leader != nil {
+			name := fullName(leader)
+			out = append(out, dto.DutyParticipantCandidateResponse{ParticipantID: u.ID().String(), FullName: fullName(u), TeamID: &id, TeamName: &name})
+		}
 	}
 	return out, nil
 }

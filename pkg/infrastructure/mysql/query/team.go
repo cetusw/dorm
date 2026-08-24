@@ -19,11 +19,11 @@ func NewTeamQueryService(db *sql.DB) *TeamQueryService {
 
 func (q *TeamQueryService) FindTeamsByDormitoryID(ctx context.Context, dormID int64) ([]*structure.Team, error) {
 	const query = `
-		SELECT t.id, t.name, t.group_id, t.leader_id, t.color, t.rotation_position
+		SELECT t.id, t.group_id, t.leader_id, t.color, t.rotation_position
 		FROM team t
 		JOIN ` + "`group` g" + ` ON t.group_id = g.id
 		WHERE g.dormitory_id = ?
-		ORDER BY t.rotation_position, t.name
+		ORDER BY t.rotation_position, t.id
 	`
 
 	rows, err := q.db.QueryContext(ctx, query, dormID)
@@ -35,22 +35,17 @@ func (q *TeamQueryService) FindTeamsByDormitoryID(ctx context.Context, dormID in
 	var teams []*structure.Team
 	for rows.Next() {
 		var tID, gID, lID []byte
-		var name string
 		var color sql.NullString
 		var rotationPosition int
 
-		if err := rows.Scan(&tID, &name, &gID, &lID, &color, &rotationPosition); err != nil {
+		if err := rows.Scan(&tID, &gID, &lID, &color, &rotationPosition); err != nil {
 			return nil, fmt.Errorf("FindByGroupID scan error: %w", err)
 		}
 
 		teamID, _ := uuid.FromBytes(tID)
 		grpID, _ := uuid.FromBytes(gID)
-		var leaderID *uuid.UUID
-		if len(lID) > 0 {
-			uid, _ := uuid.FromBytes(lID)
-			leaderID = &uid
-		}
-		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color.String, rotationPosition))
+		leaderID, _ := uuid.FromBytes(lID)
+		teams = append(teams, structure.RestoreTeam(teamID, grpID, leaderID, color.String, rotationPosition))
 	}
 	return teams, nil
 }

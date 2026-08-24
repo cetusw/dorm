@@ -72,7 +72,6 @@ func (s *Service) GetTeamsResponseByGroup(ctx context.Context, groupID uuid.UUID
 
 		items = append(items, dto.TeamResponseItem{
 			ID:           team.ID().String(),
-			Name:         team.Name(),
 			Leader:       userSummaryFromMap(residentNames, team.LeaderID()),
 			MembersCount: len(members),
 		})
@@ -115,7 +114,6 @@ func (s *Service) GetTeamDetails(ctx context.Context, id uuid.UUID) (*dto.TeamDe
 
 	return &dto.TeamDetails{
 		ID:        team.ID().String(),
-		Name:      team.Name(),
 		GroupID:   team.GroupID().String(),
 		GroupName: group.Name(),
 		Leader:    userSummaryFromMap(residentNames, team.LeaderID()),
@@ -138,30 +136,17 @@ func (s *Service) CreateResidentTeam(ctx context.Context, req dto.CreateResident
 	if err != nil {
 		return nil, err
 	}
-	leaderID, err := parseOptionalStringUUIDPointer(req.LeaderID)
+	leaderID, err := parseRequiredStringUUID(req.LeaderID)
 	if err != nil {
 		return nil, err
 	}
-	memberIDs = appendUniqueOptionalUUID(memberIDs, leaderID)
+	memberIDs = appendUniqueUUID(memberIDs, leaderID)
 	if err := s.requireUsersInDormitory(ctx, group.DormitoryID(), memberIDs); err != nil {
 		return nil, err
 	}
 
-	name := strings.TrimSpace(req.Name)
-	if err := validateResidentTeamName(name); err != nil {
-		return nil, err
-	}
-
-	order, err := s.nextTeamOrder(ctx, groupID)
-	if err != nil {
-		return nil, err
-	}
-
-	team := structure.NewTeam(name, groupID, "", order)
-	if leaderID != nil {
-		team = structure.RestoreTeam(team.ID(), team.Name(), team.GroupID(), leaderID, team.Color(), team.RotationPosition())
-	}
-	if err := s.teamRepo.Save(ctx, team); err != nil {
+	team := structure.NewTeam(groupID, leaderID, "", 1)
+	if err := s.teamRepo.CreateWithLeader(ctx, team); err != nil {
 		return nil, err
 	}
 	if err := s.moveMembers(ctx, team.ID(), memberIDs); err != nil {
@@ -197,21 +182,16 @@ func (s *Service) UpdateResidentTeam(ctx context.Context, id uuid.UUID, req dto.
 	if err != nil {
 		return nil, err
 	}
-	leaderID, err := parseOptionalStringUUIDPointer(req.LeaderID)
+	leaderID, err := parseRequiredStringUUID(req.LeaderID)
 	if err != nil {
 		return nil, err
 	}
-	memberIDs = appendUniqueOptionalUUID(memberIDs, leaderID)
+	memberIDs = appendUniqueUUID(memberIDs, leaderID)
 	if err := s.requireUsersInDormitory(ctx, group.DormitoryID(), memberIDs); err != nil {
 		return nil, err
 	}
 
-	name := strings.TrimSpace(req.Name)
-	if err := validateResidentTeamName(name); err != nil {
-		return nil, err
-	}
-
-	updated := structure.RestoreTeam(id, name, groupID, leaderID, current.Color(), current.RotationPosition())
+	updated := structure.RestoreTeam(id, groupID, leaderID, current.Color(), current.RotationPosition())
 	if err := s.teamRepo.Save(ctx, updated); err != nil {
 		return nil, err
 	}
@@ -251,6 +231,7 @@ func (s *Service) GetTeamMemberOptionsResponse(ctx context.Context, groupID uuid
 			CurrentTeamID:   currentTeamIDValue,
 			CurrentTeamName: item.CurrentTeamName,
 			IsInCurrentTeam: item.IsInCurrentTeam,
+			IsTeamLeader:    item.IsTeamLeader,
 		})
 	}
 
@@ -271,6 +252,22 @@ func (s *Service) MoveUserToTeam(ctx context.Context, teamID uuid.UUID, userID u
 	}
 	if err := s.requireUsersInDormitory(ctx, group.DormitoryID(), []uuid.UUID{userID}); err != nil {
 		return err
+	}
+	resident, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if resident == nil {
+		return fmt.Errorf("user not found")
+	}
+	if resident.TeamID() != nil && *resident.TeamID() != teamID {
+		sourceTeam, err := s.teamRepo.FindByID(ctx, *resident.TeamID())
+		if err != nil {
+			return err
+		}
+		if sourceTeam != nil && sourceTeam.LeaderID() == userID {
+			return fmt.Errorf("assign a replacement team leader first")
+		}
 	}
 	return s.userRepo.MoveUserToTeam(ctx, userID, &teamID)
 }
@@ -391,22 +388,27 @@ func (s *Service) nextTeamOrder(ctx context.Context, groupID uuid.UUID) (int, er
 	return maxOrder + 1, nil
 }
 
-func parseOptionalStringUUIDPointer(rawID *string) (*uuid.UUID, error) {
-	if rawID == nil {
-		return nil, nil
-	}
-
-	trimmed := strings.TrimSpace(*rawID)
+func parseRequiredStringUUID(rawID string) (uuid.UUID, error) {
+	trimmed := strings.TrimSpace(rawID)
 	if trimmed == "" {
-		return nil, nil
+		return uuid.Nil, fmt.Errorf("глава команды обязателен")
 	}
 
 	id, err := uuid.Parse(trimmed)
 	if err != nil {
-		return nil, fmt.Errorf("invalid user id")
+		return uuid.Nil, fmt.Errorf("invalid user id")
 	}
 
-	return &id, nil
+	return id, nil
+}
+
+func appendUniqueUUID(ids []uuid.UUID, id uuid.UUID) []uuid.UUID {
+	for _, currentID := range ids {
+		if currentID == id {
+			return ids
+		}
+	}
+	return append(ids, id)
 }
 
 func userNames(users []*user.User) map[uuid.UUID]string {
@@ -417,12 +419,8 @@ func userNames(users []*user.User) map[uuid.UUID]string {
 	return names
 }
 
-func userSummaryFromMap(names map[uuid.UUID]string, leaderID *uuid.UUID) *dto.UserSummary {
-	if leaderID == nil {
-		return nil
-	}
-
-	name, ok := names[*leaderID]
+func userSummaryFromMap(names map[uuid.UUID]string, leaderID uuid.UUID) *dto.UserSummary {
+	name, ok := names[leaderID]
 	if !ok || strings.TrimSpace(name) == "" {
 		return nil
 	}
@@ -475,8 +473,10 @@ func (s *Service) getTeamMemberItems(ctx context.Context, dormitoryID int64, cur
 		return nil, err
 	}
 	teamNames := make(map[uuid.UUID]string, len(teams))
+	teamLeaders := make(map[uuid.UUID]uuid.UUID, len(teams))
 	for _, t := range teams {
-		teamNames[t.ID()] = t.Name()
+		teamNames[t.ID()] = userSummaryFromMap(userNames(users), t.LeaderID()).Name
+		teamLeaders[t.ID()] = t.LeaderID()
 	}
 
 	items := make([]dto.TeamMemberItem, 0, len(users))
@@ -492,6 +492,7 @@ func (s *Service) getTeamMemberItems(ctx context.Context, dormitoryID int64, cur
 			CurrentTeamID:   u.TeamID(),
 			CurrentTeamName: currentTeamName,
 			IsInCurrentTeam: currentTeamID != uuid.Nil && u.TeamID() != nil && *u.TeamID() == currentTeamID,
+			IsTeamLeader:    u.TeamID() != nil && teamLeaders[*u.TeamID()] == u.ID(),
 		})
 	}
 	sort.SliceStable(items, func(i, j int) bool {

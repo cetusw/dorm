@@ -31,12 +31,12 @@ export function TeamsTable({ teams, onEdit, onDelete }: Props) {
         const filteredTeams = query === ''
             ? teams
             : teams.filter((team) =>
-                normalize(`${team.name} ${team.leader?.name ?? 'Не назначен'}`).includes(query),
+                normalize(team.leader.name).includes(query),
             )
 
         return [...filteredTeams].sort((left, right) => {
-            const leftValue = normalize(sortField === 'leaderName' ? left.leader?.name ?? 'Не назначен' : left.name)
-            const rightValue = normalize(sortField === 'leaderName' ? right.leader?.name ?? 'Не назначен' : right.name)
+            const leftValue = normalize(left.leader.name)
+            const rightValue = normalize(right.leader.name)
             const result = leftValue.localeCompare(rightValue, 'ru')
 
             return sortDirection === 'asc' ? result : result * -1
@@ -96,12 +96,10 @@ export function TeamsTable({ teams, onEdit, onDelete }: Props) {
                                 data-menu-open={menuOpened ? 'true' : undefined}
                             >
                                 <Table.Td>
-                                    <Text fw={600}>{team.name}</Text>
+                                    <Text fw={600}>{team.leader.name}</Text>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Text c={team.leader ? undefined : 'dimmed'}>
-                                        {team.leader?.name ?? 'Не назначен'}
-                                    </Text>
+                                    <Text>{team.leader.name}</Text>
                                 </Table.Td>
                                 <Table.Td className={classes.actionCell}>
                                     <div className={classes.actionCellInner}>
@@ -115,7 +113,7 @@ export function TeamsTable({ teams, onEdit, onDelete }: Props) {
                                                 <ActionIcon
                                                     variant="subtle"
                                                     color="gray"
-                                                    aria-label={`Действия с командой ${team.name}`}
+                                                    aria-label={`Действия с командой ${team.leader.name}`}
                                                     className={classes.actionButton}
                                                 >
                                                     <DotsThreeVerticalIcon size={24} />

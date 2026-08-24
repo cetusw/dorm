@@ -11,29 +11,27 @@ func TestRestoreTeam(t *testing.T) {
 	id := uuid.New()
 	groupID := uuid.New()
 	leaderID := uuid.New()
-	name := "Test Team"
 	color := "#FF0000"
 	rotationPosition := 1
 
-	team := RestoreTeam(id, name, groupID, &leaderID, color, rotationPosition)
+	team := RestoreTeam(id, groupID, leaderID, color, rotationPosition)
 
 	assert.Equal(t, id, team.ID())
 	assert.Equal(t, groupID, team.GroupID())
-	assert.Equal(t, &leaderID, team.LeaderID())
-	assert.Equal(t, name, team.Name())
+	assert.Equal(t, leaderID, team.LeaderID())
 	assert.Equal(t, color, team.Color())
 	assert.Equal(t, rotationPosition, team.RotationPosition())
 }
 
 func TestNewTeam(t *testing.T) {
 	groupID := uuid.New()
+	leaderID := uuid.New()
 
-	team := NewTeam("Test Team", groupID, "#FF0000", 1)
+	team := NewTeam(groupID, leaderID, "#FF0000", 1)
 
 	assert.NotEqual(t, uuid.Nil, team.ID())
 	assert.Equal(t, groupID, team.GroupID())
-	assert.Nil(t, team.LeaderID())
-	assert.Equal(t, "Test Team", team.Name())
+	assert.Equal(t, leaderID, team.LeaderID())
 	assert.Equal(t, "#FF0000", team.Color())
 	assert.Equal(t, 1, team.RotationPosition())
 }
