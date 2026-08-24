@@ -165,6 +165,9 @@ func (m *MockTeamRepo) UpdateRotationPositions(ctx context.Context, groupID uuid
 }
 func (m *MockTeamRepo) Save(ctx context.Context, team *structure.Team) error { return nil }
 func (m *MockTeamRepo) Delete(ctx context.Context, id uuid.UUID) error       { return nil }
+func (m *MockTeamRepo) ReplaceLeaderAndRemoveMember(ctx context.Context, teamID uuid.UUID, leaderID uuid.UUID, replacementLeaderID uuid.UUID) error {
+	return nil
+}
 
 type MockCatalogRepo struct{ mock.Mock }
 

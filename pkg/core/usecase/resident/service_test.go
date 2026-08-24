@@ -54,6 +54,9 @@ func (s *teamRepositoryStub) UpdateRotationPositions(context.Context, uuid.UUID,
 }
 func (s *teamRepositoryStub) Save(context.Context, *structure.Team) error { return nil }
 func (s *teamRepositoryStub) Delete(context.Context, uuid.UUID) error     { return nil }
+func (s *teamRepositoryStub) ReplaceLeaderAndRemoveMember(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error {
+	return nil
+}
 
 type groupRepositoryStub struct {
 	groups            []*structure.Group

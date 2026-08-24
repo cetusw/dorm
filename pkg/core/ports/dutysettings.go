@@ -16,7 +16,7 @@ type DutySettingsUseCase interface {
 	GetTeamMemberOptions(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID *uuid.UUID) (dto.TeamMemberOptionsResponse, error)
 	AddTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error
 	AssignTeamLeader(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error
-	RemoveTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error
+	RemoveTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID, replacementLeaderID *uuid.UUID) error
 	CreateTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, req dto.CreateResidentTeamRequest) (*dto.TeamDetails, error)
 	UpdateTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, req dto.UpdateResidentTeamRequest) (*dto.TeamDetails, error)
 	DeleteTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID) error

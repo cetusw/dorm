@@ -335,11 +335,20 @@ export async function assignDutySettingsTeamLeader(groupId: string, teamId: stri
     })
 }
 
-export async function removeDutySettingsTeamMember(groupId: string, teamId: string, userId: string): Promise<void> {
+export async function removeDutySettingsTeamMember(
+    groupId: string,
+    teamId: string,
+    userId: string,
+    replacementLeaderId: string | null = null,
+): Promise<void> {
     await apiRequest(
         `/api/v1/groups/${encodeURIComponent(groupId)}/duty-settings/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
         {
             method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ replacement_leader_id: replacementLeaderId }),
         },
     )
 }

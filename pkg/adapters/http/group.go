@@ -2,6 +2,7 @@ package http
 
 import (
 	"dorm/pkg/core/domain/duty"
+	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
 	cleaninguc "dorm/pkg/core/usecase/cleaning"
@@ -384,7 +385,22 @@ func (h *GroupAPIHandler) HandleRemoveDutySettingsTeamMember(c *fiber.Ctx) error
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор жителя"))
 	}
 
-	if err := h.dutySettingsUC.RemoveTeamMember(c.Context(), userID, groupID, teamID, targetUserID); err != nil {
+	var req dto.DutySettingsRemoveTeamMemberRequest
+	if len(c.Body()) > 0 {
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
+		}
+	}
+	var replacementLeaderID *uuid.UUID
+	if req.ReplacementLeaderID != nil && *req.ReplacementLeaderID != "" {
+		parsedReplacementLeaderID, err := uuid.Parse(*req.ReplacementLeaderID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор нового главы команды"))
+		}
+		replacementLeaderID = &parsedReplacementLeaderID
+	}
+
+	if err := h.dutySettingsUC.RemoveTeamMember(c.Context(), userID, groupID, teamID, targetUserID, replacementLeaderID); err != nil {
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -681,6 +697,12 @@ func (h *GroupAPIHandler) respondDutySettingsError(c *fiber.Ctx, err error) erro
 	switch {
 	case errors.Is(err, dutysettingsuc.ErrAccessDenied):
 		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
+	case errors.Is(err, structure.ErrReplacementLeaderRequired):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("укажите нового главу команды"))
+	case errors.Is(err, structure.ErrInvalidReplacementLeader):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("новый глава должен быть другим участником этой команды"))
+	case errors.Is(err, structure.ErrCannotRemoveOnlyLeader):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("нельзя исключить единственного главу команды"))
 	case err.Error() == "группа не найдена":
 		return c.Status(fiber.StatusNotFound).JSON(errorResponse(err.Error()))
 	case err.Error() == "территория не найдена":

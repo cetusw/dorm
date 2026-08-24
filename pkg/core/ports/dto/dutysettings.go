@@ -71,6 +71,10 @@ type DutySettingsTeamMemberRequest struct {
 	UserID string `json:"user_id"`
 }
 
+type DutySettingsRemoveTeamMemberRequest struct {
+	ReplacementLeaderID *string `json:"replacement_leader_id"`
+}
+
 type DutySettingsTeamLeaderRequest struct {
 	UserID string `json:"user_id"`
 }

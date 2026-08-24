@@ -15,18 +15,27 @@
 
 .memberCard {
     width: 100%;
+    border-bottom: 1px solid #DDE4E2;
+    background: transparent;
+    padding: 15px 0;
 }
 
 .memberContent {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) max-content 40px;
+    display: flex;
     align-items: center;
-    column-gap: 16px;
-    min-height: 40px;
+    justify-content: flex-start;
+    gap: 16px;
+    min-height: 24px;
 }
 
-.memberNameCell,
-.memberBadgeCell,
+.memberDetails {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 0 1 auto;
+    gap: 16px;
+}
+
 .memberActionsCell {
     min-width: 0;
 }
@@ -40,21 +49,26 @@
 
 .memberActionsCell {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    gap: 8px;
+    min-width: 88px;
 }
 
 .actionButton {
     width: 40px;
     height: 40px;
+    color: #66736F;
+    transition: opacity 140ms ease, color 140ms ease, background-color 140ms ease;
 }
 
-@media (max-width: 768px) {
-    .memberContent {
-        grid-template-columns: minmax(0, 1fr) 40px;
-        row-gap: 8px;
+@media (hover: hover) and (pointer: fine) {
+    .actionButton {
+        opacity: 0;
     }
 
-    .memberBadgeCell {
-        grid-column: 1 / 2;
+    .memberCard:hover .actionButton,
+    .memberCard:focus-within .actionButton,
+    .actionButton:focus-visible {
+        opacity: 1;
     }
 }

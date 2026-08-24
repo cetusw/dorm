@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -164,6 +165,86 @@ func (r *TeamRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx, query, idBytes)
 	if err != nil {
 		return fmt.Errorf("TeamRepository.Delete: %w", err)
+	}
+	return nil
+}
+
+func (r *TeamRepository) ReplaceLeaderAndRemoveMember(ctx context.Context, teamID, leaderID, replacementLeaderID uuid.UUID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin replace team leader transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	teamIDBytes, err := teamID.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("marshal team id: %w", err)
+	}
+	leaderIDBytes, err := leaderID.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("marshal leader id: %w", err)
+	}
+	replacementIDBytes, err := replacementLeaderID.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("marshal replacement leader id: %w", err)
+	}
+	if leaderID == replacementLeaderID {
+		return structure.ErrInvalidReplacementLeader
+	}
+
+	var currentLeaderID []byte
+	if err := tx.QueryRowContext(ctx, `SELECT leader_id FROM team WHERE id = ? FOR UPDATE`, teamIDBytes).Scan(&currentLeaderID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("team not found")
+		}
+		return fmt.Errorf("lock team: %w", err)
+	}
+	if len(currentLeaderID) == 0 || !bytes.Equal(currentLeaderID, leaderIDBytes) {
+		return structure.ErrInvalidReplacementLeader
+	}
+
+	rows, err := tx.QueryContext(ctx, `SELECT id FROM user WHERE team_id = ? AND deleted_at IS NULL FOR UPDATE`, teamIDBytes)
+	if err != nil {
+		return fmt.Errorf("lock team members: %w", err)
+	}
+	memberCount := 0
+	for rows.Next() {
+		memberCount++
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close locked team members: %w", err)
+	}
+	if memberCount <= 1 {
+		return structure.ErrCannotRemoveOnlyLeader
+	}
+
+	for _, userID := range [][]byte{leaderIDBytes, replacementIDBytes} {
+		var memberID []byte
+		if err := tx.QueryRowContext(ctx, `SELECT id FROM user WHERE id = ? AND team_id = ? AND deleted_at IS NULL FOR UPDATE`, userID, teamIDBytes).Scan(&memberID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return structure.ErrInvalidReplacementLeader
+			}
+			return fmt.Errorf("lock team member: %w", err)
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `UPDATE team SET leader_id = ? WHERE id = ?`, replacementIDBytes, teamIDBytes); err != nil {
+		return fmt.Errorf("replace team leader: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE user SET team_id = NULL WHERE id = ? AND team_id = ?`, leaderIDBytes, teamIDBytes)
+	if err != nil {
+		return fmt.Errorf("remove former team leader: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count removed former team leader: %w", err)
+	}
+	if affected != 1 {
+		return structure.ErrInvalidReplacementLeader
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit replace team leader transaction: %w", err)
 	}
 	return nil
 }

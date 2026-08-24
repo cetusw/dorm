@@ -184,9 +184,6 @@ func (s *Service) SearchTeamMembers(ctx context.Context, currentUserID uuid.UUID
 	}
 
 	normalizedQuery := strings.ToLower(strings.TrimSpace(query))
-	if normalizedQuery == "" {
-		return &dto.DutySettingsTeamSearchResponse{Users: []dto.DutySettingsTeamSearchItem{}}, nil
-	}
 
 	users, err := s.userRepo.FindByDormitoryID(ctx, group.DormitoryID())
 	if err != nil {
@@ -224,7 +221,7 @@ func (s *Service) SearchTeamMembers(ctx context.Context, currentUserID uuid.UUID
 			resident.FirstName(),
 			stringValue(resident.MiddleName()),
 		}, " "))
-		if !strings.Contains(searchableName, normalizedQuery) {
+		if normalizedQuery != "" && !strings.Contains(searchableName, normalizedQuery) {
 			continue
 		}
 
@@ -352,7 +349,7 @@ func (s *Service) AssignTeamLeader(ctx context.Context, currentUserID uuid.UUID,
 	return nil
 }
 
-func (s *Service) RemoveTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID) error {
+func (s *Service) RemoveTeamMember(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID, userID uuid.UUID, replacementLeaderID *uuid.UUID) error {
 	_, team, err := s.requireManagedGroupTeam(ctx, currentUserID, groupID, teamID)
 	if err != nil {
 		return err
@@ -366,7 +363,16 @@ func (s *Service) RemoveTeamMember(ctx context.Context, currentUserID uuid.UUID,
 		return fmt.Errorf("житель не состоит в этой команде")
 	}
 	if team.LeaderID() != nil && *team.LeaderID() == resident.ID() {
-		return fmt.Errorf("Сначала назначьте другого участника главой команды")
+		if replacementLeaderID == nil {
+			return structure.ErrReplacementLeaderRequired
+		}
+		if *replacementLeaderID == resident.ID() {
+			return structure.ErrInvalidReplacementLeader
+		}
+		return s.teamRepo.ReplaceLeaderAndRemoveMember(ctx, team.ID(), resident.ID(), *replacementLeaderID)
+	}
+	if replacementLeaderID != nil {
+		return structure.ErrInvalidReplacementLeader
 	}
 
 	if err := s.userRepo.MoveUserToTeam(ctx, resident.ID(), nil); err != nil {

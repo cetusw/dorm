@@ -2,19 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
     CrownSimpleIcon,
-    DotsThreeVerticalIcon,
-    TrashIcon,
+    UserMinusIcon,
 } from '@phosphor-icons/react'
 import {
     ActionIcon,
     Alert,
+    Button,
     Center,
     Drawer,
+    FocusTrap,
+    Group,
     Loader,
-    Menu,
+    Modal,
     ScrollArea,
     Stack,
     Text,
+    Tooltip,
 } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 
@@ -41,7 +44,6 @@ import {
     type ResidentSearchOption,
 } from '../../../shared/ui/ResidentSearchCombobox'
 import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
-import { SettingsCardSurface } from '../../../shared/ui/SettingsCardSurface'
 import classes from './DutySettingsTeamMembersDrawer.module.css'
 
 type Props = {
@@ -57,54 +59,65 @@ type PendingMove = {
 }
 
 type PendingMemberAction =
-    { type: 'remove-member'; member: DutySettingsTeamMember }
+    { member: DutySettingsTeamMember }
 
 function TeamMemberCard({
     member,
+    onlyLeader,
+    assigningLeader,
     onAssignLeader,
     onRemove,
 }: {
     member: DutySettingsTeamMember
+    onlyLeader: boolean
+    assigningLeader: boolean
     onAssignLeader: () => void
     onRemove: () => void
 }) {
-    const [menuOpened, setMenuOpened] = useState(false)
+    const removeDisabled = onlyLeader && member.is_leader
+    const removeTooltip = removeDisabled ? 'Нельзя исключить единственного главу' : 'Исключить из команды'
 
     return (
-        <SettingsCardSurface className={classes.memberCard} menuOpen={menuOpened}>
+        <div className={classes.memberCard}>
             <div className={classes.memberContent}>
-                <div className={classes.memberNameCell}>
+                <div className={classes.memberDetails}>
                     <Text fw={500} className={classes.memberName}>{member.name}</Text>
-                </div>
-
-                <div className={classes.memberBadgeCell}>
                     {member.is_leader ? <SettingsBadge color="leader">Глава команды</SettingsBadge> : null}
                 </div>
 
                 <div className={classes.memberActionsCell}>
-                    <Menu opened={menuOpened} onChange={setMenuOpened} withinPortal position="bottom-end">
-                        <Menu.Target>
+                    {!member.is_leader ? (
+                        <Tooltip label="Назначить главой команды" withArrow>
                             <ActionIcon
                                 variant="subtle"
                                 color="gray"
-                                aria-label="Действия с участником"
+                                aria-label={`Назначить ${member.name} главой команды`}
                                 className={classes.actionButton}
+                                loading={assigningLeader}
+                                disabled={assigningLeader}
+                                onClick={onAssignLeader}
                             >
-                                <DotsThreeVerticalIcon size={25} />
+                                <CrownSimpleIcon size={20} />
                             </ActionIcon>
-                        </Menu.Target>
-                        <Menu.Dropdown>
-                            <Menu.Item leftSection={<CrownSimpleIcon size={25} />} onClick={onAssignLeader}>
-                                Назначить главой
-                            </Menu.Item>
-                            <Menu.Item color="red" leftSection={<TrashIcon size={25} />} onClick={onRemove}>
-                                Исключить из команды
-                            </Menu.Item>
-                        </Menu.Dropdown>
-                    </Menu>
+                        </Tooltip>
+                    ) : null}
+                    <Tooltip label={removeTooltip} withArrow>
+                        <span>
+                            <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                aria-label={`Исключить ${member.name} из команды`}
+                                className={classes.actionButton}
+                                disabled={removeDisabled}
+                                onClick={onRemove}
+                            >
+                                <UserMinusIcon size={20} />
+                            </ActionIcon>
+                        </span>
+                    </Tooltip>
                 </div>
             </div>
-        </SettingsCardSurface>
+        </div>
     )
 }
 
@@ -118,17 +131,18 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
     const [searchError, setSearchError] = useState<string | null>(null)
     const [searchItems, setSearchItems] = useState<DutySettingsTeamSearchItem[]>([])
     const [searchFocused, setSearchFocused] = useState(false)
+    const [searchComboboxKey, setSearchComboboxKey] = useState(0)
     const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
     const [pendingAction, setPendingAction] = useState<PendingMemberAction | null>(null)
+    const [replacementLeaderId, setReplacementLeaderId] = useState<string | null>(null)
+    const [replacementSearch, setReplacementSearch] = useState('')
+    const [removingMember, setRemovingMember] = useState(false)
+    const [removeError, setRemoveError] = useState<string | null>(null)
+    const [assigningLeaderId, setAssigningLeaderId] = useState<string | null>(null)
     const teamID = team?.id ?? null
     const contentRef = useRef<HTMLDivElement | null>(null)
 
-    const title = useMemo(() => {
-        if (!team) {
-            return 'Участники команды'
-        }
-        return `Участники команды ${formatDutySettingsLeaderName(team.leader)}`
-    }, [team])
+    const title = 'Исполнители команды'
 
     async function loadMembers() {
         if (!team) {
@@ -165,6 +179,9 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
             setSearchFocused(false)
             setPendingMove(null)
             setPendingAction(null)
+            setReplacementLeaderId(null)
+            setReplacementSearch('')
+            setRemoveError(null)
             return
         }
 
@@ -173,8 +190,7 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
             return
         }
 
-        const trimmedQuery = debouncedSearch.trim()
-        if (trimmedQuery === '') {
+        if (!searchFocused) {
             setSearchItems([])
             setSearchError(null)
             setSearchLoading(false)
@@ -185,7 +201,7 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
         setSearchLoading(true)
         setSearchError(null)
 
-        void searchDutySettingsTeamMembers(groupId, teamID, trimmedQuery)
+        void searchDutySettingsTeamMembers(groupId, teamID, debouncedSearch.trim())
             .then((response) => {
                 if (cancelled) {
                     return
@@ -217,6 +233,22 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
         await onUpdated()
     }
 
+    function resetMemberSearch() {
+        setSearchValue('')
+        setSearchItems([])
+        setSearchError(null)
+        setSearchLoading(false)
+        setSearchFocused(false)
+        setSearchComboboxKey((current) => current + 1)
+    }
+
+    function closeRemovalModal() {
+        setPendingAction(null)
+        setReplacementLeaderId(null)
+        setReplacementSearch('')
+        setRemoveError(null)
+    }
+
     async function addMember(user: DutySettingsTeamSearchItem) {
         if (!teamID) {
             return
@@ -226,8 +258,7 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
 
         try {
             await addDutySettingsTeamMember(groupId, teamID, user.id)
-            setSearchValue('')
-            setSearchItems([])
+            resetMemberSearch()
             await refreshAfterMutation()
         } catch (currentError) {
             if (currentError instanceof ApiError) {
@@ -238,7 +269,15 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
         }
     }
 
-    const members = data?.members ?? []
+    const members = useMemo(() => data?.members ?? [], [data])
+    const pendingMemberIsLeader = pendingAction?.member.is_leader ?? false
+    const replacementOptions = useMemo(() => {
+        const query = replacementSearch.trim().toLocaleLowerCase()
+        return members
+            .filter((member) => member.id !== pendingAction?.member.id)
+            .filter((member) => query === '' || member.name.toLocaleLowerCase().includes(query))
+            .map((member) => ({ id: member.id, name: member.name }))
+    }, [members, pendingAction?.member.id, replacementSearch])
     const searchOptions: ResidentSearchOption[] = searchItems.map((item) => ({
         id: item.id,
         name: item.name,
@@ -271,11 +310,14 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                                     <TeamMemberCard
                                         key={member.id}
                                         member={member}
+                                        onlyLeader={members.length === 1}
+                                        assigningLeader={assigningLeaderId === member.id}
                                         onAssignLeader={() => {
                                             if (!teamID) {
                                                 return
                                             }
 
+                                            setAssigningLeaderId(member.id)
                                             void assignDutySettingsTeamLeader(groupId, teamID, member.id)
                                                 .then(refreshAfterMutation)
                                                 .catch((currentError) => {
@@ -285,8 +327,14 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                                                         setError('Не удалось назначить главу команды')
                                                     }
                                                 })
+                                                .finally(() => setAssigningLeaderId(null))
                                         }}
-                                        onRemove={() => setPendingAction({ type: 'remove-member', member })}
+                                        onRemove={() => {
+                                            setPendingAction({ member })
+                                            setReplacementLeaderId(null)
+                                            setReplacementSearch('')
+                                            setRemoveError(null)
+                                        }}
                                     />
                                 ))}
                             </Stack>
@@ -294,6 +342,7 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                     )}
 
                     <ResidentSearchCombobox
+                        key={searchComboboxKey}
                         overlayOpened={opened}
                         searchValue={searchValue}
                         options={searchOptions}
@@ -302,7 +351,12 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                         placeholder="Добавить участника"
                         selectedId={null}
                         onSearchChange={setSearchValue}
-                        onFocus={() => setSearchFocused(true)}
+                        onFocus={() => {
+                            setSearchFocused(true)
+                            if (searchItems.length === 0) {
+                                setSearchLoading(true)
+                            }
+                        }}
                         onOptionSelect={(option) => {
                             const selectedUser = searchItems.find((item) => item.id === option.id)
                             if (!selectedUser) {
@@ -336,24 +390,77 @@ export function DutySettingsTeamMembersDrawer({ groupId, team, opened, onClose, 
                 errorMessage="Не удалось переместить участника"
             />
 
-            <ConfirmActionModal
+            <Modal
                 opened={pendingAction !== null}
-                onClose={() => setPendingAction(null)}
-                title="Исключение из команды"
-                description={pendingAction == null ? '' : `Исключить жителя «${pendingAction.member.name}» из команды?`}
-                confirmLabel="Исключить"
-                confirmColor="red"
-                onConfirm={async () => {
-                    if (!teamID || !pendingAction) {
-                        return
-                    }
-
-                    await removeDutySettingsTeamMember(groupId, teamID, pendingAction.member.id)
-                    setPendingAction(null)
-                    await refreshAfterMutation()
-                }}
-                errorMessage="Не удалось исключить участника из команды"
-            />
+                onClose={closeRemovalModal}
+                title="Исключение исполнителя"
+                withCloseButton={false}
+                centered
+                radius="xl"
+                size={620}
+            >
+                <FocusTrap.InitialFocus />
+                <Stack gap="lg">
+                    {removeError ? <Alert color="red">{removeError}</Alert> : null}
+                    {pendingAction ? (
+                        <Text>
+                            Вы уверены, что хотите исключить исполнителя <Text component="span" fw={700}>{pendingAction.member.name}</Text> из команды?
+                        </Text>
+                    ) : null}
+                    {pendingAction && pendingMemberIsLeader ? (
+                        <>
+                            <Text>
+                                <Text component="span" fw={700}>{pendingAction.member.name}</Text> является главой команды, назначьте нового главу команды:
+                            </Text>
+                            <ResidentSearchCombobox
+                                overlayOpened={pendingAction !== null}
+                                searchValue={replacementSearch}
+                                options={replacementOptions}
+                                loading={false}
+                                placeholder="Житель*"
+                                selectedId={replacementLeaderId}
+                                selectedLabel={replacementOptions.find((option) => option.id === replacementLeaderId)?.name ?? null}
+                                hideDropdownWhenSelected
+                                onSearchChange={(value) => {
+                                    setReplacementSearch(value)
+                                    setReplacementLeaderId(null)
+                                }}
+                                onOptionSelect={(option) => {
+                                    setReplacementLeaderId(option.id)
+                                    setReplacementSearch(option.name)
+                                }}
+                            />
+                        </>
+                    ) : null}
+                    <Group justify="flex-end" gap="15">
+                        <Button variant="default" onClick={closeRemovalModal}>Отменить</Button>
+                        <Button
+                            color="dark"
+                            loading={removingMember}
+                            disabled={pendingMemberIsLeader && replacementLeaderId === null}
+                            onClick={async () => {
+                                if (!teamID || !pendingAction) {
+                                    return
+                                }
+                                setRemovingMember(true)
+                                setRemoveError(null)
+                                try {
+                                    await removeDutySettingsTeamMember(groupId, teamID, pendingAction.member.id, replacementLeaderId)
+                                    closeRemovalModal()
+                                    resetMemberSearch()
+                                    await refreshAfterMutation()
+                                } catch (currentError) {
+                                    setRemoveError(currentError instanceof ApiError ? currentError.message : 'Не удалось исключить участника из команды')
+                                } finally {
+                                    setRemovingMember(false)
+                                }
+                            }}
+                        >
+                            Исключить
+                        </Button>
+                    </Group>
+                </Stack>
+            </Modal>
         </>
     )
 }
