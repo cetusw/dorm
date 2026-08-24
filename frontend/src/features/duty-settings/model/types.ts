@@ -75,6 +75,7 @@ export type DutySettingsGroup = {
 }
 
 export type DutySettingsResponse = {
+    can_manage_group_settings: boolean
     group: DutySettingsGroup
     areas: DutySettingsArea[]
     teams: DutySettingsTeam[]
@@ -84,6 +85,23 @@ export type DutySettingsResponse = {
     active_duty: DutySettingsActiveDuty | null
 }
 
-export type DutySettingsMainTab = 'tasks' | 'teams' | 'next-duty'
+export type DutyParticipant = {
+    participant_id: string
+    full_name: string
+    type: 'REGULAR' | 'TEMPORARY'
+    excluded_at: string | null
+    is_leader: boolean
+    team_id: string | null
+    team_name: string | null
+}
+
+export type DutyParticipantCandidate = {
+    participant_id: string
+    full_name: string
+    team_id: string | null
+    team_name: string | null
+}
+
+export type DutySettingsMainTab = 'tasks' | 'participants' | 'teams'
 
 export type DutySettingsViewMode = 'list' | 'plan'

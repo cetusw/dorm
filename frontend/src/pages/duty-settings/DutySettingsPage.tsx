@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { CaretLeftIcon } from '@phosphor-icons/react'
-import { Alert, Box, Center, Group, Loader, SegmentedControl, Select, Stack } from '@mantine/core'
+import { Alert, Center, Group, Loader, SegmentedControl, Select, Stack } from '@mantine/core'
 
 import { AreaFormModal } from '../../features/areas/ui/AreaFormModal'
 import { DeleteAreaModal } from '../../features/areas/ui/DeleteAreaModal'
@@ -23,6 +23,7 @@ import { DutySettingsCreateTaskModal } from '../../features/duty-settings/ui/Dut
 import { DutySettingsPlanPanel } from '../../features/duty-settings/ui/DutySettingsPlanPanel'
 import { DutySettingsTaskSummary } from '../../features/duty-settings/ui/DutySettingsTaskSummary'
 import { DutySettingsTeamsTab } from '../../widgets/duty-settings-teams/ui/DutySettingsTeamsTab'
+import { DutySettingsParticipantsTab } from '../../widgets/duty-settings-participants/ui/DutySettingsParticipantsTab'
 import { floorPlans } from '../../features/current-duty/building-plan/generated/plans'
 import { getFloorLabel } from '../../features/current-duty/building-plan/utils'
 import { ConfirmActionModal } from '../../shared/ui/ConfirmActionModal'
@@ -108,6 +109,12 @@ export function DutySettingsPage({ groupId }: Props) {
         }
     }, [availableFloorPlans, selectedFloorPlanId])
 
+    useEffect(() => {
+        if (data && !data.can_manage_group_settings && mainTab !== 'participants') {
+            setMainTab('participants')
+        }
+    }, [data, mainTab])
+
     function handleCreateTask(areaId: number) {
         setTaskAreaId(areaId)
         setEditingTaskId(null)
@@ -172,8 +179,18 @@ export function DutySettingsPage({ groupId }: Props) {
                 onReload={() => reload({ silent: true })}
                 onMemberCountChange={changeTeamMembersCount}
             />
-        ) : mainTab !== 'tasks' ? (
-            <Box h={120} />
+        ) : mainTab === 'participants' ? (
+            data.task_editor_state !== 'active' || !data.active_duty ? (
+                <EmptyState
+                    title="В группе нет активного дежурства"
+                    description={data.task_editor_alert || 'Состав исполнителей можно изменять только у текущего дежурства.'}
+                />
+            ) : (
+                <DutySettingsParticipantsTab
+                    activeDuty={data.active_duty}
+                    onReload={() => reload({ silent: true })}
+                />
+            )
         ) : data.task_editor_state !== 'active' || !data.active_duty ? (
             <EmptyState
                 title="Дежурство не найдено"
@@ -266,8 +283,9 @@ export function DutySettingsPage({ groupId }: Props) {
                         <SegmentedControl
                             value={mainTab}
                             data={[
-                                { label: 'Задачи', value: 'tasks' },
-                                { label: 'Команды', value: 'teams' },
+                                ...(data?.can_manage_group_settings ? [{ label: 'Задачи', value: 'tasks' }] : []),
+                                { label: 'Исполнители', value: 'participants' },
+                                ...(data?.can_manage_group_settings ? [{ label: 'Команды', value: 'teams' }] : []),
                             ]}
                             classNames={{
                                 control: segmentedControlClasses.control,
@@ -277,7 +295,7 @@ export function DutySettingsPage({ groupId }: Props) {
                             onChange={(value) => setMainTab(value as DutySettingsMainTab)}
                         />
 
-                        {mainTab === 'tasks' ? (
+                        {mainTab === 'tasks' && data?.can_manage_group_settings ? (
                             <SegmentedControl
                                 value={viewMode}
                                 data={[

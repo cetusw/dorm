@@ -108,7 +108,7 @@ func NewContainer(configPath string) (*Container, error) {
 	dormitoryService := dormitory.NewDormitoryService(dormitoryRepo, groupRepo, teamRepo, userRepo)
 	teamService := team.NewTeamService(teamRepo, groupRepo, dormitoryRepo, userRepo, teamQueryService)
 	taskCatalogService := cataloguc.NewCatalogService(taskRepo, areaRepo, groupRepo)
-	dutySettingsService := dutysettingsuc.NewDutySettingsService(groupRepo, teamRepo, areaRepo, taskRepo, dutyRepo, dutyTaskRepo, userRepo)
+	dutySettingsService := dutysettingsuc.NewDutySettingsService(groupRepo, teamRepo, areaRepo, taskRepo, dutyRepo, dutyTaskRepo, dutyParticipantRepo, userRepo, dormitoryRepo)
 	pushSubscriptionService := notificationuc.NewNotificationService(pushSubscriptionRepo)
 	penaltyService := penaltyuc.NewPenaltyService(
 		penaltyRepo,

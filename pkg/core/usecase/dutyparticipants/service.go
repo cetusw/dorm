@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"dorm/pkg/core/domain/duty"
@@ -17,7 +18,7 @@ var (
 	ErrAccessDenied          = errors.New("duty participants access denied")
 	ErrDutyNotFound          = errors.New("duty not found")
 	ErrNotCurrent            = errors.New("duty participants can only be edited for current duty")
-	ErrCandidateOutsideGroup = errors.New("participant must belong to the duty group")
+	ErrCandidateOutsideGroup = errors.New("participant must belong to the duty dormitory")
 )
 
 type Service struct {
@@ -78,25 +79,31 @@ func (s *Service) GetCandidates(ctx context.Context, actorID, dutyID uuid.UUID) 
 	if err != nil {
 		return nil, err
 	}
-	users, err := s.users.FindAll(ctx)
+	// Residents are currently scoped to the dormitory. A resident may not yet
+	// have a permanent Team, so deriving candidates through user.team_id would
+	// incorrectly hide them from the duty roster.
+	users, err := s.users.FindByDormitoryID(ctx, g.DormitoryID())
 	if err != nil {
 		return nil, err
 	}
 	out := []dto.DutyParticipantCandidateResponse{}
 	for _, u := range users {
-		if u.TeamID() == nil {
-			continue
+		item := dto.DutyParticipantCandidateResponse{ParticipantID: u.ID().String(), FullName: fullName(u)}
+		if u.TeamID() != nil {
+			if t, findErr := s.teams.FindByID(ctx, *u.TeamID()); findErr == nil && t != nil {
+				id := u.TeamID().String()
+				item.TeamID = &id
+				if leader, leaderErr := s.users.FindByID(ctx, t.LeaderID()); leaderErr == nil && leader != nil {
+					name := fullName(leader)
+					item.TeamName = &name
+				}
+			}
 		}
-		t, err := s.teams.FindByID(ctx, *u.TeamID())
-		if err != nil || t == nil || t.GroupID() != g.ID() {
-			continue
-		}
-		id := u.TeamID().String()
-		if leader, _ := s.users.FindByID(ctx, t.LeaderID()); leader != nil {
-			name := fullName(leader)
-			out = append(out, dto.DutyParticipantCandidateResponse{ParticipantID: u.ID().String(), FullName: fullName(u), TeamID: &id, TeamName: &name})
-		}
+		out = append(out, item)
 	}
+	// FindByDormitoryID is ordered by name in MySQL; retain an explicit stable
+	// ordering for other repository implementations too.
+	sort.Slice(out, func(i, j int) bool { return out[i].FullName < out[j].FullName })
 	return out, nil
 }
 func (s *Service) AddParticipant(ctx context.Context, actorID, dutyID, participantID uuid.UUID) error {
@@ -104,7 +111,7 @@ func (s *Service) AddParticipant(ctx context.Context, actorID, dutyID, participa
 	if err != nil {
 		return err
 	}
-	if err := s.ensureSameGroup(ctx, participantID, g.ID()); err != nil {
+	if err := s.ensureSameDormitory(ctx, participantID, g.DormitoryID()); err != nil {
 		return err
 	}
 	return s.participants.Add(ctx, duty.DutyParticipant{DutyID: dutyID, ParticipantID: participantID, Type: duty.ParticipantTypeTemporary}, d.Start(), d.End())
@@ -164,19 +171,12 @@ func (s *Service) requireManageable(ctx context.Context, actorID, dutyID uuid.UU
 	}
 	return nil, nil, ErrAccessDenied
 }
-func (s *Service) ensureSameGroup(ctx context.Context, userID, groupID uuid.UUID) error {
+func (s *Service) ensureSameDormitory(ctx context.Context, userID uuid.UUID, dormitoryID int64) error {
 	u, err := s.users.FindByID(ctx, userID)
 	if err != nil {
 		return err
 	}
-	if u == nil || u.TeamID() == nil {
-		return ErrCandidateOutsideGroup
-	}
-	t, err := s.teams.FindByID(ctx, *u.TeamID())
-	if err != nil {
-		return err
-	}
-	if t == nil || t.GroupID() != groupID {
+	if u == nil || u.DormitoryID() == nil || *u.DormitoryID() != dormitoryID {
 		return ErrCandidateOutsideGroup
 	}
 	return nil

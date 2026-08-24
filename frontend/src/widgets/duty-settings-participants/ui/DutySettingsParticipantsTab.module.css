@@ -1,0 +1,81 @@
+.summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.summaryItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    line-height: 1.25;
+}
+
+.search {
+    margin-top: 25px;
+}
+
+.participantList {
+    margin-top: 6px;
+}
+
+.participantCard {
+    width: 100%;
+    padding: 15px 0;
+    border-bottom: 1px solid #DDE4E2;
+    background: transparent;
+}
+
+.leaderCard {
+    padding-bottom: 10px;
+}
+
+.participantContent {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 24px;
+}
+
+.participantDetails {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 0 1 auto;
+    gap: 16px;
+}
+
+.participantName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.participantActions {
+    display: flex;
+    justify-content: flex-start;
+    gap: 8px;
+    min-width: 88px;
+}
+
+.actionButton {
+    width: 40px;
+    height: 40px;
+    color: #66736F;
+    transition: opacity 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .actionButton {
+        opacity: 0;
+    }
+
+    .participantCard:hover .actionButton,
+    .participantCard:focus-within .actionButton,
+    .actionButton:focus-visible {
+        opacity: 1;
+    }
+}

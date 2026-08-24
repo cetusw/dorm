@@ -86,13 +86,14 @@ type DutySettingsArea struct {
 }
 
 type DutySettingsResponse struct {
-	Group            DutySettingsGroup       `json:"group"`
-	Areas            []DutySettingsArea      `json:"areas"`
-	Teams            []DutySettingsTeam      `json:"teams"`
-	ActiveDutyTeamID *string                 `json:"active_duty_team_id"`
-	TaskEditorState  string                  `json:"task_editor_state"`
-	TaskEditorAlert  string                  `json:"task_editor_alert"`
-	ActiveDuty       *DutySettingsActiveDuty `json:"active_duty"`
+	CanManageGroupSettings bool                    `json:"can_manage_group_settings"`
+	Group                  DutySettingsGroup       `json:"group"`
+	Areas                  []DutySettingsArea      `json:"areas"`
+	Teams                  []DutySettingsTeam      `json:"teams"`
+	ActiveDutyTeamID       *string                 `json:"active_duty_team_id"`
+	TaskEditorState        string                  `json:"task_editor_state"`
+	TaskEditorAlert        string                  `json:"task_editor_alert"`
+	ActiveDuty             *DutySettingsActiveDuty `json:"active_duty"`
 }
 
 type ReorderDutySettingsTeamsRequest struct {

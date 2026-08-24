@@ -21,14 +21,16 @@ import (
 var ErrAccessDenied = errors.New("duty settings access denied")
 
 type Service struct {
-	groupRepo    structure.GroupRepository
-	teamRepo     structure.TeamRepository
-	areaRepo     catalog.AreaRepository
-	taskRepo     catalog.TaskDefinitionRepository
-	dutyRepo     duty.DutyRepository
-	dutyTaskRepo duty.DutyTaskRepository
-	userRepo     user.Repository
-	now          func() time.Time
+	groupRepo       structure.GroupRepository
+	teamRepo        structure.TeamRepository
+	areaRepo        catalog.AreaRepository
+	taskRepo        catalog.TaskDefinitionRepository
+	dutyRepo        duty.DutyRepository
+	dutyTaskRepo    duty.DutyTaskRepository
+	participantRepo duty.ParticipantRepository
+	userRepo        user.Repository
+	dormRepo        structure.DormitoryRepository
+	now             func() time.Time
 }
 
 func NewDutySettingsService(
@@ -38,24 +40,48 @@ func NewDutySettingsService(
 	taskRepo catalog.TaskDefinitionRepository,
 	dutyRepo duty.DutyRepository,
 	dutyTaskRepo duty.DutyTaskRepository,
+	participantRepo duty.ParticipantRepository,
 	userRepo user.Repository,
+	dormRepo structure.DormitoryRepository,
 ) *Service {
 	return &Service{
-		groupRepo:    groupRepo,
-		teamRepo:     teamRepo,
-		areaRepo:     areaRepo,
-		taskRepo:     taskRepo,
-		dutyRepo:     dutyRepo,
-		dutyTaskRepo: dutyTaskRepo,
-		userRepo:     userRepo,
-		now:          time.Now,
+		groupRepo:       groupRepo,
+		teamRepo:        teamRepo,
+		areaRepo:        areaRepo,
+		taskRepo:        taskRepo,
+		dutyRepo:        dutyRepo,
+		dutyTaskRepo:    dutyTaskRepo,
+		participantRepo: participantRepo,
+		userRepo:        userRepo,
+		dormRepo:        dormRepo,
+		now:             time.Now,
 	}
 }
 
 func (s *Service) GetDutySettings(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID) (*dto.DutySettingsResponse, error) {
-	group, err := s.requireManagedGroup(ctx, currentUserID, groupID)
+	group, err := s.groupRepo.FindByID(ctx, groupID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load group: %w", err)
+	}
+	if group == nil {
+		return nil, fmt.Errorf("группа не найдена")
+	}
+	canManageGroupSettings := group.LeaderID() != nil && *group.LeaderID() == currentUserID
+	canManageDormitory := false
+	if !canManageGroupSettings {
+		dorm, dormErr := s.dormRepo.FindByID(ctx, group.DormitoryID())
+		if dormErr != nil {
+			return nil, fmt.Errorf("load dormitory: %w", dormErr)
+		}
+		canManageDormitory = dorm != nil && dorm.LeaderID() != nil && *dorm.LeaderID() == currentUserID
+	}
+	latestDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, group.ID())
+	if err != nil {
+		return nil, fmt.Errorf("load latest duty: %w", err)
+	}
+	canManageParticipants := canManageGroupSettings || canManageDormitory || (latestDuty != nil && isDutyActiveOnDate(latestDuty, s.now()) && latestDuty.LeaderID() != nil && *latestDuty.LeaderID() == currentUserID)
+	if !canManageParticipants {
+		return nil, ErrAccessDenied
 	}
 
 	tasks, err := s.taskRepo.FindByGroupID(ctx, group.ID())
@@ -73,11 +99,6 @@ func (s *Service) GetDutySettings(ctx context.Context, currentUserID uuid.UUID, 
 		return nil, fmt.Errorf("load task completion dates: %w", err)
 	}
 
-	responseTeams, activeDutyTeamID, err := s.buildDutySettingsTeams(ctx, group)
-	if err != nil {
-		return nil, err
-	}
-
 	responseAreas, activeDuty, taskEditorState, taskEditorAlert, err := s.buildTaskEditorState(
 		ctx,
 		group,
@@ -87,8 +108,21 @@ func (s *Service) GetDutySettings(ctx context.Context, currentUserID uuid.UUID, 
 	if err != nil {
 		return nil, err
 	}
+	responseTeams := []dto.DutySettingsTeam{}
+	var activeDutyTeamID *string
+	if canManageGroupSettings {
+		responseTeams, activeDutyTeamID, err = s.buildDutySettingsTeams(ctx, group)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Duty leader may manage only the current duty roster. Do not expose
+		// task or permanent-team settings through this page response.
+		responseAreas = []dto.DutySettingsArea{}
+	}
 
 	return &dto.DutySettingsResponse{
+		CanManageGroupSettings: canManageGroupSettings,
 		Group: dto.DutySettingsGroup{
 			ID:          group.ID().String(),
 			Name:        group.Name(),
@@ -841,10 +875,14 @@ func (s *Service) buildTaskEditorState(
 		}
 	})
 
-	memberCount := len(teamMembers)
+	activeParticipants, err := s.participantRepo.List(ctx, latestDuty.ID(), false)
+	if err != nil {
+		return nil, nil, "", "", fmt.Errorf("load active duty participants: %w", err)
+	}
+	memberCount := len(activeParticipants)
 	costPerMember := 0
 	if memberCount > 0 {
-		costPerMember = (totalCost + memberCount - 1) / memberCount
+		costPerMember = totalCost / memberCount
 	}
 
 	return responseAreas, &dto.DutySettingsActiveDuty{

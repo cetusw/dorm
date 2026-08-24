@@ -843,7 +843,7 @@ func buildResidentCurrentDutyResponse(
 		MyGroup:               buildResidentMyGroupOption(currentDuty.myResidentGroup),
 		Group:                 currentDuty.selectedGroup.Name(),
 		CanManageTasks:        view.canManageTasks,
-		CanManageDutySettings: isGroupLeader(currentDuty.selectedGroup, currentDuty.resident.ID()),
+		CanManageDutySettings: canOpenDutySettings(currentDuty, now),
 		ReadOnly:              view.readOnly,
 		ShowGroupSelect:       view.showGroupSelect,
 		VisibleTabs:           view.visibleTabs,
@@ -882,6 +882,17 @@ func buildResidentCurrentDutyResponse(
 		TeamMembers:           response.TeamMembers,
 		Tasks:                 response.Tasks,
 	}
+}
+
+func canOpenDutySettings(currentDuty *currentDutyContext, now time.Time) bool {
+	if currentDuty == nil || currentDuty.resident == nil {
+		return false
+	}
+	actorID := currentDuty.resident.ID()
+	if isGroupLeader(currentDuty.selectedGroup, actorID) || isDormitoryLeader(currentDuty.dormitory, actorID) {
+		return true
+	}
+	return currentDuty.duty != nil && currentDuty.duty.IsActiveAt(now) && currentDuty.duty.LeaderID() != nil && *currentDuty.duty.LeaderID() == actorID
 }
 
 func teamLeaderName(leaderID uuid.UUID, members []dto.ResidentDutyTeamMember) string {

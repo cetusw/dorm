@@ -8,13 +8,38 @@ import type {
     UpdateTeamRequest,
 } from '../../teams/model/types'
 import type {
+    DutyParticipant,
+    DutyParticipantCandidate,
     DutySettingsResponse,
     DutySettingsTeamMembersResponse,
     DutySettingsTeamSearchResponse,
 } from '../model/types'
 
+function normalizeDutyParticipant(item: Record<string, unknown>): DutyParticipant {
+    const type = String(item.type ?? 'TEMPORARY')
+    return {
+        participant_id: String(item.participant_id ?? ''),
+        full_name: String(item.full_name ?? ''),
+        type: type === 'REGULAR' ? 'REGULAR' : 'TEMPORARY',
+        excluded_at: item.excluded_at == null ? null : String(item.excluded_at),
+        is_leader: Boolean(item.is_leader),
+        team_id: item.team_id == null ? null : String(item.team_id),
+        team_name: item.team_name == null ? null : String(item.team_name),
+    }
+}
+
+function normalizeDutyParticipantCandidate(item: Record<string, unknown>): DutyParticipantCandidate {
+    return {
+        participant_id: String(item.participant_id ?? ''),
+        full_name: String(item.full_name ?? ''),
+        team_id: item.team_id == null ? null : String(item.team_id),
+        team_name: item.team_name == null ? null : String(item.team_name),
+    }
+}
+
 function normalizeDutySettingsResponse(response: DutySettingsResponse): DutySettingsResponse {
     return {
+        can_manage_group_settings: Boolean(response.can_manage_group_settings),
         group: response.group,
         areas: Array.isArray(response.areas)
                     ? response.areas.map((area) => ({
@@ -382,5 +407,55 @@ export async function reorderDutySettingsTeams(groupId: string, teamIds: string[
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({ team_ids: teamIds }),
+    })
+}
+
+export async function getDutyParticipants(dutyId: string): Promise<DutyParticipant[]> {
+    const response = await apiRequest(`/api/v1/resident/duties/${encodeURIComponent(dutyId)}/participants`)
+    const body = await response.json() as { participants?: unknown }
+    return Array.isArray(body.participants)
+        ? body.participants.map((item) => normalizeDutyParticipant(item as Record<string, unknown>))
+        : []
+}
+
+export async function getDutyParticipantCandidates(dutyId: string): Promise<DutyParticipantCandidate[]> {
+    const response = await apiRequest(`/api/v1/resident/duties/${encodeURIComponent(dutyId)}/participant-candidates`)
+    const body = await response.json() as { participants?: unknown }
+    return Array.isArray(body.participants)
+        ? body.participants.map((item) => normalizeDutyParticipantCandidate(item as Record<string, unknown>))
+        : []
+}
+
+export async function addDutyParticipant(dutyId: string, participantId: string): Promise<void> {
+    await apiRequest(`/api/v1/resident/duties/${encodeURIComponent(dutyId)}/participants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participant_id: participantId }),
+    })
+}
+
+export async function restoreDutyParticipant(dutyId: string, participantId: string): Promise<void> {
+    await apiRequest(`/api/v1/resident/duties/${encodeURIComponent(dutyId)}/participants/${encodeURIComponent(participantId)}/restore`, {
+        method: 'POST',
+    })
+}
+
+export async function excludeDutyParticipant(
+    dutyId: string,
+    participantId: string,
+    replacementLeaderId: string | null = null,
+): Promise<void> {
+    await apiRequest(`/api/v1/resident/duties/${encodeURIComponent(dutyId)}/participants/${encodeURIComponent(participantId)}/exclude`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replacement_leader_id: replacementLeaderId }),
+    })
+}
+
+export async function changeDutyLeader(dutyId: string, leaderId: string): Promise<void> {
+    await apiRequest(`/api/v1/resident/duties/${encodeURIComponent(dutyId)}/leader`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leader_id: leaderId }),
     })
 }

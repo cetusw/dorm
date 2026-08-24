@@ -155,8 +155,10 @@
 
 - `GET /api/v1/resident/duties/:dutyId/participants` — список active и excluded
   участников с `participant_id`, `full_name`, `type`, `excluded_at`, `is_leader`;
-- `GET /api/v1/resident/duties/:dutyId/participant-candidates` — жители той же
-  группы, пригодные для временного добавления;
+- `GET /api/v1/resident/duties/:dutyId/participant-candidates` — активные жители
+  того же общежития, пригодные для временного добавления; текущий временный scope
+  шире Group, поскольку самостоятельная принадлежность Resident к Group ещё не
+  моделируется. После её появления scope должен быть сужен до Group;
 - `POST /api/v1/resident/duties/:dutyId/participants` body
   `{ "participant_id": "..." }` — добавляет `TEMPORARY`;
 - `POST /api/v1/resident/duties/:dutyId/participants/:participantId/exclude` body
