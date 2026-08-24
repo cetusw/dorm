@@ -53,7 +53,7 @@ export function TeamMemberTaskGroups({ duty }: Props) {
 
     return (
         <>
-            <Stack gap="sm">
+            <Stack gap={0}>
                 {teamMembers.map((memberSummary) => (
                     <TeamMemberCard
                         key={memberSummary.member.id}

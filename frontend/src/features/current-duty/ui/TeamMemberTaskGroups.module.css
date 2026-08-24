@@ -1,22 +1,18 @@
 .memberCard {
     display: block;
     width: 100%;
-    background: var(--app-color-surface);
-    border: 1px solid var(--app-color-border);
-    border-radius: 20px;
-    min-height: 72px;
-    padding: 0 20px;
+    padding: 15px 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid #DDE4E2;
+    border-radius: 0;
     text-align: left;
     cursor: pointer;
-    transition:
-        border-color 120ms ease,
-        box-shadow 120ms ease,
-        transform 120ms ease;
+    transition: background-color 120ms ease;
 }
 
 .memberCard:hover {
-    border-color: #c6d1ce;
-    box-shadow: 0 8px 24px rgba(31, 41, 39, 0.08);
+    background: transparent;
 }
 
 .memberCard:focus-visible {
@@ -28,13 +24,13 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    min-height: 70px;
+    min-height: 24px;
 }
 
 .memberName {
     flex: 1 1 auto;
     min-width: 0;
-    font-weight: 700;
+    font-weight: 500;
     font-size: var(--mantine-font-size-md);
     line-height: 1.35;
 }
@@ -123,7 +119,7 @@
     }
 
     .memberCard {
-        padding: 16px;
+        padding: 15px 0;
     }
 
     .memberCardInner {
