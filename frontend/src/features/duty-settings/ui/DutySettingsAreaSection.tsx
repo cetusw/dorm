@@ -1,5 +1,5 @@
-import { PencilIcon, PlusIcon, RowsPlusBottomIcon, TrashIcon } from '@phosphor-icons/react'
-import { ActionIcon, Group, Stack, Text } from '@mantine/core'
+import { PencilIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
+import { ActionIcon, Group, Stack, Text, Tooltip } from '@mantine/core'
 
 import type { DutySettingsArea } from '../model/types'
 import { formatDutySettingsAreaTitle } from '../model/utils'
@@ -30,19 +30,25 @@ export function DutySettingsAreaSection({
     onDeleteTask,
 }: Props) {
     return (
-        <Stack gap="md" className={classes.section}>
+        <Stack gap={0} className={classes.section}>
             <Group gap={15} wrap="nowrap" align="center" className={classes.header}>
-                <Text size="xl" fw={500}>{formatDutySettingsAreaTitle(area)}</Text>
-                <Group gap={4} wrap="nowrap" className={classes.headerActions}>
-                    <ActionIcon variant="subtle" color="gray" size={25} aria-label="Добавить территорию" onClick={onCreateArea}>
-                        <PlusIcon size={25} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="gray" size={25} aria-label="Редактировать территорию" onClick={() => onEditArea(area.id)}>
-                        <PencilIcon size={25} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="red" size={25} aria-label="Удалить территорию" onClick={() => onDeleteArea(area.id)}>
-                        <TrashIcon size={25} />
-                    </ActionIcon>
+                <Text size="lg" fw={700}>{formatDutySettingsAreaTitle(area)}</Text>
+                <Group gap={5} wrap="nowrap" className={classes.headerActions}>
+                    <Tooltip label="Добавить территорию">
+                        <ActionIcon size={30} radius="md" variant="subtle" className={classes.iconButton} aria-label="Добавить территорию" onClick={onCreateArea}>
+                            <PlusIcon size={20} />
+                        </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Редактировать территорию">
+                        <ActionIcon size={30} radius="md" variant="subtle" className={classes.iconButton} aria-label="Редактировать территорию" onClick={() => onEditArea(area.id)}>
+                            <PencilIcon size={20} />
+                        </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Удалить территорию">
+                        <ActionIcon size={30} radius="md" variant="subtle" className={classes.iconButton} aria-label="Удалить территорию" onClick={() => onDeleteArea(area.id)}>
+                            <TrashIcon size={20} />
+                        </ActionIcon>
+                    </Tooltip>
                 </Group>
             </Group>
 
@@ -65,7 +71,7 @@ export function DutySettingsAreaSection({
                     className={classes.addTaskLink}
                     onClick={() => onCreateTask(area.id)}
                 >
-                    <RowsPlusBottomIcon size={25} />
+                    <PlusIcon size={25} />
                     <Text className={classes.addTaskText}>Добавить задачу</Text>
                 </button>
             </div>

@@ -1,20 +1,16 @@
-import { useMemo, useState } from 'react'
-
 import {
     BackspaceIcon,
     CheckIcon,
-    DotsThreeVerticalIcon,
     PencilIcon,
     TrashIcon,
 } from '@phosphor-icons/react'
-import { ActionIcon, Menu, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Text, Tooltip } from '@mantine/core'
 
 import { DutyTaskStatusBadge, type DutyTaskStatus } from '../../../entities/duty-task'
-import { formatPointsLabel } from '../../../shared/lib/formatPointsLabel'
 import { SettingsBadge } from '../../../shared/ui/SettingsBadge'
+import { TaskCostBadge } from '../../current-duty/ui/TaskCostBadge'
 import { formatDutySettingsRecurrence } from '../model/utils'
 import type { DutySettingsTask } from '../model/types'
-import { SettingsCardSurface } from '../../../shared/ui/SettingsCardSurface'
 import classes from './DutySettingsTaskCard.module.css'
 
 type Props = {
@@ -26,79 +22,85 @@ type Props = {
 }
 
 export function DutySettingsTaskCard({ task, onEdit, onInclude, onExclude, onDelete }: Props) {
-    const [menuOpened, setMenuOpened] = useState(false)
-    const badgeStatus = useMemo<DutyTaskStatus>(() => (task.status === '' ? 'free' : task.status), [task.status])
+    const badgeStatus: DutyTaskStatus = task.status === '' ? 'free' : task.status
     const canExclude = task.is_included && (task.status === 'free' || task.status === 'assigned' || task.status === '')
     const shouldShowStatus = task.is_included && (task.status === 'completed' || task.status === 'verified')
     const shouldShowAssignee = task.is_included && Boolean(task.assignee_name)
 
     return (
-        <SettingsCardSurface
-            className={classes.cardRoot}
-            menuOpen={menuOpened}
-            muted={!task.is_included}
-        >
+        <article className={classes.cardRoot} data-muted={!task.is_included ? 'true' : undefined}>
             <div className={classes.content}>
                 <div className={classes.titleCell}>
                     <Tooltip label={task.title}>
                         <Text fw={500} className={classes.title}>{task.title}</Text>
                     </Tooltip>
-                </div>
 
-                <div className={classes.scoreCell}>
-                    <SettingsBadge>{formatPointsLabel(task.cost)}</SettingsBadge>
-                </div>
+                    <div className={classes.actions}>
+                        {task.is_included ? (
+                            canExclude ? (
+                                <Tooltip label="Исключить из дежурства">
+                                    <ActionIcon
+                                        size={30}
+                                        radius="md"
+                                        variant="subtle"
+                                        aria-label={`Исключить задачу ${task.title} из дежурства`}
+                                        className={classes.iconButton}
+                                        onClick={() => onExclude(task.id)}
+                                    >
+                                        <BackspaceIcon size={20} />
+                                    </ActionIcon>
+                                </Tooltip>
+                            ) : null
+                        ) : (
+                            <Tooltip label="Включить в дежурство">
+                                <ActionIcon
+                                    size={30}
+                                    radius="md"
+                                    variant="subtle"
+                                    aria-label={`Включить задачу ${task.title} в дежурство`}
+                                    className={classes.iconButton}
+                                    onClick={() => onInclude(task.id)}
+                                >
+                                    <CheckIcon size={20} />
+                                </ActionIcon>
+                            </Tooltip>
+                        )}
 
-                <div className={classes.dateCell}>
-                    <SettingsBadge>{formatDutySettingsRecurrence(task)}</SettingsBadge>
-                </div>
-
-                <div className={classes.assigneeCell}>
-                    {shouldShowAssignee ? (
-                        <Text fw={500} className={classes.assigneeText}>{task.assignee_name}</Text>
-                    ) : null}
-                </div>
-
-                <div className={classes.statusCell}>
-                    {shouldShowStatus ? (
-                        <DutyTaskStatusBadge status={badgeStatus} justify="flex-start" />
-                    ) : null}
-                </div>
-
-                <div className={classes.actions}>
-                    <Menu opened={menuOpened} onChange={setMenuOpened} withinPortal position="bottom-end">
-                        <Menu.Target>
+                        <Tooltip label="Редактировать">
                             <ActionIcon
+                                size={30}
+                                radius="md"
                                 variant="subtle"
-                                color="gray"
-                                aria-label="Действия с задачей"
+                                aria-label={`Редактировать задачу ${task.title}`}
                                 className={classes.iconButton}
+                                onClick={() => onEdit(task.id)}
                             >
-                                <DotsThreeVerticalIcon size={25} />
+                                <PencilIcon size={20} />
                             </ActionIcon>
-                        </Menu.Target>
-                        <Menu.Dropdown>
-                            <Menu.Item leftSection={<PencilIcon size={25} />} onClick={() => onEdit(task.id)}>
-                                Редактировать
-                            </Menu.Item>
-                            {task.is_included ? (
-                                canExclude ? (
-                                    <Menu.Item leftSection={<BackspaceIcon size={25} />} onClick={() => onExclude(task.id)}>
-                                        Исключить из дежурства
-                                    </Menu.Item>
-                                ) : null
-                            ) : (
-                                <Menu.Item leftSection={<CheckIcon size={25} />} onClick={() => onInclude(task.id)}>
-                                    Включить в дежурство
-                                </Menu.Item>
-                            )}
-                            <Menu.Item color="red" leftSection={<TrashIcon size={25} />} onClick={() => onDelete(task.id)}>
-                                Удалить
-                            </Menu.Item>
-                        </Menu.Dropdown>
-                    </Menu>
+                        </Tooltip>
+
+                        <Tooltip label="Удалить">
+                            <ActionIcon
+                                size={30}
+                                radius="md"
+                                variant="subtle"
+                                aria-label={`Удалить задачу ${task.title}`}
+                                className={classes.iconButton}
+                                onClick={() => onDelete(task.id)}
+                            >
+                                <TrashIcon size={20} />
+                            </ActionIcon>
+                        </Tooltip>
+                    </div>
+                </div>
+
+                <div className={classes.metaRow}>
+                    <TaskCostBadge cost={task.cost} />
+                    <SettingsBadge color="taskType">{formatDutySettingsRecurrence(task)}</SettingsBadge>
+                    {shouldShowStatus ? <DutyTaskStatusBadge status={badgeStatus} justify="flex-start" /> : null}
+                    {shouldShowAssignee ? <Text className={classes.assigneeText}>{task.assignee_name}</Text> : null}
                 </div>
             </div>
-        </SettingsCardSurface>
+        </article>
     )
 }

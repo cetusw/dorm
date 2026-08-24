@@ -1,65 +1,92 @@
-:global(:root) {
-    --duty-settings-score-column-width: 110px;
-    --duty-settings-date-column-width: 140px;
-    --duty-settings-assignee-column-width: 180px;
-    --duty-settings-status-column-width: 140px;
+.cardRoot {
+    min-height: 72px;
+    background: transparent;
 }
 
-.cardRoot + .cardRoot {
-    margin-top: 6px;
+.cardRoot[data-muted='true'] {
+    background: #F1F3F2;
+    color: #66706C;
 }
 
 .content {
-    display: grid;
-    grid-template-columns:
-        minmax(0, 1fr)
-        var(--duty-settings-score-column-width)
-        var(--duty-settings-date-column-width)
-        var(--duty-settings-assignee-column-width)
-        var(--duty-settings-status-column-width)
-        40px;
+    position: relative;
+    padding: 20px 0 10px;
+}
+
+.content::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-bottom: 1px solid #DDE4E2;
+}
+
+.titleCell {
+    display: flex;
     align-items: center;
-    column-gap: 16px;
-    min-height: 40px;
-}
-
-.titleCell,
-.scoreCell,
-.dateCell,
-.assigneeCell,
-.statusCell {
     min-width: 0;
+    gap: 12px;
 }
 
-.title,
-.assigneeText {
+.title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 16px;
+    line-height: 24px;
+}
+
+.metaRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    margin-top: 4px;
+}
+
+.assigneeText {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 20px;
 }
 
 .actions {
-    opacity: 1;
-    transition: opacity 140ms ease;
     display: flex;
-    justify-content: flex-end;
-    width: 40px;
+    align-items: center;
+    gap: 5px;
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 120ms ease;
+}
+
+.iconButton {
+    background: transparent;
+    color: #66736F;
+}
+
+.iconButton:hover {
+    background: #DDE4E2;
+}
+
+.iconButton :global(svg) {
+    color: #66736F;
 }
 
 @media (hover: hover) and (pointer: fine) {
     .actions {
         opacity: 0;
+        pointer-events: none;
     }
 
     .cardRoot:hover .actions,
-    .cardRoot:focus-within .actions,
-    .cardRoot[data-menu-open='true'] .actions {
+    .cardRoot:focus-within .actions {
         opacity: 1;
+        pointer-events: auto;
     }
-}
-
-.iconButton {
-    width: 40px;
-    height: 40px;
 }

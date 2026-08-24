@@ -6,7 +6,7 @@ import classes from './SettingsBadge.module.css'
 
 type Props = {
     children: ReactNode
-    color?: 'default' | 'success' | 'leader' | 'area'
+    color?: 'default' | 'success' | 'leader' | 'area' | 'taskType'
 }
 
 export function SettingsBadge({ children, color = 'default' }: Props) {
@@ -17,6 +17,7 @@ export function SettingsBadge({ children, color = 'default' }: Props) {
                 color === 'success' ? classes.success : '',
                 color === 'leader' ? classes.leader : '',
                 color === 'area' ? classes.area : '',
+                color === 'taskType' ? classes.taskType : '',
             ].filter(Boolean).join(' ')}
         >
             <Text size="sm">{children}</Text>

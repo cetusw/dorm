@@ -25,3 +25,16 @@
     line-height: 1.5;
     font-weight: 500;
 }
+
+.iconButton {
+    background: transparent;
+    color: #66736F;
+}
+
+.iconButton:hover {
+    background: #DDE4E2;
+}
+
+.iconButton :global(svg) {
+    color: #66736F;
+}

@@ -12,6 +12,19 @@
     transition: opacity 140ms ease;
 }
 
+.iconButton {
+    background: transparent;
+    color: #66736F;
+}
+
+.iconButton:hover {
+    background: #DDE4E2;
+}
+
+.iconButton :global(svg) {
+    color: #66736F;
+}
+
 @media (hover: hover) and (pointer: fine) {
     .headerActions,
     .addTaskAction {
@@ -44,7 +57,7 @@
 .section:focus-within .addTaskWrap {
     max-height: 40px;
     opacity: 1;
-    margin-top: 4px;
+    margin-top: 15px;
 }
 
 .addTaskLink {
