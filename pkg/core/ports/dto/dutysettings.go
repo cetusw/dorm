@@ -21,10 +21,10 @@ type DutySettingsTask struct {
 }
 
 type DutySettingsTaskSummary struct {
-	TaskCount       int `json:"task_count"`
-	TotalCost       int `json:"total_cost"`
-	CostPerMember   int `json:"cost_per_member"`
-	TeamMemberCount int `json:"team_member_count"`
+	TaskCount          int `json:"task_count"`
+	TotalCost          int `json:"total_cost"`
+	CostPerParticipant int `json:"cost_per_participant"`
+	ParticipantCount   int `json:"participant_count"`
 }
 
 type DutySettingsActiveDuty struct {

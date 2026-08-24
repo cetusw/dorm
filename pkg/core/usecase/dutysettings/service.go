@@ -75,11 +75,11 @@ func (s *Service) GetDutySettings(ctx context.Context, currentUserID uuid.UUID, 
 		}
 		canManageDormitory = dorm != nil && dorm.LeaderID() != nil && *dorm.LeaderID() == currentUserID
 	}
-	latestDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, group.ID())
+	activeDuty, err := s.dutyRepo.FindActiveByGroupID(ctx, group.ID(), s.now())
 	if err != nil {
-		return nil, fmt.Errorf("load latest duty: %w", err)
+		return nil, fmt.Errorf("load active duty: %w", err)
 	}
-	canManageParticipants := canManageGroupSettings || canManageDormitory || (latestDuty != nil && isDutyActiveOnDate(latestDuty, s.now()) && latestDuty.LeaderID() != nil && *latestDuty.LeaderID() == currentUserID)
+	canManageParticipants := canManageGroupSettings || canManageDormitory || (activeDuty != nil && activeDuty.LeaderID() != nil && *activeDuty.LeaderID() == currentUserID)
 	if !canManageParticipants {
 		return nil, ErrAccessDenied
 	}
@@ -99,11 +99,12 @@ func (s *Service) GetDutySettings(ctx context.Context, currentUserID uuid.UUID, 
 		return nil, fmt.Errorf("load task completion dates: %w", err)
 	}
 
-	responseAreas, activeDuty, taskEditorState, taskEditorAlert, err := s.buildTaskEditorState(
+	responseAreas, activeDutyResponse, taskEditorState, taskEditorAlert, err := s.buildTaskEditorState(
 		ctx,
 		group,
 		tasks,
 		lastCompletionDates,
+		activeDuty,
 	)
 	if err != nil {
 		return nil, err
@@ -111,7 +112,7 @@ func (s *Service) GetDutySettings(ctx context.Context, currentUserID uuid.UUID, 
 	responseTeams := []dto.DutySettingsTeam{}
 	var activeDutyTeamID *string
 	if canManageGroupSettings {
-		responseTeams, activeDutyTeamID, err = s.buildDutySettingsTeams(ctx, group)
+		responseTeams, activeDutyTeamID, err = s.buildDutySettingsTeams(ctx, group, activeDuty)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +134,7 @@ func (s *Service) GetDutySettings(ctx context.Context, currentUserID uuid.UUID, 
 		ActiveDutyTeamID: activeDutyTeamID,
 		TaskEditorState:  taskEditorState,
 		TaskEditorAlert:  taskEditorAlert,
-		ActiveDuty:       activeDuty,
+		ActiveDuty:       activeDutyResponse,
 	}, nil
 }
 
@@ -490,7 +491,7 @@ func (s *Service) AssignActiveDutyTeam(ctx context.Context, currentUserID uuid.U
 		return err
 	}
 
-	activeDuty, err := s.requireActiveLatestDuty(ctx, groupID)
+	activeDuty, err := s.requireActiveDuty(ctx, groupID)
 	if err != nil {
 		return err
 	}
@@ -609,7 +610,7 @@ func (s *Service) CreateTask(ctx context.Context, currentUserID uuid.UUID, group
 	}
 
 	if normalized.includeInCurrentDuty {
-		activeDuty, err := s.requireActiveLatestDuty(ctx, group.ID())
+		activeDuty, err := s.requireActiveDuty(ctx, group.ID())
 		if err != nil {
 			return nil, err
 		}
@@ -619,7 +620,7 @@ func (s *Service) CreateTask(ctx context.Context, currentUserID uuid.UUID, group
 		}
 	}
 
-	return buildTaskDetails(task, group, area), nil
+	return buildTaskDetails(task, area), nil
 }
 
 func (s *Service) UpdateTask(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, taskID uuid.UUID, req dto.UpdateTaskRequest) (*dto.TaskDetails, error) {
@@ -656,7 +657,7 @@ func (s *Service) UpdateTask(ctx context.Context, currentUserID uuid.UUID, group
 		return nil, fmt.Errorf("update task: %w", err)
 	}
 
-	return buildTaskDetails(updated, group, targetArea), nil
+	return buildTaskDetails(updated, targetArea), nil
 }
 
 func (s *Service) DeleteTask(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, taskID uuid.UUID) error {
@@ -715,7 +716,7 @@ func (s *Service) ExcludeTaskFromActiveDuty(ctx context.Context, currentUserID u
 	return nil
 }
 
-func (s *Service) buildDutySettingsTeams(ctx context.Context, group *structure.Group) ([]dto.DutySettingsTeam, *string, error) {
+func (s *Service) buildDutySettingsTeams(ctx context.Context, group *structure.Group, activeDuty *duty.Duty) ([]dto.DutySettingsTeam, *string, error) {
 	teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
 	if err != nil {
 		return nil, nil, fmt.Errorf("load teams: %w", err)
@@ -749,15 +750,11 @@ func (s *Service) buildDutySettingsTeams(ctx context.Context, group *structure.G
 		})
 	}
 
-	latestDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, group.ID())
-	if err != nil {
-		return nil, nil, fmt.Errorf("load latest duty: %w", err)
-	}
-	if latestDuty == nil || !isDutyActiveOnDate(latestDuty, s.now()) {
+	if activeDuty == nil {
 		return responseTeams, nil, nil
 	}
 
-	activeDutyTeamID := latestDuty.TeamID().String()
+	activeDutyTeamID := activeDuty.TeamID().String()
 	return responseTeams, &activeDutyTeamID, nil
 }
 
@@ -766,19 +763,20 @@ func (s *Service) buildTaskEditorState(
 	group *structure.Group,
 	tasks []*catalog.TaskDefinition,
 	lastCompletionDates map[uuid.UUID]*time.Time,
+	activeDuty *duty.Duty,
 ) ([]dto.DutySettingsArea, *dto.DutySettingsActiveDuty, string, string, error) {
-	latestDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, group.ID())
-	if err != nil {
-		return nil, nil, "", "", fmt.Errorf("load latest duty: %w", err)
-	}
-	if latestDuty == nil {
-		return nil, nil, "no_duties", "В вашей группе пока нет дежурств", nil
-	}
-	if !isDutyActiveOnDate(latestDuty, s.now()) {
+	if activeDuty == nil {
+		latestDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, group.ID())
+		if err != nil {
+			return nil, nil, "", "", fmt.Errorf("load latest duty: %w", err)
+		}
+		if latestDuty == nil {
+			return nil, nil, "no_duties", "В вашей группе пока нет дежурств", nil
+		}
 		return nil, nil, "no_active_duty", "В группе нет активного дежурства", nil
 	}
 
-	team, err := s.teamRepo.FindByID(ctx, latestDuty.TeamID())
+	team, err := s.teamRepo.FindByID(ctx, activeDuty.TeamID())
 	if err != nil {
 		return nil, nil, "", "", fmt.Errorf("load active duty team: %w", err)
 	}
@@ -786,9 +784,9 @@ func (s *Service) buildTaskEditorState(
 		return nil, nil, "", "", fmt.Errorf("команда не найдена")
 	}
 
-	teamMembers, err := s.userRepo.FindByTeamID(ctx, team.ID())
+	residents, err := s.userRepo.FindByDormitoryID(ctx, group.DormitoryID())
 	if err != nil {
-		return nil, nil, "", "", fmt.Errorf("load active duty team members: %w", err)
+		return nil, nil, "", "", fmt.Errorf("load duty residents: %w", err)
 	}
 
 	areasByID, err := s.groupAreasByID(ctx, group.ID())
@@ -796,14 +794,14 @@ func (s *Service) buildTaskEditorState(
 		return nil, nil, "", "", err
 	}
 
-	dutyTasksByTaskID := make(map[uuid.UUID]*duty.DutyTask, len(latestDuty.Tasks()))
-	for _, dutyTask := range latestDuty.Tasks() {
+	dutyTasksByTaskID := make(map[uuid.UUID]*duty.DutyTask, len(activeDuty.Tasks()))
+	for _, dutyTask := range activeDuty.Tasks() {
 		dutyTasksByTaskID[dutyTask.TaskDefID()] = dutyTask
 	}
 
-	assigneeNames := make(map[uuid.UUID]string, len(teamMembers))
-	for _, member := range teamMembers {
-		assigneeNames[member.ID()] = fullUserName(member)
+	assigneeNames := make(map[uuid.UUID]string, len(residents))
+	for _, resident := range residents {
+		assigneeNames[resident.ID()] = fullUserName(resident)
 	}
 
 	tasksByArea := make(map[int][]dto.DutySettingsTask)
@@ -875,27 +873,27 @@ func (s *Service) buildTaskEditorState(
 		}
 	})
 
-	activeParticipants, err := s.participantRepo.List(ctx, latestDuty.ID(), false)
+	activeParticipants, err := s.participantRepo.List(ctx, activeDuty.ID(), false)
 	if err != nil {
 		return nil, nil, "", "", fmt.Errorf("load active duty participants: %w", err)
 	}
-	memberCount := len(activeParticipants)
-	costPerMember := 0
-	if memberCount > 0 {
-		costPerMember = totalCost / memberCount
+	participantCount := len(activeParticipants)
+	costPerParticipant := 0
+	if participantCount > 0 {
+		costPerParticipant = totalCost / participantCount
 	}
 
 	return responseAreas, &dto.DutySettingsActiveDuty{
-		ID:        latestDuty.ID().String(),
+		ID:        activeDuty.ID().String(),
 		TeamID:    team.ID().String(),
-		TeamName:  dutyLeaderName(ctx, s.userRepo, latestDuty.LeaderID()),
-		StartDate: latestDuty.Start().Format("2006-01-02"),
-		EndDate:   latestDuty.End().Format("2006-01-02"),
+		TeamName:  dutyLeaderName(ctx, s.userRepo, activeDuty.LeaderID()),
+		StartDate: activeDuty.Start().Format("2006-01-02"),
+		EndDate:   activeDuty.End().Format("2006-01-02"),
 		Summary: dto.DutySettingsTaskSummary{
-			TaskCount:       taskCount,
-			TotalCost:       totalCost,
-			CostPerMember:   costPerMember,
-			TeamMemberCount: memberCount,
+			TaskCount:          taskCount,
+			TotalCost:          totalCost,
+			CostPerParticipant: costPerParticipant,
+			ParticipantCount:   participantCount,
 		},
 	}, "active", "", nil
 }
@@ -935,25 +933,6 @@ func (s *Service) requireManagedGroupArea(ctx context.Context, currentUserID uui
 	return group, area, nil
 }
 
-func (s *Service) requireManagedGroupAreaWithActiveDuty(
-	ctx context.Context,
-	currentUserID uuid.UUID,
-	groupID uuid.UUID,
-	areaID int,
-) (*structure.Group, *catalog.Area, *duty.Duty, error) {
-	group, area, err := s.requireManagedGroupArea(ctx, currentUserID, groupID, areaID)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	activeDuty, err := s.requireActiveLatestDuty(ctx, group.ID())
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return group, area, activeDuty, nil
-}
-
 func (s *Service) requireManagedGroupTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID) (*structure.Group, *structure.Team, error) {
 	group, err := s.requireManagedGroup(ctx, currentUserID, groupID)
 	if err != nil {
@@ -982,7 +961,7 @@ func (s *Service) requireManagedGroupTaskWithActiveDuty(
 		return nil, nil, nil, nil, err
 	}
 
-	activeDuty, err := s.requireActiveLatestDuty(ctx, group.ID())
+	activeDuty, err := s.requireActiveDuty(ctx, group.ID())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -1025,20 +1004,6 @@ func appendUniqueUUID(ids []uuid.UUID, id uuid.UUID) []uuid.UUID {
 	return append(ids, id)
 }
 
-func appendUniqueOptionalUUID(ids []uuid.UUID, optionalID *uuid.UUID) []uuid.UUID {
-	if optionalID == nil {
-		return ids
-	}
-
-	for _, id := range ids {
-		if id == *optionalID {
-			return ids
-		}
-	}
-
-	return append(ids, *optionalID)
-}
-
 func optionalUUIDString(value *uuid.UUID) *string {
 	if value == nil {
 		return nil
@@ -1046,16 +1011,6 @@ func optionalUUIDString(value *uuid.UUID) *string {
 
 	stringValue := value.String()
 	return &stringValue
-}
-
-func validateResidentTeamName(name string) error {
-	if strings.TrimSpace(name) == "" {
-		return fmt.Errorf("Введите название")
-	}
-	if utf8.RuneCountInString(strings.TrimSpace(name)) > 255 {
-		return fmt.Errorf("Название не должно превышать 255 символов")
-	}
-	return nil
 }
 
 func userSummaryFromMap(names map[uuid.UUID]string, leaderID uuid.UUID) *dto.UserSummary {
@@ -1117,31 +1072,6 @@ func compareUsersByName(left *user.User, right *user.User) bool {
 	leftKey := strings.ToLower(fullUserName(left))
 	rightKey := strings.ToLower(fullUserName(right))
 	return leftKey < rightKey
-}
-
-func (s *Service) nextTeamOrder(ctx context.Context, groupID uuid.UUID) (int, error) {
-	teams, err := s.teamRepo.FindByGroupID(ctx, groupID)
-	if err != nil {
-		return 0, err
-	}
-
-	maxOrder := 0
-	for _, team := range teams {
-		if team.RotationPosition() > maxOrder {
-			maxOrder = team.RotationPosition()
-		}
-	}
-
-	return maxOrder + 1, nil
-}
-
-func (s *Service) moveMembers(ctx context.Context, teamID uuid.UUID, memberIDs []uuid.UUID) error {
-	for _, userID := range memberIDs {
-		if err := s.userRepo.MoveUserToTeam(ctx, userID, &teamID); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *Service) syncMembers(ctx context.Context, teamID uuid.UUID, memberIDs []uuid.UUID) error {
@@ -1298,32 +1228,16 @@ func (s *Service) groupAreasByID(ctx context.Context, groupID uuid.UUID) (map[in
 	return result, nil
 }
 
-func (s *Service) requireActiveLatestDuty(ctx context.Context, groupID uuid.UUID) (*duty.Duty, error) {
-	latestDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, groupID)
+func (s *Service) requireActiveDuty(ctx context.Context, groupID uuid.UUID) (*duty.Duty, error) {
+	activeDuty, err := s.dutyRepo.FindActiveByGroupID(ctx, groupID, s.now())
 	if err != nil {
-		return nil, fmt.Errorf("load latest duty: %w", err)
+		return nil, fmt.Errorf("load active duty: %w", err)
 	}
-	if latestDuty == nil {
-		return nil, fmt.Errorf("В вашей группе пока нет дежурств")
-	}
-	if !isDutyActiveOnDate(latestDuty, s.now()) {
+	if activeDuty == nil {
 		return nil, fmt.Errorf("В группе нет активного дежурства")
 	}
 
-	return latestDuty, nil
-}
-
-func isDutyActiveOnDate(currentDuty *duty.Duty, now time.Time) bool {
-	currentDate := truncateToLocalDate(now)
-	startDate := truncateToLocalDate(currentDuty.Start())
-	endDate := truncateToLocalDate(currentDuty.End())
-
-	return !currentDate.Before(startDate) && !currentDate.After(endDate)
-}
-
-func truncateToLocalDate(value time.Time) time.Time {
-	year, month, day := value.In(time.Local).Date()
-	return time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+	return activeDuty, nil
 }
 
 func sortDutySettingsTasks(tasks []dto.DutySettingsTask) {
@@ -1440,7 +1354,7 @@ func buildAreaDetails(area *catalog.Area, group *structure.Group) *dto.AreaDetai
 	}
 }
 
-func buildTaskDetails(task *catalog.TaskDefinition, group *structure.Group, area *catalog.Area) *dto.TaskDetails {
+func buildTaskDetails(task *catalog.TaskDefinition, area *catalog.Area) *dto.TaskDetails {
 	return &dto.TaskDetails{
 		ID:                 task.ID().String(),
 		Title:              task.Title(),

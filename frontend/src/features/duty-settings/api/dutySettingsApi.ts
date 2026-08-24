@@ -88,8 +88,8 @@ function normalizeDutySettingsResponse(response: DutySettingsResponse): DutySett
                 summary: {
                     task_count: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.task_count) ?? 0),
                     total_cost: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.total_cost) ?? 0),
-                    cost_per_member: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.cost_per_member) ?? 0),
-                    team_member_count: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.team_member_count) ?? 0),
+                    cost_per_participant: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.cost_per_participant) ?? 0),
+                    participant_count: Number((((response.active_duty as Record<string, unknown>).summary as Record<string, unknown>)?.participant_count) ?? 0),
                 },
             }
             : null,

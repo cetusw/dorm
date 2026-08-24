@@ -102,8 +102,10 @@ type DutyRepository interface {
 	CreateWithTasks(ctx context.Context, currentDuty *Duty, tasks []*DutyTask) error
 	FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
 	FindActiveByTeamID(ctx context.Context, teamID uuid.UUID, at time.Time) (*Duty, error)
+	FindActiveByGroupID(ctx context.Context, groupID uuid.UUID, at time.Time) (*Duty, error)
 	FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Duty, error)
+	FindGroupIDByDutyID(ctx context.Context, id uuid.UUID) (*uuid.UUID, error)
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*Duty, error)
 	FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*Duty, error)
 	FindHistoryByGroupID(ctx context.Context, groupID uuid.UUID) ([]DutyHistoryEntry, error)

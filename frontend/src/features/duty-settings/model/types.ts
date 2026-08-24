@@ -13,8 +13,8 @@ export type DutySettingsTask = {
 export type DutySettingsTaskSummary = {
     task_count: number
     total_cost: number
-    cost_per_member: number
-    team_member_count: number
+    cost_per_participant: number
+    participant_count: number
 }
 
 export type DutySettingsActiveDuty = {

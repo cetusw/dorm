@@ -31,6 +31,46 @@ function sortTasks(tasks: DutySettingsTask[]): DutySettingsTask[] {
     })
 }
 
+function isSameTask(left: DutySettingsTask, right: DutySettingsTask): boolean {
+    return left.id === right.id
+        && left.title === right.title
+        && left.cost === right.cost
+        && left.recurrenceInterval === right.recurrenceInterval
+        && left.startSequence === right.startSequence
+        && left.last_completed_at === right.last_completed_at
+        && left.is_included === right.is_included
+        && left.assignee_name === right.assignee_name
+        && left.status === right.status
+}
+
+function reconcileTasks(currentTasks: DutySettingsTask[], nextTasks: DutySettingsTask[]): DutySettingsTask[] {
+    const currentByID = new Map(currentTasks.map((task) => [task.id, task]))
+    const tasks = sortTasks(nextTasks).map((task) => {
+        const current = currentByID.get(task.id)
+        return current && isSameTask(current, task) ? current : task
+    })
+
+    return currentTasks.length === tasks.length && currentTasks.every((task, index) => task === tasks[index])
+        ? currentTasks
+        : tasks
+}
+
+function reconcileAreas(currentAreas: DutySettingsArea[], nextAreas: DutySettingsArea[]): DutySettingsArea[] {
+    const currentByID = new Map(currentAreas.map((area) => [area.id, area]))
+    const areas = sortAreas(nextAreas).map((area) => {
+        const current = currentByID.get(area.id)
+        const tasks = reconcileTasks(current?.tasks ?? [], area.tasks)
+        if (current && current.name === area.name && current.floor === area.floor && current.tasks === tasks) {
+            return current
+        }
+        return { ...area, tasks }
+    })
+
+    return currentAreas.length === areas.length && currentAreas.every((area, index) => area === areas[index])
+        ? currentAreas
+        : areas
+}
+
 function isSameTeam(left: DutySettingsTeam, right: DutySettingsTeam): boolean {
     return left.id === right.id
         && left.rotation_position === right.rotation_position
@@ -121,10 +161,7 @@ export function useDutySettings(groupId: string) {
             setData((current) => ({
                 ...response,
                 teams: reconcileTeams(current?.teams ?? [], response.teams),
-                areas: sortAreas(response.areas.map((area) => ({
-                    ...area,
-                    tasks: sortTasks(area.tasks),
-                }))),
+                areas: reconcileAreas(current?.areas ?? [], response.areas),
             }))
             const activeDutyID = response.active_duty?.id ?? null
             if (activeDutyID !== participantsDutyIDRef.current) {

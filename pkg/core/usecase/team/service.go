@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/domain/user"
@@ -332,38 +331,6 @@ func parseMemberIDs(rawIDs []string) ([]uuid.UUID, error) {
 	return memberIDs, nil
 }
 
-func parseOptionalUUID(rawID string) (*uuid.UUID, error) {
-	if strings.TrimSpace(rawID) == "" {
-		return nil, nil
-	}
-	id, err := uuid.Parse(rawID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user id")
-	}
-	return &id, nil
-}
-
-func appendOptionalUUID(ids []uuid.UUID, optionalID *uuid.UUID) []uuid.UUID {
-	if optionalID == nil {
-		return ids
-	}
-	return append(ids, *optionalID)
-}
-
-func appendUniqueOptionalUUID(ids []uuid.UUID, optionalID *uuid.UUID) []uuid.UUID {
-	if optionalID == nil {
-		return ids
-	}
-
-	for _, id := range ids {
-		if id == *optionalID {
-			return ids
-		}
-	}
-
-	return append(ids, *optionalID)
-}
-
 func optionalUUIDString(value *uuid.UUID) *string {
 	if value == nil {
 		return nil
@@ -371,22 +338,6 @@ func optionalUUIDString(value *uuid.UUID) *string {
 
 	stringValue := value.String()
 	return &stringValue
-}
-
-func (s *Service) nextTeamOrder(ctx context.Context, groupID uuid.UUID) (int, error) {
-	teams, err := s.teamRepo.FindByGroupID(ctx, groupID)
-	if err != nil {
-		return 0, err
-	}
-
-	maxOrder := 0
-	for _, team := range teams {
-		if team.RotationPosition() > maxOrder {
-			maxOrder = team.RotationPosition()
-		}
-	}
-
-	return maxOrder + 1, nil
 }
 
 func parseRequiredStringUUID(rawID string) (uuid.UUID, error) {
@@ -430,16 +381,6 @@ func userSummaryFromMap(names map[uuid.UUID]string, leaderID uuid.UUID) *dto.Use
 		ID:   leaderID.String(),
 		Name: name,
 	}
-}
-
-func validateResidentTeamName(name string) error {
-	if strings.TrimSpace(name) == "" {
-		return fmt.Errorf("Введите название")
-	}
-	if utf8.RuneCountInString(strings.TrimSpace(name)) > 255 {
-		return fmt.Errorf("Название не должно превышать 255 символов")
-	}
-	return nil
 }
 
 func (s *Service) requireUsersInDormitory(ctx context.Context, dormitoryID int64, userIDs []uuid.UUID) error {

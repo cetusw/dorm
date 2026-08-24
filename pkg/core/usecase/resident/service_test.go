@@ -127,6 +127,9 @@ func (s *dutyRepositoryStub) FindCurrentByTeamID(context.Context, uuid.UUID) (*d
 func (s *dutyRepositoryStub) FindActiveByTeamID(_ context.Context, teamID uuid.UUID, _ time.Time) (*duty.Duty, error) {
 	return s.activeByTeam[teamID], nil
 }
+func (s *dutyRepositoryStub) FindActiveByGroupID(context.Context, uuid.UUID, time.Time) (*duty.Duty, error) {
+	return nil, nil
+}
 func (s *dutyRepositoryStub) FindLatestByTeamID(_ context.Context, teamID uuid.UUID) (*duty.Duty, error) {
 	for _, currentDuty := range s.byID {
 		if currentDuty.TeamID() == teamID {
@@ -137,6 +140,9 @@ func (s *dutyRepositoryStub) FindLatestByTeamID(_ context.Context, teamID uuid.U
 }
 func (s *dutyRepositoryStub) FindByID(_ context.Context, id uuid.UUID) (*duty.Duty, error) {
 	return s.byID[id], nil
+}
+func (s *dutyRepositoryStub) FindGroupIDByDutyID(context.Context, uuid.UUID) (*uuid.UUID, error) {
+	return nil, nil
 }
 func (s *dutyRepositoryStub) FindByGroupID(context.Context, uuid.UUID) ([]*duty.Duty, error) {
 	return nil, nil
@@ -237,6 +243,7 @@ func TestGetCurrentDutyFallsBackToObserverViewForResidentWithoutTeam(t *testing.
 		1,
 		nil,
 	)
+	activeDuty.SetLeaderID(&teamMemberID)
 	dormitory := structure.RestoreDormitory(dormitoryID, "Dorm", nil, "Moscow", "st", "Lenina", "1")
 
 	service := NewResidentDutyService(
@@ -334,6 +341,7 @@ func TestGetCurrentDuty_UsesRequestedDormitoryForDormitoryLeader(t *testing.T) {
 		1,
 		nil,
 	)
+	activeDuty.SetLeaderID(&leaderID)
 	homeDormitory := structure.RestoreDormitory(homeDormitoryID, "Home Dorm", &leaderID, "Moscow", "st", "Lenina", "1")
 	selectedDormitory := structure.RestoreDormitory(selectedDormitoryID, "Observed Dorm", nil, "Moscow", "st", "Tverskaya", "2")
 

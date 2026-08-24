@@ -17,6 +17,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const dutyLeaderUnassigned = "Глава дежурства не назначен"
+
 var (
 	ErrResidentDutyGroupNotFound = errors.New("resident duty group not found")
 	ErrResidentDutyNotFound      = errors.New("resident duty not found")
@@ -167,7 +169,7 @@ func (s *Service) GetCurrentDuty(
 		len(lookups.userNames),
 		s.currentTime(),
 	)
-	response.Team = s.loadTeamLeaderName(ctx, currentDuty.dutyTeam)
+	response.Team = s.loadDutyLeaderName(ctx, currentDuty.duty)
 	return response, nil
 }
 
@@ -243,11 +245,23 @@ func (s *Service) GetDutyDetails(
 	if err != nil {
 		return nil, fmt.Errorf("load duty team: %w", err)
 	}
-	if dutyTeam == nil {
-		return nil, ErrResidentDutyNotFound
+
+	var dutyGroupID uuid.UUID
+	if dutyTeam != nil {
+		dutyGroupID = dutyTeam.GroupID()
+	} else {
+		dutyGroupID, err = s.dutyGroupID(ctx, selectedDuty)
+		if err != nil {
+			return nil, err
+		}
+		leaderID := uuid.Nil
+		if selectedDuty.LeaderID() != nil {
+			leaderID = *selectedDuty.LeaderID()
+		}
+		dutyTeam = structure.RestoreTeam(selectedDuty.TeamID(), dutyGroupID, leaderID, "", 1)
 	}
 
-	selectedGroup, err := s.groupRepo.FindByID(ctx, dutyTeam.GroupID())
+	selectedGroup, err := s.groupRepo.FindByID(ctx, dutyGroupID)
 	if err != nil {
 		return nil, fmt.Errorf("load duty group: %w", err)
 	}
@@ -286,8 +300,19 @@ func (s *Service) GetDutyDetails(
 		len(lookups.userNames),
 		s.currentTime(),
 	)
-	response.Team = s.loadTeamLeaderName(ctx, dutyTeam)
+	response.Team = s.loadDutyLeaderName(ctx, selectedDuty)
 	return response, nil
+}
+
+func (s *Service) dutyGroupID(ctx context.Context, currentDuty *dutydomain.Duty) (uuid.UUID, error) {
+	groupID, err := s.dutyRepo.FindGroupIDByDutyID(ctx, currentDuty.ID())
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("load duty group: %w", err)
+	}
+	if groupID == nil {
+		return uuid.Nil, ErrResidentDutyNotFound
+	}
+	return *groupID, nil
 }
 
 func (s *Service) TakeTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
@@ -874,7 +899,7 @@ func buildResidentCurrentDutyResponse(
 		MyGroup:               response.MyGroup,
 		DutyID:                currentDuty.duty.ID().String(),
 		Group:                 currentDuty.selectedGroup.Name(),
-		Team:                  teamLeaderName(currentDuty.dutyTeam.LeaderID(), teamMembers),
+		Team:                  dutyLeaderName(currentDuty.duty.LeaderID(), teamMembers),
 		StartDate:             currentDuty.duty.Start().Format("2006-01-02"),
 		EndDate:               currentDuty.duty.End().Format("2006-01-02"),
 		CostPerResidentGoal:   calculateCostPerResidentGoal(tasks, residentCount),
@@ -895,13 +920,16 @@ func canOpenDutySettings(currentDuty *currentDutyContext, now time.Time) bool {
 	return currentDuty.duty != nil && currentDuty.duty.IsActiveAt(now) && currentDuty.duty.LeaderID() != nil && *currentDuty.duty.LeaderID() == actorID
 }
 
-func teamLeaderName(leaderID uuid.UUID, members []dto.ResidentDutyTeamMember) string {
+func dutyLeaderName(leaderID *uuid.UUID, members []dto.ResidentDutyTeamMember) string {
+	if leaderID == nil {
+		return dutyLeaderUnassigned
+	}
 	for _, member := range members {
 		if member.ID == leaderID.String() {
 			return member.Name
 		}
 	}
-	return "Глава команды не назначен"
+	return dutyLeaderUnassigned
 }
 
 func buildResidentDutyGroupOptions(groups []*structure.Group, enabled bool) []dto.ResidentDutyGroupOption {
@@ -1147,7 +1175,7 @@ func (s *Service) resolveCurrentDutyNotice(
 		return ""
 	}
 
-	return fmt.Sprintf("На этой неделе ответственный за дежурство — %s", s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam))
+	return fmt.Sprintf("На этой неделе ответственный за дежурство — %s", s.loadDutyLeaderName(ctx, currentDuty.activeDuty))
 }
 
 func (s *Service) resolveCurrentDutyNoticeTone(
@@ -1263,14 +1291,14 @@ func dutyIsLaterThan(left *dutydomain.Duty, right *dutydomain.Duty) bool {
 	return left.ID().String() > right.ID().String()
 }
 
-func (s *Service) loadTeamLeaderName(ctx context.Context, dutyTeam *structure.Team) string {
-	if dutyTeam == nil {
-		return "Глава команды не назначен"
+func (s *Service) loadDutyLeaderName(ctx context.Context, currentDuty *dutydomain.Duty) string {
+	if currentDuty == nil || currentDuty.LeaderID() == nil {
+		return dutyLeaderUnassigned
 	}
 
-	leader, err := s.userRepo.FindByID(ctx, dutyTeam.LeaderID())
+	leader, err := s.userRepo.FindByID(ctx, *currentDuty.LeaderID())
 	if err != nil || leader == nil {
-		return "Глава команды не назначен"
+		return dutyLeaderUnassigned
 	}
 
 	return formatUserName(leader)
