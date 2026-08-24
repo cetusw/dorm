@@ -49,7 +49,7 @@ type schedulingOptions struct {
 }
 
 func (s *Service) StartNewWeek(ctx context.Context) error {
-	now := time.Now()
+	now := s.currentTime()
 	distributingCtx, err := s.loadSchedulingData(ctx, schedulingOptions{
 		start: now,
 		end:   now.Add(7 * 24 * time.Hour),
@@ -262,26 +262,41 @@ func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) 
 		return fmt.Errorf("cannot start new week: no groups found")
 	}
 
-	skippedGroups := 0
 	for _, group := range c.groups {
 		teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
 		if err != nil {
 			log.Printf("Skipping group %s: load teams: %v", group.Name(), err)
-			skippedGroups++
 			continue
 		}
 
 		lastDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, group.ID())
 		if err != nil {
 			log.Printf("Skipping group %s: load last duty: %v", group.Name(), err)
-			skippedGroups++
 			continue
 		}
 
-		nextTeam, err := determineNextTeam(teams, lastDuty)
+		if len(teams) == 0 {
+			if c.groupID != nil {
+				return ErrGroupHasNoTeams
+			}
+			// A group without active teams is a supported state. It has no Duty
+			// this week, while other groups continue through the same batch.
+			continue
+		}
+
+		rotationAnchor := lastDuty
+		if lastDuty != nil && !containsTeam(teams, lastDuty.TeamID()) {
+			duties, err := s.dutyRepo.FindByGroupID(ctx, group.ID())
+			if err != nil {
+				log.Printf("Skipping group %s: load duty history: %v", group.Name(), err)
+				continue
+			}
+			rotationAnchor = latestDutyForActiveTeam(duties, teams)
+		}
+
+		nextTeam, err := determineNextTeam(teams, rotationAnchor)
 		if err != nil {
 			log.Printf("Skipping group %s: %v", group.Name(), err)
-			skippedGroups++
 			continue
 		}
 
@@ -298,10 +313,6 @@ func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) 
 	sort.Slice(c.dutiesList, func(i, j int) bool {
 		return c.dutiesList[i].TeamID().String() < c.dutiesList[j].TeamID().String()
 	})
-
-	if len(c.dutiesList) == 0 {
-		return fmt.Errorf("cannot start new week: no duties generated (%d groups skipped)", skippedGroups)
-	}
 
 	return nil
 }
@@ -391,9 +402,32 @@ func determineNextTeam(teams []*structure.Team, lastDuty *duty.Duty) (*structure
 	return nil, ErrLastDutyTeamNotFound
 }
 
+func containsTeam(teams []*structure.Team, teamID uuid.UUID) bool {
+	for _, team := range teams {
+		if team.ID() == teamID {
+			return true
+		}
+	}
+	return false
+}
+
+func latestDutyForActiveTeam(duties []*duty.Duty, teams []*structure.Team) *duty.Duty {
+	var latest *duty.Duty
+	for _, candidate := range duties {
+		if !containsTeam(teams, candidate.TeamID()) {
+			continue
+		}
+		if latest == nil || candidate.SequenceNumber() > latest.SequenceNumber() ||
+			(candidate.SequenceNumber() == latest.SequenceNumber() && candidate.Start().After(latest.Start())) {
+			latest = candidate
+		}
+	}
+	return latest
+}
+
 func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) error {
 	if len(c.dutiesList) == 0 {
-		return fmt.Errorf("cannot finalize week: no duties to persist")
+		return nil
 	}
 
 	for _, d := range c.dutiesList {
@@ -407,7 +441,7 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 			return fmt.Errorf("save duty %s: %w", d.ID(), err)
 		}
 	}
-	if err := s.clearAppliedTaskOverrides(ctx, c.taskDefs); err != nil {
+	if err := s.clearAppliedTaskOverrides(ctx, scheduledTaskDefinitions(c)); err != nil {
 		return fmt.Errorf("clear task overrides: %w", err)
 	}
 
@@ -431,6 +465,23 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 	}(startedDuties)
 
 	return nil
+}
+
+func scheduledTaskDefinitions(c *distributingContext) []*catalog.TaskDefinition {
+	result := make([]*catalog.TaskDefinition, 0, len(c.taskDefs))
+	for _, task := range c.taskDefs {
+		areaGroupID := c.areaGroupMap[task.AreaID()]
+		if areaGroupID == nil {
+			if len(c.dutiesList) > 0 {
+				result = append(result, task)
+			}
+			continue
+		}
+		if _, ok := c.dutiesByGroup[*areaGroupID]; ok {
+			result = append(result, task)
+		}
+	}
+	return result
 }
 
 func (s *Service) clearAppliedTaskOverrides(ctx context.Context, tasks []*catalog.TaskDefinition) error {

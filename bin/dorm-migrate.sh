@@ -3,6 +3,10 @@ set -euo pipefail
 
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.local.yml"
 
+if [ "$#" -eq 0 ]; then
+  set -- up
+fi
+
 if [ ! -f ".env" ]; then
   echo "Missing .env file."
   echo "Create it from .env.example:"
@@ -19,6 +23,6 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' dorm-db)" = "healthy" ];
 done
 
 echo "Applying migrations..."
-docker compose $COMPOSE_FILES run --rm -T migrate </dev/null
+docker compose $COMPOSE_FILES run --rm -T migrate ./dorm-migrate "$@" </dev/null
 
 echo "Migrations applied."

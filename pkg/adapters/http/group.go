@@ -703,6 +703,8 @@ func (h *GroupAPIHandler) respondDutySettingsError(c *fiber.Ctx, err error) erro
 		return c.Status(fiber.StatusConflict).JSON(errorResponse("новый глава должен быть другим участником этой команды"))
 	case errors.Is(err, structure.ErrCannotRemoveOnlyLeader):
 		return c.Status(fiber.StatusConflict).JSON(errorResponse("нельзя исключить единственного главу команды"))
+	case errors.Is(err, structure.ErrCannotDeleteCurrentDutyTeam):
+		return c.Status(fiber.StatusConflict).JSON(errorResponse("нельзя удалить команду, пока она участвует в текущем дежурстве"))
 	case err.Error() == "группа не найдена":
 		return c.Status(fiber.StatusNotFound).JSON(errorResponse(err.Error()))
 	case err.Error() == "территория не найдена":

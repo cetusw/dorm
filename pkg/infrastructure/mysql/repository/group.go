@@ -124,11 +124,24 @@ func uuidPtrFromBytes(value []byte) *uuid.UUID {
 }
 
 func (r *GroupRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	const query = "DELETE FROM `group` WHERE id = ?"
 	idBytes, _ := id.MarshalBinary()
-	_, err := r.db.ExecContext(ctx, query, idBytes)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("DeleteGroup: %w", err)
+		return fmt.Errorf("begin delete group transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// fk_duty_team is RESTRICT to protect a Team's history from direct deletion.
+	// Group deletion intentionally retains its previous cascade semantics, so Duty
+	// roots are removed first and their dependent task/participant rows cascade.
+	if _, err := tx.ExecContext(ctx, "DELETE FROM duty WHERE group_id = ?", idBytes); err != nil {
+		return fmt.Errorf("delete group duties: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM `group` WHERE id = ?", idBytes); err != nil {
+		return fmt.Errorf("delete group: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit delete group transaction: %w", err)
 	}
 	return nil
 }

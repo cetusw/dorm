@@ -22,7 +22,7 @@ func (q *TeamQueryService) FindTeamsByDormitoryID(ctx context.Context, dormID in
 		SELECT t.id, t.group_id, t.leader_id, t.color, t.rotation_position
 		FROM team t
 		JOIN ` + "`group` g" + ` ON t.group_id = g.id
-		WHERE g.dormitory_id = ?
+		WHERE g.dormitory_id = ? AND t.deleted_at IS NULL
 		ORDER BY t.rotation_position, t.id
 	`
 

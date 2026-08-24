@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"dorm/pkg/core/domain/structure"
@@ -203,7 +204,7 @@ func (s *Service) UpdateResidentTeam(ctx context.Context, id uuid.UUID, req dto.
 }
 
 func (s *Service) DeleteTeam(ctx context.Context, id uuid.UUID) error {
-	return s.teamRepo.Delete(ctx, id)
+	return s.teamRepo.SoftDelete(ctx, id, time.Now())
 }
 
 func (s *Service) GetTeamMemberOptionsResponse(ctx context.Context, groupID uuid.UUID, teamID *uuid.UUID) (dto.TeamMemberOptionsResponse, error) {

@@ -358,6 +358,22 @@ func (s *Service) loadCurrentDutyContext(
 			}
 		}
 	}
+	// Team soft deletion clears current user.team_id but does not remove the
+	// participant snapshot of an outstanding past Duty. Keep that Duty reachable.
+	if displayDuty == activeDuty && s.participantRepo != nil {
+		unfinishedDuty, err := s.loadLatestUnfinishedPastDutyForParticipant(ctx, userID, selectedGroup.ID())
+		if err != nil {
+			return nil, fmt.Errorf("load unfinished participant duty: %w", err)
+		}
+		if unfinishedDuty != nil {
+			leaderID := uuid.Nil
+			if unfinishedDuty.LeaderID() != nil {
+				leaderID = *unfinishedDuty.LeaderID()
+			}
+			displayDuty = unfinishedDuty
+			displayDutyTeam = structure.RestoreTeam(unfinishedDuty.TeamID(), selectedGroup.ID(), leaderID, "", 1)
+		}
+	}
 
 	return &currentDutyContext{
 		resident:          access.resident,
@@ -626,6 +642,40 @@ func (s *Service) loadLatestUnfinishedPastDutyForTeam(
 		}
 	}
 
+	return selected, nil
+}
+
+func (s *Service) loadLatestUnfinishedPastDutyForParticipant(
+	ctx context.Context,
+	participantID uuid.UUID,
+	groupID uuid.UUID,
+) (*dutydomain.Duty, error) {
+	duties, err := s.dutyRepo.FindByGroupID(ctx, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("load duties by group: %w", err)
+	}
+
+	now := s.currentTime()
+	var selected *dutydomain.Duty
+	for _, currentDuty := range duties {
+		if resolveDutyPeriodStatus(currentDuty.Start(), currentDuty.End(), now) != dutyPeriodStatusPast || !dutyHasOutstandingTasks(currentDuty) {
+			continue
+		}
+		participants, err := s.participantRepo.List(ctx, currentDuty.ID(), false)
+		if err != nil {
+			return nil, fmt.Errorf("load duty participants: %w", err)
+		}
+		isParticipant := false
+		for _, participant := range participants {
+			if participant.ParticipantID == participantID {
+				isParticipant = true
+				break
+			}
+		}
+		if isParticipant && (selected == nil || dutyIsLaterThan(currentDuty, selected)) {
+			selected = currentDuty
+		}
+	}
 	return selected, nil
 }
 

@@ -1,8 +1,10 @@
 package http
 
 import (
+	"dorm/pkg/core/domain/structure"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
+	"errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -147,6 +149,9 @@ func (h *TeamAPIHandler) HandleDeleteTeam(c *fiber.Ctx) error {
 	}
 
 	if err := h.teamUC.DeleteTeam(c.Context(), teamID); err != nil {
+		if errors.Is(err, structure.ErrCannotDeleteCurrentDutyTeam) {
+			return c.Status(fiber.StatusConflict).JSON(errorResponse("нельзя удалить команду, пока она участвует в текущем дежурстве"))
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 

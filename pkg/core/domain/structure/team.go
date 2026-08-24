@@ -3,14 +3,16 @@ package structure
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 var (
-	ErrReplacementLeaderRequired = errors.New("replacement team leader is required")
-	ErrInvalidReplacementLeader  = errors.New("replacement team leader must be another active team member")
-	ErrCannotRemoveOnlyLeader    = errors.New("cannot remove the only team leader")
+	ErrReplacementLeaderRequired   = errors.New("replacement team leader is required")
+	ErrInvalidReplacementLeader    = errors.New("replacement team leader must be another active team member")
+	ErrCannotRemoveOnlyLeader      = errors.New("cannot remove the only team leader")
+	ErrCannotDeleteCurrentDutyTeam = errors.New("cannot delete team while it participates in the current duty")
 )
 
 type Team struct {
@@ -66,6 +68,6 @@ type TeamRepository interface {
 	UpdateRotationPositions(ctx context.Context, groupID uuid.UUID, orderedTeamIDs []uuid.UUID) error
 	Save(ctx context.Context, team *Team) error
 	CreateWithLeader(ctx context.Context, team *Team) error
-	Delete(ctx context.Context, id uuid.UUID) error
+	SoftDelete(ctx context.Context, id uuid.UUID, at time.Time) error
 	ReplaceLeaderAndRemoveMember(ctx context.Context, teamID, leaderID, replacementLeaderID uuid.UUID) error
 }

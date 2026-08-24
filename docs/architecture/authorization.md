@@ -24,7 +24,7 @@ Cookie подписывается HMAC-SHA256 от `userID|expiresAt`. Исто�
 
 - глава общежития: `dormitory.leader_id == currentUser.id`
 - глава группы: `group.leader_id == currentUser.id`
-- глава команды: `team.leader_id == currentUser.id`
+- глава команды: `team.leader_id == currentUser.id` только для active Team
 - участник команды: `user.team_id == team.id`
 
 Один пользователь может одновременно быть:
@@ -78,7 +78,8 @@ flowchart TD
 `resident.Service` сначала строит `residentAccessContext`:
 
 - обычный житель привязан к своей группе через текущее `team_id`;
-- глава команды, если `team_id` у него отсутствует, всё равно может быть распознан по `team.leader_id`;
+- глава команды, если `team_id` у него отсутствует, всё равно может быть распознан по
+  `team.leader_id` active Team;
 - глава группы без команды имеет доступ к своей группе;
 - глава общежития может выбрать любую группу внутри выбранного общежития, а также другой `dormitory_id`.
 

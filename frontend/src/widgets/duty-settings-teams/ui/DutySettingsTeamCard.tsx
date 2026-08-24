@@ -120,16 +120,25 @@ export const DutySettingsTeamCard = memo(function DutySettingsTeamCard({ team, i
                                     Назначить дежурной
                                 </Menu.Item>
                             ) : null}
-                            <Menu.Item
-                                color="red"
-                                leftSection={<TrashIcon size={25} />}
-                                onClick={(event) => {
-                                    event.stopPropagation()
-                                    onDelete(team)
-                                }}
+                            <Tooltip
+                                label="Нельзя удалить дежурную команду"
+                                disabled={!isDutyTeam}
+                                withArrow
                             >
-                                Удалить
-                            </Menu.Item>
+                                <div>
+                                    <Menu.Item
+                                        color="red"
+                                        leftSection={<TrashIcon size={25} />}
+                                        disabled={isDutyTeam}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            onDelete(team)
+                                        }}
+                                    >
+                                        Удалить
+                                    </Menu.Item>
+                                </div>
+                            </Tooltip>
                         </Menu.Dropdown>
                     </Menu>
                 </div>

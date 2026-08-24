@@ -447,7 +447,7 @@ func (s *Service) DeleteTeam(ctx context.Context, currentUserID uuid.UUID, group
 	if err != nil {
 		return err
 	}
-	return s.teamRepo.Delete(ctx, teamID)
+	return s.teamRepo.SoftDelete(ctx, teamID, s.now())
 }
 
 func (s *Service) AssignActiveDutyTeam(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, teamID uuid.UUID) error {

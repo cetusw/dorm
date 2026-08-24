@@ -30,6 +30,10 @@
 
 ```bash
 ./bin/dorm-migrate.sh
+
+# Исправление dirty-state или просмотр версии через ту же Docker-обёртку
+./bin/dorm-migrate.sh version
+./bin/dorm-migrate.sh force <version>
 ```
 
 Или напрямую через бинарник:

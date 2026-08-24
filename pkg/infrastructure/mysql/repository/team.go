@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -21,7 +22,7 @@ func NewTeamRepository(db *sql.DB) *TeamRepository {
 }
 
 func (r *TeamRepository) FindByID(ctx context.Context, id uuid.UUID) (*structure.Team, error) {
-	const query = `SELECT id, group_id, leader_id, color, rotation_position FROM team WHERE id = ?`
+	const query = `SELECT id, group_id, leader_id, color, rotation_position FROM team WHERE id = ? AND deleted_at IS NULL`
 
 	idBytes, _ := id.MarshalBinary()
 	row := r.db.QueryRowContext(ctx, query, idBytes)
@@ -46,7 +47,7 @@ func (r *TeamRepository) FindByID(ctx context.Context, id uuid.UUID) (*structure
 
 // TODO: вынести в DTO, как в user
 func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*structure.Team, error) {
-	const query = `SELECT id, group_id, leader_id, color, rotation_position FROM team WHERE group_id = ? ORDER BY rotation_position, id`
+	const query = `SELECT id, group_id, leader_id, color, rotation_position FROM team WHERE group_id = ? AND deleted_at IS NULL ORDER BY rotation_position, id`
 
 	gIDBytes, _ := groupID.MarshalBinary()
 	rows, err := r.db.QueryContext(ctx, query, gIDBytes)
@@ -133,7 +134,7 @@ func (r *TeamRepository) CreateWithLeader(ctx context.Context, team *structure.T
 	}
 
 	var leaderTeamID []byte
-	err = tx.QueryRowContext(ctx, `SELECT id FROM team WHERE leader_id = ? FOR UPDATE`, leaderID).Scan(&leaderTeamID)
+	err = tx.QueryRowContext(ctx, `SELECT id FROM team WHERE leader_id = ? AND deleted_at IS NULL FOR UPDATE`, leaderID).Scan(&leaderTeamID)
 	if err == nil {
 		return fmt.Errorf("resident is already a team leader")
 	}
@@ -142,7 +143,7 @@ func (r *TeamRepository) CreateWithLeader(ctx context.Context, team *structure.T
 	}
 
 	var maxPosition int
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(rotation_position), 0) FROM team WHERE group_id = ? FOR UPDATE`, groupID).Scan(&maxPosition); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(rotation_position), 0) FROM team WHERE group_id = ? AND deleted_at IS NULL FOR UPDATE`, groupID).Scan(&maxPosition); err != nil {
 		return fmt.Errorf("load rotation position: %w", err)
 	}
 	position := maxPosition + 1
@@ -165,11 +166,16 @@ func (r *TeamRepository) UpdateRotationPositions(ctx context.Context, groupID uu
 	}
 
 	groupIDBytes, _ := groupID.MarshalBinary()
+	var lockedGroupID []byte
+	if err := tx.QueryRowContext(ctx, "SELECT id FROM `group` WHERE id = ? FOR UPDATE", groupIDBytes).Scan(&lockedGroupID); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("TeamRepository.UpdateRotationPositions lock group: %w", err)
+	}
 	shiftValue := len(orderedTeamIDs)
 
 	if _, err := tx.ExecContext(
 		ctx,
-		`UPDATE team SET rotation_position = rotation_position + ? WHERE group_id = ?`,
+		`UPDATE team SET rotation_position = rotation_position + ? WHERE group_id = ? AND deleted_at IS NULL`,
 		shiftValue,
 		groupIDBytes,
 	); err != nil {
@@ -181,7 +187,7 @@ func (r *TeamRepository) UpdateRotationPositions(ctx context.Context, groupID uu
 		teamIDBytes, _ := teamID.MarshalBinary()
 		if _, err := tx.ExecContext(
 			ctx,
-			`UPDATE team SET rotation_position = ? WHERE id = ? AND group_id = ?`,
+			`UPDATE team SET rotation_position = ? WHERE id = ? AND group_id = ? AND deleted_at IS NULL`,
 			index+1,
 			teamIDBytes,
 			groupIDBytes,
@@ -198,12 +204,86 @@ func (r *TeamRepository) UpdateRotationPositions(ctx context.Context, groupID uu
 	return nil
 }
 
-func (r *TeamRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	const query = `DELETE FROM team WHERE id = ?`
-	idBytes, _ := id.MarshalBinary()
-	_, err := r.db.ExecContext(ctx, query, idBytes)
+func (r *TeamRepository) SoftDelete(ctx context.Context, id uuid.UUID, at time.Time) error {
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("TeamRepository.Delete: %w", err)
+		return fmt.Errorf("begin soft delete team transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	idBytes, _ := id.MarshalBinary()
+	var groupID []byte
+	if err := tx.QueryRowContext(ctx, `SELECT group_id FROM team WHERE id = ? AND deleted_at IS NULL`, idBytes).Scan(&groupID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("team not found")
+		}
+		return fmt.Errorf("lock team: %w", err)
+	}
+	// Every rotation mutation locks this group row first. Lock it before checking
+	// the calendar period so creation, reorder and deletion cannot interleave.
+	var lockedGroupID []byte
+	if err := tx.QueryRowContext(ctx, "SELECT id FROM `group` WHERE id = ? FOR UPDATE", groupID).Scan(&lockedGroupID); err != nil {
+		return fmt.Errorf("lock team group: %w", err)
+	}
+	var lockedTeamID []byte
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM team WHERE id = ? AND group_id = ? AND deleted_at IS NULL FOR UPDATE`, idBytes, groupID).Scan(&lockedTeamID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("team not found")
+		}
+		return fmt.Errorf("lock active team: %w", err)
+	}
+
+	var currentDutyID []byte
+	err = tx.QueryRowContext(ctx, `
+		SELECT id FROM duty
+		WHERE team_id = ? AND start_date <= ? AND end_date > ?
+		LIMIT 1 FOR UPDATE`, idBytes, at, at).Scan(&currentDutyID)
+	if err == nil {
+		return structure.ErrCannotDeleteCurrentDutyTeam
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check current duty: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `UPDATE team SET deleted_at = ?, rotation_position = NULL WHERE id = ?`, at, idBytes); err != nil {
+		return fmt.Errorf("soft delete team: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE user SET team_id = NULL WHERE team_id = ?`, idBytes); err != nil {
+		return fmt.Errorf("clear deleted team members: %w", err)
+	}
+
+	var activeCount int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM team WHERE group_id = ? AND deleted_at IS NULL`, groupID).Scan(&activeCount); err != nil {
+		return fmt.Errorf("count active teams: %w", err)
+	}
+	if activeCount > 0 {
+		if _, err := tx.ExecContext(ctx, `UPDATE team SET rotation_position = rotation_position + ? WHERE group_id = ? AND deleted_at IS NULL`, activeCount, groupID); err != nil {
+			return fmt.Errorf("shift active team rotation: %w", err)
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT id FROM team WHERE group_id = ? AND deleted_at IS NULL ORDER BY rotation_position, id`, groupID)
+		if err != nil {
+			return fmt.Errorf("load active teams for rotation: %w", err)
+		}
+		teamIDs := make([][]byte, 0, activeCount)
+		for rows.Next() {
+			var teamID []byte
+			if err := rows.Scan(&teamID); err != nil {
+				_ = rows.Close()
+				return fmt.Errorf("scan active team for rotation: %w", err)
+			}
+			teamIDs = append(teamIDs, teamID)
+		}
+		if err := rows.Close(); err != nil {
+			return fmt.Errorf("close active team rotation rows: %w", err)
+		}
+		for position, teamID := range teamIDs {
+			if _, err := tx.ExecContext(ctx, `UPDATE team SET rotation_position = ? WHERE id = ?`, position+1, teamID); err != nil {
+				return fmt.Errorf("normalize active team rotation: %w", err)
+			}
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit soft delete team transaction: %w", err)
 	}
 	return nil
 }
@@ -232,7 +312,7 @@ func (r *TeamRepository) ReplaceLeaderAndRemoveMember(ctx context.Context, teamI
 	}
 
 	var currentLeaderID []byte
-	if err := tx.QueryRowContext(ctx, `SELECT leader_id FROM team WHERE id = ? FOR UPDATE`, teamIDBytes).Scan(&currentLeaderID); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT leader_id FROM team WHERE id = ? AND deleted_at IS NULL FOR UPDATE`, teamIDBytes).Scan(&currentLeaderID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("team not found")
 		}

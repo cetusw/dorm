@@ -105,7 +105,7 @@ func dutyTeamLeaderID(ctx context.Context, tx *sql.Tx, teamID uuid.UUID) (*uuid.
 		return nil, err
 	}
 	var raw []byte
-	if err := tx.QueryRowContext(ctx, `SELECT leader_id FROM team WHERE id = ?`, teamIDBytes).Scan(&raw); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT leader_id FROM team WHERE id = ? AND deleted_at IS NULL`, teamIDBytes).Scan(&raw); err != nil {
 		return nil, fmt.Errorf("load duty team leader: %w", err)
 	}
 	if len(raw) == 0 {
@@ -148,7 +148,7 @@ func insertDutyParticipants(ctx context.Context, tx *sql.Tx, dutyID, teamID uuid
 }
 
 func dutyGroupIDBytes(ctx context.Context, tx *sql.Tx, teamID uuid.UUID) ([]byte, error) {
-	const query = `SELECT group_id FROM team WHERE id = ?`
+	const query = `SELECT group_id FROM team WHERE id = ? AND deleted_at IS NULL`
 
 	teamIDBytes, err := marshalUUID(teamID, "team id")
 	if err != nil {
@@ -503,8 +503,7 @@ func (r *DutyRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 	const query = `
 		SELECT d.id, d.team_id, d.start_date, d.end_date, d.sequence_number
 		FROM duty d
-		JOIN team t ON t.id = d.team_id
-		WHERE t.group_id = ?
+		WHERE d.group_id = ?
 		ORDER BY d.start_date DESC, d.sequence_number DESC, d.id DESC
 	`
 
@@ -539,8 +538,7 @@ func (r *DutyRepository) FindLatestByGroupID(ctx context.Context, groupID uuid.U
 	const query = `
 		SELECT d.id, d.team_id, d.start_date, d.end_date, d.sequence_number
 		FROM duty d
-		JOIN team t ON t.id = d.team_id
-		WHERE t.group_id = ?
+		WHERE d.group_id = ?
 		ORDER BY d.sequence_number DESC, d.start_date DESC, d.id DESC
 		LIMIT 1
 	`
@@ -667,11 +665,10 @@ func (r *DutyRepository) FindHistoryByGroupID(ctx context.Context, groupID uuid.
 			COALESCE(SUM(CASE WHEN dt.completion_date IS NOT NULL THEN 1 ELSE 0 END), 0) AS completed_tasks_count,
 			COALESCE(SUM(CASE WHEN dt.verification_date IS NOT NULL THEN 1 ELSE 0 END), 0) AS verified_tasks_count
 		FROM duty d
-		JOIN team t ON t.id = d.team_id
-		LEFT JOIN user leader ON leader.id = t.leader_id
+		LEFT JOIN user leader ON leader.id = d.leader_id
 		LEFT JOIN duty_task dt ON dt.duty_id = d.id
 		LEFT JOIN task tk ON tk.id = dt.task_id
-		WHERE t.group_id = ?
+		WHERE d.group_id = ?
 		GROUP BY d.id, d.team_id, d.start_date, d.end_date, d.sequence_number, team_leader_name
 		ORDER BY d.start_date DESC, d.sequence_number DESC, d.id DESC
 	`

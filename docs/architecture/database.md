@@ -9,7 +9,7 @@
 - UUID хранятся как `BINARY(16)`.
 - Основные текстовые таблицы используют `utf8mb4`.
 - История дежурств не снапшотит `user`, `team`, `task`, `area`: старые записи продолжают ссылаться на текущие mutable сущности.
-- Soft delete используется в таблицах `user.deleted_at` и `task.deleted_at`.
+- Soft delete используется в таблицах `user.deleted_at`, `task.deleted_at` и `team.deleted_at`.
 
 ## Основные таблицы
 
@@ -34,7 +34,8 @@
 - `group_id`
 - `leader_id BINARY(16) NOT NULL`
 - `color NULL`
-- `rotation_position INT NOT NULL`
+- `rotation_position INT NULL`
+- `deleted_at TIMESTAMP NULL`
 
 Ограничения:
 
@@ -42,6 +43,9 @@
 - `idx_team_group_rotation (group_id, rotation_position)`
 - `fk_team_leader` использует `ON DELETE RESTRICT`, поэтому команда не может
   остаться без главы.
+- `deleted_at IS NULL` означает active Team; только active Team имеет позицию ротации.
+- `fk_duty_team` использует `ON DELETE RESTRICT`, поэтому физическое удаление Team не
+  может уничтожить историю Duty.
 
 ### `user`
 
