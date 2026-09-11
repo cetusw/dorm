@@ -278,7 +278,10 @@ func (s *Service) UpdatePenaltyEntry(
 	return penaltyItemFromDomain(updatedEntry), nil
 }
 
-func (s *Service) resolveScope(ctx context.Context, currentUserID uuid.UUID) (queryports.PenaltyScope, error) {
+func (s *Service) resolveScope(
+	ctx context.Context,
+	currentUserID uuid.UUID,
+) (queryports.PenaltyScope, error) {
 	currentUser, err := s.userRepo.FindByID(ctx, currentUserID)
 	if err != nil {
 		return queryports.PenaltyScope{}, fmt.Errorf("load current user: %w", err)
