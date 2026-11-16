@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVER_USER="${SERVER_USER:-ubuntu}"
-SERVER_IP="${SERVER_IP:-185.65.201.42}"
-SERVER_DIR="${SERVER_DIR:-/home/ubuntu/dorm}"
+if [ "$#" -lt 1 ]; then
+  echo "Usage: $0 user@host [--pull]" >&2
+  exit 1
+fi
+
+REMOTE="$1"
+shift
+
+if [[ ! "$REMOTE" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*@[^@[:space:]:]+$ ]]; then
+  echo "Invalid SSH destination: $REMOTE (expected user@host)" >&2
+  exit 1
+fi
+
+SERVER_USER="${REMOTE%@*}"
+SERVER_DIR="/home/${SERVER_USER}/dorm"
 
 IMAGE_NAME="dorm-app:latest"
 IMAGE_TAR="dorm-app.tar"
-
-REMOTE="${SERVER_USER}@${SERVER_IP}"
 
 COMPOSE_BASE="docker-compose.yml"
 COMPOSE_PROD="docker-compose.prod.yml"
@@ -23,7 +33,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 [--pull]"
+      echo "Usage: $0 user@host [--pull]"
       exit 1
       ;;
   esac
@@ -59,6 +69,9 @@ docker build "${docker_build_args[@]}" .
 
 echo "Saving image..."
 docker save "$IMAGE_NAME" -o "$IMAGE_TAR"
+
+echo "Preparing remote directory..."
+ssh "$REMOTE" "mkdir -p '$SERVER_DIR'"
 
 echo "Copying deployment files..."
 scp "$IMAGE_TAR" "$REMOTE:$SERVER_DIR/"
