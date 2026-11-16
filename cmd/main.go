@@ -153,12 +153,10 @@ wait:
 		}
 	}
 
-	eventsDone := ctn.EventBus.Stop()
-	select {
-	case <-eventsDone.Done():
+	if err := ctn.EventBus.Stop(ctx); err != nil {
+		result = errors.Join(result, err)
+	} else {
 		log.Println("Event handlers finished")
-	case <-ctx.Done():
-		result = errors.Join(result, fmt.Errorf("wait for event handlers: %w", ctx.Err()))
 	}
 
 	closed := make(chan error, 1)

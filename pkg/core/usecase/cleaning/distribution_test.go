@@ -105,7 +105,7 @@ func TestStartNewWeek_AppliesOverrideIncludeForTaskNotDue(t *testing.T) {
 	}, nil)
 	env.overrideRepo.On("DeleteByTaskIDs", ctx, mock.Anything).Return(nil)
 	env.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))
-	env.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
+	env.eventBus.On("PublishAsync", events.TopicWeekStarted, mock.Anything, 20*time.Second).Return(nil)
 
 	var savedDuties []*duty.Duty
 	env.dutyRepo.On("CreateWithTasks", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
@@ -138,7 +138,7 @@ func TestStartNewWeek_AppliesOverrideExcludeForTaskDue(t *testing.T) {
 	}, nil)
 	env.overrideRepo.On("DeleteByTaskIDs", ctx, mock.Anything).Return(nil)
 	env.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))
-	env.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
+	env.eventBus.On("PublishAsync", events.TopicWeekStarted, mock.Anything, 20*time.Second).Return(nil)
 
 	var savedDuties []*duty.Duty
 	env.dutyRepo.On("CreateWithTasks", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
@@ -187,7 +187,7 @@ func TestStartNewDutyForGroup_CreatesOnlySelectedGroupDuty(t *testing.T) {
 		return len(taskIDs) == 1 && taskIDs[0] == data.taskPrivate.ID()
 	})).Return(nil).Once()
 	env.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))
-	env.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
+	env.eventBus.On("PublishAsync", events.TopicWeekStarted, mock.Anything, 20*time.Second).Return(nil)
 
 	var savedDuties []*duty.Duty
 	env.dutyRepo.On("CreateWithTasks", ctx, mock.MatchedBy(func(d *duty.Duty) bool {
@@ -340,7 +340,7 @@ func setupCommonExpectations(ctx context.Context, e *testEnv, f *testFixtures) {
 
 	e.dutyRepo.On("FindAllLatest", ctx).Return(nil, errors.New("snapshot unavailable"))
 
-	e.eventBus.On("Publish", mock.Anything, events.TopicWeekStarted, mock.Anything).Return(nil)
+	e.eventBus.On("PublishAsync", events.TopicWeekStarted, mock.Anything, 20*time.Second).Return(nil)
 }
 
 func findDutyByTeam(duties []*duty.Duty, teamID uuid.UUID) *duty.Duty {

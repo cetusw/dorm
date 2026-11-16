@@ -419,16 +419,11 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 		})
 	}
 
-	go func(dutiesSnapshot []events.StartedDuty) {
-		pubCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer cancel()
-
-		if err := s.eventBus.Publish(pubCtx, events.TopicWeekStarted, events.WeekStartedEvent{
-			Duties: dutiesSnapshot,
-		}); err != nil {
-			log.Printf("Failed to publish week started event: %v", err)
-		}
-	}(startedDuties)
+	if err := s.eventBus.PublishAsync(events.TopicWeekStarted, events.WeekStartedEvent{
+		Duties: startedDuties,
+	}, 20*time.Second); err != nil {
+		log.Printf("Failed to publish week started event: %v", err)
+	}
 
 	return nil
 }

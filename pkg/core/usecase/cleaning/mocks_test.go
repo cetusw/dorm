@@ -239,6 +239,9 @@ type MockEventBus struct{ mock.Mock }
 func (m *MockEventBus) Publish(ctx context.Context, topic string, event interface{}) error {
 	return m.Called(ctx, topic, event).Error(0)
 }
+func (m *MockEventBus) PublishAsync(topic string, event interface{}, timeout time.Duration) error {
+	return m.Called(topic, event, timeout).Error(0)
+}
 func (m *MockEventBus) Subscribe(_ string, _ ports.EventHandler) {}
 
 type MockUserRepo struct{ mock.Mock }
