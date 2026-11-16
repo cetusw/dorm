@@ -6,12 +6,24 @@ ROOT=${1:?Missing deployment directory}
 ACTION=${2:?Missing action}
 NEW=${3:-}
 [[ "$ROOT" =~ ^/[a-zA-Z0-9_./-]+$ && "$ROOT" != / ]] || { echo 'Invalid deployment directory' >&2; exit 1; }
-for command in docker flock gzip mktemp timeout curl; do command -v "$command" >/dev/null; done
+for command in docker flock gzip mktemp timeout curl find sha256sum cmp stat ln; do command -v "$command" >/dev/null; done
 mkdir -p "$ROOT/backups" "$ROOT/releases"
 exec 9>"$ROOT/.deployment.lock"
 flock -n 9 || { echo 'Another deployment, backup or rollback is running' >&2; exit 1; }
-TEMP=''
-trap '[[ -z "$TEMP" ]] || rm -f -- "$TEMP"' EXIT
+TEMP=''; ASSET_STAGE=''; ASSET_CONTAINER=''
+cleanup() {
+  [[ -z "$TEMP" ]] || rm -f -- "$TEMP"
+  if [[ -n "$ASSET_CONTAINER" ]]; then
+    if timeout 15 docker rm -f "$ASSET_CONTAINER" >/dev/null; then ASSET_CONTAINER='';
+    else echo "WARNING: cannot remove temporary container $ASSET_CONTAINER" >&2; fi
+  fi
+  if [[ -n "$ASSET_STAGE" ]]; then
+    if rm -rf -- "$ASSET_STAGE"; then ASSET_STAGE='';
+    else echo "WARNING: cannot remove staging directory $ASSET_STAGE" >&2; fi
+  fi
+  return 0
+}
+trap cleanup EXIT
 fail() { echo "$*" >&2; return 1; }
 mysql_query() {
   timeout 30 docker exec -i dorm-db sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --batch --skip-column-names "$MYSQL_DATABASE"' <<< "$1"
@@ -65,8 +77,132 @@ fi
 compose() {
   local image=$1; shift
   local directory="$ROOT/releases/${image#dorm-app:}"
-  DORM_IMAGE="$image" timeout 180 docker compose -p dorm --project-directory "$directory" \
-    --env-file "$directory/.env" -f "$directory/docker-compose.yml" -f "$directory/docker-compose.prod.yml" "$@"
+  [[ -d "$ROOT/shared/assets" && -f "$ROOT/assets.override.yml" ]] || { fail 'Shared assets configuration is missing'; return 1; }
+  DORM_IMAGE="$image" DORM_ASSETS_DIR="$ROOT/shared/assets" timeout 180 docker compose -p dorm --project-directory "$directory" \
+    --env-file "$directory/.env" -f "$directory/docker-compose.yml" -f "$directory/docker-compose.prod.yml" -f "$ROOT/assets.override.yml" "$@"
+}
+# Public files live outside release directories; the override also applies to old images.
+prepare_assets() {
+  local directory
+  for directory in "$ROOT/shared" "$ROOT/shared/assets"; do
+    [[ ! -L "$directory" && ( ! -e "$directory" || -d "$directory" ) ]] || {
+      fail "Unsafe shared assets directory: $directory"; return 1;
+    }
+    mkdir -p "$directory" && chmod 755 "$directory" || return 1
+  done
+  TEMP=$(mktemp "$ROOT/.assets-override.XXXXXX") || return 1
+  if ! cat > "$TEMP" <<'OVERRIDE'
+services:
+  app:
+    volumes:
+      - type: bind
+        source: ${DORM_ASSETS_DIR:?DORM_ASSETS_DIR is required}
+        target: /app/web/app/assets
+        read_only: true
+        bind:
+          create_host_path: false
+OVERRIDE
+  then return 1; fi
+  if [[ -e "$ROOT/assets.override.yml" || -L "$ROOT/assets.override.yml" ]]; then
+    [[ -f "$ROOT/assets.override.yml" && ! -L "$ROOT/assets.override.yml" ]] && cmp -s "$TEMP" "$ROOT/assets.override.yml" || {
+      fail 'assets.override.yml differs from the managed configuration'; return 1;
+    }
+    rm "$TEMP" || return 1
+  else
+    mv "$TEMP" "$ROOT/assets.override.yml" || return 1
+  fi
+  TEMP=''
+}
+validate_asset_tree() {
+  local tree=$1 invalid
+  # Docker cp must not introduce links, devices or paths through existing links.
+  invalid=$(find "$tree" ! -type d ! -type f -print -quit) || return 1
+  [[ -z "$invalid" ]] || { fail "Unexpected asset type: $invalid"; return 1; }
+  invalid=$(find "$tree" -type f -links +1 -print -quit) || return 1
+  [[ -z "$invalid" ]] || { fail "Unexpected hard-linked asset: $invalid"; return 1; }
+}
+asset_hash() { sha256sum < "$1" | awk '{print $1}'; }
+declare -A RETAINED_ASSETS=()
+sync_assets_from_image() {
+  local image=$1 available required path relative target expected actual staging_device assets_device
+  image_id "$image" >/dev/null || return 1
+  validate_asset_tree "$ROOT/shared/assets" || return 1
+  required=$(timeout 10 docker image inspect --format '{{.Size}}' "$image") || return 1
+  [[ "$required" =~ ^[0-9]+$ ]] || { fail "Cannot estimate assets space: $image"; return 1; }
+  staging_device=$(stat -c %d "$ROOT/shared") || return 1
+  assets_device=$(stat -c %d "$ROOT/shared/assets") || return 1
+  [[ "$staging_device" == "$assets_device" ]] || {
+    fail 'Assets and staging must share a filesystem for atomic publication'; return 1;
+  }
+  available=$(df -Pk "$ROOT/shared/assets" | awk 'END {printf "%.0f", $4*1024}') || return 1
+  (( available >= required * 2 + 67108864 )) || { fail 'Insufficient shared assets space (twice image size plus 64 MiB required)'; return 1; }
+  ASSET_STAGE=$(mktemp -d "$ROOT/shared/.assets.XXXXXX") || return 1
+  ASSET_CONTAINER="dorm-assets-$$-${ASSET_STAGE##*.}"
+  timeout 30 docker create --name "$ASSET_CONTAINER" "$image" >/dev/null || return 1
+  timeout 120 docker cp "$ASSET_CONTAINER:/app/web/app/assets" "$ASSET_STAGE/source" || return 1
+  timeout 15 docker rm "$ASSET_CONTAINER" >/dev/null || return 1
+  ASSET_CONTAINER=''
+  [[ -d "$ASSET_STAGE/source" && ! -L "$ASSET_STAGE/source" ]] || { fail "Assets root must be a directory in $image"; return 1; }
+  validate_asset_tree "$ASSET_STAGE/source" || return 1
+  [[ -n $(find "$ASSET_STAGE/source" -type f -print -quit) ]] || { fail "No assets found in $image"; return 1; }
+  find "$ASSET_STAGE/source" -print0 > "$ASSET_STAGE/paths" || return 1
+  # Check the whole tree before adding any file. No existing contents are replaced.
+  while IFS= read -r -d '' path; do
+    relative=${path#"$ASSET_STAGE/source"}
+    target="$ROOT/shared/assets$relative"
+    if [[ -d "$path" ]]; then
+      [[ ! -e "$target" || -d "$target" ]] || { fail "Asset directory conflict: $target"; return 1; }
+    else
+      expected=$(asset_hash "$path") || return 1
+      if [[ -e "$target" ]]; then
+        [[ -f "$target" ]] || { fail "Asset file conflict: $target"; return 1; }
+        actual=$(asset_hash "$target") || return 1
+        [[ "$expected" == "$actual" ]] || { fail "Immutable asset conflict: $target"; return 1; }
+      fi
+    fi
+  done < "$ASSET_STAGE/paths"
+  while IFS= read -r -d '' path; do
+    relative=${path#"$ASSET_STAGE/source"}
+    target="$ROOT/shared/assets$relative"
+    if [[ -d "$path" ]]; then
+      mkdir -p "$target" && chmod 755 "$target" || return 1
+    else
+      chmod 644 "$path" || return 1
+      # Staging and destination share a filesystem. ln creates a complete file
+      # atomically and fails if any entry already owns the destination name.
+      if [[ ! -e "$target" ]]; then
+        if ! ln -T -- "$path" "$target"; then
+          [[ -f "$target" && ! -L "$target" ]] && cmp -s "$path" "$target" || return 1
+        fi
+      fi
+      expected=$(asset_hash "$path") || return 1
+      actual=$(asset_hash "$target") || return 1
+      [[ ! -L "$target" && "$expected" == "$actual" ]] || { fail "Published asset mismatch: $target"; return 1; }
+      chmod 644 "$target" || return 1
+      # Snapshot old CSS/JS too, so validation after switching checks both builds.
+      if [[ "$relative" =~ ^/[a-zA-Z0-9_./-]+\.(css|js)$ ]]; then RETAINED_ASSETS["$relative"]=$expected; fi
+    fi
+  done < "$ASSET_STAGE/paths"
+  rm -rf -- "$ASSET_STAGE" || return 1
+  ASSET_STAGE=''
+  echo "Assets preserved: $image" >&2
+}
+check_assets_mount() {
+  local mount
+  mount=$(timeout 5 docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/web/app/assets"}}{{.Type}} {{.Source}} {{.RW}}{{println}}{{end}}{{end}}' dorm-app) || return 1
+  [[ "$mount" == "bind $ROOT/shared/assets false" ]] || {
+    fail "Incorrect shared assets mount: $mount"; return 1;
+  }
+}
+check_retained_assets() {
+  local end=$1 relative actual
+  for relative in "${!RETAINED_ASSETS[@]}"; do
+    (( SECONDS < end )) || { fail 'Retained assets validation timed out'; return 1; }
+    actual=$(curl --fail --silent --max-time 3 "http://127.0.0.1:8080/app/assets$relative" | sha256sum | awk '{print $1}') || return 1
+    [[ "$actual" == "${RETAINED_ASSETS[$relative]}" ]] || {
+      fail "Previously published asset changed or unavailable: $relative"; return 1;
+    }
+  done
 }
 schema() {
   local exists value
@@ -236,9 +372,11 @@ write_state() {
   if ! mv "$temporary" "$ROOT/release-state"; then rm -f "$temporary"; return 1; fi
 }
 check_release() {
-  local image=$1 end=$((SECONDS+120)) health html assets asset headers expected actual
+  local image=$1 mount_check=${2:-required} end=$((SECONDS+120)) health html assets asset headers expected actual
   local directory="$ROOT/releases/${image#dorm-app:}" expected_id
+  [[ "$mount_check" == required || "$mount_check" == original ]] || { fail 'Invalid release validation mode'; return 1; }
   expected_id=$(image_id "$image") || return 1
+  if [[ "$mount_check" == required ]]; then check_assets_mount || return 1; fi
   while (( SECONDS < end )); do
     check_identity "$image" "$expected_id" || return 1
     health=$(timeout 5 docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Running}}{{end}}' dorm-app 2>/dev/null || true)
@@ -271,6 +409,9 @@ check_release() {
     done <<< "$assets"
     if (( good )); then
       check_identity "$image" "$expected_id" || return 1
+      if [[ "$mount_check" == required ]]; then
+        check_assets_mount && check_retained_assets "$end" || return 1
+      fi
       [[ ! -f "$directory/legacy" ]] || echo 'Legacy rollback: verified static assets and MySQL; old image has no readiness endpoint' >&2
       return 0
     fi
@@ -291,12 +432,16 @@ restore_current() {
     }
   fi
   actual=$(recovery_container_image) || return 1
+  prepare_assets || return 1
+  sync_assets_from_image "$CURRENT" || return 1
+  compose "$CURRENT" config --quiet || return 1
   # Repair all aliases as well as active after a partially completed selection.
   select_release "$CURRENT" || return 1
-  if [[ "$actual" == "$expected" ]] && check_release "$CURRENT"; then
+  if [[ "$actual" == "$expected" ]] && check_assets_mount && check_release "$CURRENT"; then
     echo 'Confirmed container already healthy; no recreation required' >&2
     return 0
   fi
+  echo 'Recreating app to restore the confirmed image and required read-only assets mount' >&2
   compose "$CURRENT" up -d --no-deps --force-recreate app || return 1
   check_release "$CURRENT"
 }
@@ -305,6 +450,7 @@ on_failure() {
   if (( BASH_SUBSHELL > 0 )); then exit "$code"; fi
   trap - ERR HUP INT TERM
   set +e
+  cleanup
   echo "Release operation failed during $STAGE" >&2
   timeout 15 docker logs --tail 100 dorm-app >&2
   if [[ "$STAGE" == confirm ]]; then
@@ -375,6 +521,15 @@ if [[ "$ACTION" == rollback ]]; then
   fi
   WORKING_CURRENT=$CURRENT; WORKING_SCHEMA=$CURRENT_SCHEMA
   WORKING_PREVIOUS=$PREVIOUS; WORKING_PREVIOUS_SCHEMA=$PREVIOUS_SCHEMA; WORKING_SET=1
+  STAGE=assets
+  prepare_assets
+  sync_assets_from_image "$CURRENT"
+  if [[ -n "$PREVIOUS" && "$PREVIOUS" != "$TARGET" ]]; then
+    if timeout 10 docker image inspect "$PREVIOUS" >/dev/null 2>&1; then sync_assets_from_image "$PREVIOUS"
+    else echo "WARNING: cannot import assets of unavailable previous image $PREVIOUS" >&2; fi
+  fi
+  if [[ "$TARGET" != "$CURRENT" ]]; then sync_assets_from_image "$TARGET"; fi
+  compose "$TARGET" config --quiet
   STAGE=switch
   SWITCH_STARTED=1
   if (( RECOVER_CURRENT )); then
@@ -431,6 +586,8 @@ check_image_storage "$DIRECTORY/image.tar"
 docker load -i "$DIRECTORY/image.tar"
 touch "$DIRECTORY/loaded"
 rm "$DIRECTORY/image.tar"
+STAGE=assets
+prepare_assets
 # Do not recreate an existing database or change its volume/configuration.
 if ! docker inspect dorm-db >/dev/null 2>&1; then compose "$NEW" up -d db; fi
 for attempt in {1..60}; do
@@ -448,6 +605,8 @@ create_backup
 write_state backed_up
 STAGE=schema
 BEFORE=$(schema)
+WORKING_CURRENT=$CURRENT; WORKING_SCHEMA=$CURRENT_SCHEMA
+WORKING_PREVIOUS=$PREVIOUS; WORKING_PREVIOUS_SCHEMA=$PREVIOUS_SCHEMA; WORKING_SET=1
 # Bootstrap the old latest deployment using its actual image ID, never a mutable tag.
 if [[ -z "$CURRENT" ]] && docker inspect dorm-app >/dev/null 2>&1; then
   LEGACY="dorm-app:legacy-$(date -u +%Y%m%d-%H%M%S)"
@@ -459,9 +618,27 @@ if [[ -z "$CURRENT" ]] && docker inspect dorm-app >/dev/null 2>&1; then
   pin_env "$OLD_DIRECTORY" "$LEGACY"
   docker tag "$(docker inspect -f '{{.Image}}' dorm-app)" "$LEGACY"
   touch "$OLD_DIRECTORY/legacy"
-  check_release "$LEGACY"
+  check_release "$LEGACY" original
   CURRENT=$LEGACY; CURRENT_SCHEMA=$BEFORE
 fi
+STAGE=assets
+# Import every retained release with an available image, including legacy. CURRENT
+# is mandatory; unavailable older images are reported explicitly.
+if [[ -n "$CURRENT" ]]; then sync_assets_from_image "$CURRENT"; fi
+if [[ -n "$PREVIOUS" ]]; then
+  if timeout 10 docker image inspect "$PREVIOUS" >/dev/null 2>&1; then sync_assets_from_image "$PREVIOUS"
+  else echo "WARNING: cannot import assets of unavailable previous image $PREVIOUS" >&2; fi
+fi
+for retained in "$ROOT"/releases/*; do
+  [[ -d "$retained" && ( -f "$retained/loaded" || -f "$retained/legacy" ) ]] || continue
+  retained_image="dorm-app:${retained##*/}"
+  [[ "$retained_image" != "$NEW" && "$retained_image" != "$CURRENT" && "$retained_image" != "$PREVIOUS" ]] || continue
+  if timeout 10 docker image inspect "$retained_image" >/dev/null 2>&1; then
+    sync_assets_from_image "$retained_image"
+  else echo "WARNING: cannot import assets of unavailable retained image $retained_image" >&2; fi
+done
+sync_assets_from_image "$NEW"
+compose "$NEW" config --quiet
 write_state backed_up
 WORKING_CURRENT=$CURRENT; WORKING_SCHEMA=$CURRENT_SCHEMA
 WORKING_PREVIOUS=$PREVIOUS; WORKING_PREVIOUS_SCHEMA=$PREVIOUS_SCHEMA; WORKING_SET=1
