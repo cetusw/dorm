@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -437,26 +438,7 @@ func (r *DutyRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 	if err != nil {
 		return nil, fmt.Errorf("find duties by group: %w", err)
 	}
-	defer rows.Close()
-
-	var result []*duty.Duty
-	for rows.Next() {
-		var dID, tID []byte
-		var start, end time.Time
-		var sequenceNumber int
-		if err := rows.Scan(&dID, &tID, &start, &end, &sequenceNumber); err != nil {
-			return nil, err
-		}
-		id, _ := uuid.FromBytes(dID)
-		teamID, _ := uuid.FromBytes(tID)
-
-		tasks, err := r.findTasksByDutyID(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, duty.RestoreDuty(id, teamID, start, end, sequenceNumber, tasks))
-	}
-	return result, rows.Err()
+	return r.restoreDuties(ctx, rows)
 }
 
 func (r *DutyRepository) FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*duty.Duty, error) {
@@ -552,27 +534,120 @@ func (r *DutyRepository) FindAllLatest(ctx context.Context) ([]*duty.Duty, error
 	if err != nil {
 		return nil, fmt.Errorf("find all latest duties: %w", err)
 	}
-	defer rows.Close()
+	return r.restoreDuties(ctx, rows)
+}
 
-	var result []*duty.Duty
-	for rows.Next() {
-		var dID, tID []byte
-		var start, end time.Time
-		var sequenceNumber int
-		if err := rows.Scan(&dID, &tID, &start, &end, &sequenceNumber); err != nil {
-			return nil, err
+type dutyRootRecord struct {
+	id             uuid.UUID
+	teamID         uuid.UUID
+	start          time.Time
+	end            time.Time
+	sequenceNumber int
+}
+
+func (r *DutyRepository) restoreDuties(ctx context.Context, rows *sql.Rows) ([]*duty.Duty, error) {
+	records, err := scanDutyRoots(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+
+	dutyIDs := make([]uuid.UUID, len(records))
+	for i, record := range records {
+		dutyIDs[i] = record.id
+	}
+	tasksByDutyID, err := r.findTasksByDutyIDs(ctx, dutyIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*duty.Duty, 0, len(records))
+	for _, record := range records {
+		result = append(result, duty.RestoreDuty(record.id, record.teamID,
+			record.start, record.end, record.sequenceNumber, tasksByDutyID[record.id]))
+	}
+	return result, nil
+}
+
+func scanDutyRoots(rows *sql.Rows) (records []dutyRootRecord, err error) {
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			records = nil
+			err = errors.Join(err, fmt.Errorf("close duty rows: %w", closeErr))
 		}
-		id, _ := uuid.FromBytes(dID)
-		teamID, _ := uuid.FromBytes(tID)
+	}()
 
-		tasks, err := r.findTasksByDutyID(ctx, id)
+	for rows.Next() {
+		var record dutyRootRecord
+		var dutyIDBytes, teamIDBytes []byte
+		if err := rows.Scan(&dutyIDBytes, &teamIDBytes, &record.start, &record.end, &record.sequenceNumber); err != nil {
+			return nil, fmt.Errorf("scan duty root: %w", err)
+		}
+		record.id, err = uuid.FromBytes(dutyIDBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse duty id: %w", err)
+		}
+		record.teamID, err = uuid.FromBytes(teamIDBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse duty team id: %w", err)
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read duty rows: %w", err)
+	}
+	return records, nil
+}
+
+func (r *DutyRepository) findTasksByDutyIDs(ctx context.Context, dutyIDs []uuid.UUID) (map[uuid.UUID][]*duty.DutyTask, error) {
+	const batchSize = 500
+
+	tasksByDutyID := make(map[uuid.UUID][]*duty.DutyTask)
+	for start := 0; start < len(dutyIDs); start += batchSize {
+		end := min(start+batchSize, len(dutyIDs))
+		tasks, err := r.findDutyTasksBatch(ctx, dutyIDs[start:end])
 		if err != nil {
 			return nil, err
 		}
-
-		result = append(result, duty.RestoreDuty(id, teamID, start, end, sequenceNumber, tasks))
+		for _, task := range tasks {
+			tasksByDutyID[task.DutyID()] = append(tasksByDutyID[task.DutyID()], task)
+		}
 	}
-	return result, rows.Err()
+	return tasksByDutyID, nil
+}
+
+func (r *DutyRepository) findDutyTasksBatch(ctx context.Context, dutyIDs []uuid.UUID) (tasks []*duty.DutyTask, err error) {
+	query := `
+		SELECT id, duty_id, task_id, assignee_id, reviewer_id,
+			assignment_date, completion_date, verification_date
+		FROM duty_task
+		WHERE duty_id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(dutyIDs)), ",") + `)`
+
+	args := make([]any, len(dutyIDs))
+	for i, id := range dutyIDs {
+		args[i], err = marshalUUID(id, "duty id")
+		if err != nil {
+			return nil, err
+		}
+	}
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("find duty tasks batch: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			tasks = nil
+			err = errors.Join(err, fmt.Errorf("close duty task rows: %w", closeErr))
+		}
+	}()
+
+	tasks, err = scanDutyTasks(rows)
+	if err != nil {
+		return nil, fmt.Errorf("read duty tasks batch: %w", err)
+	}
+	return tasks, nil
 }
 
 func (r *DutyRepository) FindHistoryByGroupID(ctx context.Context, groupID uuid.UUID) ([]duty.DutyHistoryEntry, error) {
