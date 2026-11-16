@@ -108,6 +108,39 @@ selected_release() {
   release_config "$image" || return 1
   printf '%s\n' "$image"
 }
+# Missing or dangling managed links can be repaired; foreign paths cannot.
+recovery_selection() {
+  local link
+  if [[ ! -e "$ROOT/active" && ! -L "$ROOT/active" ]]; then
+    printf 'absent\n'
+    return 0
+  fi
+  [[ -L "$ROOT/active" ]] || { fail 'Refusing to replace non-symlink active'; return 1; }
+  link=$(readlink "$ROOT/active") || return 1
+  [[ "$link" =~ ^releases/([a-z0-9][a-z0-9_.-]{0,127})$ ]] || {
+    fail "Refusing to replace unmanaged active link: $link"; return 1;
+  }
+  if [[ ! -e "$ROOT/active" ]]; then printf 'absent\n'
+  else selected_release; fi
+}
+# Listing must succeed before absence can be trusted. Inspect errors are never absence.
+container_state() {
+  local names
+  names=$(timeout 5 docker container ls -a --filter 'name=^/dorm-app$' --format '{{.Names}}') || {
+    fail 'Cannot determine whether dorm-app exists'; return 1;
+  }
+  case "$names" in
+    dorm-app) printf 'present\n' ;;
+    '') printf 'absent\n' ;;
+    *) fail "Unexpected container existence result: $names"; return 1 ;;
+  esac
+}
+recovery_container_image() {
+  local state
+  state=$(container_state) || return 1
+  if [[ "$state" == absent ]]; then printf 'absent\n'
+  else container_image; fi
+}
 image_id() {
   local id
   id=$(timeout 10 docker image inspect --format '{{.Id}}' "$1") || return 1
@@ -247,15 +280,17 @@ check_release() {
 }
 # Recovery may repair only configuration: do not restart a healthy confirmed container.
 restore_current() {
-  local expected actual containers
+  local expected actual live
   expected=$(image_id "$CURRENT") || return 1
   release_config "$CURRENT" || return 1
-  selected_release >/dev/null || return 1
-  if ! actual=$(container_image); then
-    containers=$(timeout 5 docker container ls -a --filter 'name=^/dorm-app$' --format '{{.Names}}') || return 1
-    [[ -z "$containers" ]] || return 1
-    actual=absent
+  recovery_selection >/dev/null || return 1
+  live=$(schema) || return 1
+  if [[ "$live" != "$CURRENT_SCHEMA" ]]; then
+    [[ "$ACTION" == rollback && "$CONFIRM_SCHEMA" == 1 ]] || {
+      fail 'Cannot recover CURRENT: schema differs from its confirmed historical version'; return 1;
+    }
   fi
+  actual=$(recovery_container_image) || return 1
   # Repair all aliases as well as active after a partially completed selection.
   select_release "$CURRENT" || return 1
   if [[ "$actual" == "$expected" ]] && check_release "$CURRENT"; then
@@ -273,9 +308,11 @@ on_failure() {
   echo "Release operation failed during $STAGE" >&2
   timeout 15 docker logs --tail 100 dorm-app >&2
   if [[ "$STAGE" == confirm ]]; then
+    echo "Candidate $NEW passed check_release before confirmation was attempted." >&2
     # mv is the commit point: a signal may arrive immediately after it. Read
     # durable confirmed values instead of overwriting them with an old snapshot.
     if ! read_confirmed_state; then
+      echo 'Manual consistency recovery required: atomic confirmation could not be determined.' >&2
       echo 'Confirmation outcome unreadable; no recovery or metadata overwrite performed. Only prior known metadata can be reported.' >&2
       if [[ ${WORKING_SET:-0} == 1 ]]; then
         CURRENT=$WORKING_CURRENT; CURRENT_SCHEMA=$WORKING_SCHEMA
@@ -283,6 +320,11 @@ on_failure() {
       fi
       report_state
       exit "$code"
+    fi
+    if [[ "$CURRENT" == "$NEW" ]]; then
+      echo "Atomic confirmation is recorded in release-state for $CURRENT; command still failed during confirmation. Verify reported runtime consistency manually." >&2
+    else
+      echo "Candidate $NEW was NOT atomically confirmed; release-state still confirms ${CURRENT:-none}. Manual consistency recovery is required; no automatic rollback or re-confirmation will run." >&2
     fi
   elif [[ ${WORKING_SET:-0} == 1 ]]; then
     CURRENT=$WORKING_CURRENT; CURRENT_SCHEMA=$WORKING_SCHEMA
@@ -315,9 +357,9 @@ if [[ "$ACTION" == rollback ]]; then
   check_db
   LIVE=$(schema)
   BEFORE=$LIVE
-  SELECTED=$(selected_release)
+  SELECTED=$(recovery_selection)
   CONFIRMED_ID=$(image_id "$CURRENT")
-  ACTUAL_ID=$(container_image)
+  ACTUAL_ID=$(recovery_container_image)
   TARGET=$PREVIOUS; TARGET_SCHEMA=$PREVIOUS_SCHEMA; RECOVER_CURRENT=0
   if [[ "$SELECTED" != "$CURRENT" || "$ACTUAL_ID" != "$CONFIRMED_ID" ]]; then
     TARGET=$CURRENT; TARGET_SCHEMA=$CURRENT_SCHEMA; RECOVER_CURRENT=1
