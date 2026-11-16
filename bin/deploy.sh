@@ -38,7 +38,7 @@ set -euo pipefail
 umask 077
 root=$1; release=$2; image_bytes=$3
 mkdir -p "$root/releases"
-available=$(df -Pk "$root" | awk 'END {printf "%.0f", $4*1024}')
+available=$(df -Pk "$root/releases" | awk 'END {printf "%.0f", $4*1024}')
 if (( available < image_bytes * 2 + 67108864 )); then
   echo 'Insufficient space to transfer and load the release image' >&2
   exit 1
