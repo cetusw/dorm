@@ -100,6 +100,7 @@ type DutyRepository interface {
 	FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
 	FindActiveByTeamID(ctx context.Context, teamID uuid.UUID, at time.Time) (*Duty, error)
 	FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
+	FindLatestUnfinishedPastByTeamAndGroup(ctx context.Context, teamID uuid.UUID, groupID uuid.UUID, at time.Time) (*Duty, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Duty, error)
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*Duty, error)
 	FindLatestByGroupID(ctx context.Context, groupID uuid.UUID) (*Duty, error)

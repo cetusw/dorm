@@ -131,6 +131,9 @@ func (s *dutyRepositoryStub) FindLatestByTeamID(_ context.Context, teamID uuid.U
 	}
 	return s.activeByTeam[teamID], nil
 }
+func (s *dutyRepositoryStub) FindLatestUnfinishedPastByTeamAndGroup(context.Context, uuid.UUID, uuid.UUID, time.Time) (*duty.Duty, error) {
+	return nil, nil
+}
 func (s *dutyRepositoryStub) FindByID(_ context.Context, id uuid.UUID) (*duty.Duty, error) {
 	return s.byID[id], nil
 }

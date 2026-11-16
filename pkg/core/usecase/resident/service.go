@@ -599,29 +599,7 @@ func (s *Service) loadLatestUnfinishedPastDutyForTeam(
 	teamID uuid.UUID,
 	groupID uuid.UUID,
 ) (*dutydomain.Duty, error) {
-	duties, err := s.dutyRepo.FindByGroupID(ctx, groupID)
-	if err != nil {
-		return nil, fmt.Errorf("load duties by group: %w", err)
-	}
-
-	now := s.currentTime()
-	var selected *dutydomain.Duty
-	for _, currentDuty := range duties {
-		if currentDuty.TeamID() != teamID {
-			continue
-		}
-		if resolveDutyPeriodStatus(currentDuty.Start(), currentDuty.End(), now) != dutyPeriodStatusPast {
-			continue
-		}
-		if !dutyHasOutstandingTasks(currentDuty) {
-			continue
-		}
-		if selected == nil || dutyIsLaterThan(currentDuty, selected) {
-			selected = currentDuty
-		}
-	}
-
-	return selected, nil
+	return s.dutyRepo.FindLatestUnfinishedPastByTeamAndGroup(ctx, teamID, groupID, s.currentTime())
 }
 
 func (s *Service) loadCurrentDutyLookups(
@@ -1141,16 +1119,6 @@ func dutyHasOutstandingTasks(currentDuty *dutydomain.Duty) bool {
 	}
 
 	return false
-}
-
-func dutyIsLaterThan(left *dutydomain.Duty, right *dutydomain.Duty) bool {
-	if left.SequenceNumber() != right.SequenceNumber() {
-		return left.SequenceNumber() > right.SequenceNumber()
-	}
-	if !left.Start().Equal(right.Start()) {
-		return left.Start().After(right.Start())
-	}
-	return left.ID().String() > right.ID().String()
 }
 
 func (s *Service) loadTeamLeaderName(ctx context.Context, dutyTeam *structure.Team) string {

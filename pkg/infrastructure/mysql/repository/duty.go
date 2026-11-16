@@ -395,6 +395,66 @@ func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUI
 	return duty.RestoreDuty(dutyID, teamID, start, end, sequenceNumber, tasks), nil
 }
 
+func (r *DutyRepository) FindLatestUnfinishedPastByTeamAndGroup(
+	ctx context.Context,
+	teamID uuid.UUID,
+	groupID uuid.UUID,
+	at time.Time,
+) (*duty.Duty, error) {
+	const query = `
+		SELECT d.id, d.team_id, d.start_date, d.end_date, d.sequence_number
+		FROM duty d
+		JOIN team t ON t.id = d.team_id
+		WHERE d.team_id = ?
+		  AND t.group_id = ?
+		  AND d.start_date <= ?
+		  AND d.end_date <= ?
+		  AND EXISTS (
+			SELECT 1
+			FROM duty_task dt
+			WHERE dt.duty_id = d.id
+			  AND dt.verification_date IS NULL
+		  )
+		ORDER BY d.sequence_number DESC, d.start_date DESC, d.id DESC
+		LIMIT 1
+	`
+
+	teamIDBytes, err := marshalUUID(teamID, "team id")
+	if err != nil {
+		return nil, fmt.Errorf("find latest unfinished past duty: %w", err)
+	}
+	groupIDBytes, err := marshalUUID(groupID, "group id")
+	if err != nil {
+		return nil, fmt.Errorf("find latest unfinished past duty: %w", err)
+	}
+
+	row := r.db.QueryRowContext(ctx, query, teamIDBytes, groupIDBytes, at, at)
+	var dutyIDBytes, teamIDResultBytes []byte
+	var startDate, endDate time.Time
+	var sequenceNumber int
+	if err := row.Scan(&dutyIDBytes, &teamIDResultBytes, &startDate, &endDate, &sequenceNumber); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find latest unfinished past duty: %w", err)
+	}
+
+	dutyID, err := uuid.FromBytes(dutyIDBytes)
+	if err != nil {
+		return nil, fmt.Errorf("find latest unfinished past duty: parse duty id: %w", err)
+	}
+	teamIDResult, err := uuid.FromBytes(teamIDResultBytes)
+	if err != nil {
+		return nil, fmt.Errorf("find latest unfinished past duty: parse team id: %w", err)
+	}
+
+	tasks, err := r.findTasksByDutyID(ctx, dutyID)
+	if err != nil {
+		return nil, fmt.Errorf("find latest unfinished past duty: load tasks: %w", err)
+	}
+	return duty.RestoreDuty(dutyID, teamIDResult, startDate, endDate, sequenceNumber, tasks), nil
+}
+
 func (r *DutyRepository) FindByID(ctx context.Context, id uuid.UUID) (*duty.Duty, error) {
 	const dutyQuery = `SELECT id, team_id, start_date, end_date, sequence_number FROM duty WHERE id = ?`
 
