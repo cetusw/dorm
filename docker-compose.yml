@@ -3,6 +3,7 @@ services:
     image: dorm-app:latest
     container_name: dorm-app
     restart: unless-stopped
+    stop_grace_period: 30s
 
     env_file:
       - .env

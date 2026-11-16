@@ -2,7 +2,10 @@ package scheduler
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"dorm/pkg/core/ports"
@@ -19,6 +22,10 @@ const (
 )
 
 type Scheduler struct {
+	mu                  sync.Mutex
+	started             bool
+	ctx                 context.Context
+	cancel              context.CancelFunc
 	cron                *cron.Cron
 	cleaningUseCase     ports.CleaningUseCase
 	dutyReminderUseCase ports.DutyReminderUseCase
@@ -36,7 +43,10 @@ func NewScheduler(
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Scheduler{
+		ctx:    ctx,
+		cancel: cancel,
 		cron: cron.New(
 			cron.WithLocation(location),
 			cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger)),
@@ -48,14 +58,22 @@ func NewScheduler(
 	}, nil
 }
 
-func (s *Scheduler) Start() {
+func (s *Scheduler) Start() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ctx.Err(); err != nil {
+		return fmt.Errorf("start stopped scheduler: %w", err)
+	}
+	if s.started {
+		return nil
+	}
 	if err := s.registerWeekStartJob(); err != nil {
-		log.Fatalf("Failed to schedule WeekStart: %v", err)
+		return fmt.Errorf("register week start job: %w", err)
 	}
 
 	if s.cfg.NotificationSchedulerEnabled {
 		if err := s.registerReminderJobs(); err != nil {
-			log.Fatalf("Failed to schedule notification reminders: %v", err)
+			return fmt.Errorf("register notification reminders: %w", err)
 		}
 	} else {
 		log.Println("Notification scheduler disabled")
@@ -63,17 +81,29 @@ func (s *Scheduler) Start() {
 
 	log.Printf("Scheduler started with schedule: %s", s.cfg.Cron.WeekStart)
 	s.cron.Start()
+	s.started = true
+	return nil
 }
 
-func (s *Scheduler) Stop() {
-	s.cron.Stop()
+func (s *Scheduler) Stop() context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	done := s.cron.Stop()
+	s.cancel()
+	return done
 }
 
 func (s *Scheduler) registerWeekStartJob() error {
 	_, err := s.cron.AddFunc(s.cfg.Cron.WeekStart, func() {
+		if s.ctx.Err() != nil {
+			return
+		}
 		log.Println("Scheduler: Triggering StartNewWeek...")
-		ctx := context.Background()
-		if err := s.cleaningUseCase.StartNewWeek(ctx); err != nil {
+		if err := s.cleaningUseCase.StartNewWeek(s.ctx); err != nil {
+			if s.ctx.Err() != nil && errors.Is(err, context.Canceled) {
+				log.Println("Scheduler: StartNewWeek cancelled during shutdown")
+				return
+			}
 			log.Printf("Scheduler Error (StartNewWeek): %v", err)
 		}
 	})
@@ -85,9 +115,9 @@ func (s *Scheduler) registerReminderJobs() error {
 		spec string
 		job  cron.Job
 	}{
-		{spec: saturdayTaskReminderSpec, job: SaturdayTaskReminderJob{service: s.dutyReminderUseCase, location: s.location}},
-		{spec: sundayTakeTaskReminderSpec, job: SundayTakeTaskReminderJob{service: s.dutyReminderUseCase, location: s.location}},
-		{spec: sundayFinishTaskReminderSpec, job: SundayFinishTaskReminderJob{service: s.dutyReminderUseCase, location: s.location}},
+		{spec: saturdayTaskReminderSpec, job: SaturdayTaskReminderJob{ctx: s.ctx, service: s.dutyReminderUseCase, location: s.location}},
+		{spec: sundayTakeTaskReminderSpec, job: SundayTakeTaskReminderJob{ctx: s.ctx, service: s.dutyReminderUseCase, location: s.location}},
+		{spec: sundayFinishTaskReminderSpec, job: SundayFinishTaskReminderJob{ctx: s.ctx, service: s.dutyReminderUseCase, location: s.location}},
 	}
 
 	for _, item := range jobs {
@@ -100,34 +130,40 @@ func (s *Scheduler) registerReminderJobs() error {
 }
 
 type SaturdayTaskReminderJob struct {
+	ctx      context.Context
 	service  ports.DutyReminderUseCase
 	location *time.Location
 }
 
 func (j SaturdayTaskReminderJob) Run() {
-	runReminderJob("saturday task reminders", j.location, j.service.SendSaturdayTaskReminders)
+	runReminderJob(j.ctx, "saturday task reminders", j.location, j.service.SendSaturdayTaskReminders)
 }
 
 type SundayTakeTaskReminderJob struct {
+	ctx      context.Context
 	service  ports.DutyReminderUseCase
 	location *time.Location
 }
 
 func (j SundayTakeTaskReminderJob) Run() {
-	runReminderJob("sunday take task reminders", j.location, j.service.SendSundayTakeTaskReminders)
+	runReminderJob(j.ctx, "sunday take task reminders", j.location, j.service.SendSundayTakeTaskReminders)
 }
 
 type SundayFinishTaskReminderJob struct {
+	ctx      context.Context
 	service  ports.DutyReminderUseCase
 	location *time.Location
 }
 
 func (j SundayFinishTaskReminderJob) Run() {
-	runReminderJob("sunday finish task reminders", j.location, j.service.SendSundayFinishTaskReminders)
+	runReminderJob(j.ctx, "sunday finish task reminders", j.location, j.service.SendSundayFinishTaskReminders)
 }
 
-func runReminderJob(name string, location *time.Location, handler func(ctx context.Context, at time.Time) error) {
-	ctx, cancel := context.WithTimeout(context.Background(), jobTimeout)
+func runReminderJob(parent context.Context, name string, location *time.Location, handler func(ctx context.Context, at time.Time) error) {
+	if parent.Err() != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(parent, jobTimeout)
 	defer cancel()
 
 	at := time.Now()
@@ -135,6 +171,10 @@ func runReminderJob(name string, location *time.Location, handler func(ctx conte
 		at = at.In(location)
 	}
 	if err := handler(ctx, at); err != nil {
+		if parent.Err() != nil && errors.Is(err, context.Canceled) {
+			log.Printf("Scheduler: %s cancelled during shutdown", name)
+			return
+		}
 		log.Printf("Scheduler Error (%s): %v", name, err)
 	}
 }

@@ -13,8 +13,8 @@ import (
 	warehouseuc "dorm/pkg/core/usecase/warehouse"
 	"dorm/pkg/infrastructure/mysql/query"
 	notificationinfra "dorm/pkg/infrastructure/notification"
+	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"dorm/pkg/core/ports"
@@ -34,13 +34,13 @@ import (
 type Container struct {
 	Config          *config.AppConfig
 	DB              *sql.DB
-	EventBus        ports.EventBus
+	EventBus        *eventbus.InMemoryEventBus
 	CleaningService ports.CleaningUseCase
 	Scheduler       *scheduler.Scheduler
 	HTTPServer      *fiber.App
 }
 
-func NewContainer(configPath string) (*Container, error) {
+func NewContainer(configPath string) (_ *Container, err error) {
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
@@ -50,6 +50,14 @@ func NewContainer(configPath string) (*Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
+
+	defer func() {
+		if err != nil {
+			if closeErr := db.Close(); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("close database after container initialization failure: %w", closeErr))
+			}
+		}
+	}()
 
 	bus := eventbus.NewInMemoryEventBus()
 
@@ -204,12 +212,11 @@ func NewContainer(configPath string) (*Container, error) {
 	}, nil
 }
 
-func (c *Container) Close() {
+func (c *Container) Close() error {
 	if c.DB != nil {
 		if err := c.DB.Close(); err != nil {
-			log.Printf("Error closing database connection: %v", err)
-		} else {
-			log.Println("Database connection closed gracefully")
+			return fmt.Errorf("close database connection: %w", err)
 		}
 	}
+	return nil
 }
