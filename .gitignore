@@ -28,3 +28,8 @@ frontend/pnpm-debug.log*
 # Local Go binaries
 main
 migrate
+
+# Database backups
+backups/
+dorm-backup*.sql
+*.sql.gz

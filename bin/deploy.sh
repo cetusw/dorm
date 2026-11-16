@@ -1,167 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-if [ "$#" -lt 1 ]; then
-  echo "Usage: $0 user@host [--pull]" >&2
-  exit 1
-fi
-
-REMOTE="$1"
-shift
-
-if [[ ! "$REMOTE" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*@[^@[:space:]:]+$ ]]; then
-  echo "Invalid SSH destination: $REMOTE (expected user@host)" >&2
-  exit 1
-fi
-
-SERVER_USER="${REMOTE%@*}"
-SERVER_DIR="/home/${SERVER_USER}/dorm"
-
-IMAGE_NAME="dorm-app:latest"
-IMAGE_TAR="dorm-app.tar"
-
-COMPOSE_BASE="docker-compose.yml"
-COMPOSE_PROD="docker-compose.prod.yml"
-COMPOSE_FILES="-f ${COMPOSE_BASE} -f ${COMPOSE_PROD}"
-DOCKER_BUILD_PULL=0
-
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --pull)
-      DOCKER_BUILD_PULL=1
-      shift
-      ;;
-    *)
-      echo "Unknown argument: $1"
-      echo "Usage: $0 user@host [--pull]"
-      exit 1
-      ;;
-  esac
+umask 077
+cd "$(dirname "$0")/.."
+[[ $# -ge 1 ]] || { echo "Usage: $0 user@host [--pull]" >&2; exit 1; }
+REMOTE=$1; shift
+[[ "$REMOTE" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*@[a-zA-Z0-9._-]+$ ]] || { echo 'Expected SSH destination user@host' >&2; exit 1; }
+BUILD_ARGS=()
+if [[ $# == 1 && "$1" == --pull ]]; then BUILD_ARGS+=(--pull); shift; fi
+[[ $# == 0 ]] || { echo 'Unknown arguments (only --pull is supported)' >&2; exit 1; }
+for command in docker git ssh scp rsync mktemp; do command -v "$command" >/dev/null; done
+for path in Dockerfile docker-compose.yml docker-compose.prod.yml .env.prod mysql bin/release.sh; do
+  [[ -e "$path" ]] || { echo "Missing required path: $path" >&2; exit 1; }
 done
-
-required_paths=(
-  "Dockerfile"
-  "$COMPOSE_BASE"
-  "$COMPOSE_PROD"
-  ".env.prod"
-  "mysql"
-)
-
-for path in "${required_paths[@]}"; do
-  if [ ! -e "$path" ]; then
-    echo "Missing required path: $path"
-    exit 1
-  fi
-done
-
-cleanup() {
-  rm -f "$IMAGE_TAR"
-}
-
-trap cleanup EXIT
-
-echo "Building image..."
-docker_build_args=(-t "$IMAGE_NAME")
-if [ "$DOCKER_BUILD_PULL" -eq 1 ]; then
-  docker_build_args+=(--pull)
-fi
-docker build "${docker_build_args[@]}" .
-
-echo "Saving image..."
-docker save "$IMAGE_NAME" -o "$IMAGE_TAR"
-
-echo "Preparing remote directory..."
-ssh "$REMOTE" "mkdir -p '$SERVER_DIR'"
-
-echo "Copying deployment files..."
-scp "$IMAGE_TAR" "$REMOTE:$SERVER_DIR/"
-scp "$COMPOSE_BASE" "$REMOTE:$SERVER_DIR/"
-scp "$COMPOSE_PROD" "$REMOTE:$SERVER_DIR/"
-scp ".env.prod" "$REMOTE:$SERVER_DIR/.env"
-
-rsync -av --delete "mysql/" "$REMOTE:$SERVER_DIR/mysql/"
-
-ssh "$REMOTE" "
-  chmod 600 '$SERVER_DIR/.env'
-"
-
-ssh "$REMOTE" <<EOF
+BRANCH=$(git symbolic-ref --quiet --short HEAD) || { echo 'Detached HEAD: deploy from a named Git branch' >&2; exit 1; }
+BRANCH_TAG=$(printf '%s' "$BRANCH" | LC_ALL=C tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g; s/^[^a-z0-9]+//; s/[-.]+$//')
+BRANCH_TAG=${BRANCH_TAG:0:110}
+[[ -n "$BRANCH_TAG" ]] || { echo 'Branch name cannot form a Docker tag' >&2; exit 1; }
+RELEASE="$BRANCH_TAG-$(date -u +%Y%m%d-%H%M%S)"
+IMAGE="dorm-app:$RELEASE"
+SERVER_DIR="/home/${REMOTE%@*}/dorm"
+SSH=(ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+"${SSH[@]}" "$REMOTE" 'command -v docker >/dev/null && command -v bash >/dev/null' </dev/null
+if docker image inspect "$IMAGE" >/dev/null 2>&1; then echo "Release image already exists: $IMAGE" >&2; exit 1; fi
+if [[ -n $(git status --porcelain) ]]; then echo 'Warning: building with uncommitted local changes' >&2; fi
+RESERVATION="${TMPDIR:-/tmp}/dorm-image-$RELEASE.lock"
+mkdir "$RESERVATION" || { echo "Release tag is reserved by another build: $RELEASE" >&2; exit 1; }
+TEMP_DIR=''
+trap '[[ -z "$TEMP_DIR" ]] || rm -rf -- "$TEMP_DIR"; rmdir "$RESERVATION"' EXIT
+TEMP_DIR=$(mktemp -d)
+echo "Building $IMAGE (branch=$BRANCH, UTC timestamp)"
+docker build "${BUILD_ARGS[@]}" -t "$IMAGE" .
+docker save "$IMAGE" -o "$TEMP_DIR/image.tar"
+# Reserve room for both the transferred tar and its unpacked layers.
+IMAGE_BYTES=$(wc -c < "$TEMP_DIR/image.tar")
+"${SSH[@]}" "$REMOTE" bash -s -- "$SERVER_DIR" "$RELEASE" "$IMAGE_BYTES" <<'REMOTE_PREPARE'
 set -euo pipefail
-
-cd "$SERVER_DIR"
-
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
-
-disk_usage_percent=\$(df -P / | awk 'NR==2 { gsub("%", "", \$5); print \$5 }')
-if [ "\${disk_usage_percent}" -ge 90 ]; then
-  echo "WARNING: root filesystem usage is \${disk_usage_percent}%."
-elif [ "\${disk_usage_percent}" -ge 85 ]; then
-  echo "Warning: root filesystem usage is \${disk_usage_percent}%."
+umask 077
+root=$1; release=$2; image_bytes=$3
+mkdir -p "$root/releases"
+available=$(df -Pk "$root" | awk 'END {printf "%.0f", $4*1024}')
+if (( available < image_bytes * 2 + 67108864 )); then
+  echo 'Insufficient space to transfer and load the release image' >&2
+  exit 1
 fi
-
-echo "Loading image..."
-docker load -i "$IMAGE_TAR"
-rm -f "$IMAGE_TAR"
-
-echo "Starting database..."
-docker compose \$COMPOSE_FILES up -d db
-
-echo "Waiting for database..."
-for attempt in \$(seq 1 60); do
-  status=\$(docker inspect \
-    --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
-    dorm-db 2>/dev/null || true)
-
-  if [ "\$status" = "healthy" ]; then
-    break
-  fi
-
-  if [ "\$attempt" -eq 60 ]; then
-    docker compose \$COMPOSE_FILES logs --tail=200 db
-    exit 1
-  fi
-
-  sleep 2
-done
-
-echo "Applying migrations..."
-docker compose \$COMPOSE_FILES run --rm -T --no-deps \
-  migrate ./dorm-migrate up </dev/null
-
-echo "Starting application..."
-docker compose \$COMPOSE_FILES up -d \
-  --no-deps \
-  --force-recreate \
-  app
-
-echo "Checking application..."
-for attempt in \$(seq 1 30); do
-  app_html=\$(curl --fail --silent http://127.0.0.1:8080/app/ || true)
-  first_asset_path=\$(printf "%s" "\$app_html" | grep -Eo '/app/assets/[^"]+\.(css|js)' | head -n 1 || true)
-
-  if [ -n "\$app_html" ] && [ -n "\$first_asset_path" ]; then
-    asset_headers=\$(curl --head --silent --fail "http://127.0.0.1:8080\$first_asset_path" || true)
-    if printf "%s" "\$asset_headers" | grep -qi '^Content-Type: text/html'; then
-      asset_headers=""
-    fi
-
-    if [ -n "\$asset_headers" ]; then
-      break
-    fi
-  fi
-
-  if [ "\$attempt" -eq 30 ]; then
-    docker compose \$COMPOSE_FILES logs --tail=200 app
-    exit 1
-  fi
-
-  sleep 2
-done
-
-docker compose \$COMPOSE_FILES ps
-docker compose \$COMPOSE_FILES logs --tail=100 app
-
-docker image prune -f
-
-echo "Deployment completed successfully."
-EOF
+# mkdir reserves the name; retries never overwrite an earlier upload.
+mkdir "$root/releases/$release"
+REMOTE_PREPARE
+scp -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "$TEMP_DIR/image.tar" docker-compose.yml docker-compose.prod.yml "$REMOTE:$SERVER_DIR/releases/$RELEASE/"
+scp -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 .env.prod "$REMOTE:$SERVER_DIR/releases/$RELEASE/.env"
+rsync -a -e 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3' -- mysql/ "$REMOTE:$SERVER_DIR/releases/$RELEASE/mysql/"
+"${SSH[@]}" "$REMOTE" bash -s -- "$SERVER_DIR" deploy "$IMAGE" < bin/release.sh

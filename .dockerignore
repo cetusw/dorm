@@ -16,3 +16,8 @@ web/app
 
 docker-compose*.yml
 bin/deploy.sh
+
+# Database backups
+backups/
+dorm-backup*.sql
+*.sql.gz

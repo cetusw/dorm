@@ -1,9 +1,15 @@
 services:
   app:
-    image: dorm-app:latest
+    image: ${DORM_IMAGE:-dorm-app:latest}
     container_name: dorm-app
     restart: unless-stopped
     stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
     env_file:
       - .env
@@ -13,7 +19,7 @@ services:
         condition: service_healthy
 
   migrate:
-    image: dorm-app:latest
+    image: ${DORM_IMAGE:-dorm-app:latest}
     env_file:
       - .env
 

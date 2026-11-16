@@ -155,6 +155,7 @@ func NewContainer(configPath string) (_ *Container, err error) {
 	}
 
 	app := fiber.New()
+	http.NewHealthHandler(db).RegisterRoutes(app)
 	webapp.RegisterRoutes(app, "./web/app")
 
 	residentAuthHandler := http.NewResidentAuthHandler(userService, cfg.AuthSecret)
