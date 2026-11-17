@@ -9,11 +9,24 @@ import (
 
 	"dorm/pkg/infrastructure/config"
 
-	_ "github.com/go-sql-driver/mysql"
+	mysqlDriver "github.com/go-sql-driver/mysql"
 )
 
 func NewConnection(cfg *config.AppConfig) (*sql.DB, error) {
-	dsn := cfg.GetDBConnectionString()
+	return newConnection(cfg, cfg.GetDBConnectionString())
+}
+
+// NewMigrationConnection permits long DDL reads without changing backend limits.
+func NewMigrationConnection(cfg *config.AppConfig) (*sql.DB, error) {
+	options, err := mysqlDriver.ParseDSN(cfg.GetDBConnectionString())
+	if err != nil {
+		return nil, fmt.Errorf("parse migration connection options: %w", err)
+	}
+	options.ReadTimeout = 10 * time.Minute
+	return newConnection(cfg, options.FormatDSN())
+}
+
+func newConnection(cfg *config.AppConfig, dsn string) (*sql.DB, error) {
 
 	db, err := sql.Open(cfg.DBDriver, dsn)
 	if err != nil {

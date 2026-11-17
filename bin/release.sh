@@ -75,10 +75,12 @@ if [[ "$ACTION" == rollback ]]; then
   NEW=''
 fi
 compose() {
+  local duration=180
+  if [[ "$1" == --timeout ]]; then duration=$2; shift 2; fi
   local image=$1; shift
   local directory="$ROOT/releases/${image#dorm-app:}"
   [[ -d "$ROOT/shared/assets" && -f "$ROOT/assets.override.yml" ]] || { fail 'Shared assets configuration is missing'; return 1; }
-  DORM_IMAGE="$image" DORM_ASSETS_DIR="$ROOT/shared/assets" timeout 180 docker compose -p dorm --project-directory "$directory" \
+  DORM_IMAGE="$image" DORM_ASSETS_DIR="$ROOT/shared/assets" timeout "$duration" docker compose -p dorm --project-directory "$directory" \
     --env-file "$directory/.env" -f "$directory/docker-compose.yml" -f "$directory/docker-compose.prod.yml" -f "$ROOT/assets.override.yml" "$@"
 }
 # Public files live outside release directories; the override also applies to old images.
@@ -644,11 +646,15 @@ WORKING_CURRENT=$CURRENT; WORKING_SCHEMA=$CURRENT_SCHEMA
 WORKING_PREVIOUS=$PREVIOUS; WORKING_PREVIOUS_SCHEMA=$PREVIOUS_SCHEMA; WORKING_SET=1
 STAGE=migration
 # A failed migration may leave dirty DDL; never run force, down or restore.
-if ! compose "$NEW" run --rm -T --no-deps migrate ./dorm-migrate up </dev/null; then
-  echo 'Migration failed. Current migration state:' >&2
-  schema >&2 || true
-  echo 'Inspect the schema manually; no down/force/restore was performed.' >&2
-  false
+if compose --timeout 900 "$NEW" run --rm -T --no-deps migrate ./dorm-migrate up </dev/null; then
+  :
+else
+  migration_code=$?
+  echo "Migration failed (exit=$migration_code). Current migration state:" >&2
+  if ! schema >&2; then echo 'Migration state is dirty or unreadable.' >&2; fi
+  echo 'MySQL DDL may still be running. Inspect the actual schema and schema_migrations manually.' >&2
+  echo 'No retry/down/force/restore was performed; the backup is retained.' >&2
+  on_failure "$migration_code"
 fi
 AFTER=$(schema)
 echo "Schema before=$BEFORE after=$AFTER"

@@ -759,12 +759,12 @@ func (h *GroupAPIHandler) HandleExcludeDutySettingsTask(c *fiber.Ctx) error {
 func (h *GroupAPIHandler) parseDutySettingsAccess(c *fiber.Ctx) (uuid.UUID, uuid.UUID, error) {
 	userID, err := currentUserID(c)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+		return uuid.Nil, uuid.Nil, fiber.NewError(fiber.StatusUnauthorized, "требуется авторизация")
 	}
 
 	groupID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор группы"))
+		return uuid.Nil, uuid.Nil, fiber.NewError(fiber.StatusBadRequest, "некорректный идентификатор группы")
 	}
 
 	return userID, groupID, nil
@@ -812,7 +812,7 @@ func (h *GroupAPIHandler) respondCreateGroupDutyError(c *fiber.Ctx, err error) e
 func (h *GroupAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) error {
 	userID, err := currentUserID(c)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+		return fiber.NewError(fiber.StatusUnauthorized, "требуется авторизация")
 	}
 
 	canManage, err := h.dormitoryUC.CanManageDormitories(c.UserContext(), userID)
@@ -820,10 +820,10 @@ func (h *GroupAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) error {
 		if isInfrastructureError(err) {
 			return err
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
+		return fiber.NewError(fiber.StatusInternalServerError, "не удалось проверить доступ")
 	}
 	if !canManage {
-		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
+		return fiber.NewError(fiber.StatusForbidden, "доступ запрещен")
 	}
 
 	return nil

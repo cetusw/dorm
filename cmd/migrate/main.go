@@ -22,7 +22,7 @@ func main() {
 		log.Fatalf("failed to load database config: %v", err)
 	}
 
-	db, err := infraMysql.NewConnection(cfg)
+	db, err := infraMysql.NewMigrationConnection(cfg)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}

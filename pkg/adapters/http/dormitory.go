@@ -150,7 +150,7 @@ func (h *DormitoryAPIHandler) HandleDeleteDormitory(c *fiber.Ctx) error {
 func (h *DormitoryAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) error {
 	userID, err := currentUserID(c)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+		return fiber.NewError(fiber.StatusUnauthorized, "требуется авторизация")
 	}
 
 	canManage, err := h.dormitoryUC.CanManageDormitories(c.UserContext(), userID)
@@ -158,10 +158,10 @@ func (h *DormitoryAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) err
 		if isInfrastructureError(err) {
 			return err
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
+		return fiber.NewError(fiber.StatusInternalServerError, "не удалось проверить доступ")
 	}
 	if !canManage {
-		return c.Status(fiber.StatusForbidden).JSON(errorResponse("доступ запрещен"))
+		return fiber.NewError(fiber.StatusForbidden, "доступ запрещен")
 	}
 
 	return nil

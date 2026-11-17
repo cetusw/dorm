@@ -202,12 +202,12 @@ func (h *WarehouseAPIHandler) handleMovement(c *fiber.Ctx, isAdd bool) error {
 func (h *WarehouseAPIHandler) parseWarehouseItemRequest(c *fiber.Ctx) (uuid.UUID, uuid.UUID, error) {
 	userID, err := currentUserID(c)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+		return uuid.Nil, uuid.Nil, fiber.NewError(fiber.StatusUnauthorized, "требуется авторизация")
 	}
 
 	itemID, err := uuid.Parse(c.Params("itemId"))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор позиции"))
+		return uuid.Nil, uuid.Nil, fiber.NewError(fiber.StatusBadRequest, "некорректный идентификатор позиции")
 	}
 
 	return userID, itemID, nil
@@ -221,7 +221,7 @@ func (h *WarehouseAPIHandler) parseWarehouseMovementRequest(c *fiber.Ctx) (uuid.
 
 	movementID, err := uuid.Parse(c.Params("movementId"))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор движения"))
+		return uuid.Nil, uuid.Nil, uuid.Nil, fiber.NewError(fiber.StatusBadRequest, "некорректный идентификатор движения")
 	}
 
 	return userID, itemID, movementID, nil
