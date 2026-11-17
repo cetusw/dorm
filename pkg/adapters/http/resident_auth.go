@@ -22,9 +22,9 @@ func NewResidentAuthHandler(userUC ports.UserUseCase, authSecret string) *Reside
 func (h *ResidentAuthHandler) RegisterRoutes(app *fiber.App) {
 	auth := app.Group("/api/v1/auth")
 
-	auth.Post("/login", h.HandleLogin)
-	auth.Post("/logout", h.HandleLogout)
-	auth.Get("/me", ResidentAuthMiddleware(h.authSecret), h.HandleCurrentUser)
+	auth.Post("/login", apiDeadline, h.HandleLogin)
+	auth.Post("/logout", apiDeadline, h.HandleLogout)
+	auth.Get("/me", ResidentAuthMiddleware(h.authSecret), apiDeadline, h.HandleCurrentUser)
 }
 
 func (h *ResidentAuthHandler) HandleLogin(c *fiber.Ctx) error {
@@ -33,8 +33,11 @@ func (h *ResidentAuthHandler) HandleLogin(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	u, err := h.userUC.AuthenticateResident(c.Context(), req.Login, req.Password)
+	u, err := h.userUC.AuthenticateResident(c.UserContext(), req.Login, req.Password)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		clearResidentSession(c)
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse(err.Error()))
 	}
@@ -59,8 +62,11 @@ func (h *ResidentAuthHandler) HandleCurrentUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	currentUser, err := h.userUC.GetCurrentUser(c.Context(), userID)
+	currentUser, err := h.userUC.GetCurrentUser(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить текущего пользователя"))
 	}
 	if currentUser == nil {

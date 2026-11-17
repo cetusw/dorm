@@ -1,6 +1,7 @@
 package di
 
 import (
+	"context"
 	"database/sql"
 	"dorm/pkg/adapters/http"
 	"dorm/pkg/core/domain/events"
@@ -32,12 +33,15 @@ import (
 )
 
 type Container struct {
-	Config          *config.AppConfig
-	DB              *sql.DB
-	EventBus        *eventbus.InMemoryEventBus
-	CleaningService ports.CleaningUseCase
-	Scheduler       *scheduler.Scheduler
-	HTTPServer      *fiber.App
+	Config             *config.AppConfig
+	DB                 *sql.DB
+	EventBus           *eventbus.InMemoryEventBus
+	CleaningService    ports.CleaningUseCase
+	Scheduler          *scheduler.Scheduler
+	HTTPServer         *fiber.App
+	CancelHTTPRequests context.CancelFunc
+	stopPoolMonitor    context.CancelFunc
+	poolMonitorDone    <-chan struct{}
 }
 
 func NewContainer(configPath string) (_ *Container, err error) {
@@ -154,7 +158,14 @@ func NewContainer(configPath string) (_ *Container, err error) {
 		return nil, fmt.Errorf("scheduler init failed: %w", err)
 	}
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 120 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		ErrorHandler: http.ErrorHandler,
+	})
+	httpLifetime, cancelHTTP := context.WithCancel(context.Background())
+	http.RegisterDiagnostics(app, httpLifetime)
 	http.NewHealthHandler(db).RegisterRoutes(app)
 	webapp.RegisterRoutes(app, "./web/app")
 
@@ -203,17 +214,30 @@ func NewContainer(configPath string) (_ *Container, err error) {
 	userAPIHandler := http.NewUserAPIHandler(userService, dormitoryService)
 	userAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
 
+	monitorCtx, stopMonitor := context.WithCancel(context.Background())
+	monitorDone := make(chan struct{})
+	go func() { defer close(monitorDone); mysql.MonitorPool(monitorCtx, db) }()
 	return &Container{
-		Config:          cfg,
-		DB:              db,
-		EventBus:        bus,
-		CleaningService: cleaningService,
-		Scheduler:       cronScheduler,
-		HTTPServer:      app,
+		Config:             cfg,
+		DB:                 db,
+		EventBus:           bus,
+		CleaningService:    cleaningService,
+		Scheduler:          cronScheduler,
+		HTTPServer:         app,
+		CancelHTTPRequests: cancelHTTP,
+		stopPoolMonitor:    stopMonitor,
+		poolMonitorDone:    monitorDone,
 	}, nil
 }
 
 func (c *Container) Close() error {
+	if c.CancelHTTPRequests != nil {
+		c.CancelHTTPRequests()
+	}
+	if c.stopPoolMonitor != nil {
+		c.stopPoolMonitor()
+		<-c.poolMonitorDone
+	}
 	if c.DB != nil {
 		if err := c.DB.Close(); err != nil {
 			return fmt.Errorf("close database connection: %w", err)

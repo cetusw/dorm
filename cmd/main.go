@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -18,6 +19,7 @@ import (
 const shutdownTimeout = 20 * time.Second
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	if err := run(); err != nil {
 		log.Printf("Application stopped with error: %v", err)
 		os.Exit(1)
@@ -102,6 +104,12 @@ func unexpectedHTTPExit(err error) error {
 }
 
 func stopApplication(ctx context.Context, ctn *di.Container, ready <-chan struct{}, listenErr <-chan error) error {
+	// Graceful requests may finish normally; cancel remaining SQL work only when
+	// the shared shutdown budget expires, before closing the database.
+	if ctn.CancelHTTPRequests != nil {
+		stopCancellation := context.AfterFunc(ctx, ctn.CancelHTTPRequests)
+		defer stopCancellation()
+	}
 	cronDone := ctn.Scheduler.Stop().Done()
 	log.Println("Scheduler stopped accepting jobs; active jobs cancelled")
 

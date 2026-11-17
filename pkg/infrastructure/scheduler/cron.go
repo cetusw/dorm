@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -98,13 +99,19 @@ func (s *Scheduler) registerWeekStartJob() error {
 		if s.ctx.Err() != nil {
 			return
 		}
-		log.Println("Scheduler: Triggering StartNewWeek...")
-		if err := s.cleaningUseCase.StartNewWeek(s.ctx); err != nil {
+		ctx, cancel := context.WithTimeout(s.ctx, jobTimeout)
+		defer cancel()
+		slog.Info("duty.week_start.triggered", "event", "duty.week_start.triggered", "source", "scheduler", "started_at", time.Now(), "schedule", s.cfg.Cron.WeekStart)
+		err := s.cleaningUseCase.StartNewWeek(ctx)
+		if err == nil {
+			err = ctx.Err()
+		}
+		if err != nil {
 			if s.ctx.Err() != nil && errors.Is(err, context.Canceled) {
-				log.Println("Scheduler: StartNewWeek cancelled during shutdown")
+				slog.Info("duty.week_start.cancelled", "event", "duty.week_start.cancelled", "source", "scheduler", "reason", "shutdown")
 				return
 			}
-			log.Printf("Scheduler Error (StartNewWeek): %v", err)
+			slog.Error("duty.week_start.failed", "event", "duty.week_start.failed", "source", "scheduler", "error", err)
 		}
 	})
 	return err

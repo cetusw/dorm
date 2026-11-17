@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"database/sql"
-	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -28,7 +27,6 @@ func (h *HealthHandler) ready(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
 	defer cancel()
 	if err := h.db.PingContext(ctx); err != nil {
-		log.Printf("Readiness database check failed: %v", err)
 		return c.Status(fiber.StatusServiceUnavailable).Send(nil)
 	}
 	return c.SendStatus(fiber.StatusNoContent)

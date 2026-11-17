@@ -23,12 +23,12 @@ func NewUserAPIHandler(userUC ports.UserUseCase, dormitoryUC ports.DormitoryUseC
 
 func (h *UserAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/users", auth)
-	api.Get("", h.HandleGetResidents)
-	api.Get("/options", h.HandleGetUserOptions)
-	api.Get("/:id", h.HandleGetResident)
-	api.Post("", h.HandleCreateResident)
-	api.Put("/:id", h.HandleUpdateResident)
-	api.Delete("/:id", h.HandleDeleteResident)
+	api.Get("", apiDeadline, h.HandleGetResidents)
+	api.Get("/options", apiDeadline, h.HandleGetUserOptions)
+	api.Get("/:id", apiDeadline, h.HandleGetResident)
+	api.Post("", apiDeadline, h.HandleCreateResident)
+	api.Put("/:id", apiDeadline, h.HandleUpdateResident)
+	api.Delete("/:id", apiDeadline, h.HandleDeleteResident)
 }
 
 func (h *UserAPIHandler) HandleGetResidents(c *fiber.Ctx) error {
@@ -37,8 +37,11 @@ func (h *UserAPIHandler) HandleGetResidents(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	canManage, err := h.dormitoryUC.CanManageDormitories(c.Context(), userID)
+	canManage, err := h.dormitoryUC.CanManageDormitories(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
 	}
 	if !canManage {
@@ -50,8 +53,11 @@ func (h *UserAPIHandler) HandleGetResidents(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор общежития"))
 	}
 
-	response, err := h.userUC.GetResidentsResponse(c.Context(), dormitoryID)
+	response, err := h.userUC.GetResidentsResponse(c.UserContext(), dormitoryID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить список жителей"))
 	}
 
@@ -68,8 +74,11 @@ func (h *UserAPIHandler) HandleGetResident(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор жителя"))
 	}
 
-	resident, err := h.userUC.GetResidentDetails(c.Context(), residentID)
+	resident, err := h.userUC.GetResidentDetails(c.UserContext(), residentID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить жителя"))
 	}
 	if resident == nil {
@@ -89,8 +98,11 @@ func (h *UserAPIHandler) HandleCreateResident(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	resident, err := h.userUC.CreateResident(c.Context(), req)
+	resident, err := h.userUC.CreateResident(c.UserContext(), req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -112,8 +124,11 @@ func (h *UserAPIHandler) HandleUpdateResident(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	resident, err := h.userUC.UpdateResident(c.Context(), residentID, req)
+	resident, err := h.userUC.UpdateResident(c.UserContext(), residentID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 	if resident == nil {
@@ -133,7 +148,10 @@ func (h *UserAPIHandler) HandleDeleteResident(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор жителя"))
 	}
 
-	if err := h.userUC.DeleteResident(c.Context(), residentID); err != nil {
+	if err := h.userUC.DeleteResident(c.UserContext(), residentID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -145,8 +163,11 @@ func (h *UserAPIHandler) HandleGetUserOptions(c *fiber.Ctx) error {
 		return err
 	}
 
-	response, err := h.dormitoryUC.GetUserOptionsResponse(c.Context())
+	response, err := h.dormitoryUC.GetUserOptionsResponse(c.UserContext())
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить список жителей"))
 	}
 
@@ -159,8 +180,11 @@ func (h *UserAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	canManage, err := h.dormitoryUC.CanManageDormitories(c.Context(), userID)
+	canManage, err := h.dormitoryUC.CanManageDormitories(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
 	}
 	if !canManage {

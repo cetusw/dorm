@@ -31,15 +31,15 @@ func NewResidentAPIHandler(
 func (h *ResidentAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/resident", auth)
 
-	api.Get("/current-duty", h.HandleGetCurrentDuty)
-	api.Get("/duties", h.HandleGetDutyHistory)
-	api.Get("/duties/:dutyId", h.HandleGetDutyDetails)
-	api.Post("/tasks/:taskId/take", h.HandleTakeTask)
-	api.Post("/tasks/:taskId/return", h.HandleReturnTask)
-	api.Post("/tasks/:taskId/complete", h.HandleCompleteTask)
-	api.Post("/tasks/:taskId/open", h.HandleOpenTask)
-	api.Post("/tasks/:taskId/verify", h.HandleVerifyTask)
-	api.Post("/tasks/:taskId/reopen", h.HandleReopenTask)
+	api.Get("/current-duty", apiDeadline, h.HandleGetCurrentDuty)
+	api.Get("/duties", apiDeadline, h.HandleGetDutyHistory)
+	api.Get("/duties/:dutyId", apiDeadline, h.HandleGetDutyDetails)
+	api.Post("/tasks/:taskId/take", apiDeadline, h.HandleTakeTask)
+	api.Post("/tasks/:taskId/return", apiDeadline, h.HandleReturnTask)
+	api.Post("/tasks/:taskId/complete", apiDeadline, h.HandleCompleteTask)
+	api.Post("/tasks/:taskId/open", apiDeadline, h.HandleOpenTask)
+	api.Post("/tasks/:taskId/verify", apiDeadline, h.HandleVerifyTask)
+	api.Post("/tasks/:taskId/reopen", apiDeadline, h.HandleReopenTask)
 }
 
 func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
@@ -58,8 +58,11 @@ func (h *ResidentAPIHandler) HandleGetCurrentDuty(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID, dormitoryID)
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.UserContext(), userID, groupID, dormitoryID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentDutyError(c, err)
 	}
 
@@ -77,8 +80,11 @@ func (h *ResidentAPIHandler) HandleGetDutyHistory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	history, err := h.residentDutyUC.GetDutyHistory(c.Context(), userID, groupID)
+	history, err := h.residentDutyUC.GetDutyHistory(c.UserContext(), userID, groupID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentDutyError(c, err)
 	}
 
@@ -96,8 +102,11 @@ func (h *ResidentAPIHandler) HandleGetDutyDetails(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор дежурства"))
 	}
 
-	dutyDetails, err := h.residentDutyUC.GetDutyDetails(c.Context(), userID, dutyID)
+	dutyDetails, err := h.residentDutyUC.GetDutyDetails(c.UserContext(), userID, dutyID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentDutyError(c, err)
 	}
 
@@ -110,7 +119,10 @@ func (h *ResidentAPIHandler) HandleTakeTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	if err := h.residentDutyUC.TakeTask(c.Context(), userID, taskID); err != nil {
+	if err := h.residentDutyUC.TakeTask(c.UserContext(), userID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		if errors.Is(err, duty.ErrTaskAssigned) {
 			return h.respondResidentTaskAssignedConflict(c, userID, taskID)
 		}
@@ -127,7 +139,10 @@ func (h *ResidentAPIHandler) HandleReturnTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	if err := h.residentDutyUC.ReturnTask(c.Context(), userID, taskID); err != nil {
+	if err := h.residentDutyUC.ReturnTask(c.UserContext(), userID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentTaskError(c, err)
 	}
 
@@ -140,7 +155,10 @@ func (h *ResidentAPIHandler) HandleCompleteTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	if err := h.residentDutyUC.CompleteTask(c.Context(), userID, taskID); err != nil {
+	if err := h.residentDutyUC.CompleteTask(c.UserContext(), userID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentTaskError(c, err)
 	}
 
@@ -153,7 +171,10 @@ func (h *ResidentAPIHandler) HandleOpenTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	if err := h.residentDutyUC.OpenTask(c.Context(), userID, taskID); err != nil {
+	if err := h.residentDutyUC.OpenTask(c.UserContext(), userID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentTaskError(c, err)
 	}
 
@@ -166,7 +187,10 @@ func (h *ResidentAPIHandler) HandleVerifyTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	if err := h.residentDutyUC.VerifyTask(c.Context(), userID, taskID); err != nil {
+	if err := h.residentDutyUC.VerifyTask(c.UserContext(), userID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentTaskError(c, err)
 	}
 
@@ -179,7 +203,10 @@ func (h *ResidentAPIHandler) HandleReopenTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	if err := h.residentDutyUC.ReopenTask(c.Context(), userID, taskID); err != nil {
+	if err := h.residentDutyUC.ReopenTask(c.UserContext(), userID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentTaskError(c, err)
 	}
 
@@ -219,8 +246,11 @@ func (h *ResidentAPIHandler) respondResidentTaskAssignedConflict(c *fiber.Ctx, u
 		return c.Status(fiber.StatusConflict).JSON(errorResponse(message))
 	}
 
-	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID, dormitoryID)
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.UserContext(), userID, groupID, dormitoryID)
 	if err != nil || currentDuty == nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusConflict).JSON(errorResponse(message))
 	}
 
@@ -267,8 +297,11 @@ func (h *ResidentAPIHandler) respondWithCurrentDuty(c *fiber.Ctx, userID uuid.UU
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.Context(), userID, groupID, dormitoryID)
+	currentDuty, err := h.residentDutyUC.GetCurrentDuty(c.UserContext(), userID, groupID, dormitoryID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondResidentDutyError(c, err)
 	}
 

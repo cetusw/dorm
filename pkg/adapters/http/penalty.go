@@ -21,12 +21,12 @@ func NewPenaltyAPIHandler(penaltyUC ports.PenaltyUseCase) *PenaltyAPIHandler {
 
 func (h *PenaltyAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/penalties", auth)
-	api.Get("", h.HandleListResidents)
-	api.Get("/me", h.HandleGetCurrentUserPenalties)
-	api.Get("/residents", h.HandleSearchResidents)
-	api.Get("/residents/:userId", h.HandleGetResidentPenalties)
-	api.Post("", h.HandleCreatePenalty)
-	api.Delete("/:penaltyId", h.HandleResolvePenalty)
+	api.Get("", apiDeadline, h.HandleListResidents)
+	api.Get("/me", apiDeadline, h.HandleGetCurrentUserPenalties)
+	api.Get("/residents", apiDeadline, h.HandleSearchResidents)
+	api.Get("/residents/:userId", apiDeadline, h.HandleGetResidentPenalties)
+	api.Post("", apiDeadline, h.HandleCreatePenalty)
+	api.Delete("/:penaltyId", apiDeadline, h.HandleResolvePenalty)
 }
 
 func (h *PenaltyAPIHandler) HandleListResidents(c *fiber.Ctx) error {
@@ -35,8 +35,11 @@ func (h *PenaltyAPIHandler) HandleListResidents(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	response, err := h.penaltyUC.ListResidents(c.Context(), userID)
+	response, err := h.penaltyUC.ListResidents(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondPenaltyError(c, err)
 	}
 
@@ -49,8 +52,11 @@ func (h *PenaltyAPIHandler) HandleSearchResidents(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	response, err := h.penaltyUC.SearchResidents(c.Context(), userID, c.Query("q"))
+	response, err := h.penaltyUC.SearchResidents(c.UserContext(), userID, c.Query("q"))
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondPenaltyError(c, err)
 	}
 
@@ -63,8 +69,11 @@ func (h *PenaltyAPIHandler) HandleGetCurrentUserPenalties(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	response, err := h.penaltyUC.GetCurrentUserPenalties(c.Context(), userID)
+	response, err := h.penaltyUC.GetCurrentUserPenalties(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondPenaltyError(c, err)
 	}
 
@@ -82,8 +91,11 @@ func (h *PenaltyAPIHandler) HandleGetResidentPenalties(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор жителя"))
 	}
 
-	response, err := h.penaltyUC.GetResidentPenalties(c.Context(), userID, residentID)
+	response, err := h.penaltyUC.GetResidentPenalties(c.UserContext(), userID, residentID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondPenaltyError(c, err)
 	}
 
@@ -101,8 +113,11 @@ func (h *PenaltyAPIHandler) HandleCreatePenalty(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	item, err := h.penaltyUC.CreatePenalty(c.Context(), userID, request)
+	item, err := h.penaltyUC.CreatePenalty(c.UserContext(), userID, request)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondPenaltyError(c, err)
 	}
 
@@ -120,7 +135,10 @@ func (h *PenaltyAPIHandler) HandleResolvePenalty(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор предупреждения"))
 	}
 
-	if err := h.penaltyUC.ResolvePenalty(c.Context(), userID, penaltyID); err != nil {
+	if err := h.penaltyUC.ResolvePenalty(c.UserContext(), userID, penaltyID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondPenaltyError(c, err)
 	}
 

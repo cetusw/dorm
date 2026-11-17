@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -27,18 +28,22 @@ var (
 )
 
 type distributingContext struct {
-	groups        []*structure.Group
-	groupID       *uuid.UUID
-	taskDefs      []*catalog.TaskDefinition
-	areas         []*catalog.Area
-	areaGroupMap  map[int]*uuid.UUID
-	tasksByArea   map[int][]*catalog.TaskDefinition
-	taskOverrides map[uuid.UUID]bool
-	dutiesByGroup map[uuid.UUID]*duty.Duty
-	dutiesList    []*duty.Duty
-	weekNumber    int
-	start         time.Time
-	end           time.Time
+	source          string
+	stage           string
+	skippedGroups   int
+	persistedDuties int
+	groups          []*structure.Group
+	groupID         *uuid.UUID
+	taskDefs        []*catalog.TaskDefinition
+	areas           []*catalog.Area
+	areaGroupMap    map[int]*uuid.UUID
+	tasksByArea     map[int][]*catalog.TaskDefinition
+	taskOverrides   map[uuid.UUID]bool
+	dutiesByGroup   map[uuid.UUID]*duty.Duty
+	dutiesList      []*duty.Duty
+	weekNumber      int
+	start           time.Time
+	end             time.Time
 }
 
 type schedulingOptions struct {
@@ -50,77 +55,72 @@ type schedulingOptions struct {
 
 func (s *Service) StartNewWeek(ctx context.Context) error {
 	now := time.Now()
-	distributingCtx, err := s.loadSchedulingData(ctx, schedulingOptions{
-		start: now,
-		end:   now.Add(7 * 24 * time.Hour),
-	})
-	if err != nil {
-		return err
-	}
-
-	if err := s.initializeDuties(ctx, distributingCtx); err != nil {
-		return err
-	}
-
-	if err := s.distributeTasks(ctx, distributingCtx); err != nil {
-		return err
-	}
-
-	return s.finalizeNewWeek(ctx, distributingCtx)
+	return s.createScheduledDuties(ctx, schedulingOptions{start: now, end: now.Add(7 * 24 * time.Hour)}, "scheduler")
 }
 
 func (s *Service) StartNewDutiesForDormitory(ctx context.Context, dormitoryID int64, startDate, endDate time.Time) error {
 	if !startDate.Before(endDate) {
 		return fmt.Errorf("start date must be before end date")
 	}
-
-	distributingCtx, err := s.loadSchedulingData(ctx, schedulingOptions{
-		dormitoryID: &dormitoryID,
-		start:       startDate,
-		end:         endDate,
-	})
-	if err != nil {
-		return err
-	}
-
-	if err := s.initializeDuties(ctx, distributingCtx); err != nil {
-		return err
-	}
-
-	if err := s.distributeTasks(ctx, distributingCtx); err != nil {
-		return err
-	}
-
-	return s.finalizeNewWeek(ctx, distributingCtx)
+	return s.createScheduledDuties(ctx, schedulingOptions{dormitoryID: &dormitoryID, start: startDate, end: endDate}, "manual_dormitory")
 }
 
 func (s *Service) StartNewDutyForGroup(ctx context.Context, currentUserID uuid.UUID, groupID uuid.UUID, startDate, endDate time.Time) error {
 	if !startDate.Before(endDate) {
 		return fmt.Errorf("start date must be before end date")
 	}
-
 	if _, err := s.requireGroupLeaderAccess(ctx, currentUserID, groupID); err != nil {
 		return err
 	}
+	return s.createScheduledDuties(ctx, schedulingOptions{groupID: &groupID, start: startDate, end: endDate}, "manual_group")
+}
 
-	distributingCtx, err := s.loadSchedulingData(ctx, schedulingOptions{
-		groupID: &groupID,
-		start:   startDate,
-		end:     endDate,
-	})
+// Keep one diagnostic scope across loading, distribution, individual commits and
+// override cleanup. Persisted duties remain visible even if a later stage fails.
+func (s *Service) createScheduledDuties(ctx context.Context, opts schedulingOptions, source string) (err error) {
+	started := time.Now()
+	var data *distributingContext
+	completed := false
+	defer func() {
+		stage, created, skipped := "load", 0, 0
+		if data != nil {
+			stage, created, skipped = data.stage, data.persistedDuties, data.skippedGroups
+		}
+		fields := []any{"source", source, "duration_ms", time.Since(started).Milliseconds(), "created_duties", created, "skipped_groups", skipped}
+		failure := err
+		if failure == nil && !completed {
+			failure = errors.New("operation interrupted before completion")
+		}
+		if failure != nil {
+			slog.ErrorContext(ctx, "duty.week_creation.failed", append(fields, "event", "duty.week_creation.failed", "stage", stage, "error", failure)...)
+			return
+		}
+		level, result := slog.LevelInfo, "success"
+		if skipped > 0 {
+			level, result = slog.LevelWarn, "partial"
+		}
+		slog.Log(ctx, level, "duty.week_creation.completed", append(fields, "event", "duty.week_creation.completed", "result", result)...)
+	}()
+	data, err = s.loadSchedulingData(ctx, opts)
 	if err != nil {
 		return err
 	}
-
-	if err := s.initializeDuties(ctx, distributingCtx); err != nil {
+	data.source, data.stage = source, "initialize"
+	if err := s.initializeDuties(ctx, data); err != nil {
 		return err
 	}
-
-	if err := s.distributeTasks(ctx, distributingCtx); err != nil {
+	data.stage = "distribute"
+	if err := s.distributeTasks(ctx, data); err != nil {
 		return err
 	}
-
-	return s.finalizeNewWeek(ctx, distributingCtx)
+	data.stage = "persist"
+	err = s.finalizeNewWeek(ctx, data)
+	if err == nil {
+		data.stage = "completion"
+		err = ctx.Err()
+	}
+	completed = err == nil
+	return err
 }
 
 func (s *Service) loadSchedulingData(ctx context.Context, opts schedulingOptions) (*distributingContext, error) {
@@ -255,6 +255,9 @@ func (s *Service) indexData(c *distributingContext) {
 }
 
 func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if len(c.groups) == 0 {
 		if c.groupID != nil {
 			return ErrDutyGroupNotFound
@@ -262,26 +265,46 @@ func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) 
 		return fmt.Errorf("cannot start new week: no groups found")
 	}
 
-	skippedGroups := 0
 	for _, group := range c.groups {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
 			log.Printf("Skipping group %s: load teams: %v", group.Name(), err)
-			skippedGroups++
+			c.skippedGroups++
 			continue
 		}
 
 		lastDuty, err := s.dutyRepo.FindLatestByGroupID(ctx, group.ID())
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
 			log.Printf("Skipping group %s: load last duty: %v", group.Name(), err)
-			skippedGroups++
+			c.skippedGroups++
 			continue
 		}
 
 		nextTeam, err := determineNextTeam(teams, lastDuty)
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
 			log.Printf("Skipping group %s: %v", group.Name(), err)
-			skippedGroups++
+			c.skippedGroups++
 			continue
 		}
 
@@ -300,7 +323,7 @@ func (s *Service) initializeDuties(ctx context.Context, c *distributingContext) 
 	})
 
 	if len(c.dutiesList) == 0 {
-		return fmt.Errorf("cannot start new week: no duties generated (%d groups skipped)", skippedGroups)
+		return fmt.Errorf("cannot start new week: no duties generated (%d groups skipped)", c.skippedGroups)
 	}
 
 	return nil
@@ -314,6 +337,9 @@ func (s *Service) distributeTasks(ctx context.Context, c *distributingContext) e
 	rrIndex := c.weekNumber % len(c.dutiesList)
 
 	for _, area := range c.areas {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		tasks := c.tasksByArea[area.ID()]
 		if len(tasks) == 0 {
 			continue
@@ -355,6 +381,9 @@ func (s *Service) resolveTargetDuty(area *catalog.Area, c *distributingContext, 
 
 func (s *Service) assignBatchToDuty(ctx context.Context, d *duty.Duty, tasks []*catalog.TaskDefinition, c *distributingContext) error {
 	for _, def := range tasks {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		isDue := def.IsScheduledFor(d.SequenceNumber())
 
 		if include, ok := c.taskOverrides[def.ID()]; ok {
@@ -396,7 +425,14 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 		return fmt.Errorf("cannot finalize week: no duties to persist")
 	}
 
+	groupsByDuty := make(map[uuid.UUID]uuid.UUID, len(c.dutiesByGroup))
+	for groupID, d := range c.dutiesByGroup {
+		groupsByDuty[d.ID()] = groupID
+	}
 	for _, d := range c.dutiesList {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if err := s.dutyRepo.CreateWithTasks(ctx, d, d.Tasks()); err != nil {
 			if errors.Is(err, duty.ErrDutyPeriodOverlap) {
 				return duty.ErrDutyPeriodOverlap
@@ -406,6 +442,16 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 			}
 			return fmt.Errorf("save duty %s: %w", d.ID(), err)
 		}
+		c.persistedDuties++
+		fields := []any{"event", "duty.persisted", "duty_id", d.ID(), "team_id", d.TeamID(), "task_count", len(d.Tasks()), "start_date", d.Start(), "end_date", d.End(), "source", c.source}
+		if groupID, ok := groupsByDuty[d.ID()]; ok {
+			fields = append(fields, "group_id", groupID)
+		}
+		slog.InfoContext(ctx, "duty.persisted", fields...)
+	}
+	c.stage = "clear_overrides"
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if err := s.clearAppliedTaskOverrides(ctx, c.taskDefs); err != nil {
 		return fmt.Errorf("clear task overrides: %w", err)
@@ -422,7 +468,9 @@ func (s *Service) finalizeNewWeek(ctx context.Context, c *distributingContext) e
 	if err := s.eventBus.PublishAsync(events.TopicWeekStarted, events.WeekStartedEvent{
 		Duties: startedDuties,
 	}, 20*time.Second); err != nil {
-		log.Printf("Failed to publish week started event: %v", err)
+		slog.ErrorContext(ctx, "event.week_started.publish_failed", "event", "event.week_started.publish_failed", "source", c.source, "created_duties", c.persistedDuties, "error", err)
+	} else {
+		slog.InfoContext(ctx, "event.week_started.accepted", "event", "event.week_started.accepted", "source", c.source, "created_duties", c.persistedDuties)
 	}
 
 	return nil

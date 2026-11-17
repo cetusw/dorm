@@ -7,7 +7,9 @@ import (
 	cleaninguc "dorm/pkg/core/usecase/cleaning"
 	dutysettingsuc "dorm/pkg/core/usecase/dutysettings"
 	"errors"
+	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -38,34 +40,34 @@ func NewGroupAPIHandler(
 
 func (h *GroupAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/groups", auth)
-	api.Get("", h.HandleGetGroups)
-	api.Get("/options", h.HandleGetDormitoryUserOptions)
-	api.Get("/:id", h.HandleGetGroup)
-	api.Post("/:id/duties", h.HandleCreateGroupDuty)
-	api.Get("/:id/duty-settings", h.HandleGetDutySettings)
-	api.Get("/:id/duty-settings/teams/members", h.HandleGetDutySettingsTeamMemberOptions)
-	api.Post("/:id/duty-settings/teams/reorder", h.HandleReorderDutySettingsTeams)
-	api.Get("/:id/duty-settings/teams/:teamId", h.HandleGetDutySettingsTeam)
-	api.Get("/:id/duty-settings/teams/:teamId/members", h.HandleGetDutySettingsTeamMembers)
-	api.Get("/:id/duty-settings/teams/:teamId/member-search", h.HandleSearchDutySettingsTeamMembers)
-	api.Post("/:id/duty-settings/teams/:teamId/members", h.HandleAddDutySettingsTeamMember)
-	api.Put("/:id/duty-settings/teams/:teamId/leader", h.HandleAssignDutySettingsTeamLeader)
-	api.Delete("/:id/duty-settings/teams/:teamId/members/:userId", h.HandleRemoveDutySettingsTeamMember)
-	api.Post("/:id/duty-settings/teams", h.HandleCreateDutySettingsTeam)
-	api.Put("/:id/duty-settings/teams/:teamId", h.HandleUpdateDutySettingsTeam)
-	api.Delete("/:id/duty-settings/teams/:teamId", h.HandleDeleteDutySettingsTeam)
-	api.Post("/:id/duty-settings/teams/:teamId/assign-active-duty", h.HandleAssignDutySettingsActiveTeam)
-	api.Post("/:id/duty-settings/areas", h.HandleCreateDutySettingsArea)
-	api.Put("/:id/duty-settings/areas/:areaId", h.HandleUpdateDutySettingsArea)
-	api.Delete("/:id/duty-settings/areas/:areaId", h.HandleDeleteDutySettingsArea)
-	api.Post("/:id/duty-settings/areas/:areaId/tasks", h.HandleCreateDutySettingsTask)
-	api.Put("/:id/duty-settings/tasks/:taskId", h.HandleUpdateDutySettingsTask)
-	api.Delete("/:id/duty-settings/tasks/:taskId", h.HandleDeleteDutySettingsTask)
-	api.Post("/:id/duty-settings/tasks/:taskId/include", h.HandleIncludeDutySettingsTask)
-	api.Delete("/:id/duty-settings/tasks/:taskId/include", h.HandleExcludeDutySettingsTask)
-	api.Post("", h.HandleCreateGroup)
-	api.Put("/:id", h.HandleUpdateGroup)
-	api.Delete("/:id", h.HandleDeleteGroup)
+	api.Get("", apiDeadline, h.HandleGetGroups)
+	api.Get("/options", apiDeadline, h.HandleGetDormitoryUserOptions)
+	api.Get("/:id", apiDeadline, h.HandleGetGroup)
+	api.Post("/:id/duties", dutyCreationDeadline, h.HandleCreateGroupDuty)
+	api.Get("/:id/duty-settings", apiDeadline, h.HandleGetDutySettings)
+	api.Get("/:id/duty-settings/teams/members", apiDeadline, h.HandleGetDutySettingsTeamMemberOptions)
+	api.Post("/:id/duty-settings/teams/reorder", apiDeadline, h.HandleReorderDutySettingsTeams)
+	api.Get("/:id/duty-settings/teams/:teamId", apiDeadline, h.HandleGetDutySettingsTeam)
+	api.Get("/:id/duty-settings/teams/:teamId/members", apiDeadline, h.HandleGetDutySettingsTeamMembers)
+	api.Get("/:id/duty-settings/teams/:teamId/member-search", apiDeadline, h.HandleSearchDutySettingsTeamMembers)
+	api.Post("/:id/duty-settings/teams/:teamId/members", apiDeadline, h.HandleAddDutySettingsTeamMember)
+	api.Put("/:id/duty-settings/teams/:teamId/leader", apiDeadline, h.HandleAssignDutySettingsTeamLeader)
+	api.Delete("/:id/duty-settings/teams/:teamId/members/:userId", apiDeadline, h.HandleRemoveDutySettingsTeamMember)
+	api.Post("/:id/duty-settings/teams", apiDeadline, h.HandleCreateDutySettingsTeam)
+	api.Put("/:id/duty-settings/teams/:teamId", apiDeadline, h.HandleUpdateDutySettingsTeam)
+	api.Delete("/:id/duty-settings/teams/:teamId", apiDeadline, h.HandleDeleteDutySettingsTeam)
+	api.Post("/:id/duty-settings/teams/:teamId/assign-active-duty", apiDeadline, h.HandleAssignDutySettingsActiveTeam)
+	api.Post("/:id/duty-settings/areas", apiDeadline, h.HandleCreateDutySettingsArea)
+	api.Put("/:id/duty-settings/areas/:areaId", apiDeadline, h.HandleUpdateDutySettingsArea)
+	api.Delete("/:id/duty-settings/areas/:areaId", apiDeadline, h.HandleDeleteDutySettingsArea)
+	api.Post("/:id/duty-settings/areas/:areaId/tasks", apiDeadline, h.HandleCreateDutySettingsTask)
+	api.Put("/:id/duty-settings/tasks/:taskId", apiDeadline, h.HandleUpdateDutySettingsTask)
+	api.Delete("/:id/duty-settings/tasks/:taskId", apiDeadline, h.HandleDeleteDutySettingsTask)
+	api.Post("/:id/duty-settings/tasks/:taskId/include", apiDeadline, h.HandleIncludeDutySettingsTask)
+	api.Delete("/:id/duty-settings/tasks/:taskId/include", apiDeadline, h.HandleExcludeDutySettingsTask)
+	api.Post("", apiDeadline, h.HandleCreateGroup)
+	api.Put("/:id", apiDeadline, h.HandleUpdateGroup)
+	api.Delete("/:id", apiDeadline, h.HandleDeleteGroup)
 }
 
 func (h *GroupAPIHandler) HandleGetGroups(c *fiber.Ctx) error {
@@ -78,8 +80,11 @@ func (h *GroupAPIHandler) HandleGetGroups(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор общежития"))
 	}
 
-	response, err := h.dormitoryUC.GetGroupsResponse(c.Context(), dormitoryID)
+	response, err := h.dormitoryUC.GetGroupsResponse(c.UserContext(), dormitoryID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить список групп"))
 	}
 
@@ -96,8 +101,11 @@ func (h *GroupAPIHandler) HandleGetDormitoryUserOptions(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор общежития"))
 	}
 
-	response, err := h.dormitoryUC.GetDormitoryUserOptionsResponse(c.Context(), dormitoryID)
+	response, err := h.dormitoryUC.GetDormitoryUserOptionsResponse(c.UserContext(), dormitoryID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить список жителей"))
 	}
 
@@ -114,8 +122,11 @@ func (h *GroupAPIHandler) HandleGetGroup(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор группы"))
 	}
 
-	group, err := h.dormitoryUC.GetGroupDetails(c.Context(), groupID)
+	group, err := h.dormitoryUC.GetGroupDetails(c.UserContext(), groupID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить группу"))
 	}
 	if group == nil {
@@ -135,8 +146,11 @@ func (h *GroupAPIHandler) HandleCreateGroup(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	group, err := h.dormitoryUC.CreateGroupDetails(c.Context(), req)
+	group, err := h.dormitoryUC.CreateGroupDetails(c.UserContext(), req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -158,8 +172,11 @@ func (h *GroupAPIHandler) HandleUpdateGroup(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	group, err := h.dormitoryUC.UpdateGroupDetails(c.Context(), groupID, req)
+	group, err := h.dormitoryUC.UpdateGroupDetails(c.UserContext(), groupID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 	if group == nil {
@@ -179,7 +196,10 @@ func (h *GroupAPIHandler) HandleDeleteGroup(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор группы"))
 	}
 
-	if err := h.dormitoryUC.DeleteGroup(c.Context(), groupID); err != nil {
+	if err := h.dormitoryUC.DeleteGroup(c.UserContext(), groupID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -212,10 +232,20 @@ func (h *GroupAPIHandler) HandleCreateGroupDuty(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
-	if err := h.cleaningUC.StartNewDutyForGroup(c.Context(), userID, groupID, startDate, endDate); err != nil {
+	started := time.Now()
+	err = h.cleaningUC.StartNewDutyForGroup(c.UserContext(), userID, groupID, startDate, endDate)
+	if err == nil {
+		err = c.UserContext().Err()
+	}
+	if err != nil {
+		slog.ErrorContext(c.UserContext(), "duty.manual_creation.failed", "event", "duty.manual_creation.failed", "request_id", requestID(c.UserContext()), "group_id", groupID, "duration_ms", time.Since(started).Milliseconds(), "error", err)
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondCreateGroupDutyError(c, err)
 	}
 
+	slog.InfoContext(c.UserContext(), "duty.manual_creation.completed", "event", "duty.manual_creation.completed", "request_id", requestID(c.UserContext()), "group_id", groupID, "duration_ms", time.Since(started).Milliseconds())
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -225,8 +255,11 @@ func (h *GroupAPIHandler) HandleGetDutySettings(c *fiber.Ctx) error {
 		return err
 	}
 
-	response, err := h.dutySettingsUC.GetDutySettings(c.Context(), userID, groupID)
+	response, err := h.dutySettingsUC.GetDutySettings(c.UserContext(), userID, groupID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -244,8 +277,11 @@ func (h *GroupAPIHandler) HandleGetDutySettingsTeam(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	team, err := h.dutySettingsUC.GetTeamDetails(c.Context(), userID, groupID, teamID)
+	team, err := h.dutySettingsUC.GetTeamDetails(c.UserContext(), userID, groupID, teamID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 	if team == nil {
@@ -266,8 +302,11 @@ func (h *GroupAPIHandler) HandleGetDutySettingsTeamMembers(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	response, err := h.dutySettingsUC.GetTeamMembers(c.Context(), userID, groupID, teamID)
+	response, err := h.dutySettingsUC.GetTeamMembers(c.UserContext(), userID, groupID, teamID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -285,8 +324,11 @@ func (h *GroupAPIHandler) HandleSearchDutySettingsTeamMembers(c *fiber.Ctx) erro
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	response, err := h.dutySettingsUC.SearchTeamMembers(c.Context(), userID, groupID, teamID, c.Query("q"))
+	response, err := h.dutySettingsUC.SearchTeamMembers(c.UserContext(), userID, groupID, teamID, c.Query("q"))
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -304,8 +346,11 @@ func (h *GroupAPIHandler) HandleGetDutySettingsTeamMemberOptions(c *fiber.Ctx) e
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	response, err := h.dutySettingsUC.GetTeamMemberOptions(c.Context(), userID, groupID, teamID)
+	response, err := h.dutySettingsUC.GetTeamMemberOptions(c.UserContext(), userID, groupID, teamID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -333,7 +378,10 @@ func (h *GroupAPIHandler) HandleAddDutySettingsTeamMember(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор жителя"))
 	}
 
-	if err := h.dutySettingsUC.AddTeamMember(c.Context(), userID, groupID, teamID, targetUserID); err != nil {
+	if err := h.dutySettingsUC.AddTeamMember(c.UserContext(), userID, groupID, teamID, targetUserID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -361,7 +409,10 @@ func (h *GroupAPIHandler) HandleAssignDutySettingsTeamLeader(c *fiber.Ctx) error
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор жителя"))
 	}
 
-	if err := h.dutySettingsUC.AssignTeamLeader(c.Context(), userID, groupID, teamID, targetUserID); err != nil {
+	if err := h.dutySettingsUC.AssignTeamLeader(c.UserContext(), userID, groupID, teamID, targetUserID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -384,7 +435,10 @@ func (h *GroupAPIHandler) HandleRemoveDutySettingsTeamMember(c *fiber.Ctx) error
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор жителя"))
 	}
 
-	if err := h.dutySettingsUC.RemoveTeamMember(c.Context(), userID, groupID, teamID, targetUserID); err != nil {
+	if err := h.dutySettingsUC.RemoveTeamMember(c.UserContext(), userID, groupID, teamID, targetUserID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -402,8 +456,11 @@ func (h *GroupAPIHandler) HandleCreateDutySettingsTeam(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	team, err := h.dutySettingsUC.CreateTeam(c.Context(), userID, groupID, req)
+	team, err := h.dutySettingsUC.CreateTeam(c.UserContext(), userID, groupID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -426,8 +483,11 @@ func (h *GroupAPIHandler) HandleUpdateDutySettingsTeam(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	team, err := h.dutySettingsUC.UpdateTeam(c.Context(), userID, groupID, teamID, req)
+	team, err := h.dutySettingsUC.UpdateTeam(c.UserContext(), userID, groupID, teamID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 	if team == nil {
@@ -448,7 +508,10 @@ func (h *GroupAPIHandler) HandleDeleteDutySettingsTeam(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	if err := h.dutySettingsUC.DeleteTeam(c.Context(), userID, groupID, teamID); err != nil {
+	if err := h.dutySettingsUC.DeleteTeam(c.UserContext(), userID, groupID, teamID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -466,7 +529,10 @@ func (h *GroupAPIHandler) HandleAssignDutySettingsActiveTeam(c *fiber.Ctx) error
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	if err := h.dutySettingsUC.AssignActiveDutyTeam(c.Context(), userID, groupID, teamID); err != nil {
+	if err := h.dutySettingsUC.AssignActiveDutyTeam(c.UserContext(), userID, groupID, teamID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -493,7 +559,10 @@ func (h *GroupAPIHandler) HandleReorderDutySettingsTeams(c *fiber.Ctx) error {
 		teamIDs = append(teamIDs, teamID)
 	}
 
-	if err := h.dutySettingsUC.ReorderTeams(c.Context(), userID, groupID, teamIDs); err != nil {
+	if err := h.dutySettingsUC.ReorderTeams(c.UserContext(), userID, groupID, teamIDs); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -511,8 +580,11 @@ func (h *GroupAPIHandler) HandleCreateDutySettingsArea(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	area, err := h.dutySettingsUC.CreateArea(c.Context(), userID, groupID, req)
+	area, err := h.dutySettingsUC.CreateArea(c.UserContext(), userID, groupID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -535,8 +607,11 @@ func (h *GroupAPIHandler) HandleUpdateDutySettingsArea(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	area, err := h.dutySettingsUC.UpdateArea(c.Context(), userID, groupID, areaID, req)
+	area, err := h.dutySettingsUC.UpdateArea(c.UserContext(), userID, groupID, areaID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -554,7 +629,10 @@ func (h *GroupAPIHandler) HandleDeleteDutySettingsArea(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор территории"))
 	}
 
-	if err := h.dutySettingsUC.DeleteArea(c.Context(), userID, groupID, areaID); err != nil {
+	if err := h.dutySettingsUC.DeleteArea(c.UserContext(), userID, groupID, areaID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -577,8 +655,11 @@ func (h *GroupAPIHandler) HandleCreateDutySettingsTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	task, err := h.dutySettingsUC.CreateTask(c.Context(), userID, groupID, areaID, req)
+	task, err := h.dutySettingsUC.CreateTask(c.UserContext(), userID, groupID, areaID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -601,8 +682,11 @@ func (h *GroupAPIHandler) HandleUpdateDutySettingsTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	task, err := h.dutySettingsUC.UpdateTask(c.Context(), userID, groupID, taskID, req)
+	task, err := h.dutySettingsUC.UpdateTask(c.UserContext(), userID, groupID, taskID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -620,7 +704,10 @@ func (h *GroupAPIHandler) HandleDeleteDutySettingsTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор задачи"))
 	}
 
-	if err := h.dutySettingsUC.DeleteTask(c.Context(), userID, groupID, taskID); err != nil {
+	if err := h.dutySettingsUC.DeleteTask(c.UserContext(), userID, groupID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -638,7 +725,10 @@ func (h *GroupAPIHandler) HandleIncludeDutySettingsTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор задачи"))
 	}
 
-	if err := h.dutySettingsUC.IncludeTaskInActiveDuty(c.Context(), userID, groupID, taskID); err != nil {
+	if err := h.dutySettingsUC.IncludeTaskInActiveDuty(c.UserContext(), userID, groupID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -656,7 +746,10 @@ func (h *GroupAPIHandler) HandleExcludeDutySettingsTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор задачи"))
 	}
 
-	if err := h.dutySettingsUC.ExcludeTaskFromActiveDuty(c.Context(), userID, groupID, taskID); err != nil {
+	if err := h.dutySettingsUC.ExcludeTaskFromActiveDuty(c.UserContext(), userID, groupID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondDutySettingsError(c, err)
 	}
 
@@ -722,8 +815,11 @@ func (h *GroupAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	canManage, err := h.dormitoryUC.CanManageDormitories(c.Context(), userID)
+	canManage, err := h.dormitoryUC.CanManageDormitories(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
 	}
 	if !canManage {

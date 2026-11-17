@@ -23,9 +23,9 @@ func NewNotificationAPIHandler(webPush config.WebPushConfig, subscriptionService
 
 func (h *NotificationAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/notifications", auth)
-	api.Get("/config", h.HandleGetConfig)
-	api.Post("/subscriptions", h.HandleSubscribe)
-	api.Delete("/subscriptions", h.HandleUnsubscribe)
+	api.Get("/config", apiDeadline, h.HandleGetConfig)
+	api.Post("/subscriptions", apiDeadline, h.HandleSubscribe)
+	api.Delete("/subscriptions", apiDeadline, h.HandleUnsubscribe)
 }
 
 func (h *NotificationAPIHandler) HandleGetConfig(c *fiber.Ctx) error {
@@ -60,12 +60,15 @@ func (h *NotificationAPIHandler) HandleSubscribe(c *fiber.Ctx) error {
 		userAgent = &userAgentValue
 	}
 
-	if err := h.subscriptionService.Subscribe(c.Context(), userID, dto.SubscribeToPushRequest{
+	if err := h.subscriptionService.Subscribe(c.UserContext(), userID, dto.SubscribeToPushRequest{
 		Endpoint:   request.Endpoint,
 		P256DH:     request.Keys.P256DH,
 		AuthSecret: request.Keys.Auth,
 		UserAgent:  userAgent,
 	}); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondSubscriptionError(c, err)
 	}
 
@@ -83,7 +86,10 @@ func (h *NotificationAPIHandler) HandleUnsubscribe(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	if err := h.subscriptionService.Unsubscribe(c.Context(), userID, request.Endpoint); err != nil {
+	if err := h.subscriptionService.Unsubscribe(c.UserContext(), userID, request.Endpoint); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondSubscriptionError(c, err)
 	}
 

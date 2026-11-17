@@ -23,11 +23,11 @@ func NewTaskCatalogAPIHandler(dormitoryUC ports.DormitoryUseCase, taskUC ports.T
 
 func (h *TaskCatalogAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/task-definitions", auth)
-	api.Get("", h.HandleGetTasks)
-	api.Get("/:id", h.HandleGetTask)
-	api.Post("", h.HandleCreateTask)
-	api.Put("/:id", h.HandleUpdateTask)
-	api.Delete("/:id", h.HandleDeleteTask)
+	api.Get("", apiDeadline, h.HandleGetTasks)
+	api.Get("/:id", apiDeadline, h.HandleGetTask)
+	api.Post("", apiDeadline, h.HandleCreateTask)
+	api.Put("/:id", apiDeadline, h.HandleUpdateTask)
+	api.Delete("/:id", apiDeadline, h.HandleDeleteTask)
 }
 
 func (h *TaskCatalogAPIHandler) HandleGetTasks(c *fiber.Ctx) error {
@@ -40,8 +40,11 @@ func (h *TaskCatalogAPIHandler) HandleGetTasks(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор общежития"))
 	}
 
-	response, err := h.taskUC.GetTasksResponse(c.Context(), dormitoryID)
+	response, err := h.taskUC.GetTasksResponse(c.UserContext(), dormitoryID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -63,8 +66,11 @@ func (h *TaskCatalogAPIHandler) HandleGetTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор задачи"))
 	}
 
-	task, err := h.taskUC.GetTaskDetails(c.Context(), dormitoryID, taskID)
+	task, err := h.taskUC.GetTaskDetails(c.UserContext(), dormitoryID, taskID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 	if task == nil {
@@ -89,8 +95,11 @@ func (h *TaskCatalogAPIHandler) HandleCreateTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	task, err := h.taskUC.CreateTaskDetails(c.Context(), dormitoryID, req)
+	task, err := h.taskUC.CreateTaskDetails(c.UserContext(), dormitoryID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -117,8 +126,11 @@ func (h *TaskCatalogAPIHandler) HandleUpdateTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	task, err := h.taskUC.UpdateTaskDetails(c.Context(), dormitoryID, taskID, req)
+	task, err := h.taskUC.UpdateTaskDetails(c.UserContext(), dormitoryID, taskID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 	if task == nil {
@@ -143,7 +155,10 @@ func (h *TaskCatalogAPIHandler) HandleDeleteTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор задачи"))
 	}
 
-	if err := h.taskUC.DeleteTaskDetails(c.Context(), dormitoryID, taskID); err != nil {
+	if err := h.taskUC.DeleteTaskDetails(c.UserContext(), dormitoryID, taskID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -156,8 +171,11 @@ func (h *TaskCatalogAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) e
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	canManage, err := h.dormitoryUC.CanManageDormitories(c.Context(), userID)
+	canManage, err := h.dormitoryUC.CanManageDormitories(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
 	}
 	if !canManage {

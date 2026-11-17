@@ -74,7 +74,7 @@ func LoadDatabaseConfig() (*AppConfig, error) {
 
 func (cfg *AppConfig) GetDBConnectionString() string {
 	return fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true&allowNativePasswords=true&loc=%s",
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true&allowNativePasswords=true&loc=%s&timeout=5s&readTimeout=30s&writeTimeout=15s",
 		cfg.DBUser,
 		cfg.DBPassword,
 		cfg.DBHost,

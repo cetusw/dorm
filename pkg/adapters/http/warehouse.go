@@ -21,15 +21,15 @@ func NewWarehouseAPIHandler(warehouseUC ports.WarehouseUseCase) *WarehouseAPIHan
 
 func (h *WarehouseAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/warehouse", auth)
-	api.Get("", h.HandleGetWarehouse)
-	api.Get("/items/:itemId/history", h.HandleGetItemHistory)
-	api.Post("/items", h.HandleCreateItem)
-	api.Put("/items/:itemId", h.HandleUpdateItem)
-	api.Delete("/items/:itemId", h.HandleDeleteItem)
-	api.Post("/items/:itemId/add", h.HandleAddItems)
-	api.Post("/items/:itemId/write-off", h.HandleWriteOffItems)
-	api.Put("/items/:itemId/movements/:movementId", h.HandleUpdateMovement)
-	api.Delete("/items/:itemId/movements/:movementId", h.HandleDeleteMovement)
+	api.Get("", apiDeadline, h.HandleGetWarehouse)
+	api.Get("/items/:itemId/history", apiDeadline, h.HandleGetItemHistory)
+	api.Post("/items", apiDeadline, h.HandleCreateItem)
+	api.Put("/items/:itemId", apiDeadline, h.HandleUpdateItem)
+	api.Delete("/items/:itemId", apiDeadline, h.HandleDeleteItem)
+	api.Post("/items/:itemId/add", apiDeadline, h.HandleAddItems)
+	api.Post("/items/:itemId/write-off", apiDeadline, h.HandleWriteOffItems)
+	api.Put("/items/:itemId/movements/:movementId", apiDeadline, h.HandleUpdateMovement)
+	api.Delete("/items/:itemId/movements/:movementId", apiDeadline, h.HandleDeleteMovement)
 }
 
 func (h *WarehouseAPIHandler) HandleGetWarehouse(c *fiber.Ctx) error {
@@ -38,8 +38,11 @@ func (h *WarehouseAPIHandler) HandleGetWarehouse(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	response, err := h.warehouseUC.GetWarehouse(c.Context(), userID)
+	response, err := h.warehouseUC.GetWarehouse(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondWarehouseError(c, err)
 	}
 
@@ -52,8 +55,11 @@ func (h *WarehouseAPIHandler) HandleGetItemHistory(c *fiber.Ctx) error {
 		return err
 	}
 
-	response, err := h.warehouseUC.GetItemHistory(c.Context(), userID, itemID)
+	response, err := h.warehouseUC.GetItemHistory(c.UserContext(), userID, itemID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondWarehouseError(c, err)
 	}
 
@@ -71,8 +77,11 @@ func (h *WarehouseAPIHandler) HandleCreateItem(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	item, err := h.warehouseUC.CreateItem(c.Context(), userID, request)
+	item, err := h.warehouseUC.CreateItem(c.UserContext(), userID, request)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondWarehouseError(c, err)
 	}
 
@@ -90,8 +99,11 @@ func (h *WarehouseAPIHandler) HandleUpdateItem(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	item, err := h.warehouseUC.UpdateItem(c.Context(), userID, itemID, request)
+	item, err := h.warehouseUC.UpdateItem(c.UserContext(), userID, itemID, request)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondWarehouseError(c, err)
 	}
 
@@ -104,7 +116,10 @@ func (h *WarehouseAPIHandler) HandleDeleteItem(c *fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.warehouseUC.DeleteItem(c.Context(), userID, itemID); err != nil {
+	if err := h.warehouseUC.DeleteItem(c.UserContext(), userID, itemID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondWarehouseError(c, err)
 	}
 
@@ -130,8 +145,11 @@ func (h *WarehouseAPIHandler) HandleUpdateMovement(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	item, err := h.warehouseUC.UpdateMovement(c.Context(), userID, itemID, movementID, request)
+	item, err := h.warehouseUC.UpdateMovement(c.UserContext(), userID, itemID, movementID, request)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondWarehouseError(c, err)
 	}
 
@@ -144,7 +162,10 @@ func (h *WarehouseAPIHandler) HandleDeleteMovement(c *fiber.Ctx) error {
 		return err
 	}
 
-	if _, err := h.warehouseUC.DeleteMovement(c.Context(), userID, itemID, movementID); err != nil {
+	if _, err := h.warehouseUC.DeleteMovement(c.UserContext(), userID, itemID, movementID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondWarehouseError(c, err)
 	}
 
@@ -164,11 +185,14 @@ func (h *WarehouseAPIHandler) handleMovement(c *fiber.Ctx, isAdd bool) error {
 
 	var item *dto.WarehouseItem
 	if isAdd {
-		item, err = h.warehouseUC.AddItems(c.Context(), userID, itemID, request)
+		item, err = h.warehouseUC.AddItems(c.UserContext(), userID, itemID, request)
 	} else {
-		item, err = h.warehouseUC.WriteOffItems(c.Context(), userID, itemID, request)
+		item, err = h.warehouseUC.WriteOffItems(c.UserContext(), userID, itemID, request)
 	}
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return h.respondWarehouseError(c, err)
 	}
 

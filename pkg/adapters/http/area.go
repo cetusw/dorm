@@ -22,11 +22,11 @@ func NewAreaAPIHandler(dormitoryUC ports.DormitoryUseCase, taskUC ports.TaskCata
 
 func (h *AreaAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/areas", auth)
-	api.Get("", h.HandleGetAreas)
-	api.Get("/:id", h.HandleGetArea)
-	api.Post("", h.HandleCreateArea)
-	api.Put("/:id", h.HandleUpdateArea)
-	api.Delete("/:id", h.HandleDeleteArea)
+	api.Get("", apiDeadline, h.HandleGetAreas)
+	api.Get("/:id", apiDeadline, h.HandleGetArea)
+	api.Post("", apiDeadline, h.HandleCreateArea)
+	api.Put("/:id", apiDeadline, h.HandleUpdateArea)
+	api.Delete("/:id", apiDeadline, h.HandleDeleteArea)
 }
 
 func (h *AreaAPIHandler) HandleGetAreas(c *fiber.Ctx) error {
@@ -39,8 +39,11 @@ func (h *AreaAPIHandler) HandleGetAreas(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор общежития"))
 	}
 
-	response, err := h.taskUC.GetAreasResponse(c.Context(), dormitoryID)
+	response, err := h.taskUC.GetAreasResponse(c.UserContext(), dormitoryID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -57,8 +60,11 @@ func (h *AreaAPIHandler) HandleGetArea(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор территории"))
 	}
 
-	area, err := h.taskUC.GetAreaDetails(c.Context(), areaID)
+	area, err := h.taskUC.GetAreaDetails(c.UserContext(), areaID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 	if area == nil {
@@ -83,8 +89,11 @@ func (h *AreaAPIHandler) HandleCreateArea(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	area, err := h.taskUC.CreateArea(c.Context(), dormitoryID, req)
+	area, err := h.taskUC.CreateArea(c.UserContext(), dormitoryID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -111,8 +120,11 @@ func (h *AreaAPIHandler) HandleUpdateArea(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	area, err := h.taskUC.UpdateArea(c.Context(), dormitoryID, areaID, req)
+	area, err := h.taskUC.UpdateArea(c.UserContext(), dormitoryID, areaID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 	if area == nil {
@@ -137,7 +149,10 @@ func (h *AreaAPIHandler) HandleDeleteArea(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор территории"))
 	}
 
-	if err := h.taskUC.DeleteArea(c.Context(), dormitoryID, areaID); err != nil {
+	if err := h.taskUC.DeleteArea(c.UserContext(), dormitoryID, areaID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -150,8 +165,11 @@ func (h *AreaAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	canManage, err := h.dormitoryUC.CanManageDormitories(c.Context(), userID)
+	canManage, err := h.dormitoryUC.CanManageDormitories(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
 	}
 	if !canManage {

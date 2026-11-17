@@ -22,12 +22,12 @@ func NewTeamAPIHandler(dormitoryUC ports.DormitoryUseCase, teamUC ports.TeamUseC
 
 func (h *TeamAPIHandler) RegisterRoutes(app *fiber.App, auth fiber.Handler) {
 	api := app.Group("/api/v1/teams", auth)
-	api.Get("", h.HandleGetTeams)
-	api.Get("/members", h.HandleGetTeamMemberOptions)
-	api.Get("/:id", h.HandleGetTeam)
-	api.Post("", h.HandleCreateTeam)
-	api.Put("/:id", h.HandleUpdateTeam)
-	api.Delete("/:id", h.HandleDeleteTeam)
+	api.Get("", apiDeadline, h.HandleGetTeams)
+	api.Get("/members", apiDeadline, h.HandleGetTeamMemberOptions)
+	api.Get("/:id", apiDeadline, h.HandleGetTeam)
+	api.Post("", apiDeadline, h.HandleCreateTeam)
+	api.Put("/:id", apiDeadline, h.HandleUpdateTeam)
+	api.Delete("/:id", apiDeadline, h.HandleDeleteTeam)
 }
 
 func (h *TeamAPIHandler) HandleGetTeams(c *fiber.Ctx) error {
@@ -40,8 +40,11 @@ func (h *TeamAPIHandler) HandleGetTeams(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор группы"))
 	}
 
-	response, err := h.teamUC.GetTeamsResponseByGroup(c.Context(), groupID)
+	response, err := h.teamUC.GetTeamsResponseByGroup(c.UserContext(), groupID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -63,8 +66,11 @@ func (h *TeamAPIHandler) HandleGetTeamMemberOptions(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	response, err := h.teamUC.GetTeamMemberOptionsResponse(c.Context(), groupID, teamID)
+	response, err := h.teamUC.GetTeamMemberOptionsResponse(c.UserContext(), groupID, teamID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -81,8 +87,11 @@ func (h *TeamAPIHandler) HandleGetTeam(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	team, err := h.teamUC.GetTeamDetails(c.Context(), teamID)
+	team, err := h.teamUC.GetTeamDetails(c.UserContext(), teamID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 	if team == nil {
@@ -102,8 +111,11 @@ func (h *TeamAPIHandler) HandleCreateTeam(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	team, err := h.teamUC.CreateResidentTeam(c.Context(), req)
+	team, err := h.teamUC.CreateResidentTeam(c.UserContext(), req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -125,8 +137,11 @@ func (h *TeamAPIHandler) HandleUpdateTeam(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
-	team, err := h.teamUC.UpdateResidentTeam(c.Context(), teamID, req)
+	team, err := h.teamUC.UpdateResidentTeam(c.UserContext(), teamID, req)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 	if team == nil {
@@ -146,7 +161,10 @@ func (h *TeamAPIHandler) HandleDeleteTeam(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный идентификатор команды"))
 	}
 
-	if err := h.teamUC.DeleteTeam(c.Context(), teamID); err != nil {
+	if err := h.teamUC.DeleteTeam(c.UserContext(), teamID); err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse(err.Error()))
 	}
 
@@ -159,8 +177,11 @@ func (h *TeamAPIHandler) requireDormitoryManagementAccess(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 
-	canManage, err := h.dormitoryUC.CanManageDormitories(c.Context(), userID)
+	canManage, err := h.dormitoryUC.CanManageDormitories(c.UserContext(), userID)
 	if err != nil {
+		if isInfrastructureError(err) {
+			return err
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось проверить доступ"))
 	}
 	if !canManage {
