@@ -5,13 +5,35 @@ umask 077
 ROOT=${1:?Missing deployment directory}
 ACTION=${2:?Missing action}
 NEW=${3:-}
+PREPARE=${4:-}
+WRITERS_CONFIRMED=${5:-}
+[[ $# -le 5 ]] || exit 1
+[[ -z "$PREPARE" || ( "$ACTION" == deploy && "$PREPARE" == --prepare-auth && "$WRITERS_CONFIRMED" == --confirm-exclusive-db-writers ) ]] || { echo 'Invalid authentication preparation arguments' >&2; exit 1; }
 [[ "$ROOT" =~ ^/[a-zA-Z0-9_./-]+$ && "$ROOT" != / ]] || { echo 'Invalid deployment directory' >&2; exit 1; }
-for command in docker flock gzip mktemp timeout curl find sha256sum cmp stat ln; do command -v "$command" >/dev/null; done
+for command in docker flock gzip mktemp timeout curl find sha256sum cmp stat ln sync; do command -v "$command" >/dev/null; done
 mkdir -p "$ROOT/backups" "$ROOT/releases"
 exec 9>"$ROOT/.deployment.lock"
 flock -n 9 || { echo 'Another deployment, backup or rollback is running' >&2; exit 1; }
-TEMP=''; ASSET_STAGE=''; ASSET_CONTAINER=''
+HAD_DEPLOYMENT=0
+for evidence in release-state active .env docker-compose.yml assets.override.yml shared mysql; do
+  [[ ! -e "$ROOT/$evidence" && ! -L "$ROOT/$evidence" ]] || HAD_DEPLOYMENT=1
+done
+for evidence in "$ROOT"/releases/*; do
+  [[ ! -e "$evidence" || ( "$ACTION" == deploy && "$evidence" == "$ROOT/releases/${NEW#dorm-app:}" && ! -e "$evidence/loaded" && ! -e "$evidence/legacy" ) ]] || HAD_DEPLOYMENT=1
+done
+for evidence in "$ROOT"/backups/* "$ROOT"/backups/.dump.*; do
+  [[ ! -e "$evidence" && ! -L "$evidence" ]] || HAD_DEPLOYMENT=1
+done
+TEMP=''; ASSET_STAGE=''; ASSET_CONTAINER=''; BACKUP_PID=''
+SECURITY_BOUNDARY_CROSSED=0
 cleanup() {
+  if [[ -n "${BACKUP_PID:-}" ]]; then
+    if ! kill -KILL -- "-$BACKUP_PID" 2>/dev/null; then
+      kill -KILL "$BACKUP_PID" 2>/dev/null || :
+    fi
+    wait "$BACKUP_PID" 2>/dev/null || :
+    BACKUP_PID=''
+  fi
   [[ -z "$TEMP" ]] || rm -f -- "$TEMP"
   if [[ -n "$ASSET_CONTAINER" ]]; then
     if timeout 15 docker rm -f "$ASSET_CONTAINER" >/dev/null; then ASSET_CONTAINER='';
@@ -24,47 +46,110 @@ cleanup() {
   return 0
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 fail() { echo "$*" >&2; return 1; }
 mysql_query() {
   timeout 30 docker exec -i dorm-db sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --batch --skip-column-names "$MYSQL_DATABASE"' <<< "$1"
 }
 check_db() {
-  [[ $(docker inspect -f '{{.State.Running}}' dorm-db) == true ]] || fail 'MySQL container is not running'
-  [[ $(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' dorm-db) == dorm ]] || fail 'Unexpected MySQL Compose project; refusing to select another volume'
+  [[ $(docker inspect -f '{{.State.Running}}' dorm-db) == true ]] || { fail 'MySQL container is not running'; return 1; }
+  [[ $(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' dorm-db) == dorm ]] || { fail 'Unexpected MySQL Compose project; refusing to select another volume'; return 1; }
   [[ $(mysql_query 'SELECT 1;') == 1 ]] || fail 'MySQL is unavailable'
 }
 create_backup() {
-  check_db
-  local size available usage name target
-  size=$(mysql_query 'SELECT COALESCE(SUM(data_length + index_length),0) FROM information_schema.tables WHERE table_schema=DATABASE();')
-  [[ "$size" =~ ^[0-9]+$ ]] || fail 'Cannot estimate database size'
-  read -r available usage < <(df -Pk "$ROOT/backups" | awk 'END {gsub(/%/, "", $5); printf "%.0f %s\n", $4*1024, $5}')
-  (( available >= size * 2 + 67108864 )) || fail 'Insufficient backup disk space (requires twice the estimated DB size plus 64 MiB)'
+  check_db || return 1
+  local kind=${1:-preliminary} size available usage name target dump_command
+  [[ "$kind" == preliminary || "$kind" == final ]] || { fail 'Invalid backup kind'; return 1; }
+  size=$(mysql_query 'SELECT COALESCE(SUM(data_length + index_length),0) FROM information_schema.tables WHERE table_schema=DATABASE();') || return 1
+  [[ "$size" =~ ^[0-9]+$ ]] || { fail 'Cannot estimate database size'; return 1; }
+  read -r available usage < <(df -Pk "$ROOT/backups" | awk 'END {gsub(/%/, "", $5); printf "%.0f %s\n", $4*1024, $5}') || return 1
+  [[ "$available" =~ ^[0-9]+$ && "$usage" =~ ^[0-9]+$ ]] || { fail 'Cannot measure backup disk space'; return 1; }
+  (( available >= size * 2 + 67108864 )) || { fail 'Insufficient backup disk space (twice estimated DB size plus 64 MiB required)'; return 1; }
   (( usage < 85 )) || echo "WARNING: backup filesystem is ${usage}% full; retention is manual" >&2
-  name="dorm-backup-$(date -u +%Y%m%d-%H%M%S).sql.gz"
+  TEMP=$(mktemp "$ROOT/backups/.dump.XXXXXX") || return 1
+  name="dorm-backup-$(date -u +%Y%m%d-%H%M%S)-$kind-${TEMP##*.}.sql.gz"
   target="$ROOT/backups/$name"
-  [[ ! -e "$target" ]] || fail "Backup already exists: $target"
-  TEMP=$(mktemp "$ROOT/backups/.dump.XXXXXX")
-  timeout 1800 docker exec dorm-db sh -c '
+  dump_command='
     export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
     exec mysqldump -uroot --single-transaction --quick --no-tablespaces \
       --set-gtid-purged=OFF --default-character-set=utf8mb4 --hex-blob \
       --routines --events --triggers --databases "$MYSQL_DATABASE"
-  ' | gzip > "$TEMP"
-  [[ -s "$TEMP" ]] && gzip -t "$TEMP"
-  gzip -dc "$TEMP" | LC_ALL=C grep -a -E '^CREATE (DATABASE|TABLE)' >/dev/null
-  mv -n -- "$TEMP" "$target"
-  [[ ! -e "$TEMP" ]] || fail "Refusing to overwrite backup: $target"
+  '
+  timeout --kill-after=10 1800 bash -c '
+    set -o pipefail
+    if docker exec dorm-db sh -c "$2" | gzip > "$1"; then
+      exit 0
+    else
+      pipeline_status=("${PIPESTATUS[@]}")
+      printf "Backup pipeline failed: mysqldump=%s gzip=%s\n" "${pipeline_status[0]}" "${pipeline_status[1]}" >&2
+      exit 1
+    fi
+  ' bash "$TEMP" "$dump_command" &
+  BACKUP_PID=$!
+  if wait "$BACKUP_PID"; then
+    BACKUP_PID=''
+  else
+    BACKUP_PID=''
+    fail 'Backup command failed or timed out; no migrations may follow'
+    return 1
+  fi
+  [[ -s "$TEMP" ]] && gzip -t "$TEMP" || { fail 'Backup gzip integrity check failed'; return 1; }
+  gzip -dc "$TEMP" | LC_ALL=C grep -a -E '^CREATE (DATABASE|TABLE)' >/dev/null || { fail 'Backup contains no readable schema'; return 1; }
+  sync -f "$TEMP" || return 1
+  ln -T -- "$TEMP" "$target" || { fail "Refusing to overwrite backup: $target"; return 1; }
+  sync -f "$ROOT/backups" || return 1
+  rm -- "$TEMP" || return 1
   TEMP=''
   BACKUP=$target
-  echo "Backup saved: $BACKUP" >&2
+  echo "Verified $kind backup saved: $BACKUP" >&2
+}
+verify_no_writers() {
+  local running network attached events state transactions
+  [[ "$WRITERS_CONFIRMED" == --confirm-exclusive-db-writers ]] || {
+    fail 'Maintenance requires --confirm-exclusive-db-writers: administrator must disable external jobs, scripts, direct DB writes and container starters for the entire maintenance window'; return 1;
+  }
+  state=$(container_state) || return 1
+  if [[ "$state" == present ]]; then
+    [[ $(timeout 5 docker inspect --format '{{.State.Running}} {{.State.ExitCode}} {{.State.OOMKilled}}' dorm-app) == 'false 0 false' ]] || {
+      fail 'Backend shutdown was not clean; HTTP/jobs completion is unconfirmed. Inspect logs before retrying maintenance'; return 1;
+    }
+  fi
+  running=$(timeout 10 docker ps --filter label=com.docker.compose.project=dorm --format '{{.Names}}') || return 1
+  while IFS= read -r state; do
+    [[ -z "$state" || "$state" == dorm-db ]] || { fail "Active Compose writer candidate: $state"; return 1; }
+  done <<< "$running"
+  attached=$(timeout 10 docker inspect --format '{{range $name, $settings := .NetworkSettings.Networks}}{{println $name}}{{end}}' dorm-db) || return 1
+  while IFS= read -r network; do
+    [[ -n "$network" ]] || continue
+    running=$(timeout 10 docker ps --filter "network=$network" --format '{{.Names}}') || return 1
+    while IFS= read -r state; do
+      [[ -z "$state" || "$state" == dorm-db ]] || { fail "Other container can access the production DB network: $state"; return 1; }
+    done <<< "$running"
+  done <<< "$attached"
+  events=$(mysql_query "SELECT COUNT(*) FROM information_schema.events WHERE status='ENABLED' AND @@GLOBAL.event_scheduler='ON';") || return 1
+  [[ "$events" == 0 ]] || { fail 'Enabled MySQL Events may write during maintenance; disable and verify their completion manually'; return 1; }
+  events=$(mysql_query 'SELECT @@performance_schema;') || return 1
+  case "$events" in
+    1)
+      events=$(mysql_query "SELECT COUNT(*) FROM performance_schema.threads WHERE name='thread/sql/event_worker';") || return 1
+      [[ "$events" == 0 ]] || { fail 'Previously started MySQL Events are still running; reviewed completion is required'; return 1; }
+      ;;
+    0)
+      [[ $(mysql_query 'SELECT @@GLOBAL.event_scheduler;') == DISABLED ]] || { fail 'Cannot verify Event workers with performance_schema disabled and Event Scheduler not permanently disabled'; return 1; }
+      ;;
+    *) fail 'Cannot establish MySQL Event instrumentation state'; return 1 ;;
+  esac
+  transactions=$(mysql_query 'SELECT COUNT(*) FROM information_schema.innodb_trx;') || return 1
+  [[ "$transactions" == 0 ]] || { fail 'MySQL still has active InnoDB transactions; wait for reviewed completion before final backup'; return 1; }
 }
 if [[ "$ACTION" == backup ]]; then
   create_backup
   printf '%s\n' "$BACKUP"
   exit 0
 fi
-[[ "$ACTION" == deploy || "$ACTION" == rollback ]] || fail 'Unknown release action'
+[[ "$ACTION" == deploy || "$ACTION" == rollback || "$ACTION" == migrate-passwords || "$ACTION" == activate-auth ]] || fail 'Unknown release action'
 CONFIRM_SCHEMA=0
 if [[ "$ACTION" == rollback ]]; then
   case "$NEW" in
@@ -302,8 +387,47 @@ check_identity() {
     fail "Image identity mismatch for $image: expected=$expected actual=$actual tag_now=$tagged"; return 1;
   }
 }
+auth_activated() {
+  local marker="$ROOT/.auth-v2-activated"
+  if [[ ! -e "$marker" && ! -L "$marker" ]]; then return 1; fi
+  [[ -f "$marker" && ! -L "$marker" && -O "$marker" && $(stat -c '%a %h %s' "$marker") == '600 1 8' && $(cat "$marker") == auth-v2 ]] || { fail 'Corrupt authentication activation marker; audited recovery required'; return 2; }
+}
+activate_auth_boundary() {
+  if auth_activated; then return 0; else [[ $? == 1 ]] || return 1; fi
+  TEMP=$(mktemp "$ROOT/.auth-v2.XXXXXX") || return 1
+  printf 'auth-v2\n' > "$TEMP" || return 1
+  sync -f "$TEMP" || return 1
+  ln -T -- "$TEMP" "$ROOT/.auth-v2-activated" || return 1
+  rm "$TEMP" || return 1
+  TEMP=''
+  sync -f "$ROOT"
+}
+require_auth_ready() {
+  local image=$1 mode=${2:-start} capability activated=0 objects
+  if auth_activated; then activated=1; else [[ $? == 1 ]] || return 1; fi
+  capability=$(timeout 10 docker image inspect --format '{{index .Config.Labels "org.dorm.auth-v2"}}' "$image") || return 1
+  if [[ "$activated" == 1 || "$mode" == preflight ]]; then
+    [[ "$capability" == true ]] || { fail 'Image does not support Argon2id and server-side v2 sessions'; return 1; }
+  fi
+  schema >/dev/null || return 1
+  if [[ "$mode" == preflight ]]; then return 0; fi
+  if [[ "$activated" == 0 ]]; then
+    [[ -n "$CURRENT" && "$CURRENT_SCHEMA" =~ ^[0-9]+$ && "$CURRENT_SCHEMA" -lt 1795059644 ]] || { fail 'Missing activation marker with unknown or post-transition deployment history; audited recovery required'; return 1; }
+    objects=$(mysql_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='auth_session';") || return 1
+    [[ "$objects" == 0 && "$IRREVERSIBLE_STARTED" == 0 ]] || { fail 'Activation marker missing after possible security transition; audited recovery required'; return 1; }
+    [[ "$capability" != true ]] || { fail 'Prepare authentication before starting the new backend'; return 1; }
+    objects=$(mysql_query "SELECT COUNT(*) FROM user WHERE deleted_at IS NULL AND password_hash NOT REGEXP '^[0-9a-fA-F]{64}$';") || return 1
+    [[ "$objects" == 0 ]] || { fail 'Old backend is incompatible with stored credentials'; return 1; }
+    return 0
+  fi
+  mysql_query 'SELECT id,user_id,created_at,expires_at,revoked_at FROM auth_session LIMIT 0;' >/dev/null || return 1
+  objects=$(mysql_query "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='user' AND index_name='uq_active_user_login' AND non_unique=0;") || return 1
+  [[ "$objects" == 1 ]] || { fail 'Active login uniqueness is missing; forward recovery required'; return 1; }
+  compose "$image" run --rm -T --no-deps app ./dorm-password-migration check </dev/null || { fail 'Credentials are not ready; leave the backend stopped and recover forward'; return 1; }
+}
 select_release() {
   local image=$1 file
+  require_auth_ready "$image" || return 1
   release_config "$image" || return 1
   rm -f "$ROOT/.active.tmp" || return 1
   ln -s "releases/${image#dorm-app:}" "$ROOT/.active.tmp" || return 1
@@ -330,7 +454,8 @@ report_state() {
   if live=$(schema); then echo "Database schema: $live (clean)" >&2
   else echo 'Database schema: dirty or unreadable' >&2; fi
   echo "Attempt: ${NEW:-none}; database backup: ${BACKUP:-not created}" >&2
-  echo 'No database rollback was performed.' >&2
+  echo "Preliminary backup: ${PRELIMINARY_BACKUP:-not confirmed}; final backup: ${FINAL_BACKUP:-not confirmed}; irreversible boundary started: ${IRREVERSIBLE_STARTED:-unknown}" >&2
+  echo 'No database rollback was performed.'  >&2
 }
 state_value() {
   awk -v key="$1" 'index($0,key "=")==1 { count++; value=substr($0,length(key)+2) } END { if(count!=1) exit 1; print value }' "$ROOT/release-state" || {
@@ -355,7 +480,7 @@ read_confirmed_state() {
   CURRENT=$current; CURRENT_SCHEMA=$current_schema
   PREVIOUS=$previous; PREVIOUS_SCHEMA=$previous_schema
 }
-CURRENT=''; CURRENT_SCHEMA=''; PREVIOUS=''; PREVIOUS_SCHEMA=''; BACKUP=''; STAGE=prepare; SWITCH_STARTED=0; WORKING_SET=0
+CURRENT=''; CURRENT_SCHEMA=''; PREVIOUS=''; PREVIOUS_SCHEMA=''; BACKUP=''; PRELIMINARY_BACKUP=''; FINAL_BACKUP=''; IRREVERSIBLE_STARTED=0; STAGE=prepare; SWITCH_STARTED=0; WORKING_SET=0
 if [[ -e "$ROOT/release-state" || -L "$ROOT/release-state" ]]; then
   [[ -f "$ROOT/release-state" && ! -L "$ROOT/release-state" && -r "$ROOT/release-state" ]] || { fail 'release-state is not a readable regular file'; exit 1; }
   read_confirmed_state || { report_state; exit 1; }
@@ -363,15 +488,27 @@ if [[ -e "$ROOT/release-state" || -L "$ROOT/release-state" ]]; then
     value=$(state_value "$field") || { report_state; exit 1; }
     if [[ "$field" == backup ]]; then BACKUP=$value; fi
   done
+  for field in preliminary_backup final_backup irreversible_started; do
+    if [[ $(awk -F= -v key="$field" '$1==key {n++} END{print n+0}' "$ROOT/release-state") != 0 ]]; then
+      value=$(state_value "$field") || exit 1
+      case "$field" in
+        preliminary_backup) PRELIMINARY_BACKUP=$value ;;
+        final_backup) FINAL_BACKUP=$value ;;
+        irreversible_started) [[ "$value" == 0 || "$value" == 1 ]] || exit 1; IRREVERSIBLE_STARTED=$value ;;
+      esac
+    fi
+  done
 fi
 write_state() {
   local status=$1 temporary
   temporary=$(mktemp "$ROOT/.state.XXXXXX") || return 1
-  if ! printf 'current=%s\ncurrent_schema=%s\nprevious=%s\nprevious_schema=%s\nattempt=%s\nresult=%s\nbackup=%s\n' \
-    "$CURRENT" "$CURRENT_SCHEMA" "$PREVIOUS" "$PREVIOUS_SCHEMA" "$NEW" "$status" "$BACKUP" > "$temporary"; then
+  if ! printf 'current=%s\ncurrent_schema=%s\nprevious=%s\nprevious_schema=%s\nattempt=%s\nresult=%s\nbackup=%s\npreliminary_backup=%s\nfinal_backup=%s\nirreversible_started=%s\n' \
+    "$CURRENT" "$CURRENT_SCHEMA" "$PREVIOUS" "$PREVIOUS_SCHEMA" "$NEW" "$status" "$BACKUP" "$PRELIMINARY_BACKUP" "$FINAL_BACKUP" "$IRREVERSIBLE_STARTED" > "$temporary"; then
     rm -f "$temporary"; return 1
   fi
+  if ! sync -f "$temporary"; then rm -f "$temporary"; return 1; fi
   if ! mv "$temporary" "$ROOT/release-state"; then rm -f "$temporary"; return 1; fi
+  sync -f "$ROOT" || return 1
 }
 check_release() {
   local image=$1 mount_check=${2:-required} end=$((SECONDS+120)) health html assets asset headers expected actual
@@ -424,6 +561,7 @@ check_release() {
 # Recovery may repair only configuration: do not restart a healthy confirmed container.
 restore_current() {
   local expected actual live
+  require_auth_ready "$CURRENT" || return 1
   expected=$(image_id "$CURRENT") || return 1
   release_config "$CURRENT" || return 1
   recovery_selection >/dev/null || return 1
@@ -454,6 +592,9 @@ on_failure() {
   set +e
   cleanup
   echo "Release operation failed during $STAGE" >&2
+  if [[ "$STAGE" == auth_migration ]]; then
+    echo 'DDL may still be running. Inspect schema_migrations and actual schema; no automatic force/down/restore or old backend restart is permitted.' >&2
+  fi
   timeout 15 docker logs --tail 100 dorm-app >&2
   if [[ "$STAGE" == confirm ]]; then
     echo "Candidate $NEW passed check_release before confirmation was attempted." >&2
@@ -478,8 +619,14 @@ on_failure() {
     CURRENT=$WORKING_CURRENT; CURRENT_SCHEMA=$WORKING_SCHEMA
     PREVIOUS=$WORKING_PREVIOUS; PREVIOUS_SCHEMA=$WORKING_PREVIOUS_SCHEMA
   fi
+  if [[ -n "$PREPARE" || "$ACTION" == migrate-passwords || "$ACTION" == activate-auth ]]; then
+    echo 'Credential maintenance failed: backup retained. Verify schema and run the local password migration and readiness check, then deploy a compatible image. The old backend is not restarted automatically.' >&2
+  fi
   local status="failed_$STAGE" live
-  if [[ "$SWITCH_STARTED" == 1 && -n "$CURRENT" && ( "$STAGE" == switch || "$STAGE" == verify ) ]]; then
+  if [[ "$SECURITY_BOUNDARY_CROSSED" == 1 ]]; then
+    echo 'Authentication security boundary crossed: only audited forward recovery is allowed; external marker retained.' >&2
+  fi
+  if [[ "$SECURITY_BOUNDARY_CROSSED" == 0 && "$SWITCH_STARTED" == 1 && -n "$CURRENT" && ( "$STAGE" == switch || "$STAGE" == verify ) ]]; then
     if live=$(schema) && [[ "$live" == "${BEFORE:-unavailable}" && "$live" == "$CURRENT_SCHEMA" ]]; then
       echo "Schema unchanged; recovering $CURRENT" >&2
       if restore_current; then status=rolled_back
@@ -500,6 +647,73 @@ trap on_failure ERR
 trap 'on_failure 130' INT
 trap 'on_failure 143' TERM
 trap 'on_failure 129' HUP
+finish_release() {
+  AFTER=$(schema)
+  echo "Schema before=$BEFORE after=$AFTER"
+  STAGE=switch
+  release_config "$NEW"
+  image_id "$NEW" >/dev/null
+  SWITCH_STARTED=1
+  select_release "$NEW"
+  compose "$NEW" up -d --no-deps --force-recreate app
+  STAGE=verify
+  check_release "$NEW"
+  STAGE=confirm
+  PREVIOUS=$CURRENT; PREVIOUS_SCHEMA=$CURRENT_SCHEMA
+  CURRENT=$NEW; CURRENT_SCHEMA=$AFTER
+  write_state success
+  echo "Deployment completed successfully: $CURRENT"
+  echo "Previous release: ${PREVIOUS:-none}"
+  echo "Database backup: $BACKUP"
+  echo 'Images and backups retained; no pruning or volume deletion performed.'
+}
+if [[ "$ACTION" == migrate-passwords || "$ACTION" == activate-auth ]]; then
+  NEW=$(state_value attempt)
+  valid_image "$NEW" || fail 'Invalid prepared release'
+  release_config "$NEW"
+  check_db
+  require_auth_ready "$NEW" preflight
+  image_id "$NEW" >/dev/null
+  [[ -n "$FINAL_BACKUP" && -f "$FINAL_BACKUP" && "$FINAL_BACKUP" == "$ROOT/backups/"* ]] || fail 'Verified final backup is missing'
+  gzip -t "$FINAL_BACKUP"
+  WRITERS_CONFIRMED=--confirm-exclusive-db-writers
+  if [[ "$ACTION" == migrate-passwords ]]; then
+    verify_no_writers
+    [[ "$NEW" != "$CURRENT" ]] || fail 'Cannot migrate a confirmed running release'
+    result=$(state_value result)
+    [[ "$result" == auth_prepared || "$result" == auth_ready || "$result" == failed_passwords || "$result" == failed_auth_migration || "$result" == failed_auth_boundary || "$result" == crossing_auth_boundary || "$result" == auth_migrations_started ]] || fail 'No prepared authentication transition; inspect release state before recovery'
+    STAGE=passwords
+    compose "$NEW" run --rm -T --no-deps app ./dorm-password-migration dry-run < "/proc/$$/fd/0"
+    if [[ "${3:-}" == --dry-run ]]; then exit 0; fi
+    [[ -z "${3:-}" ]] || fail 'Unknown password migration argument'
+    verify_no_writers
+    STAGE=auth_boundary
+    IRREVERSIBLE_STARTED=1
+    write_state crossing_auth_boundary
+    SECURITY_BOUNDARY_CROSSED=1
+    activate_auth_boundary
+    STAGE=auth_migration
+    write_state auth_migrations_started
+    compose --timeout 900 "$NEW" run --rm -T --no-deps migrate ./dorm-migrate up </dev/null
+    STAGE=passwords
+    compose "$NEW" run --rm -T --no-deps app ./dorm-password-migration apply < "/proc/$$/fd/0"
+    compose "$NEW" run --rm -T --no-deps app ./dorm-password-migration check </dev/null
+    write_state auth_ready
+    echo "Passwords are ready; backend remains stopped. Run: bash bin/release.sh '$ROOT' activate-auth"
+    exit 0
+  fi
+  [[ $(state_value result) == auth_ready || $(state_value result) == failed_switch || $(state_value result) == failed_verify ]] || fail 'Password migration has not completed; recover forward'
+  SECURITY_BOUNDARY_CROSSED=1
+  if [[ $(container_state) == present && $(timeout 5 docker inspect --format '{{.State.Running}}' dorm-app) == true ]]; then
+    check_identity "$NEW" "$(image_id "$NEW")"
+  else
+    verify_no_writers
+  fi
+  require_auth_ready "$NEW"
+  BEFORE=$(schema)
+  finish_release
+  exit 0
+fi
 if [[ "$ACTION" == rollback ]]; then
   [[ -n "$CURRENT" ]] || { fail 'No confirmed CURRENT; refusing to guess a rollback target'; report_state; exit 1; }
   check_db
@@ -515,6 +729,7 @@ if [[ "$ACTION" == rollback ]]; then
   fi
   [[ -n "$TARGET" ]] || fail 'No previous working release recorded'
   NEW=$TARGET
+  require_auth_ready "$TARGET"
   image_id "$TARGET" >/dev/null
   release_config "$TARGET"
   if [[ "$LIVE" != "$TARGET_SCHEMA" ]]; then
@@ -553,9 +768,9 @@ if [[ "$ACTION" == rollback ]]; then
 fi
 # An existing deployment must be readable before any backup/migration/switch.
 if [[ -n "$CURRENT" ]]; then
-  selected_release >/dev/null
+  recovery_selection >/dev/null
   image_id "$CURRENT" >/dev/null
-  container_image >/dev/null
+  recovery_container_image >/dev/null
 fi
 check_image_storage() {
   local archive=$1 size available docker_root endpoint
@@ -600,10 +815,15 @@ done
 check_db
 DB_NAME=$(timeout 10 docker exec dorm-db sh -c 'printf "%s" "$MYSQL_DATABASE"')
 compose "$NEW" run --rm -T --no-deps migrate sh -c 'test "$DB_HOST" = db && test "$DB_PORT" = 3306 && test "$DB_NAME" = "$1"' sh "$DB_NAME" </dev/null
+STAGE=security_preflight
+require_auth_ready "$NEW" preflight
+STAGE=config
+compose "$NEW" run --rm -T --no-deps app ./dorm --check-config </dev/null
 STAGE=backup
-BACKUP=''
+BACKUP=''; PRELIMINARY_BACKUP=''; FINAL_BACKUP=''
 write_state creating_backup
-create_backup
+create_backup preliminary
+PRELIMINARY_BACKUP=$BACKUP
 write_state backed_up
 STAGE=schema
 BEFORE=$(schema)
@@ -644,7 +864,45 @@ compose "$NEW" config --quiet
 write_state backed_up
 WORKING_CURRENT=$CURRENT; WORKING_SCHEMA=$CURRENT_SCHEMA
 WORKING_PREVIOUS=$PREVIOUS; WORKING_PREVIOUS_SCHEMA=$PREVIOUS_SCHEMA; WORKING_SET=1
+STAGE=credentials_preflight
+if [[ -n "$PREPARE" ]]; then
+  if auth_activated; then fail 'Authentication already activated; use normal deploy or audited forward recovery'; else [[ $? == 1 ]] || exit 1; fi
+  [[ "$WRITERS_CONFIRMED" == --confirm-exclusive-db-writers ]] || fail 'Exclusive writers confirmation is required'
+  echo '--prepare-auth confirms the administrator has verified this is the original SHA-256 installation, not an unknown restored installation.' >&2
+  [[ "$IRREVERSIBLE_STARTED" == 0 ]] || fail 'Earlier transition may have started without marker; audit history before recovery'
+  objects=$(mysql_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='auth_session';")
+  [[ "$objects" == 0 ]] || fail 'Session schema exists without activation marker; audited forward recovery required'
+  (( BEFORE < 1795059644 )) || fail 'Schema indicates an earlier transition; missing marker requires manual audit'
+  STAGE=maintenance
+  if [[ $(container_state) == present ]]; then
+    container_image >/dev/null
+    compose "$NEW" stop app
+  fi
+  STAGE=writers
+  verify_no_writers
+  STAGE=final_backup
+  write_state creating_final_backup
+  create_backup final
+  FINAL_BACKUP=$BACKUP
+  verify_no_writers
+  write_state auth_prepared
+  echo "Prepared $NEW; backend remains stopped. Run bin/migrate-passwords.sh locally, then bash bin/release.sh '$ROOT' activate-auth." >&2
+  exit 0
+fi
+if auth_activated; then
+  require_auth_ready "$NEW"
+else
+  [[ $? == 1 ]] || fail 'Invalid activation marker'
+  tables=$(mysql_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name<>'schema_migrations';")
+  [[ "$HAD_DEPLOYMENT" == 0 && "$tables" == 0 && $(container_state) == absent ]] || fail 'Existing installation requires --prepare-auth and local password migration; missing marker does not establish transition history'
+  SECURITY_BOUNDARY_CROSSED=1
+  IRREVERSIBLE_STARTED=1
+  write_state crossing_auth_boundary
+  activate_auth_boundary
+fi
 STAGE=migration
+IRREVERSIBLE_STARTED=1
+write_state migrations_started
 # A failed migration may leave dirty DDL; never run force, down or restore.
 if compose --timeout 900 "$NEW" run --rm -T --no-deps migrate ./dorm-migrate up </dev/null; then
   :
@@ -656,21 +914,6 @@ else
   echo 'No retry/down/force/restore was performed; the backup is retained.' >&2
   on_failure "$migration_code"
 fi
-AFTER=$(schema)
-echo "Schema before=$BEFORE after=$AFTER"
-STAGE=switch
-release_config "$NEW"
-image_id "$NEW" >/dev/null
-SWITCH_STARTED=1
-select_release "$NEW"
-compose "$NEW" up -d --no-deps --force-recreate app
-STAGE=verify
-check_release "$NEW"
-STAGE=confirm
-PREVIOUS=$CURRENT; PREVIOUS_SCHEMA=$CURRENT_SCHEMA
-CURRENT=$NEW; CURRENT_SCHEMA=$AFTER
-write_state success
-echo "Deployment completed successfully: $CURRENT"
-echo "Previous release: ${PREVIOUS:-none}"
-echo "Database backup: $BACKUP"
-echo 'Images and backups retained; no pruning or volume deletion performed.'
+STAGE=credentials
+compose "$NEW" run --rm -T --no-deps app ./dorm-password-migration check </dev/null
+finish_release

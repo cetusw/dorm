@@ -1,22 +1,24 @@
 package http
 
 import (
+	"dorm/pkg/core/domain/user"
 	"dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
+	"errors"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 type ResidentAuthHandler struct {
-	userUC     ports.UserUseCase
-	authSecret string
+	userUC   ports.UserUseCase
+	sessions ports.SessionUseCase
+	secure   bool
+	limiter  *loginLimiter
 }
 
-func NewResidentAuthHandler(userUC ports.UserUseCase, authSecret string) *ResidentAuthHandler {
-	return &ResidentAuthHandler{
-		userUC:     userUC,
-		authSecret: authSecret,
-	}
+func NewResidentAuthHandler(userUC ports.UserUseCase, sessions ports.SessionUseCase, secure bool) *ResidentAuthHandler {
+	return &ResidentAuthHandler{userUC: userUC, sessions: sessions, secure: secure, limiter: newLoginLimiter()}
 }
 
 func (h *ResidentAuthHandler) RegisterRoutes(app *fiber.App) {
@@ -24,7 +26,7 @@ func (h *ResidentAuthHandler) RegisterRoutes(app *fiber.App) {
 
 	auth.Post("/login", apiDeadline, h.HandleLogin)
 	auth.Post("/logout", apiDeadline, h.HandleLogout)
-	auth.Get("/me", ResidentAuthMiddleware(h.authSecret), apiDeadline, h.HandleCurrentUser)
+	auth.Get("/me", ResidentAuthMiddleware(h.sessions, h.secure), apiDeadline, h.HandleCurrentUser)
 }
 
 func (h *ResidentAuthHandler) HandleLogin(c *fiber.Ctx) error {
@@ -33,17 +35,33 @@ func (h *ResidentAuthHandler) HandleLogin(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(errorResponse("некорректный формат запроса"))
 	}
 
+	source, err := loginSource(c, h.secure)
+	if err != nil {
+		return err
+	}
+	finish, reason, retryAfter := h.limiter.reserve(source, req.Login)
+	if reason != "" {
+		c.Locals("auth.login_rate_limited", reason)
+		c.Set("Retry-After", strconv.Itoa(retryAfter))
+		return fiber.NewError(429, "слишком много попыток входа")
+	}
+	failed := false
+	defer func() { finish(failed) }()
+
 	u, err := h.userUC.AuthenticateResident(c.UserContext(), req.Login, req.Password)
 	if err != nil {
-		if isInfrastructureError(err) {
-			return err
+		if !errors.Is(err, user.ErrInvalidCredentials) {
+			return sessionHTTPError(c, err)
 		}
-		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse(err.Error()))
+		failed = true
+		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("неверный логин или пароль"))
 	}
 
-	if err := setResidentSession(c, u.ID(), h.authSecret); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось создать сессию"))
+	session, err := h.sessions.Create(c.UserContext(), u.ID(), u.PasswordHash())
+	if err != nil {
+		return sessionHTTPError(c, err)
 	}
+	setResidentSession(c, session.Token, session.ExpiresAt, h.secure)
 
 	return c.JSON(fiber.Map{
 		"redirect_url": "/app/tasks",
@@ -51,7 +69,10 @@ func (h *ResidentAuthHandler) HandleLogin(c *fiber.Ctx) error {
 }
 
 func (h *ResidentAuthHandler) HandleLogout(c *fiber.Ctx) error {
-	clearResidentSession(c)
+	if err := h.sessions.Revoke(c.UserContext(), c.Cookies(residentSessionCookie)); err != nil {
+		return sessionHTTPError(c, err)
+	}
+	clearResidentSession(c, h.secure)
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -69,7 +90,7 @@ func (h *ResidentAuthHandler) HandleCurrentUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(errorResponse("не удалось загрузить текущего пользователя"))
 	}
 	if currentUser == nil {
-		clearResidentSession(c)
+		clearResidentSession(c, h.secure)
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 	}
 

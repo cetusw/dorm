@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"dorm/pkg/infrastructure/config"
 	"dorm/pkg/infrastructure/di"
 )
 
@@ -20,6 +21,13 @@ const shutdownTimeout = 20 * time.Second
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	if len(os.Args) == 2 && os.Args[1] == "--check-config" {
+		if _, err := config.LoadConfig("config.json"); err != nil {
+			log.Print(err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		log.Printf("Application stopped with error: %v", err)
 		os.Exit(1)

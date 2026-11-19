@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"dorm/pkg/core/ports"
+	"dorm/pkg/core/usecase/authentication"
 	cataloguc "dorm/pkg/core/usecase/catalog"
 	"dorm/pkg/core/usecase/cleaning"
 	"dorm/pkg/core/usecase/user"
@@ -63,9 +64,18 @@ func NewContainer(configPath string) (_ *Container, err error) {
 		}
 	}()
 
+	if cfg.Production {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := repository.CheckPasswordReadiness(ctx, db); err != nil {
+			return nil, err
+		}
+	}
+
 	bus := eventbus.NewInMemoryEventBus()
 
 	userRepo := repository.NewUserRepository(db)
+	sessions := authentication.NewService(repository.NewSessionRepository(db))
 	teamRepo := repository.NewTeamRepository(db)
 	groupRepo := repository.NewGroupRepository(db)
 	dutyRepo := repository.NewDutyRepository(db)
@@ -159,27 +169,32 @@ func NewContainer(configPath string) (_ *Container, err error) {
 	}
 
 	app := fiber.New(fiber.Config{
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 120 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		ErrorHandler: http.ErrorHandler,
+		ReadTimeout:             15 * time.Second,
+		WriteTimeout:            120 * time.Second,
+		IdleTimeout:             60 * time.Second,
+		ErrorHandler:            http.ErrorHandler,
+		ProxyHeader:             "X-Real-IP",
+		EnableTrustedProxyCheck: true,
+		EnableIPValidation:      true,
+		TrustedProxies:          cfg.AuthTrustedProxies,
 	})
 	httpLifetime, cancelHTTP := context.WithCancel(context.Background())
 	http.RegisterDiagnostics(app, httpLifetime)
+	app.Use("/api/", http.OriginProtection(cfg.AuthOrigins...))
 	http.NewHealthHandler(db).RegisterRoutes(app)
 	webapp.RegisterRoutes(app, "./web/app")
 
-	residentAuthHandler := http.NewResidentAuthHandler(userService, cfg.AuthSecret)
+	residentAuthHandler := http.NewResidentAuthHandler(userService, sessions, cfg.Production)
 	residentAuthHandler.RegisterRoutes(app)
 
 	notificationAPIHandler := http.NewNotificationAPIHandler(cfg.WebPush, pushSubscriptionService)
-	notificationAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	notificationAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	penaltyAPIHandler := http.NewPenaltyAPIHandler(penaltyService)
-	penaltyAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	penaltyAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	warehouseAPIHandler := http.NewWarehouseAPIHandler(warehouseService)
-	warehouseAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	warehouseAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	residentDutyService := residentusecase.NewResidentDutyService(
 		userRepo,
@@ -194,25 +209,25 @@ func NewContainer(configPath string) (_ *Container, err error) {
 	residentDutyService.SetLocation(location)
 
 	residentAPIHandler := http.NewResidentAPIHandler(residentDutyService)
-	residentAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	residentAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	dormitoryAPIHandler := http.NewDormitoryAPIHandler(dormitoryService)
-	dormitoryAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	dormitoryAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	groupAPIHandler := http.NewGroupAPIHandler(dormitoryService, cleaningService, dutySettingsService)
-	groupAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	groupAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	teamAPIHandler := http.NewTeamAPIHandler(dormitoryService, teamService)
-	teamAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	teamAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	areaAPIHandler := http.NewAreaAPIHandler(dormitoryService, taskCatalogService)
-	areaAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	areaAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	taskCatalogAPIHandler := http.NewTaskCatalogAPIHandler(dormitoryService, taskCatalogService)
-	taskCatalogAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	taskCatalogAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	userAPIHandler := http.NewUserAPIHandler(userService, dormitoryService)
-	userAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(cfg.AuthSecret))
+	userAPIHandler.RegisterRoutes(app, http.ResidentAuthMiddleware(sessions, cfg.Production))
 
 	monitorCtx, stopMonitor := context.WithCancel(context.Background())
 	monitorDone := make(chan struct{})

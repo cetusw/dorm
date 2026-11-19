@@ -101,3 +101,8 @@ type userQueryServiceAdapter struct{}
 func (userQueryServiceAdapter) GetResidentsByDormitoryID(context.Context, int64) ([]dto.ResidentListItem, error) {
 	return nil, nil
 }
+
+func (s *userRepositoryStub) SaveWithPassword(ctx context.Context, u *user.User, _ string) error {
+	return s.Save(ctx, u)
+}
+func (s *userRepositoryStub) Create(ctx context.Context, u *user.User) error { return s.Save(ctx, u) }

@@ -10,9 +10,11 @@ import (
 )
 
 var (
-	ErrEmptyName         = errors.New("name cannot be empty")
-	ErrEmptyLogin        = errors.New("login cannot be empty")
-	ErrEmptyPasswordHash = errors.New("password hash cannot be empty")
+	ErrLoginConflict      = errors.New("логин уже используется")
+	ErrInvalidCredentials = errors.New("неверный логин или пароль")
+	ErrEmptyName          = errors.New("name cannot be empty")
+	ErrEmptyLogin         = errors.New("login cannot be empty")
+	ErrEmptyPasswordHash  = errors.New("password hash cannot be empty")
 )
 
 type User struct {
@@ -172,7 +174,9 @@ func (u *User) DormitoryID() *int64  { return u.dormitoryID }
 func (u *User) CreatedAt() time.Time { return u.createdAt }
 
 type Repository interface {
+	Create(ctx context.Context, user *User) error
 	Save(ctx context.Context, user *User) error
+	SaveWithPassword(ctx context.Context, u *User, expectedHash string) error
 	FindAll(ctx context.Context) ([]*User, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
 	FindByLogin(ctx context.Context, login string) (*User, error)

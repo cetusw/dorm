@@ -1,5 +1,7 @@
 services:
   app:
+    environment:
+      APP_ENV: production
     image: ${DORM_IMAGE:?Set DORM_IMAGE to a versioned release}
     ports:
       - "127.0.0.1:8080:8080"

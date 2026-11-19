@@ -348,3 +348,10 @@ func TestGetResidentPenaltiesAllowsResidentFromAnotherGroupInSameDormitory(t *te
 	assert.Equal(t, residentID.String(), response.UserID)
 	assert.Equal(t, queryService.residentBy, response.Penalties)
 }
+
+func (s *penaltyUserRepositoryStub) SaveWithPassword(ctx context.Context, u *user.User, _ string) error {
+	return s.Save(ctx, u)
+}
+func (s *penaltyUserRepositoryStub) Create(ctx context.Context, u *user.User) error {
+	return s.Save(ctx, u)
+}

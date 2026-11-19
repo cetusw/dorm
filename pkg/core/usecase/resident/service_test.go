@@ -384,3 +384,8 @@ func TestGetCurrentDuty_UsesRequestedDormitoryForDormitoryLeader(t *testing.T) {
 	assert.Equal(t, myGroup.ID().String(), response.MyGroup.ID)
 	assert.Equal(t, myGroup.Name(), response.MyGroup.Name)
 }
+
+func (s *userRepositoryStub) SaveWithPassword(ctx context.Context, u *user.User, _ string) error {
+	return s.Save(ctx, u)
+}
+func (s *userRepositoryStub) Create(ctx context.Context, u *user.User) error { return s.Save(ctx, u) }

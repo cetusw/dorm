@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
 	"dorm/pkg/core/domain/user"
@@ -87,67 +88,66 @@ func nullIntPtr(value sql.NullInt64) *int {
 	return &v
 }
 
-func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
-	const query = `
-		INSERT INTO user (id, login, password_hash, first_name, middle_name, last_name, team_id, room_number, floor_number, dormitory_id, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE
-			login = VALUES(login),
-			password_hash = VALUES(password_hash),
-			first_name = VALUES(first_name),
-			middle_name = VALUES(middle_name),
-			last_name = VALUES(last_name),
-			team_id = VALUES(team_id),
-			room_number = VALUES(room_number),
-			floor_number = VALUES(floor_number),
-			dormitory_id = VALUES(dormitory_id)
-	`
+func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
+	id := u.ID()
+	_, err := r.db.ExecContext(ctx, `INSERT INTO user
+ (id,login,password_hash,first_name,middle_name,last_name,team_id,room_number,floor_number,dormitory_id,created_at)
+ VALUES(?,?,?,?,?,?,?,?,?,?,?)`, id[:], u.Login(), u.PasswordHash(), u.FirstName(), u.MiddleName(), u.LastName(), uuidBytes(u.TeamID()), u.RoomNumber(), u.FloorNumber(), u.DormitoryID(), u.CreatedAt())
+	return userWriteError(err)
+}
 
-	var teamID interface{} = nil
-	if u.TeamID() != nil {
-		teamID, _ = u.TeamID().MarshalBinary()
+func uuidBytes(id *uuid.UUID) interface{} {
+	if id == nil {
+		return nil
 	}
+	return id[:]
+}
 
-	var middleName interface{} = nil
-	if u.MiddleName() != nil {
-		middleName = *u.MiddleName()
+func userWriteError(err error) error {
+	var mysqlErr *mysqlDriver.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+		return user.ErrLoginConflict
 	}
+	return err
+}
 
-	var roomNumber interface{} = nil
-	if u.RoomNumber() != nil {
-		roomNumber = *u.RoomNumber()
-	}
-
-	var floorNumber interface{} = nil
-	if u.FloorNumber() != nil {
-		floorNumber = *u.FloorNumber()
-	}
-
-	var dormID interface{} = nil
-	if u.DormitoryID() != nil {
-		dormID = *u.DormitoryID()
-	}
-
-	idBytes, _ := u.ID().MarshalBinary()
-
-	_, err := r.db.ExecContext(ctx, query,
-		idBytes,
-		u.Login(),
-		u.PasswordHash(),
-		u.FirstName(),
-		middleName,
-		u.LastName(),
-		teamID,
-		roomNumber,
-		floorNumber,
-		dormID,
-		u.CreatedAt(),
-	)
-
+func (r *UserRepository) Save(ctx context.Context, u *user.User) error { return r.save(ctx, u, nil) }
+func (r *UserRepository) SaveWithPassword(ctx context.Context, u *user.User, expectedHash string) error {
+	return r.save(ctx, u, &expectedHash)
+}
+func (r *UserRepository) save(ctx context.Context, u *user.User, expectedHash *string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("userRepo.Save: %w", err)
+		return err
 	}
-	return nil
+	defer tx.Rollback()
+	id := u.ID()
+	var stored string
+	var deleted sql.NullTime
+	err = tx.QueryRowContext(ctx, "SELECT password_hash,deleted_at FROM user WHERE id=? FOR UPDATE", id[:]).Scan(&stored, &deleted)
+	if errors.Is(err, sql.ErrNoRows) || deleted.Valid {
+		return fmt.Errorf("пользователь отсутствует или удалён")
+	}
+	if err != nil {
+		return err
+	}
+	if expectedHash != nil && stored != *expectedHash {
+		return fmt.Errorf("данные пользователя изменились, повторите операцию")
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE user SET login=?,first_name=?,middle_name=?,last_name=?,team_id=?,room_number=?,floor_number=?,dormitory_id=? WHERE id=? AND deleted_at IS NULL`,
+		u.Login(), u.FirstName(), u.MiddleName(), u.LastName(), uuidBytes(u.TeamID()), u.RoomNumber(), u.FloorNumber(), u.DormitoryID(), id[:])
+	if err != nil {
+		return userWriteError(err)
+	}
+	if expectedHash != nil {
+		if _, err = tx.ExecContext(ctx, "UPDATE user SET password_hash=? WHERE id=?", u.PasswordHash(), id[:]); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, "UPDATE auth_session SET revoked_at=COALESCE(revoked_at,CURRENT_TIMESTAMP(6)) WHERE user_id=?", id[:]); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (r *UserRepository) FindAll(ctx context.Context) ([]*user.User, error) {
@@ -343,15 +343,16 @@ func (r *UserRepository) MoveUserToTeam(ctx context.Context, userID uuid.UUID, t
 }
 
 func (r *UserRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
-	const query = `
-		UPDATE user
-		SET deleted_at = NOW()
-		WHERE id = ? AND deleted_at IS NULL
-	`
-	idBytes, _ := id.MarshalBinary()
-	_, err := r.db.ExecContext(ctx, query, idBytes)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("userRepo.SoftDelete: %w", err)
+		return err
 	}
-	return nil
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "UPDATE user SET deleted_at=NOW() WHERE id=? AND deleted_at IS NULL", id[:]); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "UPDATE auth_session SET revoked_at=COALESCE(revoked_at,CURRENT_TIMESTAMP(6)) WHERE user_id=?", id[:]); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

@@ -2,12 +2,11 @@ package user
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
+	coreports "dorm/pkg/core/ports"
 	"dorm/pkg/core/ports/dto"
 	ports "dorm/pkg/core/ports/query"
-	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -48,8 +47,8 @@ func NewUserService(
 func (s *Service) AuthenticateResident(ctx context.Context, login string, password string) (*user.User, error) {
 	login = strings.TrimSpace(login)
 	password = strings.TrimSpace(password)
-	if login == "" || password == "" {
-		return nil, fmt.Errorf("логин и пароль обязательны")
+	if login == "" || password == "" || len(login) > 255 || len(password) > 4096 || !residentLoginPattern.MatchString(strings.ToLower(login)) {
+		return nil, user.ErrInvalidCredentials
 	}
 
 	u, err := s.userRepo.FindByLogin(ctx, login)
@@ -57,20 +56,17 @@ func (s *Service) AuthenticateResident(ctx context.Context, login string, passwo
 		return nil, fmt.Errorf("find user by login: %w", err)
 	}
 	if u == nil {
-		return nil, fmt.Errorf("неверный логин или пароль")
+		VerifyPassword(password, dummyPasswordHash)
+		return nil, user.ErrInvalidCredentials
 	}
 
-	passwordHash := hashResidentPassword(password)
-	if subtle.ConstantTimeCompare([]byte(u.PasswordHash()), []byte(passwordHash)) != 1 {
-		return nil, fmt.Errorf("неверный логин или пароль")
+	if !VerifyPassword(password, u.PasswordHash()) {
+		if !ValidPasswordHash(u.PasswordHash()) {
+			VerifyPassword(password, dummyPasswordHash)
+		}
+		return nil, user.ErrInvalidCredentials
 	}
-
 	return u, nil
-}
-
-func hashResidentPassword(password string) string {
-	sum := sha256.Sum256([]byte(password))
-	return hex.EncodeToString(sum[:])
 }
 
 func hashRequiredResidentPassword(password string) (string, error) {
@@ -79,7 +75,7 @@ func hashRequiredResidentPassword(password string) (string, error) {
 		return "", fmt.Errorf("пароль обязателен")
 	}
 
-	return hashResidentPassword(password), nil
+	return HashPassword(password)
 }
 
 func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
@@ -229,7 +225,7 @@ func (s *Service) CreateResident(ctx context.Context, req dto.CreateResidentRequ
 		resident.SetFloorNumber(*input.floor)
 	}
 
-	if err := s.userRepo.Save(ctx, resident); err != nil {
+	if err := s.userRepo.Create(ctx, resident); err != nil {
 		return nil, fmt.Errorf("create resident: %w", err)
 	}
 
@@ -274,15 +270,24 @@ func (s *Service) UpdateResident(ctx context.Context, id uuid.UUID, req dto.Upda
 		return nil, err
 	}
 
-	passwordHash, err := hashRequiredResidentPassword(input.password)
+	oldHash := resident.PasswordHash()
+	if VerifyPassword(input.password, oldHash) {
+		err = s.userRepo.Save(ctx, resident)
+	} else {
+		passwordHash, hashErr := HashPassword(input.password)
+		if hashErr != nil {
+			return nil, hashErr
+		}
+		if err := resident.SetPasswordHash(passwordHash); err != nil {
+			return nil, err
+		}
+		err = s.userRepo.SaveWithPassword(ctx, resident, oldHash)
+		if err == nil {
+			requestID, _ := ctx.Value(coreports.RequestIDKey{}).(string)
+			slog.InfoContext(ctx, "auth.session_revoked", "event", "auth.session_revoked", "reason", "password_changed", "user_id", id.String(), "request_id", requestID)
+		}
+	}
 	if err != nil {
-		return nil, err
-	}
-	if err := resident.SetPasswordHash(passwordHash); err != nil {
-		return nil, err
-	}
-
-	if err := s.userRepo.Save(ctx, resident); err != nil {
 		return nil, fmt.Errorf("update resident: %w", err)
 	}
 
@@ -294,6 +299,8 @@ func (s *Service) DeleteResident(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("delete resident: %w", err)
 	}
 
+	requestID, _ := ctx.Value(coreports.RequestIDKey{}).(string)
+	slog.InfoContext(ctx, "auth.session_revoked", "event", "auth.session_revoked", "reason", "user_deleted", "user_id", id.String(), "request_id", requestID)
 	return nil
 }
 

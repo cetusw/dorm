@@ -92,7 +92,6 @@ mysql_exec() {
 }
 
 require_command docker
-require_command sha256sum
 
 [[ -f "$ENV_FILE" ]] || die "не найден файл $ENV_FILE"
 
@@ -186,8 +185,7 @@ fi
 USER_ID="$(cat /proc/sys/kernel/random/uuid)"
 PASSWORD_HASH="$(
     printf '%s' "$PASSWORD" |
-        sha256sum |
-        awk '{print $1}'
+        docker compose --project-directory "$PROJECT_DIR" --env-file "$ENV_FILE" -f "$PROJECT_DIR/docker-compose.yml" run --rm -T --no-deps --entrypoint ./dorm-hash-password app
 )"
 
 FIRST_NAME_SQL="$(sql_escape "$FIRST_NAME")"

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -23,14 +24,16 @@ type WebPushConfig struct {
 }
 
 type AppConfig struct {
-	DBUser     string
-	DBPassword string
-	DBHost     string
-	DBPort     string
-	DBName     string
-	TZ         string
-	DBDriver   string
-	AuthSecret string
+	DBUser             string
+	DBPassword         string
+	DBHost             string
+	DBPort             string
+	DBName             string
+	TZ                 string
+	DBDriver           string
+	Production         bool
+	AuthOrigins        []string
+	AuthTrustedProxies []string
 
 	Cron                         CronConfig
 	WebPush                      WebPushConfig
@@ -50,7 +53,9 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 		return nil, err
 	}
 
-	cfg.getAuthConfig()
+	if err := cfg.getAuthConfig(); err != nil {
+		return nil, err
+	}
 	cfg.getWebPushConfig()
 	cfg.getNotificationSchedulerConfig()
 
@@ -119,20 +124,74 @@ func (cfg *AppConfig) getDBConfig() error {
 	return nil
 }
 
-func (cfg *AppConfig) getAuthConfig() {
-	cfg.AuthSecret = os.Getenv("AUTH_SECRET")
-	if cfg.AuthSecret != "" {
-		return
+func (cfg *AppConfig) getAuthConfig() error {
+	mode := strings.TrimSpace(os.Getenv("APP_ENV"))
+	if mode != "" && mode != "development" && mode != "production" {
+		return errors.New("APP_ENV must be development or production")
 	}
-
-	if cfg.DBPassword != "" {
-		cfg.AuthSecret = cfg.DBPassword
-		log.Println("Warning: AUTH_SECRET not set, using DB_PASSWORD as auth secret fallback.")
-		return
+	cfg.Production = mode == "production"
+	origins := []string{}
+	if !cfg.Production {
+		origins = []string{"http://localhost:8080", "https://localhost:5173", "http://127.0.0.1:8080", "https://127.0.0.1:5173"}
 	}
+	if configured := os.Getenv("AUTH_ORIGIN"); configured != "" || cfg.Production {
+		origins = append(origins, configured)
+	}
+	for _, value := range origins {
+		origin, err := NormalizeOrigin(value)
+		if err != nil {
+			return fmt.Errorf("AUTH_ORIGIN: %w", err)
+		}
+		if cfg.Production && !strings.HasPrefix(origin, "https://") {
+			return errors.New("production AUTH_ORIGIN must use HTTPS")
+		}
+		cfg.AuthOrigins = append(cfg.AuthOrigins, origin)
+	}
+	for _, entry := range strings.Split(os.Getenv("AUTH_TRUSTED_PROXIES"), ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if ip := net.ParseIP(entry); ip == nil {
+			_, network, err := net.ParseCIDR(entry)
+			if err != nil {
+				return errors.New("invalid AUTH_TRUSTED_PROXIES address")
+			}
+			ones, _ := network.Mask.Size()
+			if ones == 0 {
+				return errors.New("AUTH_TRUSTED_PROXIES must not trust every address")
+			}
+		} else if ip.IsUnspecified() {
+			return errors.New("AUTH_TRUSTED_PROXIES must not trust unspecified addresses")
+		}
+		cfg.AuthTrustedProxies = append(cfg.AuthTrustedProxies, entry)
+	}
+	if cfg.Production && len(cfg.AuthTrustedProxies) == 0 {
+		return errors.New("production requires explicit AUTH_TRUSTED_PROXIES and a proxy-provided X-Real-IP")
+	}
+	return nil
+}
 
-	cfg.AuthSecret = "dev-auth-secret"
-	log.Println("Warning: AUTH_SECRET not set, using insecure development fallback secret.")
+func NormalizeOrigin(value string) (string, error) {
+	u, err := url.Parse(value)
+	if err != nil || u == nil || u.User != nil || u.Opaque != "" || u.Hostname() == "" || u.RawQuery != "" || u.Fragment != "" || u.Path != "" && u.Path != "/" {
+		return "", errors.New("must be an HTTP(S) origin without credentials, path or query")
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", errors.New("must use HTTP(S)")
+	}
+	host := strings.ToLower(u.Hostname())
+	port := u.Port()
+	if port == "80" && scheme == "http" || port == "443" && scheme == "https" {
+		port = ""
+	}
+	if port != "" {
+		host = net.JoinHostPort(host, port)
+	} else if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	return scheme + "://" + host, nil
 }
 
 func (cfg *AppConfig) getWebPushConfig() {

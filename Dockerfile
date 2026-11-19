@@ -23,14 +23,22 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/dorm ./cmd/main.go
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/dorm-migrate ./cmd/migrate
 
 
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/dorm-hash-password ./cmd/hashpassword
+
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/dorm-password-migration ./cmd/passwordmigration
+
 FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
+LABEL org.dorm.auth-v2="true"
+
 COPY --from=backend-builder /out/dorm ./dorm
 COPY --from=backend-builder /out/dorm-migrate ./dorm-migrate
+COPY --from=backend-builder /out/dorm-hash-password ./dorm-hash-password
+COPY --from=backend-builder /out/dorm-password-migration ./dorm-password-migration
 COPY --from=backend-builder /app/config.json ./config.json
 COPY --from=backend-builder /app/data/mysql/migrations ./data/mysql/migrations
 COPY --from=backend-builder /app/web ./web

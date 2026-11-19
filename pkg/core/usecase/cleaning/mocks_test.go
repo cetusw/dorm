@@ -274,3 +274,8 @@ func (m *MockUserRepo) MoveUserToTeam(ctx context.Context, userID uuid.UUID, tea
 	return nil
 }
 func (m *MockUserRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return nil }
+
+func (s *MockUserRepo) SaveWithPassword(ctx context.Context, u *user.User, _ string) error {
+	return s.Save(ctx, u)
+}
+func (s *MockUserRepo) Create(ctx context.Context, u *user.User) error { return s.Save(ctx, u) }

@@ -308,3 +308,10 @@ func ptrInt64(value int64) *int64 {
 func ptrString(value string) *string {
 	return &value
 }
+
+func (s *warehouseUserRepositoryStub) SaveWithPassword(ctx context.Context, u *user.User, _ string) error {
+	return s.Save(ctx, u)
+}
+func (s *warehouseUserRepositoryStub) Create(ctx context.Context, u *user.User) error {
+	return s.Save(ctx, u)
+}

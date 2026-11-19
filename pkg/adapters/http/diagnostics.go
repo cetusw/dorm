@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"dorm/pkg/core/ports"
 	"errors"
 	"log/slog"
 	"net"
@@ -18,7 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type requestIDKey struct{}
+type requestIDKey = ports.RequestIDKey
 
 const panicStackKey = "http.panic_stack"
 const apiRouteKey = "http.api_route"
@@ -163,7 +164,7 @@ func accessLog() fiber.Handler {
 			fields = append(fields, "error_kind", "deadline_exceeded")
 		} else if errors.Is(operationErr, context.Canceled) {
 			fields = append(fields, "error_kind", "canceled")
-		} else if isInfrastructureError(operationErr) {
+		} else if isInfrastructureError(operationErr) || c.Locals("auth.infrastructure_error") == true {
 			fields = append(fields, "error_kind", "infrastructure_error")
 		}
 		if slow {
@@ -182,9 +183,15 @@ func accessLog() fiber.Handler {
 			if !errors.Is(reason, sessionMissingCookie) && level < slog.LevelWarn {
 				level = slog.LevelWarn
 			}
-			if errors.Is(reason, sessionSecretUnavailable) {
-				level = slog.LevelError
-			}
+		}
+		if c.Locals("auth.csrf_rejected") == true {
+			event = "auth.csrf_rejected"
+			level = slog.LevelWarn
+		}
+		if reason, ok := c.Locals("auth.login_rate_limited").(loginLimitReason); ok {
+			fields = append(fields, "reason", string(reason))
+			event = "auth.login_rate_limited"
+			level = slog.LevelWarn
 		}
 		if panicOccurred {
 			level, event = slog.LevelError, "http.panic"

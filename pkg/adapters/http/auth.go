@@ -1,157 +1,85 @@
 package http
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/base64"
-	"encoding/hex"
+	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
+	nethttp "net/http"
 	"time"
+
+	"dorm/pkg/core/ports"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
 
 const (
-	currentUserIDLocalKey = "current_user_id"
-	residentSessionCookie = "resident_session"
-	residentSessionTTL    = 365 * 24 * time.Hour
+	currentUserIDLocalKey                  = "current_user_id"
+	residentSessionCookie                  = "resident_session"
+	sessionRejectionKey                    = "auth.session_rejection"
+	sessionMissingCookie  sessionRejection = "missing_cookie"
 )
 
-type sessionRejection string
+type sessionRejection = ports.SessionRejection
 
-const (
-	sessionMissingCookie     sessionRejection = "missing_cookie"
-	sessionInvalidEncoding   sessionRejection = "invalid_encoding"
-	sessionMalformedToken    sessionRejection = "malformed_token"
-	sessionInvalidSignature  sessionRejection = "invalid_signature"
-	sessionInvalidUserID     sessionRejection = "invalid_user_id"
-	sessionInvalidExpiry     sessionRejection = "invalid_expiry"
-	sessionExpired           sessionRejection = "expired"
-	sessionSecretUnavailable sessionRejection = "secret_unavailable"
-	sessionRejectionKey                       = "auth.session_rejection"
-)
+func sessionHTTPError(c *fiber.Ctx, err error) error {
+	var reason ports.SessionRejection
+	if errors.As(err, &reason) {
+		c.Locals(sessionRejectionKey, reason)
+		return fiber.NewError(401, "требуется авторизация")
+	}
+	if isContextError(err) {
+		return err
+	}
+	c.Locals("auth.infrastructure_error", true)
+	return fiber.NewError(503, "не удалось проверить сессию")
+}
 
-func (reason sessionRejection) Error() string { return string(reason) }
-
-func ResidentAuthMiddleware(secret string) fiber.Handler {
+func ResidentAuthMiddleware(sessions ports.SessionUseCase, secure bool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		userID, err := parseResidentSession(c.Cookies(residentSessionCookie), secret)
+		ctx, cancel := context.WithTimeout(c.UserContext(), 5*time.Second)
+		session, err := sessions.Validate(ctx, c.Cookies(residentSessionCookie))
+		cancel()
 		if err != nil {
-			var reason sessionRejection
-			if errors.As(err, &reason) {
-				c.Locals(sessionRejectionKey, reason)
+			if errors.Is(err, ports.SessionRejection("user_inactive")) {
+				clearResidentSession(c, secure)
 			}
-			return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
+			return sessionHTTPError(c, err)
 		}
-
-		c.Locals(currentUserIDLocalKey, userID)
+		c.Locals(currentUserIDLocalKey, session.UserID)
 		return c.Next()
 	}
 }
 
-func setResidentSession(c *fiber.Ctx, userID uuid.UUID, secret string) error {
-	sessionValue, err := buildResidentSession(userID, time.Now().Add(residentSessionTTL), secret)
-	if err != nil {
-		return fmt.Errorf("build resident session: %w", err)
-	}
-
-	c.Cookie(&fiber.Cookie{
-		Name:     residentSessionCookie,
-		Value:    sessionValue,
-		Path:     "/",
-		HTTPOnly: true,
-		SameSite: fiber.CookieSameSiteLaxMode,
-		Expires:  time.Now().Add(residentSessionTTL),
-	})
-
-	return nil
+func residentCookie(secure bool) *nethttp.Cookie {
+	return &nethttp.Cookie{Name: residentSessionCookie, Path: "/", HttpOnly: true, Secure: secure, SameSite: nethttp.SameSiteLaxMode}
 }
 
-func clearResidentSession(c *fiber.Ctx) {
-	c.Cookie(&fiber.Cookie{
-		Name:     residentSessionCookie,
-		Value:    "",
-		Path:     "/",
-		HTTPOnly: true,
-		SameSite: fiber.CookieSameSiteLaxMode,
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-	})
+func setResidentSession(c *fiber.Ctx, token string, expires time.Time, secure bool) {
+	cookie := residentCookie(secure)
+	cookie.Value = token
+	cookie.Expires = expires
+	cookie.MaxAge = int(time.Until(expires).Seconds())
+	if cookie.MaxAge < 1 {
+		cookie.MaxAge = 1
+	}
+	c.Response().Header.DelCookie(residentSessionCookie)
+	c.Response().Header.Add(fiber.HeaderSetCookie, cookie.String())
+}
+
+func clearResidentSession(c *fiber.Ctx, secure bool) {
+	cookie := residentCookie(secure)
+	cookie.Expires = time.Unix(0, 0)
+	cookie.MaxAge = -1
+	c.Response().Header.DelCookie(residentSessionCookie)
+	c.Response().Header.Add(fiber.HeaderSetCookie, cookie.String())
 }
 
 func currentUserID(c *fiber.Ctx) (uuid.UUID, error) {
 	value := c.Locals(currentUserIDLocalKey)
-	if value == nil {
+	id, ok := value.(uuid.UUID)
+	if !ok {
 		return uuid.Nil, fmt.Errorf("current user is not set")
 	}
-
-	userID, ok := value.(uuid.UUID)
-	if !ok {
-		return uuid.Nil, fmt.Errorf("current user has invalid type")
-	}
-
-	return userID, nil
-}
-
-func buildResidentSession(userID uuid.UUID, expiresAt time.Time, secret string) (string, error) {
-	if strings.TrimSpace(secret) == "" {
-		return "", fmt.Errorf("auth secret is empty")
-	}
-
-	payload := fmt.Sprintf("%s|%d", userID.String(), expiresAt.UTC().Unix())
-	mac := signResidentSession(payload, secret)
-
-	token := fmt.Sprintf("%s|%s", payload, mac)
-	return base64.RawURLEncoding.EncodeToString([]byte(token)), nil
-}
-
-func parseResidentSession(rawValue string, secret string) (uuid.UUID, error) {
-	if rawValue == "" {
-		return uuid.Nil, sessionMissingCookie
-	}
-	if strings.TrimSpace(secret) == "" {
-		return uuid.Nil, sessionSecretUnavailable
-	}
-
-	decoded, err := base64.RawURLEncoding.DecodeString(rawValue)
-	if err != nil {
-		return uuid.Nil, sessionInvalidEncoding
-	}
-
-	parts := strings.Split(string(decoded), "|")
-	if len(parts) != 3 {
-		return uuid.Nil, sessionMalformedToken
-	}
-
-	payload := strings.Join(parts[:2], "|")
-	expectedMAC := signResidentSession(payload, secret)
-	if subtle.ConstantTimeCompare([]byte(parts[2]), []byte(expectedMAC)) != 1 {
-		return uuid.Nil, sessionInvalidSignature
-	}
-
-	userID, err := uuid.Parse(parts[0])
-	if err != nil {
-		return uuid.Nil, sessionInvalidUserID
-	}
-
-	expiresAtUnix, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil {
-		return uuid.Nil, sessionInvalidExpiry
-	}
-	if time.Now().UTC().After(time.Unix(expiresAtUnix, 0).UTC()) {
-		return uuid.Nil, sessionExpired
-	}
-
-	return userID, nil
-}
-
-func signResidentSession(payload string, secret string) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	_, _ = mac.Write([]byte(payload))
-	return hex.EncodeToString(mac.Sum(nil))
+	return id, nil
 }
