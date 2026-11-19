@@ -1,3 +1,11 @@
+@font-face {
+    font-family: 'Inter';
+    src: url('/app/assets/fonts/inter-v1/InterVariable.woff2') format('woff2');
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
 :root {
     --app-color-primary: #0F766E;
     --app-color-primary-hover: #115E59;
