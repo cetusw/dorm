@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,10 +22,30 @@ const (
 	residentSessionTTL    = 365 * 24 * time.Hour
 )
 
+type sessionRejection string
+
+const (
+	sessionMissingCookie     sessionRejection = "missing_cookie"
+	sessionInvalidEncoding   sessionRejection = "invalid_encoding"
+	sessionMalformedToken    sessionRejection = "malformed_token"
+	sessionInvalidSignature  sessionRejection = "invalid_signature"
+	sessionInvalidUserID     sessionRejection = "invalid_user_id"
+	sessionInvalidExpiry     sessionRejection = "invalid_expiry"
+	sessionExpired           sessionRejection = "expired"
+	sessionSecretUnavailable sessionRejection = "secret_unavailable"
+	sessionRejectionKey                       = "auth.session_rejection"
+)
+
+func (reason sessionRejection) Error() string { return string(reason) }
+
 func ResidentAuthMiddleware(secret string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		userID, err := parseResidentSession(c.Cookies(residentSessionCookie), secret)
 		if err != nil {
+			var reason sessionRejection
+			if errors.As(err, &reason) {
+				c.Locals(sessionRejectionKey, reason)
+			}
 			return c.Status(fiber.StatusUnauthorized).JSON(errorResponse("требуется авторизация"))
 		}
 
@@ -91,39 +112,39 @@ func buildResidentSession(userID uuid.UUID, expiresAt time.Time, secret string) 
 
 func parseResidentSession(rawValue string, secret string) (uuid.UUID, error) {
 	if rawValue == "" {
-		return uuid.Nil, fmt.Errorf("missing resident session")
+		return uuid.Nil, sessionMissingCookie
 	}
 	if strings.TrimSpace(secret) == "" {
-		return uuid.Nil, fmt.Errorf("auth secret is empty")
+		return uuid.Nil, sessionSecretUnavailable
 	}
 
 	decoded, err := base64.RawURLEncoding.DecodeString(rawValue)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("decode resident session: %w", err)
+		return uuid.Nil, sessionInvalidEncoding
 	}
 
 	parts := strings.Split(string(decoded), "|")
 	if len(parts) != 3 {
-		return uuid.Nil, fmt.Errorf("invalid resident session format")
+		return uuid.Nil, sessionMalformedToken
 	}
 
 	payload := strings.Join(parts[:2], "|")
 	expectedMAC := signResidentSession(payload, secret)
 	if subtle.ConstantTimeCompare([]byte(parts[2]), []byte(expectedMAC)) != 1 {
-		return uuid.Nil, fmt.Errorf("invalid resident session signature")
+		return uuid.Nil, sessionInvalidSignature
 	}
 
 	userID, err := uuid.Parse(parts[0])
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("parse resident session user id: %w", err)
+		return uuid.Nil, sessionInvalidUserID
 	}
 
 	expiresAtUnix, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("parse resident session expiry: %w", err)
+		return uuid.Nil, sessionInvalidExpiry
 	}
 	if time.Now().UTC().After(time.Unix(expiresAtUnix, 0).UTC()) {
-		return uuid.Nil, fmt.Errorf("resident session expired")
+		return uuid.Nil, sessionExpired
 	}
 
 	return userID, nil

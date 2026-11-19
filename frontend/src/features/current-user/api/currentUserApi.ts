@@ -13,6 +13,6 @@ function normalizeCurrentUser(response: Record<string, unknown>): CurrentUser {
 }
 
 export async function getCurrentUser(): Promise<CurrentUser> {
-    const response = await apiRequest('/api/v1/auth/me')
+    const response = await apiRequest('/api/v1/auth/me', { redirectOn401: false })
     return normalizeCurrentUser(await response.json())
 }

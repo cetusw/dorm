@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-import { Alert } from '@mantine/core'
+import { Alert, Button, Center, Loader, Stack } from '@mantine/core'
 
 import { navigateTo, replaceTo, useAppPathname } from './navigation'
 import { ResidentAppShell } from './ResidentAppShell'
@@ -141,19 +141,20 @@ function renderResidentPage(path: string, currentUser: ReturnType<typeof useCurr
 
 export function AppRouter() {
     const pathname = useAppPathname()
-    const shouldRedirectToLogin =
-        pathname === '/' || pathname === '/app' || pathname === '/app/'
+    const routePath = pathname.split('?')[0]
+    const isEntry =
+        routePath === '/' || routePath === '/app' || routePath === '/app/'
     const shouldRedirectLegacySettings =
         pathname === '/app/settings' || pathname === '/app/notifications'
-    const { currentUser, loading, error } = useCurrentUserState(
-        pathname !== '/app/login' && !shouldRedirectToLogin && !shouldRedirectLegacySettings,
+    const { currentUser, loading, error, unauthenticated, retry } = useCurrentUserState(
+        routePath !== '/app/login',
     )
 
     useEffect(() => {
-        if (shouldRedirectToLogin) {
-            window.location.replace('/app/login')
-        }
-    }, [shouldRedirectToLogin])
+        if (routePath === '/app/login' || loading) return
+        if (unauthenticated) replaceTo('/app/login')
+        else if (isEntry && currentUser) replaceTo('/app/tasks')
+    }, [routePath, loading, unauthenticated, isEntry, currentUser])
 
     useEffect(() => {
         if (shouldRedirectLegacySettings) {
@@ -161,17 +162,24 @@ export function AppRouter() {
         }
     }, [shouldRedirectLegacySettings])
 
-    if (shouldRedirectToLogin) {
-        return null
-    }
-
     if (shouldRedirectLegacySettings) {
         return null
     }
 
-    if (pathname === '/app/login') {
+    if (routePath === '/app/login') {
         return <LoginPage />
     }
+
+    if (loading || unauthenticated) return <Center mih="100dvh"><Loader /></Center>
+    if (error || !currentUser) return (
+        <Center mih="100dvh" px="md">
+            <Stack maw={480}>
+                <Alert color="red" title="Не удалось проверить сессию">{error ?? 'Не удалось загрузить пользователя'}</Alert>
+                <Button onClick={retry}>Повторить</Button>
+            </Stack>
+        </Center>
+    )
+    if (isEntry) return null
 
     return (
         <ResidentAppShell

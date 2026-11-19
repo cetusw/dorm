@@ -38,7 +38,6 @@ func (h *ResidentAuthHandler) HandleLogin(c *fiber.Ctx) error {
 		if isInfrastructureError(err) {
 			return err
 		}
-		clearResidentSession(c)
 		return c.Status(fiber.StatusUnauthorized).JSON(errorResponse(err.Error()))
 	}
 

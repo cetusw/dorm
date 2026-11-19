@@ -176,6 +176,16 @@ func accessLog() fiber.Handler {
 		if status >= 500 {
 			level = slog.LevelError
 		}
+		if reason, ok := c.Locals(sessionRejectionKey).(sessionRejection); ok {
+			fields = append(fields, "reason", string(reason))
+			event = "auth.session_rejected"
+			if !errors.Is(reason, sessionMissingCookie) && level < slog.LevelWarn {
+				level = slog.LevelWarn
+			}
+			if errors.Is(reason, sessionSecretUnavailable) {
+				level = slog.LevelError
+			}
+		}
 		if panicOccurred {
 			level, event = slog.LevelError, "http.panic"
 			fields = append(fields, "stack", stack)
