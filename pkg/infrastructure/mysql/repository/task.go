@@ -30,6 +30,31 @@ func (r *TaskRepository) GetAllTaskDefinitions(ctx context.Context) ([]*catalog.
 	return r.fetchTaskDefinitions(ctx, query)
 }
 
+func (r *TaskRepository) FindByIDs(ctx context.Context, ids []uuid.UUID) ([]*catalog.TaskDefinition, error) {
+	args := make([]any, 0, len(ids))
+	seen := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		value, err := marshalUUID(id, "task definition id")
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, value)
+	}
+	if len(args) == 0 {
+		return nil, nil
+	}
+	query := `
+        SELECT id, area_id, title, cost, recurrence_interval, start_sequence
+        FROM task
+        WHERE deleted_at IS NULL AND id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(args)), ",") + `)
+    `
+	return r.fetchTaskDefinitions(ctx, query, args...)
+}
+
 func (r *TaskRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*catalog.TaskDefinition, error) {
 	const query = `
 		SELECT t.id, t.area_id, t.title, t.cost, t.recurrence_interval, t.start_sequence

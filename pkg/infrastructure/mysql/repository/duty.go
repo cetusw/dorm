@@ -311,55 +311,89 @@ func resetDutyTasks(ctx context.Context, tx *sql.Tx, dutyID uuid.UUID) error {
 	return nil
 }
 
-func (r *DutyRepository) FindActiveByTeamID(
-	ctx context.Context,
-	teamID uuid.UUID,
-	at time.Time,
-) (*duty.Duty, error) {
-	const query = `
-		SELECT id, team_id, start_date, end_date, sequence_number
-		FROM duty
-		WHERE team_id = ?
-		  AND start_date <= ?
-		  AND end_date > ?
-		ORDER BY start_date DESC
-		LIMIT 1
-	`
-
-	teamIDBytes, err := teamID.MarshalBinary()
-	if err != nil {
-		return nil, fmt.Errorf("find active duty: marshal team id: %w", err)
-	}
-
-	row := r.db.QueryRowContext(ctx, query, teamIDBytes, at, at)
-
-	var dutyIDBytes, teamIDResultBytes []byte
-	var startDate, endDate time.Time
-	var sequenceNumber int
-
-	if err := row.Scan(&dutyIDBytes, &teamIDResultBytes, &startDate, &endDate, &sequenceNumber); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("find active duty: %w", err)
-	}
-
-	dutyID, err := uuid.FromBytes(dutyIDBytes)
-	if err != nil {
-		return nil, fmt.Errorf("find active duty: parse duty id: %w", err)
-	}
-
-	teamIDResult, err := uuid.FromBytes(teamIDResultBytes)
-	if err != nil {
-		return nil, fmt.Errorf("find active duty: parse team id: %w", err)
-	}
-
-	tasks, err := r.findTasksByDutyID(ctx, dutyID)
+func (r *DutyRepository) FindActiveByGroupID(ctx context.Context, groupID uuid.UUID, at time.Time) (*duty.Duty, error) {
+	group, err := marshalUUID(groupID, "group id")
 	if err != nil {
 		return nil, err
 	}
+	const query = `
+        SELECT d.id, d.team_id, d.start_date, d.end_date, d.sequence_number
+        FROM duty d
+        JOIN team t ON t.id = d.team_id
+        WHERE d.group_id = ? AND t.group_id = d.group_id
+          AND d.start_date <= ? AND d.end_date > ?
+        ORDER BY t.rotation_position, t.name, t.id, d.start_date DESC, d.id DESC
+        LIMIT 1
+    `
+	var dutyIDBytes, teamIDBytes []byte
+	var startDate, endDate time.Time
+	var sequenceNumber int
+	err = r.db.QueryRowContext(ctx, query, group, at, at).Scan(&dutyIDBytes, &teamIDBytes, &startDate, &endDate, &sequenceNumber)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find active group duty: %w", err)
+	}
+	id, err := uuid.FromBytes(dutyIDBytes)
+	if err != nil {
+		return nil, err
+	}
+	teamID, err := uuid.FromBytes(teamIDBytes)
+	if err != nil {
+		return nil, err
+	}
+	tasks, err := r.findTasksByDutyID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return duty.RestoreDuty(id, teamID, startDate, endDate, sequenceNumber, tasks), nil
+}
 
-	return duty.RestoreDuty(dutyID, teamIDResult, startDate, endDate, sequenceNumber, tasks), nil
+func (r *DutyRepository) FindGroupIDsWithActiveDuty(ctx context.Context, groupIDs []uuid.UUID, at time.Time) ([]uuid.UUID, error) {
+	args := make([]any, 0, len(groupIDs)+2)
+	seen := make(map[uuid.UUID]bool, len(groupIDs))
+	for _, id := range groupIDs {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		value, err := marshalUUID(id, "group id")
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, value)
+	}
+	if len(args) == 0 {
+		return nil, nil
+	}
+	query := `
+        SELECT DISTINCT d.group_id
+        FROM duty d
+        JOIN team t ON t.id = d.team_id
+        WHERE d.group_id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(args)), ",") + `)
+          AND t.group_id = d.group_id
+          AND d.start_date <= ? AND d.end_date > ?
+    `
+	args = append(args, at, at)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("find active duty groups: %w", err)
+	}
+	defer rows.Close()
+	var result []uuid.UUID
+	for rows.Next() {
+		var value []byte
+		if err := rows.Scan(&value); err != nil {
+			return nil, err
+		}
+		id, err := uuid.FromBytes(value)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, id)
+	}
+	return result, rows.Err()
 }
 
 func (r *DutyRepository) FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*duty.Duty, error) {
@@ -806,5 +840,5 @@ func (r *DutyRepository) findTasksByDutyID(ctx context.Context, dutyID uuid.UUID
 		}
 		tasks = append(tasks, task)
 	}
-	return tasks, nil
+	return tasks, rows.Err()
 }

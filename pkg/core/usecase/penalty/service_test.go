@@ -63,6 +63,9 @@ type penaltyTeamRepositoryStub struct {
 func (s *penaltyTeamRepositoryStub) FindByID(_ context.Context, id uuid.UUID) (*structure.Team, error) {
 	return s.byID[id], nil
 }
+func (s *penaltyTeamRepositoryStub) FindByLeaderAndGroupIDs(context.Context, uuid.UUID, []uuid.UUID) ([]*structure.Team, error) {
+	return nil, nil
+}
 func (s *penaltyTeamRepositoryStub) FindByGroupID(context.Context, uuid.UUID) ([]*structure.Team, error) {
 	return nil, nil
 }

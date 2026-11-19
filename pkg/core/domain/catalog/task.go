@@ -63,6 +63,7 @@ func (t *TaskDefinition) IsScheduledFor(dutySequence int) bool {
 }
 
 type TaskDefinitionRepository interface {
+	FindByIDs(ctx context.Context, ids []uuid.UUID) ([]*TaskDefinition, error)
 	GetAllTaskDefinitions(ctx context.Context) ([]*TaskDefinition, error)
 	FindByGroupID(ctx context.Context, groupID uuid.UUID) ([]*TaskDefinition, error)
 	FindCommon(ctx context.Context) ([]*TaskDefinition, error)

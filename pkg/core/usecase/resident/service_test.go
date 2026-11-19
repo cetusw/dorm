@@ -43,8 +43,26 @@ type teamRepositoryStub struct {
 	teamsByGroup map[uuid.UUID][]*structure.Team
 }
 
-func (s *teamRepositoryStub) FindByID(context.Context, uuid.UUID) (*structure.Team, error) {
+func (s *teamRepositoryStub) FindByID(_ context.Context, id uuid.UUID) (*structure.Team, error) {
+	for _, teams := range s.teamsByGroup {
+		for _, team := range teams {
+			if team.ID() == id {
+				return team, nil
+			}
+		}
+	}
 	return nil, nil
+}
+func (s *teamRepositoryStub) FindByLeaderAndGroupIDs(_ context.Context, leaderID uuid.UUID, groupIDs []uuid.UUID) ([]*structure.Team, error) {
+	var result []*structure.Team
+	for _, groupID := range groupIDs {
+		for _, team := range s.teamsByGroup[groupID] {
+			if team.LeaderID() != nil && *team.LeaderID() == leaderID {
+				result = append(result, team)
+			}
+		}
+	}
+	return result, nil
 }
 func (s *teamRepositoryStub) FindByGroupID(_ context.Context, groupID uuid.UUID) ([]*structure.Team, error) {
 	return s.teamsByGroup[groupID], nil
@@ -110,8 +128,22 @@ func (s *dormitoryRepositoryStub) Save(context.Context, *structure.Dormitory) er
 func (s *dormitoryRepositoryStub) Delete(context.Context, int64) error              { return nil }
 
 type dutyRepositoryStub struct {
-	activeByTeam map[uuid.UUID]*duty.Duty
-	byID         map[uuid.UUID]*duty.Duty
+	activeByTeam  map[uuid.UUID]*duty.Duty
+	activeByGroup map[uuid.UUID]*duty.Duty
+	byID          map[uuid.UUID]*duty.Duty
+}
+
+func (s *dutyRepositoryStub) FindActiveByGroupID(_ context.Context, id uuid.UUID, _ time.Time) (*duty.Duty, error) {
+	return s.activeByGroup[id], nil
+}
+func (s *dutyRepositoryStub) FindGroupIDsWithActiveDuty(_ context.Context, ids []uuid.UUID, _ time.Time) ([]uuid.UUID, error) {
+	var result []uuid.UUID
+	for _, id := range ids {
+		if s.activeByGroup[id] != nil {
+			result = append(result, id)
+		}
+	}
+	return result, nil
 }
 
 func (s *dutyRepositoryStub) CreateWithTasks(context.Context, *duty.Duty, []*duty.DutyTask) error {
@@ -119,9 +151,6 @@ func (s *dutyRepositoryStub) CreateWithTasks(context.Context, *duty.Duty, []*dut
 }
 func (s *dutyRepositoryStub) FindCurrentByTeamID(context.Context, uuid.UUID) (*duty.Duty, error) {
 	return nil, nil
-}
-func (s *dutyRepositoryStub) FindActiveByTeamID(_ context.Context, teamID uuid.UUID, _ time.Time) (*duty.Duty, error) {
-	return s.activeByTeam[teamID], nil
 }
 func (s *dutyRepositoryStub) FindLatestByTeamID(_ context.Context, teamID uuid.UUID) (*duty.Duty, error) {
 	for _, currentDuty := range s.byID {
@@ -159,6 +188,10 @@ func (s *dutyRepositoryStub) FindAllLatest(context.Context) ([]*duty.Duty, error
 
 type taskDefinitionRepositoryStub struct{}
 
+func (s *taskDefinitionRepositoryStub) FindByIDs(ctx context.Context, _ []uuid.UUID) ([]*catalog.TaskDefinition, error) {
+	return s.GetAllTaskDefinitions(ctx)
+}
+
 func (s *taskDefinitionRepositoryStub) GetAllTaskDefinitions(context.Context) ([]*catalog.TaskDefinition, error) {
 	return []*catalog.TaskDefinition{}, nil
 }
@@ -180,6 +213,10 @@ func (s *taskDefinitionRepositoryStub) Save(context.Context, *catalog.TaskDefini
 func (s *taskDefinitionRepositoryStub) SoftDelete(context.Context, uuid.UUID) error { return nil }
 
 type areaRepositoryStub struct{}
+
+func (s *areaRepositoryStub) FindByIDs(ctx context.Context, _ []int) ([]*catalog.Area, error) {
+	return s.GetAllAreas(ctx)
+}
 
 func (s *areaRepositoryStub) GetAllAreas(context.Context) ([]*catalog.Area, error) {
 	return []*catalog.Area{}, nil
@@ -255,6 +292,7 @@ func TestGetCurrentDutyFallsBackToObserverViewForResidentWithoutTeam(t *testing.
 			dormitory: dormitory,
 		},
 		&dutyRepositoryStub{
+			activeByGroup: map[uuid.UUID]*duty.Duty{groupID: activeDuty},
 			activeByTeam: map[uuid.UUID]*duty.Duty{
 				teamID: activeDuty,
 			},
@@ -360,6 +398,7 @@ func TestGetCurrentDuty_UsesRequestedDormitoryForDormitoryLeader(t *testing.T) {
 			},
 		},
 		&dutyRepositoryStub{
+			activeByGroup: map[uuid.UUID]*duty.Duty{groupID: activeDuty},
 			activeByTeam: map[uuid.UUID]*duty.Duty{
 				teamID: activeDuty,
 			},

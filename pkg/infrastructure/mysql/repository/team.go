@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -80,6 +81,64 @@ func (r *TeamRepository) FindByGroupID(ctx context.Context, groupID uuid.UUID) (
 		teams = append(teams, structure.RestoreTeam(teamID, name, grpID, leaderID, color.String, rotationPosition))
 	}
 	return teams, nil
+}
+
+func (r *TeamRepository) FindByLeaderAndGroupIDs(ctx context.Context, leaderID uuid.UUID, groupIDs []uuid.UUID) ([]*structure.Team, error) {
+	if len(groupIDs) == 0 {
+		return nil, nil
+	}
+	leader, err := marshalUUID(leaderID, "team leader id")
+	if err != nil {
+		return nil, err
+	}
+	args := []any{leader}
+	seen := make(map[uuid.UUID]bool, len(groupIDs))
+	for _, id := range groupIDs {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		value, err := marshalUUID(id, "group id")
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, value)
+	}
+	query := `
+        SELECT id, name, group_id, leader_id, color, rotation_position
+        FROM team
+        WHERE leader_id = ? AND group_id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(args)-1), ",") + `)
+        ORDER BY rotation_position, name, id
+    `
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("find led teams: %w", err)
+	}
+	defer rows.Close()
+	var teams []*structure.Team
+	for rows.Next() {
+		var tid, gid, lid []byte
+		var name string
+		var color sql.NullString
+		var position int
+		if err := rows.Scan(&tid, &name, &gid, &lid, &color, &position); err != nil {
+			return nil, err
+		}
+		teamID, err := uuid.FromBytes(tid)
+		if err != nil {
+			return nil, err
+		}
+		groupID, err := uuid.FromBytes(gid)
+		if err != nil {
+			return nil, err
+		}
+		leaderID, err := uuid.FromBytes(lid)
+		if err != nil {
+			return nil, err
+		}
+		teams = append(teams, structure.RestoreTeam(teamID, name, groupID, &leaderID, color.String, position))
+	}
+	return teams, rows.Err()
 }
 
 func (r *TeamRepository) Save(ctx context.Context, team *structure.Team) error {

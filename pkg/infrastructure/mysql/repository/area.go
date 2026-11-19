@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -22,7 +23,28 @@ func NewAreaRepository(db *sql.DB) *AreaRepository {
 func (r *AreaRepository) GetAllAreas(ctx context.Context) ([]*catalog.Area, error) {
 	const query = `SELECT id, name, floor, group_id FROM area ORDER BY floor DESC, name`
 
-	rows, err := r.db.QueryContext(ctx, query)
+	return r.fetchAreas(ctx, query)
+}
+
+func (r *AreaRepository) FindByIDs(ctx context.Context, ids []int) ([]*catalog.Area, error) {
+	args := make([]any, 0, len(ids))
+	seen := make(map[int]bool, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			args = append(args, id)
+		}
+	}
+	if len(args) == 0 {
+		return nil, nil
+	}
+	query := `SELECT id, name, floor, group_id FROM area WHERE id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(args)), ",") + `) ORDER BY floor DESC,name`
+	return r.fetchAreas(ctx, query, args...)
+}
+
+func (r *AreaRepository) fetchAreas(ctx context.Context, query string, args ...any) ([]*catalog.Area, error) {
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +63,10 @@ func (r *AreaRepository) GetAllAreas(ctx context.Context) ([]*catalog.Area, erro
 
 		var groupID *uuid.UUID
 		if len(groupIDBytes) > 0 {
-			parsedID, _ := uuid.FromBytes(groupIDBytes)
+			parsedID, err := uuid.FromBytes(groupIDBytes)
+			if err != nil {
+				return nil, fmt.Errorf("parse area group id: %w", err)
+			}
 			tempID := parsedID
 			groupID = &tempID
 		}
@@ -53,7 +78,7 @@ func (r *AreaRepository) GetAllAreas(ctx context.Context) ([]*catalog.Area, erro
 
 		areas = append(areas, catalog.RestoreArea(id, name, floorValue, groupID))
 	}
-	return areas, nil
+	return areas, rows.Err()
 }
 
 func (r *AreaRepository) FindByID(ctx context.Context, id int) (*catalog.Area, error) {

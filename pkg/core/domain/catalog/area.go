@@ -35,6 +35,7 @@ func (a *Area) Floor() int          { return a.floor }
 func (a *Area) GroupID() *uuid.UUID { return a.groupID }
 
 type AreaRepository interface {
+	FindByIDs(ctx context.Context, ids []int) ([]*Area, error)
 	GetAllAreas(ctx context.Context) ([]*Area, error)
 	FindByID(ctx context.Context, id int) (*Area, error)
 	Save(ctx context.Context, area *Area) error

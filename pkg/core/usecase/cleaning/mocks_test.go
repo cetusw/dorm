@@ -26,13 +26,6 @@ func (m *MockDutyRepo) FindCurrentByTeamID(ctx context.Context, id uuid.UUID) (*
 	}
 	return args.Get(0).(*duty.Duty), args.Error(1)
 }
-func (m *MockDutyRepo) FindActiveByTeamID(ctx context.Context, id uuid.UUID, at time.Time) (*duty.Duty, error) {
-	args := m.Called(ctx, id, at)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*duty.Duty), args.Error(1)
-}
 func (m *MockDutyRepo) FindLatestByTeamID(ctx context.Context, id uuid.UUID) (*duty.Duty, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
@@ -279,3 +272,39 @@ func (s *MockUserRepo) SaveWithPassword(ctx context.Context, u *user.User, _ str
 	return s.Save(ctx, u)
 }
 func (s *MockUserRepo) Create(ctx context.Context, u *user.User) error { return s.Save(ctx, u) }
+
+func (m *MockDutyRepo) FindActiveByGroupID(ctx context.Context, id uuid.UUID, at time.Time) (*duty.Duty, error) {
+	args := m.Called(ctx, id, at)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*duty.Duty), args.Error(1)
+}
+func (m *MockDutyRepo) FindGroupIDsWithActiveDuty(ctx context.Context, ids []uuid.UUID, at time.Time) ([]uuid.UUID, error) {
+	args := m.Called(ctx, ids, at)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]uuid.UUID), args.Error(1)
+}
+func (m *MockTeamRepo) FindByLeaderAndGroupIDs(ctx context.Context, id uuid.UUID, ids []uuid.UUID) ([]*structure.Team, error) {
+	args := m.Called(ctx, id, ids)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*structure.Team), args.Error(1)
+}
+func (m *MockCatalogRepo) FindByIDs(ctx context.Context, ids []uuid.UUID) ([]*catalog.TaskDefinition, error) {
+	args := m.Called(ctx, ids)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*catalog.TaskDefinition), args.Error(1)
+}
+func (m *MockAreaRepo) FindByIDs(ctx context.Context, ids []int) ([]*catalog.Area, error) {
+	args := m.Called(ctx, ids)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*catalog.Area), args.Error(1)
+}

@@ -98,7 +98,8 @@ func (d *Duty) BelongsToTeam(teamID uuid.UUID) bool {
 type DutyRepository interface {
 	CreateWithTasks(ctx context.Context, currentDuty *Duty, tasks []*DutyTask) error
 	FindCurrentByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
-	FindActiveByTeamID(ctx context.Context, teamID uuid.UUID, at time.Time) (*Duty, error)
+	FindActiveByGroupID(ctx context.Context, groupID uuid.UUID, at time.Time) (*Duty, error)
+	FindGroupIDsWithActiveDuty(ctx context.Context, groupIDs []uuid.UUID, at time.Time) ([]uuid.UUID, error)
 	FindLatestByTeamID(ctx context.Context, teamID uuid.UUID) (*Duty, error)
 	FindLatestUnfinishedPastByTeamAndGroup(ctx context.Context, teamID uuid.UUID, groupID uuid.UUID, at time.Time) (*Duty, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Duty, error)

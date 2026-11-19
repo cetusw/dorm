@@ -146,7 +146,7 @@ func (s *Service) GetCurrentDuty(
 		return buildResidentCurrentDutyResponse(currentDuty, view, nil, nil, 0, s.currentTime()), nil
 	}
 
-	lookups, err := s.loadCurrentDutyLookups(ctx, currentDuty.dutyTeam.ID())
+	lookups, err := s.loadCurrentDutyLookups(ctx, currentDuty.dutyTeam.ID(), currentDuty.duty.Tasks())
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func (s *Service) GetCurrentDuty(
 		len(lookups.userNames),
 		s.currentTime(),
 	)
-	response.Team = s.loadTeamLeaderName(ctx, currentDuty.dutyTeam)
+	response.Team = s.loadTeamLeaderName(ctx, currentDuty.dutyTeam, lookups.userNames)
 	return response, nil
 }
 
@@ -264,7 +264,7 @@ func (s *Service) GetDutyDetails(
 		groups:        access.availableGroups,
 	}
 
-	lookups, err := s.loadCurrentDutyLookups(ctx, dutyTeam.ID())
+	lookups, err := s.loadCurrentDutyLookups(ctx, dutyTeam.ID(), selectedDuty.Tasks())
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func (s *Service) GetDutyDetails(
 		len(lookups.userNames),
 		s.currentTime(),
 	)
-	response.Team = s.loadTeamLeaderName(ctx, dutyTeam)
+	response.Team = s.loadTeamLeaderName(ctx, dutyTeam, lookups.userNames)
 	return response, nil
 }
 
@@ -320,9 +320,11 @@ func (s *Service) loadCurrentDutyContext(
 		return nil, err
 	}
 
+	at := s.now()
+	activeExpected := true
 	var selectedGroup *structure.Group
 	if access.residentGroup == nil && !access.canSelectAnyGroup && groupID == nil {
-		selectedGroup, err = s.resolveObserverGroupFallback(ctx, access.availableGroups)
+		selectedGroup, activeExpected, err = s.resolveObserverGroupFallback(ctx, access.availableGroups, at)
 		if err != nil {
 			return nil, err
 		}
@@ -333,9 +335,13 @@ func (s *Service) loadCurrentDutyContext(
 		}
 	}
 
-	activeDutyTeam, activeDuty, err := s.loadActiveDutyForGroup(ctx, selectedGroup.ID())
-	if err != nil {
-		return nil, fmt.Errorf("load active duty for group: %w", err)
+	var activeDutyTeam *structure.Team
+	var activeDuty *dutydomain.Duty
+	if activeExpected {
+		activeDutyTeam, activeDuty, err = s.loadActiveDutyForGroup(ctx, selectedGroup.ID(), at, access.residentTeam)
+		if err != nil {
+			return nil, fmt.Errorf("load active duty for group: %w", err)
+		}
 	}
 
 	displayDutyTeam := activeDutyTeam
@@ -463,7 +469,8 @@ func (s *Service) resolveResidentSelectedGroup(
 	}
 
 	if access.residentGroup == nil && !access.canSelectAnyGroup && groupID == nil {
-		return s.resolveObserverGroupFallback(ctx, access.availableGroups)
+		group, _, err := s.resolveObserverGroupFallback(ctx, access.availableGroups, s.now())
+		return group, err
 	}
 
 	selectedGroup, err := resolveSelectedGroup(
@@ -491,23 +498,37 @@ func (s *Service) resolveResidentAffiliation(
 			return nil, nil, fmt.Errorf("load resident team: %w", err)
 		}
 		if residentTeam != nil {
-			residentGroup, err := s.groupRepo.FindByID(ctx, residentTeam.GroupID())
-			if err != nil {
-				return nil, nil, fmt.Errorf("load resident group: %w", err)
+			var residentGroup *structure.Group
+			for _, group := range groups {
+				if group.ID() == residentTeam.GroupID() {
+					residentGroup = group
+					break
+				}
 			}
+			if residentGroup == nil {
+				residentGroup, err = s.groupRepo.FindByID(ctx, residentTeam.GroupID())
+				if err != nil {
+					return nil, nil, fmt.Errorf("load resident group: %w", err)
+				}
+			}
+
 			if residentGroup != nil {
 				return residentTeam, residentGroup, nil
 			}
 		}
 	}
 
+	groupIDs := make([]uuid.UUID, 0, len(groups))
 	for _, group := range groups {
-		teams, err := s.teamRepo.FindByGroupID(ctx, group.ID())
-		if err != nil {
-			return nil, nil, fmt.Errorf("load group teams: %w", err)
-		}
+		groupIDs = append(groupIDs, group.ID())
+	}
+	teams, err := s.teamRepo.FindByLeaderAndGroupIDs(ctx, resident.ID(), groupIDs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load led teams: %w", err)
+	}
+	for _, group := range groups {
 		for _, team := range teams {
-			if isTeamLeader(team, resident.ID()) {
+			if team.GroupID() == group.ID() {
 				return team, group, nil
 			}
 		}
@@ -551,47 +572,46 @@ func resolveSelectedGroup(
 	return nil, fmt.Errorf("group does not belong to resident dormitory")
 }
 
-func (s *Service) loadActiveDutyForGroup(
-	ctx context.Context,
-	groupID uuid.UUID,
-) (*structure.Team, *dutydomain.Duty, error) {
-	teams, err := s.teamRepo.FindByGroupID(ctx, groupID)
+func (s *Service) loadActiveDutyForGroup(ctx context.Context, groupID uuid.UUID, at time.Time, knownTeam *structure.Team) (*structure.Team, *dutydomain.Duty, error) {
+	currentDuty, err := s.dutyRepo.FindActiveByGroupID(ctx, groupID, at)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load group teams: %w", err)
+		return nil, nil, err
 	}
-
-	for _, team := range teams {
-		duty, err := s.dutyRepo.FindActiveByTeamID(ctx, team.ID(), s.now())
-		if err != nil {
-			return nil, nil, fmt.Errorf("load active duty by team: %w", err)
-		}
-		if duty != nil {
-			return team, duty, nil
-		}
+	if currentDuty == nil {
+		return nil, nil, nil
 	}
-
-	return nil, nil, nil
+	if knownTeam != nil && knownTeam.ID() == currentDuty.TeamID() {
+		return knownTeam, currentDuty, nil
+	}
+	team, err := s.teamRepo.FindByID(ctx, currentDuty.TeamID())
+	if err != nil {
+		return nil, nil, fmt.Errorf("load active duty team: %w", err)
+	}
+	return team, currentDuty, nil
 }
 
-func (s *Service) resolveObserverGroupFallback(
-	ctx context.Context,
-	groups []*structure.Group,
-) (*structure.Group, error) {
-	for _, group := range groups {
-		dutyTeam, duty, err := s.loadActiveDutyForGroup(ctx, group.ID())
-		if err != nil {
-			return nil, fmt.Errorf("resolve observer group fallback: %w", err)
-		}
-		if dutyTeam != nil && duty != nil {
-			return group, nil
-		}
-	}
-
+func (s *Service) resolveObserverGroupFallback(ctx context.Context, groups []*structure.Group, at time.Time) (*structure.Group, bool, error) {
 	if len(groups) == 0 {
-		return nil, fmt.Errorf("resident is not assigned to a group")
+		return nil, false, fmt.Errorf("resident is not assigned to a group")
 	}
-
-	return groups[0], nil
+	ids := make([]uuid.UUID, 0, len(groups))
+	for _, group := range groups {
+		ids = append(ids, group.ID())
+	}
+	activeIDs, err := s.dutyRepo.FindGroupIDsWithActiveDuty(ctx, ids, at)
+	if err != nil {
+		return nil, false, fmt.Errorf("resolve observer group fallback: %w", err)
+	}
+	active := make(map[uuid.UUID]bool, len(activeIDs))
+	for _, id := range activeIDs {
+		active[id] = true
+	}
+	for _, group := range groups {
+		if active[group.ID()] {
+			return group, true, nil
+		}
+	}
+	return groups[0], false, nil
 }
 
 func (s *Service) loadLatestUnfinishedPastDutyForTeam(
@@ -605,13 +625,14 @@ func (s *Service) loadLatestUnfinishedPastDutyForTeam(
 func (s *Service) loadCurrentDutyLookups(
 	ctx context.Context,
 	teamID uuid.UUID,
+	dutyTasks []*dutydomain.DutyTask,
 ) (*currentDutyLookups, error) {
-	taskDefinitions, err := s.taskDefinitionsByID(ctx)
+	taskDefinitions, err := s.taskDefinitionsByID(ctx, dutyTasks)
 	if err != nil {
 		return nil, err
 	}
 
-	areas, err := s.areasByID(ctx)
+	areas, err := s.areasByID(ctx, taskDefinitions)
 	if err != nil {
 		return nil, err
 	}
@@ -814,8 +835,17 @@ func buildResidentMyGroupOption(group *structure.Group) *dto.ResidentDutyGroupOp
 
 func (s *Service) taskDefinitionsByID(
 	ctx context.Context,
+	dutyTasks []*dutydomain.DutyTask,
 ) (map[uuid.UUID]*catalog.TaskDefinition, error) {
-	taskDefinitions, err := s.taskRepo.GetAllTaskDefinitions(ctx)
+	ids := make([]uuid.UUID, 0, len(dutyTasks))
+	seen := make(map[uuid.UUID]bool, len(dutyTasks))
+	for _, task := range dutyTasks {
+		if !seen[task.TaskDefID()] {
+			seen[task.TaskDefID()] = true
+			ids = append(ids, task.TaskDefID())
+		}
+	}
+	taskDefinitions, err := s.taskRepo.FindByIDs(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("load task definitions: %w", err)
 	}
@@ -828,8 +858,16 @@ func (s *Service) taskDefinitionsByID(
 	return result, nil
 }
 
-func (s *Service) areasByID(ctx context.Context) (map[int]*catalog.Area, error) {
-	areas, err := s.areaRepo.GetAllAreas(ctx)
+func (s *Service) areasByID(ctx context.Context, tasks map[uuid.UUID]*catalog.TaskDefinition) (map[int]*catalog.Area, error) {
+	ids := make([]int, 0, len(tasks))
+	seen := make(map[int]bool, len(tasks))
+	for _, task := range tasks {
+		if !seen[task.AreaID()] {
+			seen[task.AreaID()] = true
+			ids = append(ids, task.AreaID())
+		}
+	}
+	areas, err := s.areaRepo.FindByIDs(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("load areas: %w", err)
 	}
@@ -1015,7 +1053,7 @@ func (s *Service) resolveCurrentDutyNotice(
 	if isOnDutyTeam && periodStatus == dutyPeriodStatusPast && hasOutstandingTasks && currentDuty.activeDutyTeam != nil && currentDuty.activeDuty != nil {
 		return fmt.Sprintf(
 			"На этой неделе ответственный за дежурство — %s. Скорее завершите свои задачи, чтобы не получить предупреждение",
-			s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam),
+			s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam, nil),
 		)
 	}
 
@@ -1023,7 +1061,7 @@ func (s *Service) resolveCurrentDutyNotice(
 		return ""
 	}
 
-	return fmt.Sprintf("На этой неделе ответственный за дежурство — %s", s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam))
+	return fmt.Sprintf("На этой неделе ответственный за дежурство — %s", s.loadTeamLeaderName(ctx, currentDuty.activeDutyTeam, nil))
 }
 
 func (s *Service) resolveCurrentDutyNoticeTone(
@@ -1121,11 +1159,14 @@ func dutyHasOutstandingTasks(currentDuty *dutydomain.Duty) bool {
 	return false
 }
 
-func (s *Service) loadTeamLeaderName(ctx context.Context, dutyTeam *structure.Team) string {
+func (s *Service) loadTeamLeaderName(ctx context.Context, dutyTeam *structure.Team, userNames map[uuid.UUID]string) string {
 	if dutyTeam == nil || dutyTeam.LeaderID() == nil {
 		return "Глава команды не назначен"
 	}
 
+	if name, ok := userNames[*dutyTeam.LeaderID()]; ok {
+		return name
+	}
 	leader, err := s.userRepo.FindByID(ctx, *dutyTeam.LeaderID())
 	if err != nil || leader == nil {
 		return "Глава команды не назначен"
