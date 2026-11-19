@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 import { ApiError } from '../../../shared/api/ApiError'
-import { getAuthenticationVersion } from '../../../shared/api/apiClient'
+import { getAuthenticationVersion, isAuthenticationChanging, subscribeAuthenticationVersion } from '../../../shared/api/apiClient'
 import { getCurrentUser } from '../api/currentUserApi'
 
 type CurrentUserState = Awaited<ReturnType<typeof getCurrentUser>>
@@ -15,6 +15,8 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function useCurrentUserState(enabled = true) {
+    const version = useSyncExternalStore(subscribeAuthenticationVersion, getAuthenticationVersion)
+    const changing = isAuthenticationChanging()
     const [currentUser, setCurrentUser] = useState<CurrentUserState | null>(null)
     const [loading, setLoading] = useState(enabled)
     const [error, setError] = useState<string | null>(null)
@@ -24,12 +26,11 @@ export function useCurrentUserState(enabled = true) {
     const [unauthenticated, setUnauthenticated] = useState(false)
 
     useEffect(() => {
-        if (!enabled) {
+        if (!enabled || changing || version !== getAuthenticationVersion()) {
             return
         }
 
         let active = true
-        const version = getAuthenticationVersion()
 
         async function loadCurrentUser() {
             setLoading(true)
@@ -54,7 +55,7 @@ export function useCurrentUserState(enabled = true) {
                 setUnauthenticated(currentError instanceof ApiError && currentError.status === 401)
                 setError(toErrorMessage(currentError))
             } finally {
-                if (active) {
+                if (active && version === getAuthenticationVersion()) {
                     setLoading(false)
                 }
             }
@@ -65,9 +66,9 @@ export function useCurrentUserState(enabled = true) {
         return () => {
             active = false
         }
-    }, [enabled, attempt])
+    }, [enabled, attempt, version, changing])
 
-    const fresh = resultVersion === getAuthenticationVersion()
+    const fresh = !changing && resultVersion === version
     return {
         currentUser: enabled && fresh ? currentUser : null,
         loading: enabled && (loading || !fresh),
