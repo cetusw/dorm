@@ -93,3 +93,9 @@
 - reminder use-case: `pkg/core/usecase/notification/dutyreminderservice.go`
 - event handlers: `tasksreadyhandler.go`, `weekstartedhandler.go`
 - delivery: `deliveryservice.go`
+
+## Ограничения доставки
+
+Запись создаётся до Web Push. Дубликат по ключу прекращает сценарий, включая повторную push-отправку. Ошибки отдельных push-подписок логируются; durable retry queue и гарантированная доставка не реализованы. После сбоя отправки повтор того же доменного события не означает повторную доставку push.
+
+Backend сейчас формирует `/app/current-duty` и параметры `tab=free/review`. Router не имеет отдельного маршрута current-duty и использует fallback на страницу задач; в ней вкладки выбираются локальным состоянием, без чтения `tab` из URL. Поэтому такие ссылки открывают задачи, но не гарантируют переключение на указанную вкладку. Эксплуатация подписок — в [Web Push](../operations/notifications.md).

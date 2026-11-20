@@ -48,12 +48,25 @@
 - `login`, `password_hash`
 - `first_name`, `middle_name NULL`, `last_name`
 - `team_id NULL`
-- `floor_number NULL`, `room_number NULL`
+- `floor_number NULL`, `room_number VARCHAR(50) NULL`
 - `dormitory_id NULL`
 - `created_at`
 - `deleted_at NULL`
 
-Отдельного `role_id` больше нет.
+`password_hash VARCHAR(255)` содержит Argon2id с параметрами и солью; старые пароли переводятся отдельной утилитой, не SQL-миграцией. Колонки `login` и `password_hash` исторически nullable, но production readiness требует корректные credentials всех активных пользователей.
+
+`uq_active_user_login` — уникальный функциональный индекс `(CASE WHEN deleted_at IS NULL THEN login ELSE NULL END)`. Сравнение подчиняется collation MySQL; удалённые пользователи не занимают активный логин. Отдельного `role_id` нет.
+
+### `auth_session`
+
+- `id BINARY(32)` — PK, SHA-256 полного случайного v2-токена;
+- `user_id BINARY(16) NOT NULL` — FK на `user.id`, без каскадного удаления;
+- `created_at TIMESTAMP(6)` с DEFAULT CURRENT_TIMESTAMP(6);
+- `expires_at TIMESTAMP(6) NOT NULL`;
+- `revoked_at TIMESTAMP(6) NULL`;
+- индексы `ix_auth_session_user (user_id)`, `ix_auth_session_expiry (expires_at)`.
+
+Таблиц `auth_security`, `auth_legacy_token` и поля `user.auth_legacy_allowed` в итоговой цепочке нет. Защита от старого backend — файловый маркер deployment, см. [выкладку](../operations/deployment.md). Механизм сессий — в [авторизации](./authorization.md).
 
 ### `area`
 
@@ -166,35 +179,44 @@
 - `UNIQUE (user_id, deduplication_key)` — deduplication на пользователя и доменный ключ.
 - индекс `idx_notification_user_created (user_id, created_at)`
 
+### Склад
+
+`warehouse_item`: UUID `id`, `dormitory_id`, `name`, `created_at DATETIME(6)`. Уникальность `uq_warehouse_item_dormitory_name (dormitory_id, name)`, FK на общежитие с CASCADE.
+
+`warehouse_movement`: UUID `id`, `item_id`, `type ENUM('add','write-off')`, положительный `quantity INT UNSIGNED`, `comment VARCHAR(256) NULL`, `created_by`, `created_at DATETIME(6)`. Индекс `idx_warehouse_movement_item_created (item_id, created_at, id)`; FK на позицию с CASCADE, на автора с RESTRICT. Остаток вычисляется по движениям; отдельной колонки quantity в позиции нет. Изменение истории блокирует позицию и проверяет отсутствие отрицательного промежуточного остатка.
+
+### `user_availability`
+
+Исторически созданная таблица: `availability_id`, `user_id`, `start_date`, `end_date`, `is_available`; FK на пользователя с CASCADE. В текущем runtime нет использующих её repository/use-case/API. Она не означает реализованный механизм временных замен команды.
+
 ## ER-модель
 
 ```mermaid
 erDiagram
     dormitory ||--o{ group : contains
-    dormitory ||--o{ user : houses
-    dormitory o|--o{ user : led_by
-
+    dormitory o|--o{ user : houses
+    user o|--o{ dormitory : leads
+    user o|--o{ group : leads
     group ||--o{ team : contains
-    group o|--o{ user : led_by
-    group ||--o{ area : scopes
-    group ||--o{ duty : owns
-
-    team o|--o{ user : led_by
-    team ||--o{ user : has_members
+    user o|--o{ team : leads
+    team o|--o{ user : has_members
     team ||--o{ duty : rotates
-
+    group o|--o{ area : scopes
+    group ||--o{ duty : owns
     area ||--o{ task : contains
-
     duty ||--o{ duty_task : expands
     task ||--o{ duty_task : scheduled_as
-    task ||--|| duty_task_override : overridden_by
-
+    task ||--o| duty_task_override : overridden_by
     user o|--o{ duty_task : assigned_to
     user o|--o{ duty_task : reviewed_by
-
+    user ||--o{ auth_session : owns
+    user ||--o{ user_availability : has
     user ||--o{ penalty : receives
     user ||--o{ push_subscription : owns
     user ||--o{ notification : receives
+    dormitory ||--o{ warehouse_item : owns
+    warehouse_item ||--o{ warehouse_movement : records
+    user ||--o{ warehouse_movement : creates
 ```
 
 ## Историчность и последствия
@@ -223,3 +245,9 @@ erDiagram
 - и существующее `end_date > new_start`
 
 То есть два дежурства могут соприкасаться по границе без overlap, если одно заканчивается ровно в момент начала другого.
+
+## Чтение текущего дежурства
+
+Поиск использует `duty.group_id` и JOIN `team`, границы `[start_date, end_date)` и приоритет команды по ротации. Наличие активных дежурств нескольких групп определяется пакетно. Справочники задач/территорий читаются по нужным PK через IN; состав команды — одной выборкой по `team_id`. Подробности выбора — в [домене дежурств](../domain/duties.md). DORM-108 не добавляет миграций или новых индексов; конкретный план MySQL зависит от данных.
+
+Последняя миграция `1795059644_auth_sessions` сначала проверяет дубли активных логинов, затем создаёт сессии и уникальный индекс. Её down намеренно возвращает ошибку: это [forward-only граница](../operations/migrations.md).

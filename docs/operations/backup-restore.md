@@ -1,88 +1,55 @@
-# Backup и restore
+# Резервное копирование и восстановление
 
-В repository нет отдельного backup script. Ниже описана ручная процедура для MySQL.
+## Штатный backup
 
-## Важно
-
-Restore перезапишет локальные данные в целевой базе. Перед восстановлением убедитесь, что база disposable или у вас есть свежий дамп.
-
-## Backup
-
-Пример с переменными окружения:
+Из локального checkout:
 
 ```bash
-export DB_HOST=127.0.0.1
-export DB_PORT=3306
-export DB_USER=...
-export DB_PASSWORD=...
-export DB_NAME=dorm
-
-mysqldump \
-  --single-transaction \
-  --quick \
-  --set-gtid-purged=OFF \
-  --default-character-set=utf8mb4 \
-  -h "$DB_HOST" \
-  -P "$DB_PORT" \
-  -u "$DB_USER" \
-  -p"$DB_PASSWORD" \
-  "$DB_NAME" | gzip > "dorm-$(date +%F-%H%M%S).sql.gz"
+./bin/backup.sh admin@server
+./bin/backup.sh admin@server --output-dir ./backups
+./bin/backup.sh admin@server --remote-only
 ```
 
-## Transfer
+Это альтернативные способы вызова, не обязательная последовательность. Скрипт передаёт release.sh на сервер `/home/admin/dorm`, использует тот же flock, что deploy/rollback, и оставляет проверенный архив в `$ROOT/backups/`. По умолчанию скачивает отдельную копию в ./backups, проверяет gzip и не перезаписывает существующий файл. `--remote-only` не скачивает; недоступность SCP не удаляет серверный backup.
 
-Копирование с production на локальную машину:
+`create_backup` проверяет работающий MySQL/Compose project dorm, SELECT 1 и свободное место (оценка двойного размера БД плюс 64 MiB). Файлы `dorm-backup-<UTC>-preliminary-<случайный суффикс>.sql.gz` создаются без перезаписи; для final отдельный суффикс, даже в ту же секунду.
+
+Дамп выполняется root внутри dorm-db: single-transaction, quick, hex-blob, routines/events/triggers, `--databases`, без tablespaces и GTID purged. Пароль берётся из окружения контейнера, не из аргумента mysqldump. Конвейер mysqldump/gzip использует pipefail, предел 1800 секунд и отдельную диагностику обоих exit codes. Проверяются непустой файл, gzip -t и наличие читаемой схемы; файл и каталог синхронизируются перед публикацией. Это проверка архива, а не полный тест его восстановления.
+
+Одновременно обычный backup и deploy/rollback не выполняются. Retention ручной, скрипты не удаляют старые backups или volumes. Архив содержит credentials и хеши сессий: ограничьте доступ и храните отдельную защищённую off-host копию.
+
+## Backup при релизе
+
+Обычный deploy делает предварительный backup без обязательной остановки backend. Для InnoDB single-transaction даёт согласованный снимок на начало дампа, но он не включает последующие изменения и не гарантирует согласованность при конкурентном DDL.
+
+Первый переход авторизации дополнительно останавливает backend и проверяет отсутствие writers, затем создаёт final backup до DDL и изменения паролей. Администратор обязан исключить внешние SQL writers на весь maintenance interval. Оба пути сохраняются в release-state; final используется как точка до необратимого перехода. Ошибка final блокирует миграции. Подробная последовательность — [deployment](./deployment.md#первый-переход-на-новую-авторизацию).
+
+## Ручное восстановление
+
+Автоматического restore нет. Импорт может удалить/заменить таблицы и credentials: выполняйте его только на специально выбранной изолированной БД либо по отдельно проверенному production-плану с остановленными writers и собственной свежей резервной копией. Не импортируйте неизвестный dump в работающую установку.
+
+Безопасный первый шаг — проверить копию и восстановить её в отдельное тестовое MySQL-окружение, не подключённое к production-сети. Для уже созданного disposable-контейнера с настроенным MYSQL_ROOT_PASSWORD:
 
 ```bash
-scp user@server:/path/to/dorm-2026-08-09-120000.sql.gz .
+gzip -t /absolute/path/backup.sql.gz
+set -o pipefail
+gzip -dc /absolute/path/backup.sql.gz | docker exec -i dorm-restore-db sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --default-character-set=utf8mb4'
 ```
 
-Если дамп создаётся прямо на сервере:
+`dorm-restore-db` здесь — заранее выделенная тестовая БД, не dorm-db. Дамп содержит CREATE DATABASE/USE и может содержать DROP TABLE: указание другой базы аргументом mysql не перенаправляет его в безопасное место. Сначала проверьте содержимое и назначение окружения; не включайте вывод чувствительных INSERT в логи.
 
-```bash
-ssh user@server '...mysqldump command...' > dorm.sql.gz
-```
+После импорта сверяют schema_migrations (version/dirty), фактические таблицы/индексы, количество и связи пользователей, дежурств, задач, предупреждений, движений склада и уведомлений. Проверяют уникальность активных логинов и readiness Argon2id утилитой выбранного совместимого образа, затем login/me/logout и protected API на изолированной копии. Одна лишь проверка COUNT или gzip не подтверждает восстановление.
 
-## Restore локально
+## Совместимость после активации v2
 
-Если используется локальный docker compose:
+`.auth-v2-activated` хранится вне MySQL и не восстанавливается из дампа. Его нельзя удалять или подменять для запуска старого image. После restore старой БД:
 
-1. поднять БД:
+- отсутствие auth_session/unique index или SHA-256 credentials блокируют штатный запуск через release manager;
+- capability нового image сама по себе не доказывает совместимость restored schema;
+- восстановление требует аудита данных, проверенного forward recovery схемы и при необходимости повторной офлайн-миграции паролей;
+- deploy не должен автоматически лечить это расхождение, down/force не являются repair;
+- marker отсутствует при известной истории — также повод остановиться и проверить происхождение установки.
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d db
-```
+Восстановление auth_session возвращает снимок состояния сессий: отозванная после даты backup сессия потенциально снова станет активной; сессии, созданные позднее, пропадут. Нельзя считать восстановленные сессии безопасными без отдельного решения об их отзыве. Истёкшие сроки и soft delete проверяются по восстановленным данным; удалённый после backup пользователь может появиться снова. Проверка и при необходимости отзыв восстановленных сессий — часть ручного плана, не автоматическая функция backup.sh.
 
-2. дождаться `healthy`
-3. восстановить дамп:
-
-```bash
-gzip -dc dorm-2026-08-09-120000.sql.gz | \
-docker compose -f docker-compose.yml -f docker-compose.local.yml exec -T db \
-  mysql --default-character-set=utf8mb4 -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME"
-```
-
-Если нужно полностью заменить локальную схему, сначала можно пересоздать БД вручную внутри mysql shell.
-
-## Verification
-
-Минимальная проверка после restore:
-
-```bash
-./bin/dorm-db.sh
-```
-
-И в mysql:
-
-```sql
-SELECT COUNT(*) FROM user;
-SELECT COUNT(*) FROM duty;
-SELECT COUNT(*) FROM duty_task;
-SELECT COUNT(*) FROM notification;
-```
-
-После этого можно поднять приложение и открыть:
-
-- `http://localhost:8080/app/`
-
-Если данные восстановлены некорректно, первым обычно ломается resident login или current-duty экран.
+В production восстановление БД и повторный старт согласуют отдельно; [rollback приложения](./deployment.md#rollback-приложения) не восстанавливает БД и не отменяет необратимую границу авторизации.

@@ -34,6 +34,8 @@ Frontend находится в `frontend/` и собирается Vite в `web/
 Роутинг реализован вручную в `src/app/router.tsx` по `pathname`:
 
 - `/app/login`
+- `/app/account`
+- `/app/warehouse`
 - `/app/tasks`
 - `/app/duties/history`
 - `/app/duties/:dutyId`
@@ -50,9 +52,9 @@ Frontend находится в `frontend/` и собирается Vite в `web/
 
 `ResidentAppShell` строит меню на основе `currentUser`:
 
-- обычный житель видит текущие задачи и историю;
+- основной экран обычного жителя — текущие задачи; маршрут истории существует, но данные истории доступны только текущему главе группы;
 - глава общежития видит разделы управления общежитиями, группами, жителями, территориями и каталогом задач;
-- управление предупреждениями показывается при `can_manage_penalties=true`.
+- управление предупреждениями показывается при `can_manage_penalties=true`, складом — при `can_manage_warehouse=true`; уведомления включаются кнопкой shell.
 
 Frontend только отображает права, полученные от backend. Он не является источником правил доступа.
 
@@ -61,7 +63,10 @@ Frontend только отображает права, полученные от
 Все HTTP-запросы идут через `shared/api/apiClient.ts`:
 
 - `credentials: 'same-origin'` для cookie-сессии;
-- автоматический redirect на `/app/login` при `401`;
+- исходный `401` остаётся `ApiError`, без повторения исходного запроса;
+- перед глобальным redirect выполняется отдельный `/api/v1/auth/me`: только его `401` подтверждает потерю сессии; 200, 403, 5xx, сеть или timeout не перенаправляют;
+- параллельные 401 одной версии используют общий Promise проверки с AbortController и лимитом 10 секунд; Promise очищается после любого исхода, рекурсивной проверки `/auth/me` нет;
+- login/logout отключают глобальное подтверждение 401; начало/завершение изменения авторизации меняют версию с подпиской через `useSyncExternalStore`; пока операции не завершены, новая проверка пользователя не запускается, устаревшие ответы игнорируются;
 - ошибки поднимаются как `ApiError`.
 
 Feature-level API модули:
@@ -80,12 +85,17 @@ Feature-level API модули:
 - `DutySettingsPage` — настройка команд, территорий и задач для группы;
 - `DormitoriesPage`, `GroupsPage`, `ResidentsPage`, `AreasPage`, `TaskCatalogPage` — управление структурой;
 - `PenaltiesPage` — warnings/penalties;
-- `LoginPage` — вход по логину и паролю.
+- `LoginPage` — вход по логину и паролю;
+- `AccountPage` — данные пользователя, собственные предупреждения и выход;
+- `WarehousePage` — склад и история движений.
 
 ## PWA и Service Worker
 
 - `main.tsx` регистрирует Service Worker при старте.
-- `public/manifest.webmanifest` задаёт standalone scope `/app/`.
+- `public/manifest.webmanifest`: start_url и scope `/app/`, display standalone; PNG any-иконки 192×192 и 512×512 в `/app/icons/`.
+- HTML использует `/app/favicon.svg`, `/app/manifest.webmanifest`, `/app/icons/apple-touch-icon.png` (180×180).
+- `/`, `/app`, `/app/` в router проверяют существующую сессию: 200 → replace `/app/tasks`, 401 → replace `/app/login`; до ответа loading, при 5xx/сети error и «Повторить». Backend раздаёт SPA на `/app`; корневой `/` требует доставки index внешней конфигурацией, отдельного root route backend нет.
+- На защищённой странице без загруженного currentUser показывается loading/error, а не полноценный интерфейс. Хук повторно проверяет сессию после login/logout и при Retry, не применяет ответы после размонтирования.
 - `public/service-worker.js`:
   - принимает push payload;
   - показывает notification;
@@ -99,7 +109,7 @@ Frontend собирается Vite в `web/app` с hash-based asset именам
 Для production это означает разные требования к кешированию:
 
 - `index.html` и SPA deep links должны revalidate-иться (`Cache-Control: no-cache`), потому что HTML ссылается на конкретные asset hash текущего deploy;
-- `/app/assets/*` могут иметь долгий immutable cache, потому что содержимое привязано к hash в имени файла;
+- `/app/assets/*` имеют immutable cache на год; для Vite assets версия в hash имени, для public assets требуется версия пути;
 - `/app/service-worker.js` не должен иметь immutable-cache, чтобы браузер своевременно замечал новую версию Service Worker;
 - отсутствующий `/app/assets/*` должен возвращать настоящий `404`, а не SPA fallback.
 
@@ -130,4 +140,18 @@ Frontend собирается Vite в `web/app` с hash-based asset именам
 - server-authoritative permissions;
 - cookie-based auth flow;
 - PWA scope `/app/`;
-- контракт имен полей backend response в snake_case.
+- контракт имён полей backend response, включая исторические publicKey/recurrenceInterval/startSequence.
+
+## Локальный Inter
+
+Google Fonts и внешних font CSS нет. `src/shared/styles/globals.css` регистрирует один normal `@font-face` Inter Variable WOFF2, веса 100–900, `font-display: swap`, без `local()`, italic и ограничивающего unicode-range. Mantine и body сохраняют Inter с системными fallback; используются в том числе 400/500/600/700.
+
+Файлы находятся в `frontend/public/assets/fonts/inter-v1/InterVariable.woff2` и `OFL.txt` (оба присутствуют в текущем дереве). Vite копирует их без переименования в `web/app/assets/fonts/inter-v1/`. URL — `/app/assets/fonts/inter-v1/InterVariable.woff2`; кириллица зависит от покрытия файла, дополнительных CSS-настроек не требует.
+
+Сборка допускает отсутствие WOFF2: браузер получает настоящий 404 и использует системные fallback, JavaScript от этого не ломается. Новое содержимое опубликованного immutable-шрифта требует нового каталога (`inter-v2`) и обновления URL; существующий файл не перезаписывают. Docker и shared assets release manager доставляют его тем же механизмом, что CSS/JS, без отдельного volume для шрифтов. См. [deployment](../operations/deployment.md#статические-ресурсы).
+
+SVG-планы этажей в `frontend/assets/building-plans/` преобразуются `npm run generate:plans` в `src/features/current-duty/building-plan/generated/plans.ts`; build и dev запускают генератор. Генерируемый файл не редактируют вручную.
+
+## Ограничение явного выхода
+
+AccountPanel вызывает logout и в finally выполняет `window.location.assign('/app/login')`, даже если серверный отзыв завершился ошибкой. Такой переход UI не подтверждает успешного logout: контракт backend по-прежнему возвращает ошибку при неподтверждённом отзыве. Это известное ограничение клиента; глобальная обработка обычных 401 ему не эквивалентна.

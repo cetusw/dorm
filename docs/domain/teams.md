@@ -115,3 +115,7 @@
 - CRUD и membership: `pkg/core/usecase/team/service.go`
 - group-level управление: `pkg/core/usecase/dutysettings/service.go`
 - репозиторий: `pkg/infrastructure/mysql/repository/team.go`
+
+## Границы реализации
+
+Временные исключения состава и автоматические замены отсутствующих жителей не реализованы. Наличие исторической таблицы `user_availability` не меняет текущие правила ротации или доступа. Права по совмещаемым руководящим связям описаны в [авторизации](../architecture/authorization.md).

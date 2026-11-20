@@ -1,6 +1,12 @@
 # Resident API
 
-Ниже описаны фактически зарегистрированные resident-facing маршруты Fiber. Все ответы — JSON, если не указано иное.
+Ниже описаны resident self-service, предупреждения, склад, push и используемые SPA сценарии управления. Backend prefix — `/api/v1`; UUID передаются строками, dormitory/area ID — положительными числами. Успешные ответы JSON, кроме 204. API не имеет общего механизма пагинации: не добавляйте неописанные page/limit.
+
+## Общие условия
+
+Cookie и права описаны в [авторизации](../architecture/authorization.md). На всех защищённых маршрутах проверяется серверная v2-сессия и активность пользователя. Любой POST/PUT/PATCH/DELETE, включая login/logout, требует допустимый `Origin`; отсутствие/null/чужой origin даёт 403 до use case. Для JSON body используйте Content-Type application/json.
+
+Ошибки обычно имеют `{"error":"сообщение"}`; исключение task conflict может дополнительно содержать task. Ответ содержит `X-Request-ID`. Общие статусы: 400 — параметры/валидация, 401 — сессия/credentials, 403 — права/CSRF, 404 — отсутствующая сущность, 409 — доменный конфликт, 429 — login limiter, 500 — скрытая внутренняя ошибка, 503 — недоступность проверки сессии/отмена, 504 — deadline. SQL/network ошибки других handlers не гарантируют 503: централизованный ErrorHandler может вернуть общий 500. Временные ошибки не означают logout. API deadline обычно 30 секунд, создания дежурства группы — 90; middleware сессии отдельно 5 секунд.
 
 ## Аутентификация
 
@@ -13,8 +19,11 @@
 - Ошибки:
   - `400` некорректный JSON
   - `401` неверный логин или пароль
+  - `403` недопустимый Origin
+  - `429` limiter с фактическим Retry-After
+  - `503/504` инфраструктурная ошибка/timeout
 - Side effects:
-  - устанавливает cookie `resident_session`
+  - создаёт независимую серверную сессию и только затем устанавливает cookie `resident_session`; неудачная попытка сохраняет прежнюю cookie
 
 ### `POST /api/v1/auth/logout`
 
@@ -22,7 +31,8 @@
 - Auth: не требуется, но действует на текущую cookie.
 - Response: `204 No Content`
 - Side effects:
-  - очищает cookie `resident_session`
+  - отзывает текущую v2-сессию и очищает cookie `resident_session`, не затрагивая другие устройства
+- Повторный logout, отсутствие/невалидный формат cookie безопасны. При ошибке серверного отзыва возвращается ошибка, а не ложный 204.
 
 ### `GET /api/v1/auth/me`
 
@@ -48,7 +58,7 @@
   - `group_id` — опционально, только для доступного выбора группы
   - `dormitory_id` — опционально, используется главой общежития
 - Response `200`:
-  - `selected_group_id`, `groups`, `my_group`
+  - `dormitory_id`, `my_dormitory_id` (omitempty), `selected_group_id`, `show_group_select`, `groups`, `my_group` (omitempty)
   - `has_active_duty`
   - `can_manage_tasks`
   - `can_manage_duty_settings`
@@ -77,7 +87,7 @@
   - `selected_group_id`
   - `show_group_select`
   - `groups`
-  - `duties[]` с `id`, `start_date`, `end_date`, `team_leader_name`, `progress`
+  - `duties[]` с `id`, `start_date`, `end_date`, `team_leader_name`, `period_status`, `progress`
 - Ошибки:
   - `403` доступ запрещён
   - `404` группа не найдена
@@ -88,7 +98,7 @@
 - Auth: обязательна.
 - Permissions:
   - только глава доступной группы
-- Response: тот же контракт, что `current-duty`, но в read-only режиме.
+- Response `200`: тот же контракт, что `current-duty`, но в read-only режиме. Query group_id/dormitory_id здесь не используются: доступ определяется по duty и текущей группе пользователя.
 - Ошибки:
   - `400` некорректный UUID
   - `403` доступ запрещён
@@ -141,13 +151,13 @@
 
 - Назначение: подтвердить завершённую задачу.
 - Permissions:
-  - только глава команды текущего `duty.team_id`
+  - текущий участник и глава команды `duty.team_id`, в доступном для действий периоде
 
 ### `POST /api/v1/resident/tasks/:taskId/reopen`
 
 - Назначение: вернуть завершённую задачу в работу со стороны главы команды.
 - Permissions:
-  - только глава команды
+  - текущий участник и глава команды, в доступном для действий периоде
 
 ## Push notifications
 
@@ -157,7 +167,7 @@
 - Auth: обязательна.
 - Response:
   - `enabled`
-  - `public_key | null`
+  - `publicKey | null`
 
 ### `POST /api/v1/notifications/subscriptions`
 
@@ -181,6 +191,12 @@
 - Response: `204`
 
 ## Предупреждения
+
+### `GET /api/v1/penalties/me`
+
+- Любой авторизованный пользователь, без управленческих прав.
+- `200`: `{penalties: [{id, reason, weight, issued_on}]}` — собственные активные предупреждения.
+
 
 ### `GET /api/v1/penalties`
 
@@ -221,7 +237,10 @@
 
 ### `DELETE /api/v1/penalties/:penaltyId`
 
-- Назначение: закрыть предупреждение.
+- Назначение: закрыть предупреждение; повторное закрытие идемпотентно, `204`.
+- Ошибки: 400 невалидный UUID, 403 вне scope, 404 предупреждение не найдено.
+
+Списки предупреждений не пагинируются: сводка сортируется total_weight DESC, затем по ФИО/ID; поиск — ФИО/ID, детали — issued_on DESC, created_at DESC, id ASC. DTO/сортировки: [penalty DTO](../../pkg/core/ports/dto/penalty.go), [query](../../pkg/infrastructure/mysql/query/penalty.go). Поиск возвращает `{residents: [{id, name}]}`; детали — активные записи, не архив закрытых.
 
 ## Склад
 
@@ -248,7 +267,7 @@
   - `item` с `id`, `name`, `quantity`
   - `movements[]` с `id`, `type`, `quantity`, `comment`, `created_by`, `created_at`, `balance_after`
 - Сортировка:
-  - `created_at DESC`, при равном времени tie-breaker по `id`
+  - `created_at DESC`, затем `id DESC`
 - Ошибки:
   - `400` некорректный UUID
   - `403` доступ запрещён, в том числе для позиции другого общежития
@@ -348,19 +367,68 @@
   - `404` позиция или движение не найдены
   - `409` удаление делает историю с отрицательным остатком
 
-## Management API, доступный из той же SPA
+## Управление жителями
 
-Эти маршруты не относятся к resident self-service, но реально потребляются тем же frontend и требуют auth:
+Все `/api/v1/users` требуют сессию и `CanManageDormitories`: лидерство хотя бы одного общежития, без модели роли admin. Этот gate даёт административный доступ; его нельзя документировать как ограничение только своим общежитием.
 
-- `/api/v1/dormitories`
-- `/api/v1/groups`
-- `/api/v1/groups/:id/duty-settings/**`
-- `/api/v1/teams`
-- `/api/v1/areas`
-- `/api/v1/task-definitions`
-- `/api/v1/users`
+| Method и URL | Параметры/body | Успешный ответ |
+| --- | --- | --- |
+| `GET /api/v1/users` | обязательный query dormitory_id | 200 `{users: [{id,name,room_number}]}` |
+| `GET /api/v1/users/options` | без параметров | 200 `{users: [{id,name}]}` |
+| `GET /api/v1/users/:id` | UUID | 200 ResidentDetails |
+| `POST /api/v1/users` | CreateResidentRequest | 201 ResidentDetails |
+| `PUT /api/v1/users/:id` | UUID, UpdateResidentRequest | 200 ResidentDetails |
+| `DELETE /api/v1/users/:id` | UUID | 204, soft delete и отзыв сессий |
 
-Общее правило:
+Create/Update body: first_name, last_name, middle_name (nullable), login, **password (обязателен и для PUT)**, dormitory_id, floor (nullable), room_number (nullable). ResidentDetails содержит id, first_name, last_name, middle_name, login, floor, room_number; не возвращает password_hash. Полный DTO — [user.go](../../pkg/core/ports/dto/user.go), ограничения — [жители](../domain/residents.md). Неверные данные и бизнес-конфликт логина здесь дают 400, отсутствующие детали/PUT — 404, отказ gate — 403. Нельзя обещать 409 для конфликта login: handler маппит бизнес-ошибку в 400.
 
-- доступ в основном ограничен главой общежития;
-- исключения внутри `/groups/:id/duty-settings/**` — это сценарии главы группы.
+## Настройки дежурства группы
+
+Prefix `/api/v1/groups/:id`, id — UUID группы. Здесь требуется именно текущий глава этой группы; лидерство общежитием само по себе не даёт права. Изменения защищены Origin. Некорректные ID/body — 400, отсутствие ресурса — 404, отказ — 403; ошибки инвариантов settings в основном 400.
+
+| Method и URL | Вход | Ответ |
+| --- | --- | --- |
+| `POST /api/v1/groups/:id/duties` | start_date/end_date | 204; 409 пересечение или уже созданное дежурство |
+| `GET /api/v1/groups/:id/duty-settings` | — | 200 DutySettingsResponse |
+| `GET /api/v1/groups/:id/duty-settings/teams/members` | — | 200 options |
+| `GET /api/v1/groups/:id/duty-settings/teams/:teamId` | UUID команды | 200 TeamDetails |
+| `GET /api/v1/groups/:id/duty-settings/teams/:teamId/members` | UUID команды | 200 TeamMembersResponse |
+| `GET /api/v1/groups/:id/duty-settings/teams/:teamId/member-search` | q | 200 TeamSearchResponse |
+| `POST /api/v1/groups/:id/duty-settings/teams/:teamId/members` | user_id | 204 |
+| `PUT /api/v1/groups/:id/duty-settings/teams/:teamId/leader` | user_id | 204 |
+| `DELETE /api/v1/groups/:id/duty-settings/teams/:teamId/members/:userId` | UUID | 204 |
+| `POST /api/v1/groups/:id/duty-settings/teams` | CreateResidentTeamRequest | 201 TeamDetails |
+| `PUT /api/v1/groups/:id/duty-settings/teams/:teamId` | UpdateResidentTeamRequest | 200 TeamDetails |
+| `DELETE /api/v1/groups/:id/duty-settings/teams/:teamId` | UUID | 204 |
+| `POST /api/v1/groups/:id/duty-settings/teams/reorder` | team_ids[] | 204 |
+| `POST /api/v1/groups/:id/duty-settings/teams/:teamId/assign-active-duty` | — | 204, сброс состояния задач |
+| `POST /api/v1/groups/:id/duty-settings/areas` | name, group_id, floor | 201 AreaDetails |
+| `PUT /api/v1/groups/:id/duty-settings/areas/:areaId` | name, group_id, floor | 200 AreaDetails |
+| `DELETE /api/v1/groups/:id/duty-settings/areas/:areaId` | числовой ID | 204 |
+| `POST /api/v1/groups/:id/duty-settings/areas/:areaId/tasks` | CreateTaskRequest | 201 TaskDetails |
+| `PUT /api/v1/groups/:id/duty-settings/tasks/:taskId` | UpdateTaskRequest | 200 TaskDetails |
+| `DELETE /api/v1/groups/:id/duty-settings/tasks/:taskId` | UUID | 204 |
+| `POST /api/v1/groups/:id/duty-settings/tasks/:taskId/include` | — | 204 |
+| `DELETE /api/v1/groups/:id/duty-settings/tasks/:taskId/include` | — | 204 |
+
+Ручное создание принимает даты YYYY-MM-DD; parseDutyPeriod приводит их к 09:00 в TZ. Настройки возвращают group, areas/tasks, teams, active_duty_team_id, task_editor_state, task_editor_alert, active_duty. Детали включения/исключения зависят от активного периода и доступности редактора (его календарные границы отличаются от resident view, см. [duties](../domain/duties.md#отличие-редактора-duty-settings)); это не произвольное изменение исторических DutyTask.
+
+JSON-поля настроек описаны в [dutysettings.go](../../pkg/core/ports/dto/dutysettings.go), команд — в [team.go](../../pkg/core/ports/dto/team.go), территорий/задач — в [taskcatalog.go](../../pkg/core/ports/dto/taskcatalog.go). CreateTask: title, cost, **recurrenceInterval**, area_id, include_in_current_duty. UpdateTask — без include_in_current_duty. `startSequence` возвращается, но не задаётся этими request DTO. API использует смесь snake_case, publicKey и этих двух исторических camelCase имён; не переименовывайте их в клиенте.
+
+## Остальной административный API
+
+Область этого документа — Resident API и сценарии SPA, а не полная спецификация всех CRUD DTO. Ниже точный индекс остальных зарегистрированных маршрутов; детали полей см. в связанных DTO/handlers. Все требуют CanManageDormitories и общую сессию, POST/PUT/DELETE — также Origin. CRUD: чтение/PUT 200, POST 201, DELETE 204; параметры/бизнес-валидация обычно 400, отсутствие при чтении 404, gate 403.
+
+| Ресурс | Маршруты | Фильтры и контракт |
+| --- | --- | --- |
+| Общежития | GET/POST `/api/v1/dormitories`, GET/PUT/DELETE `/api/v1/dormitories/:id` | положительный числовой id; [structure DTO](../../pkg/core/ports/dto/structure.go) |
+| Группы | GET/POST `/api/v1/groups`, GET/PUT/DELETE `/api/v1/groups/:id`, GET `/api/v1/groups/options` | GET списка/options требует dormitory_id; [handlers](../../pkg/adapters/http/group.go) |
+| Команды | GET/POST `/api/v1/teams`, GET/PUT/DELETE `/api/v1/teams/:id`, GET `/api/v1/teams/members` | GET списка/members: group_id; members также optional team_id; [team DTO](../../pkg/core/ports/dto/team.go) |
+| Территории | GET/POST `/api/v1/areas`, GET/PUT/DELETE `/api/v1/areas/:id` | список/POST/PUT/DELETE требуют dormitory_id; числовой id; [handlers](../../pkg/adapters/http/area.go) |
+| Каталог | GET/POST `/api/v1/task-definitions`, GET/PUT/DELETE `/api/v1/task-definitions/:id` | все операции требуют dormitory_id, id UUID; [handlers](../../pkg/adapters/http/task_catalog.go) |
+
+## Детали resident DTO
+
+`team` в current-duty — отображаемое имя руководителя команды, не техническое team.name. `tasks` содержит id, area_id/name/floor, title, cost, status, is_mine, can_take/return/complete/open/verify/review_open и optional assignee_id/name (omitempty). Статусы: free, assigned, completed, verified. TeamMembers: id/name, только текущие участники. Пустые коллекции и omitempty определяются DTO и сборщиком ответа; клиент не должен выводить доступ из отсутствия кнопки.
+
+История не пагинируется и сортируется start_date DESC, sequence_number DESC, id DESC; progress содержит total_cost_sum, taken_cost_sum и четыре счётчика задач. Алгоритм выбора текущего/незавершённого прошлого дежурства — [duties](../domain/duties.md); подробные DTO — [residentduty.go](../../pkg/core/ports/dto/residentduty.go).

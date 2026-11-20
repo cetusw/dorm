@@ -17,9 +17,9 @@ Backend реализован как практическая гексагона�
 
 - `domain` не знает про HTTP, MySQL, cron и browser push.
 - `ports` знают только про контракты.
-- `usecase` зависит от `domain` и `ports`.
+- `usecase` преимущественно зависит от `domain` и `ports`; фактическое исключение — cleaning/distribution.go импортирует тип ошибки MySQL для распознавания конфликта создания дежурства. SQL остаётся в repositories.
 - `adapters/http` зависит от `ports` и конкретных use-case интерфейсов.
-- `infrastructure` зависит от core-слоёв, но не наоборот.
+- реализации `infrastructure` зависят от core-контрактов; business core не импортирует пакеты инфраструктуры проекта.
 
 ## Слои
 
@@ -44,12 +44,14 @@ Backend реализован как практическая гексагона�
 - use-case интерфейсы (`CleaningUseCase`, `ResidentDutyUseCase`, `PenaltyUseCase` и т. д.);
 - DTO для HTTP/frontend;
 - query-service интерфейсы для read-моделей;
-- event bus и push sender контракты.
+- event bus и push sender контракты;
+- `SessionRepository`, `SessionUseCase` и DTO сессии (без bearer token в БД).
 
 ### `pkg/core/usecase`
 
 Ключевые сервисы:
 
+- `authentication.Service`: создание, проверка и отзыв серверных v2-сессий;
 - `cleaning.Service`: создание дежурств и действия с `DutyTask`;
 - `resident.Service`: формирование resident view текущего дежурства и истории;
 - `dutysettings.Service`: настройки группы, команд, территорий и задач;
@@ -85,7 +87,7 @@ HTTP-адаптеры регистрируются в `pkg/infrastructure/di/con
 - вызвать use-case;
 - вернуть JSON и HTTP-код.
 
-Бизнес-решения о правах и инвариантах остаются в use-case и домене.
+Проверка сессии и CSRF выполняется централизованно. Административные handlers дополнительно требуют `CanManageDormitories` и возвращают ненулевую ошибку при отказе. Сценарии resident, duty settings, предупреждений и склада проверяют отношения и область доступа в use cases. Общего RBAC нет; см. [авторизацию](./authorization.md).
 
 ### `pkg/infrastructure/mysql`
 
@@ -99,6 +101,7 @@ HTTP-адаптеры регистрируются в `pkg/infrastructure/di/con
 
 - UUID сериализуются как `BINARY(16)`;
 - soft delete есть у `user` и `task`;
+- INSERT/UPDATE пользователя разделены; смена пароля и soft delete транзакционно отзывают сессии, выдача сессии блокирует пользователя и сверяет credentials;
 - создание `duty` выполняется в транзакции с блокировкой группы и проверкой пересечения периода.
 
 ### `pkg/infrastructure/di`
@@ -123,8 +126,11 @@ HTTP-адаптеры регистрируются в `pkg/infrastructure/di/con
   - `week.started`
   - `task.assigned`
   - `task.completed`
+  - `task.uncompleted`
   - `tasks.ready_for_review`
-- сейчас на bus подписаны только notification handlers.
+- сейчас на bus подписаны notification handlers для `week.started` и `tasks.ready_for_review`;
+- bus in-memory, не является durable queue; остановка ожидает обработчики;
+- cron использует SkipIfStillRunning и контекст задания до 5 минут; при shutdown активные задания отменяются.
 
 ### Web Push infrastructure
 
@@ -164,3 +170,13 @@ sequenceDiagram
 - ad hoc SQL в handler-ах;
 - прямые вызовы push/web API из use-case кроме через порты;
 - доменную логику в DTO.
+
+## HTTP lifecycle и диагностика
+
+Fiber: ReadTimeout 15 секунд, WriteTimeout 120, IdleTimeout 60. Контекст API — 30 секунд, ручного создания дежурства группы — 90. Проверка сессии отдельно ограничена 5 секундами. Это cooperative deadlines, не гарантия отмены уже отправленного SQL/DDL.
+
+`diagnostics.go` генерирует Request ID (`X-Request-ID`), делает access logging через slog, panic recovery и централизованный JSON ErrorHandler. Deadline возвращает 504, отмена 503, внутренние детали скрыты. Логи используют шаблон route, без query и credentials; медленный запрос — от 2 секунд.
+
+`GET /health/live` возвращает 204; `/health/ready` делает PingContext до 2 секунд и возвращает 204 либо 503. Docker healthcheck использует live, release manager дополнительно ready.
+
+`cmd/main.go` обрабатывает SIGINT/SIGTERM с общим бюджетом 20 секунд: останавливает scheduler, завершает HTTP, ожидает event handlers, закрывает SQL pool. Compose даёт контейнеру 30 секунд. Production DI перед стартом проверяет готовность Argon2id; `dorm --check-config` проверяет только конфигурацию, без подключения к БД.

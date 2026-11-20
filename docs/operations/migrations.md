@@ -40,11 +40,13 @@ go run ./cmd/migrate up
 
 ## Поддерживаемые команды CLI
 
+Ниже перечислен синтаксис, а не рекомендуемая последовательность выполнения. Для force переменная VERSION должна содержать целую версию, выбранную после ручного аудита схемы.
+
 ```bash
 go run ./cmd/migrate up
 go run ./cmd/migrate down
 go run ./cmd/migrate version
-go run ./cmd/migrate force <version>
+go run ./cmd/migrate force "$VERSION"
 ```
 
 Что делает каждая:
@@ -70,7 +72,7 @@ go run ./cmd/migrate force <version>
 
 - у каждого `up.sql` должен быть `down.sql`;
 - `down.sql` должен откатывать схему настолько корректно, насколько это возможно;
-- destructive migrations всё равно должны иметь осмысленный rollback, даже если он частичный.
+- необратимая security migration может намеренно запрещать down: её нельзя представлять как обратимую.
 
 ## Проверка schema после миграции
 
@@ -104,23 +106,30 @@ SHOW INDEX FROM team;
 go run ./cmd/migrate version
 ```
 
-Если `dirty=true`, сначала нужно понять, на каком шаге миграция оборвалась. Только после этого использовать:
+Если `dirty=true`, сначала исследуют фактическую схему, продолжающийся DDL и состояние данных. Следующая команда показана как синтаксис ручного инструмента, а не способ автоматического исправления:
 
 ```bash
-go run ./cmd/migrate force <version>
+go run ./cmd/migrate force "$VERSION"
 ```
 
 `force` исправляет служебную версию migration table, но не чинит схему сам по себе.
 
 ## Production flow
 
-Production deploy script использует:
+Release manager запускает migrate из versioned image с обоими production Compose и assets override. Рабочий каталог и env — конкретный релиз, project dorm. SQL up идёт после предварительного backup и до switch; для первого перехода авторизации — только после остановки writers, final backup и активации marker. Не запускайте вручную отдельный Compose без этих проверок вместо release manager.
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm -T --no-deps migrate ./dorm-migrate up
-```
+Обычный backend имеет MySQL readTimeout 30 секунд, migrator — 10 минут; connect timeout и PingContext — 5 секунд, writeTimeout — 15. Внешний timeout Compose для up — 900 секунд, для прочих команд обычно 180. Timeout клиента не доказывает завершение DDL на сервере. После ошибки release manager сохраняет backup, сообщает stage/dirty и не выполняет retry/down/force/restore автоматически.
 
-То есть миграции применяются:
+## `1795059644_auth_sessions`
 
-1. после старта БД;
-2. до пересоздания приложения.
+Миграция содержит:
+
+1. Временную preflight-таблицу с CHECK и проверку дублирующихся активных логинов. Конфликты требуют ручного решения, данные автоматически не исправляются.
+2. `auth_session` с PK хеша токена, FK user и индексами пользователя/срока.
+3. Уникальный функциональный `uq_active_user_login`, игнорирующий soft-deleted пользователей.
+
+В ней нет auth_security, auth_legacy_token или auth_legacy_allowed. Старые промежуточные версии 1795063629/1795064130 не входят в текущую цепочку. Если окружение ранее применяло такую экспериментальную историю, нельзя считать его совместимым только по номеру: требуется аудит фактической схемы; не используйте force для сокрытия расхождения.
+
+Down этой миграции намеренно содержит SIGNAL об ошибке: граница forward-only. DDL MySQL может фиксироваться отдельно от последующих операторов, поэтому ошибка не означает откат всей схемы. Пароли не преобразуются SQL-файлом: отдельная утилита делает это транзакционно после DDL. [Первый переход](./deployment.md#первый-переход-на-новую-авторизацию) фиксирует внешний marker до начала миграции; после него старый backend запрещён.
+
+`force` только меняет служебную версию, не чинит таблицы, credentials или сессии. `down`, force и restore dump не являются автоматическим восстановлением после security migration. Нужны проверенные forward-изменения и повторная readiness-проверка. Новые миграции создают парой через create-migration.sh; уже применённые файлы не редактируют.
