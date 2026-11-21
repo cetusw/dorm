@@ -53,7 +53,7 @@
 - `created_at`
 - `deleted_at NULL`
 
-`password_hash VARCHAR(255)` содержит Argon2id с параметрами и солью; старые пароли переводятся отдельной утилитой, не SQL-миграцией. Колонки `login` и `password_hash` исторически nullable, но production readiness требует корректные credentials всех активных пользователей.
+`password_hash VARCHAR(255)` содержит Argon2id с параметрами и солью; пароли создаются и обновляются штатными use cases. Колонки `login` и `password_hash` исторически nullable, но production readiness требует корректные credentials всех активных пользователей.
 
 `uq_active_user_login` — уникальный функциональный индекс `(CASE WHEN deleted_at IS NULL THEN login ELSE NULL END)`. Сравнение подчиняется collation MySQL; удалённые пользователи не занимают активный логин. Отдельного `role_id` нет.
 
@@ -66,7 +66,7 @@
 - `revoked_at TIMESTAMP(6) NULL`;
 - индексы `ix_auth_session_user (user_id)`, `ix_auth_session_expiry (expires_at)`.
 
-Таблиц `auth_security`, `auth_legacy_token` и поля `user.auth_legacy_allowed` в итоговой цепочке нет. Защита от старого backend — файловый маркер deployment, см. [выкладку](../operations/deployment.md). Механизм сессий — в [авторизации](./authorization.md).
+Механизм серверных сессий описан в [авторизации](./authorization.md).
 
 ### `area`
 

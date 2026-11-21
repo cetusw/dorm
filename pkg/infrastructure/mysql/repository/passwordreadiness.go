@@ -22,7 +22,7 @@ func checkActiveLogins(ctx context.Context, db *sql.DB) error {
 		return errors.New("cannot check active login uniqueness")
 	}
 	if duplicates != 0 {
-		return errors.New("duplicate active logins require manual resolution before credential migration")
+		return errors.New("duplicate active logins; credential readiness check failed")
 	}
 	return nil
 }
@@ -41,7 +41,7 @@ func checkActivePasswordHashes(ctx context.Context, db interface {
 			return errors.New("cannot read credential readiness")
 		}
 		if !useruc.ValidPasswordHash(hash) {
-			return errors.New("active credentials require offline Argon2id migration; backend startup blocked")
+			return errors.New("active credentials contain an invalid password hash; backend startup blocked")
 		}
 	}
 	if rows.Err() != nil {

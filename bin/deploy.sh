@@ -2,23 +2,18 @@
 set -euo pipefail
 umask 077
 cd "$(dirname "$0")/.."
-[[ $# -ge 1 ]] || { echo "Usage: $0 user@host [--pull] [--prepare-auth --confirm-exclusive-db-writers]" >&2; exit 1; }
+[[ $# -ge 1 ]] || { echo "Usage: $0 user@host [--pull]" >&2; exit 1; }
 REMOTE=$1; shift
 [[ "$REMOTE" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*@[a-zA-Z0-9._-]+$ ]] || { echo 'Expected SSH destination user@host' >&2; exit 1; }
 BUILD_ARGS=()
-PREPARE=''
-WRITERS_CONFIRMED=''
 while (( $# )); do
   case "$1" in
     --pull) BUILD_ARGS+=(--pull); shift ;;
-    --prepare-auth) PREPARE=$1; shift ;;
-    --confirm-exclusive-db-writers) WRITERS_CONFIRMED=$1; shift ;;
     *) echo 'Unknown deploy argument' >&2; exit 1 ;;
   esac
 done
-[[ -z "$PREPARE" && -z "$WRITERS_CONFIRMED" || -n "$PREPARE" && -n "$WRITERS_CONFIRMED" ]] || { echo 'Authentication preparation requires exclusive writers confirmation' >&2; exit 1; }
 for command in docker git ssh scp rsync mktemp; do command -v "$command" >/dev/null; done
-for path in Dockerfile docker-compose.yml docker-compose.prod.yml .env.prod mysql bin/release.sh bin/migrate-passwords.sh; do
+for path in Dockerfile docker-compose.yml docker-compose.prod.yml .env.prod mysql bin/release.sh; do
   [[ -e "$path" ]] || { echo "Missing required path: $path" >&2; exit 1; }
 done
 BRANCH=$(git symbolic-ref --quiet --short HEAD) || { echo 'Detached HEAD: deploy from a named Git branch' >&2; exit 1; }
@@ -63,5 +58,5 @@ scp -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAli
 scp -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 .env.prod "$REMOTE:$SERVER_DIR/releases/$RELEASE/.env"
 rsync -a -e 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3' -- mysql/ "$REMOTE:$SERVER_DIR/releases/$RELEASE/mysql/"
 "${SSH[@]}" "$REMOTE" mkdir -p "$SERVER_DIR/bin" </dev/null
-scp -o BatchMode=yes -o ConnectTimeout=10 bin/release.sh bin/migrate-passwords.sh "$REMOTE:$SERVER_DIR/bin/"
-"${SSH[@]}" "$REMOTE" bash -s -- "$SERVER_DIR" deploy "$IMAGE" "$PREPARE" "$WRITERS_CONFIRMED" < bin/release.sh
+scp -o BatchMode=yes -o ConnectTimeout=10 bin/release.sh "$REMOTE:$SERVER_DIR/bin/"
+"${SSH[@]}" "$REMOTE" bash -s -- "$SERVER_DIR" deploy "$IMAGE" < bin/release.sh

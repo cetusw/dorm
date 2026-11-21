@@ -15,6 +15,6 @@
 
 1. [Архитектурный обзор](./architecture/overview.md) и [связи полномочий/сессии](./architecture/authorization.md).
 2. [Локальный запуск](./operations/development.md), затем домен дежурств и [API](./api/resident-api.md).
-3. Для сопровождения — [релизы и первый переход авторизации](./operations/deployment.md), [backup/restore](./operations/backup-restore.md), [миграции](./operations/migrations.md).
+3. Для сопровождения — [релизы](./operations/deployment.md), [backup/restore](./operations/backup-restore.md), [миграции](./operations/migrations.md).
 
 Документы описывают текущий checkout, но не подтверждают версию или выполнение миграций в production. ADR сохраняют контекст решений; specifications — исторические материалы. Порядок работы агента задаёт корневой `AGENTS.md`, а фактические версии toolchain — go.mod/Dockerfile/package-lock.

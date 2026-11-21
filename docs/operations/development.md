@@ -50,7 +50,7 @@ bash bin/bootstrap.sh
 
 В Git bootstrap.sh не имеет executable bit, поэтому используется bash, без изменения прав файла. Нужен работающий `dorm-db`, схема и актуальный образ app с `dorm-hash-password`; работающий `dorm-app` не нужен. Bootstrap использует одноразовый Compose-контейнер с entrypoint утилиты и передаёт пароль через stdin. Затем в транзакции создаёт первого пользователя, общежитие и назначает руководителя. Требует отсутствие активных пользователей и отсутствие общежитий; не предназначен для повторного заполнения существующей базы. Пароль вводится скрыто дважды, минимум 8 символов. Хеш — Argon2id.
 
-Bootstrap не доставляется обычным deploy автоматически. Если он нужен для новой пустой production-установки, администратор отдельно доставляет проверенный скрипт и задаёт `PROJECT_DIR`/`ENV_FILE` каталога конкретного релиза с закреплённым DORM_IMAGE; случайный latest не используют. Первый переход уже заполненной старой установки описан отдельно в [deployment](./deployment.md#первый-переход-на-новую-авторизацию).
+Bootstrap не доставляется обычным deploy автоматически. Если он нужен для новой пустой production-установки, администратор отдельно доставляет проверенный скрипт и задаёт `PROJECT_DIR`/`ENV_FILE` каталога конкретного релиза с закреплённым DORM_IMAGE; случайный latest не используют.
 
 ## Frontend dev server
 
@@ -74,16 +74,3 @@ go run ./cmd/main.go
 ```
 
 Порт 8080 должен быть свободен; для SPA нужен собранный `web/app`. Live — `/health/live`, ready — `/health/ready`.
-
-## Проверка старых паролей на изолированной локальной базе
-
-Одноразовая утилита остаётся в образе. На остановленном локальном backend, с исключёнными writers, после backup подготовьте принадлежащий вам обычный файл 0600 без ссылок: строка `логин пароль`, без пробелов внутри пароля. Не печатайте его и не передавайте пароль аргументом. Для disposable Compose-окружения с актуальным образом:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml stop app
-docker compose -f docker-compose.yml -f docker-compose.local.yml run --rm -T --no-deps app ./dorm-password-migration dry-run < /absolute/path/passwords.txt
-docker compose -f docker-compose.yml -f docker-compose.local.yml run --rm -T --no-deps app ./dorm-password-migration apply < /absolute/path/passwords.txt
-docker compose -f docker-compose.yml -f docker-compose.local.yml run --rm -T --no-deps app ./dorm-password-migration check
-```
-
-Это локальная проверка утилиты; она не заменяет production release manager и его marker/backup. Серверный `bin/migrate-passwords.sh` требует подготовленного release-state и для обычного checkout не подходит. SHA-256 не поддерживается при штатном login даже в development.

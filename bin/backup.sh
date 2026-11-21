@@ -17,7 +17,7 @@ done
 for command in ssh scp gzip mktemp; do command -v "$command" >/dev/null; done
 SERVER_DIR="/home/${REMOTE%@*}/dorm"
 BACKUP=$(ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "$REMOTE" bash -s -- "$SERVER_DIR" backup < "$SCRIPT_DIR/release.sh")
-[[ "$BACKUP" =~ ^$SERVER_DIR/backups/dorm-backup-[0-9]{8}-[0-9]{6}(-(preliminary|final)-[a-zA-Z0-9]{6})?\.sql\.gz$ ]] || { echo 'Invalid backup path returned by server' >&2; exit 1; }
+[[ "$BACKUP" =~ ^$SERVER_DIR/backups/dorm-backup-[0-9]{8}-[0-9]{6}-[a-zA-Z0-9]{6}\.sql\.gz$ ]] || { echo 'Invalid backup path returned by server' >&2; exit 1; }
 echo "Server backup: $REMOTE:$BACKUP"
 if (( REMOTE_ONLY )); then exit 0; fi
 mkdir -p -- "$OUTPUT"

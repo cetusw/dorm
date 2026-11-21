@@ -66,4 +66,4 @@ flowchart LR
 
 [Авторизация](./authorization.md) использует Argon2id и серверные v2-сессии в MySQL. Отдельных Telegram/Google Sheets интеграций и таблицы ролей в runtime нет.
 
-[Release manager](../operations/deployment.md) доставляет versioned Docker-образы, сохраняет предыдущие релизы и статические ресурсы, делает backup и проверяет readiness. Первый переход старой установки на новую авторизацию выполняется отдельно в окне обслуживания; наличие кода этой процедуры не подтверждает её выполнение в production.
+[Release manager](../operations/deployment.md) доставляет versioned Docker-образы, сохраняет предыдущие релизы и статические ресурсы, делает backup и проверяет readiness.
