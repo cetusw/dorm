@@ -1,77 +1,76 @@
 # Production deployment
 
-## Границы и конфигурация
+## Одна команда
 
-Источник истины: `bin/deploy.sh`, `release.sh`, `rollback.sh`, `backup.sh`, Dockerfile и production Compose. Команды с SSH запускаются из локального checkout; серверный каталог определяется как `/home/<SSH-user>/dorm`. Нужны доступ по SSH в BatchMode, Docker/Compose v2, Bash, rsync/scp и GNU утилиты release manager (включая flock, timeout, sync). Пароли SSH интерактивно не запрашиваются.
-
-Локально подготовьте защищённый `.env.prod`: DB_HOST=db, DB_PORT=3306, DB_USER, DB_PASSWORD, DB_ROOT_PASSWORD, DB_NAME, DB_DRIVER=mysql, TZ; `AUTH_ORIGIN` — единственный публичный HTTPS-origin, `AUTH_TRUSTED_PROXIES` — точные IP/CIDR доверенного reverse proxy. Production Compose задаёт `APP_ENV=production`. Proxy должен заменять X-Real-IP адресом клиента. `AUTH_SECRET` не нужен. Web Push и scheduler настраиваются отдельно, см. [уведомления](./notifications.md) и [авторизацию](../architecture/authorization.md).
-
-`.env.prod` копируется как `.env` конкретного релиза с закреплённым DORM_IMAGE. `dorm --check-config` проверяет конфигурацию без подключения к БД; отдельно проверяются БД, схема и готовность credentials. Пример env не содержит production AUTH_ORIGIN/proxy: их надо задать явно. TLS/reverse proxy сопровождаются вне репозитория; app публикуется на `127.0.0.1:8080`, БД наружу не публикуется.
-
-## Состав образа
-
-Dockerfile: Node 22 собирает frontend; Go 1.25 — backend. Runtime Alpine 3.22 содержит CA certificates, tzdata, `dorm`, `dorm-migrate`, `dorm-hash-password`, `config.json`, SQL-миграции и `web/`. Секреты и файл паролей в image не помещают.
-
-## Обычный deployment
-
-Из именованной Git-ветки:
+Из корня локального checkout:
 
 ```bash
 ./bin/deploy.sh admin@server
 ```
 
-Для явного обновления базовых images:
+Для обновления базовых Docker images:
 
 ```bash
 ./bin/deploy.sh admin@server --pull
 ```
 
-Без --pull используется обычный Docker cache; script предупреждает о незакоммиченных изменениях, но собирает текущее дерево. Detached HEAD запрещён. Имя `dorm-app:<нормализованная-ветка>-<UTC timestamp>` резервируется, существующий image не перезаписывается.
+Ветка Git и release notes не требуются. Образ получает уникальный тег с UTC-временем и случайным суффиксом. Скрипт собирает текущее дерево локально; Go/frontend на сервере не собираются. Отдельного серверного менеджера, истории версий и автоматического rollback нет.
 
-Последовательность:
+## Требования
 
-1. Проверить локальные инструменты, .env.prod, Compose, mysql/ и серверный доступ, собрать образ и docker save.
-2. Зарезервировать `releases/<release>/`, проверить место, доставить image.tar, Compose, env и mysql/; исходники backend/frontend не передаются. Общий release.sh доставляется в `$ROOT/bin/`.
-3. Под flock `$ROOT/.deployment.lock` проверить подтверждённый release-state, активный контейнер и image identity, загрузить image, поднять/проверить БД и конфигурацию.
-4. Создать проверенный штатный backup. Подготовить shared assets и импортировать assets кандидата/сохраняемых релизов.
-5. Проверить clean SQL schema и выполнить SQL up (внешний лимит 900 секунд; прочие Compose-команды обычно 180).
-6. Атомарно выбрать `active`, пересоздать только app без зависимостей. Production-приложение при старте проверяет корректность Argon2id всех активных пользователей.
-7. До подтверждения проверить image ID и Compose identity, health, ready, HTML, реальные CSS/JS с SHA-256 из выбранного image и shared assets mount. Бюджет проверки около 120 секунд, отдельные HTTP-запросы ограничены.
-8. Атомарно сохранить подтверждённые current/previous и версии схемы в `release-state`.
+Локально: Bash, Docker с Compose v2, SSH/SCP, rsync, mktemp и стандартные GNU утилиты. На сервере: Docker/Compose v2, Bash, flock, gzip, timeout, curl, diff, find, sha256sum, stat, sync и стандартные файловые утилиты. Docker должен быть доступен пользователю без интерактивного sudo; SSH использует BatchMode и настроенный ключ/known_hosts. Проверки не отключают проверку SSH host key.
 
-`/health/live` возвращает 204 (Compose healthcheck), `/health/ready` — 204 либо 503 после проверки MySQL. Успешная отдача HTML сама по себе не доказывает readiness.
+Нужны Dockerfile, оба Compose-файла, mysql/ и защищённый `.env.prod`. Production Compose задаёт APP_ENV=production. Настройте DB_HOST=db, DB_PORT=3306, DB_DRIVER=mysql, DB_NAME, непустые DB_USER/DB_PASSWORD/DB_ROOT_PASSWORD без TODO, TZ, HTTPS AUTH_ORIGIN и AUTH_TRUSTED_PROXIES. Proxy должен подменять X-Real-IP реальным адресом клиента. См. [авторизацию](../architecture/authorization.md). Секреты не выводятся, `.env.prod` не исполняется через source. Локальная проверка использует Compose env parser, поэтому кавычки dotenv обрабатываются так же, как при запуске приложения.
 
-Images, releases, backups и старые assets сохраняются. Автоматического image prune, удаления volume и rollback БД нет. Retention и свободное место контролирует администратор. Deploy не требует файла паролей или специальной процедуры авторизации.
+TLS/reverse proxy сопровождаются отдельно; app слушает на сервере `127.0.0.1:8080`, MySQL наружу не публикуется.
 
-## Сбои релиза
+## Серверный каталог
 
-Ошибка конфигурации или backup останавливает deploy до SQL-миграций. После ошибки DDL проверьте фактическую схему и schema_migrations: SQL может продолжать выполняться после timeout клиента. Скрипт не делает автоматических retry/down/force/restore и сохраняет backup.
+Корень — `/home/<SSH-user>/dorm/`:
 
-После неудачного switch/verification восстановление CURRENT допускается только при неизменной clean schema, совпадающей с подтверждённой версией CURRENT. Перед восстановлением проверяются image identity, конфигурация, символьные ссылки и shared assets; здоровый подтверждённый контейнер без необходимости не пересоздаётся.
-
-При сбое confirmation скрипт перечитывает атомарный release-state и сообщает, было ли подтверждение записано. Он не угадывает результат и не восстанавливает БД. Если состояние невозможно однозначно прочитать, нужна ручная сверка контейнера, selected release и metadata.
-
-## Rollback приложения
-
-```bash
-./bin/rollback.sh admin@server
+```text
+docker-compose.yml
+docker-compose.prod.yml
+.env
+mysql/
+backups/
+shared/assets/
+.deployment.lock
 ```
 
-Цель — предыдущий подтверждённый image; при рассогласовании selected/container с CURRENT сначала восстанавливается CURRENT. При отличии схемы rollback остановится; только после самостоятельной проверки совместимости допустим `--confirm-schema-compatible`. Этот флаг является подтверждением администратора, а не доказательством совместимости; dirty/unreadable schema по-прежнему блокирует операцию. SQL down и восстановление dump не выполняются.
+В `.env` закрепляются DORM_IMAGE и абсолютный DORM_ASSETS_DIR. Production Compose монтирует shared/assets read-only в `/app/web/app/assets`; дополнительных override-файлов не требуется. Все серверные Compose-команды явно используют `-p dorm`, корневые файлы и env. Volume остаётся `dorm_dorm-db-data`.
 
-Release manager не проверяет исторические поколения авторизации Docker-образов. Администратор должен выбирать для rollback только релизы с действующей Argon2id/server-session реализацией и совместимые с текущими данными. Совпадение версии схемы само по себе не подтверждает совместимость старого бинарника.
+## Последовательность
+
+1. Проверить аргументы, Docker, SSH/Compose, собрать образ и проверить production-конфигурацию одноразовым контейнером без сетевого доступа.
+2. Через приватные временные каталоги передать image.tar, Compose, env и mysql/. Исходники приложения не передаются. Временные файлы удаляются; остаток незавершённой передачи не выбирается следующим запуском.
+3. Взять flock на весь серверный этап, проверить структуру каталогов и identity существующих контейнеров/volume, загрузить image и сверить image ID с локальным.
+4. Подготовить обычные корневые конфигурационные файлы. Работающий dorm-db не пересоздаётся; остановленный запускается через docker start. Если БД отсутствует, Compose создаёт её в project dorm с тем же именем volume. При чужих labels/mount скрипт отказывает, а не выбирает другую БД.
+5. Дождаться healthy и реального SELECT 1, проверить соответствие DB_HOST/PORT/NAME существующей БД. Создать и проверить один [backup](./backup-restore.md).
+6. Проверить clean schema_migrations, чисто остановить dorm-app и выполнить dorm-migrate up из нового image. После up повторно проверить schema, поля auth_session и unique index uq_active_user_login.
+7. Дополнить shared assets без перезаписи отличающегося содержимого. При первом подключении общего каталога сохранить также assets текущего контейнера. Проверить конфигурацию и пересоздать только app с --no-deps.
+8. Дождаться running/healthy, проверить ожидаемый image ID, live/ready (204), HTML, наличие CSS/JS, их фактическое содержимое и read-only assets mount. Только затем сообщить успех.
+
+Compose обычно ограничен 180 секундами, SQL up — 900, MySQL startup — 150, проверка backend — 120. Backup — 1800 секунд. Production-приложение сохраняет CheckPasswordReadiness при старте; некорректные credentials блокируют запуск.
+
+## Первый запуск поверх прежней структуры
+
+Известные ссылки docker-compose.yml, docker-compose.prod.yml и .env вида `active/<имя>` заменяются обычными файлами через rename, без записи в их старые цели. Для mysql допускается такой же переход, только если текущий build-контекст полностью совпадает с переданным. Несовпадение, неизвестная/оборванная ссылка или необычная структура требуют ручной проверки; старые каталоги и пользовательские данные не удаляются.
+
+Существующие backups и shared/assets сохраняются. Ссылки active, каталог releases/, release-state, assets.override.yml и прежние серверные скрипты не удаляются и не используются для работы новой схемы. После успешной проверки их можно убрать вручную; сначала убедитесь, что корневые конфигурационные файлы и mysql — самостоятельные обычные файлы/каталог, а контейнер БД использует прежний volume. Не удаляйте backups, shared/assets или Docker volumes вместе с историческими файлами.
+
+## Ошибки и повторный запуск
+
+Ошибка backup не допускает SQL up, остановку или обновление backend. Dirty schema блокирует миграцию. После остановки backend ошибка может оставить приложение недоступным: скрипт сообщает этап, состояние контейнеров, последние логи и backup, но не запускает старый образ и не восстанавливает БД.
+
+После ошибки/timeout DDL SQL может продолжать выполняться. До повторного deploy проверьте реальное состояние MySQL и schema_migrations вручную; чистая версия сама по себе не объясняет неизвестный исход прерванной операции. Автоматических retry/down/force/restore нет. Ошибки передачи/загрузки/подготовки допускают повтор обычной команды с новым временным каталогом.
+
+Backup делается до остановки backend и отражает снимок начала дампа. Он может не содержать более поздние записи. Для согласованного ручного восстановления отдельно планируют maintenance и исключают всех writers; скрипт не управляет внешними cron/прямыми SQL-клиентами. Обычный deploy не заменяет план восстановления.
 
 ## Статические ресурсы
 
-`web/app` входит в image. `$ROOT/shared/assets` хранится независимо от релизов; `assets.override.yml` монтирует его read-only в `/app/web/app/assets`. Ресурсы выбранного/сохраняемых images импортируются рекурсивно, существующий путь с другим содержимым вызывает отказ. Старые CSS/JS остаются доступны вкладкам предыдущего релиза.
+Vite собирает web/app в Docker-образ. Shared assets дополняются рекурсивно, старые файлы остаются для открытых вкладок. Ссылка/специальный файл или конфликт содержимого по уже опубликованному пути вызывает отказ. Исторические образы не перебираются.
 
-- index.html, SPA deep links, service-worker.js: `Cache-Control: no-cache`;
-- `/app/assets/*`: `public, max-age=31536000, immutable`;
-- root PWA-файлы и `/app/icons/*`: revalidation;
-- отсутствующие assets/icons/root files: настоящий 404, без HTML fallback.
+HTML/deep links, service-worker.js и PWA-иконки revalidate; `/app/assets/*` имеет годовой immutable cache, отсутствие файла возвращает настоящий 404. SW не реализует fetch/offline cache. Inter Variable использует `assets/fonts/inter-v1/`; новое содержимое требует нового versioned URL. Backend и reverse proxy cache policy менять не требуется.
 
-Inter из `public/assets/fonts/inter-v1/` публикуется тем же механизмом; обновление требует inter-v2 и нового CSS URL. Дополнительный volume или proxy-route для шрифтов не нужен. SW не кеширует SPA через fetch handler. Reverse proxy не должен переопределять эти правила.
-
-## Состояние и резервные копии
-
-В `release-state`: current/previous и их schema versions, attempt/result, backup. Это метаданные подтверждения/последней попытки, а не средство отката БД. Каталоги releases/, backups/ и shared/ сохраняются между релизами. Подробности резервного копирования и ручного восстановления — в [backup-restore](./backup-restore.md).
+Автоматического удаления Docker images, backups или volumes нет. Свободное место и ручной retention контролирует администратор.

@@ -2,11 +2,18 @@ services:
   app:
     environment:
       APP_ENV: production
-    image: ${DORM_IMAGE:?Set DORM_IMAGE to a versioned release}
+    image: ${DORM_IMAGE:?Set DORM_IMAGE to the deployment image}
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      - type: bind
+        source: ${DORM_ASSETS_DIR:?Set DORM_ASSETS_DIR to the shared assets directory}
+        target: /app/web/app/assets
+        read_only: true
+        bind:
+          create_host_path: false
 
   db:
     ports: [ ]
   migrate:
-    image: ${DORM_IMAGE:?Set DORM_IMAGE to a versioned release}
+    image: ${DORM_IMAGE:?Set DORM_IMAGE to the deployment image}

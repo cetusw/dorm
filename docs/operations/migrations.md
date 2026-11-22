@@ -116,9 +116,9 @@ go run ./cmd/migrate force "$VERSION"
 
 ## Production flow
 
-Release manager запускает migrate из versioned image с обоими production Compose и assets override. Рабочий каталог и env — конкретный релиз, project dorm. SQL up идёт после штатного backup и до switch. Не запускайте вручную отдельный Compose без этих проверок вместо release manager.
+`bin/deploy.sh` подготавливает новые Compose-файлы и `.env` во временном каталоге `$upload`, проверяет MySQL и создаёт backup. После проверки clean schema backend останавливается. Штатный migrate из нового image выполняет SQL up с подготовленной конфигурацией: `--project-directory`, `--env-file` и оба Compose-файла указывают на `$upload`. Независимо от расположения конфигурации используется один project `dorm` и существующий MySQL volume `dorm_dorm-db-data`. После повторной проверки схемы подготавливаются статические ресурсы, конфигурация публикуется в постоянный каталог, затем запускается новый backend и выполняется healthcheck. До публикации постоянные конфигурационные файлы не заменяются. Не обходите эти проверки ручным Compose во время deploy.
 
-Обычный backend имеет MySQL readTimeout 30 секунд, migrator — 10 минут; connect timeout и PingContext — 5 секунд, writeTimeout — 15. Внешний timeout Compose для up — 900 секунд, для прочих команд обычно 180. Timeout клиента не доказывает завершение DDL на сервере. После ошибки release manager сохраняет backup, сообщает stage/dirty и не выполняет retry/down/force/restore автоматически.
+Обычный backend имеет MySQL readTimeout 30 секунд, migrator — 10 минут; connect timeout и PingContext — 5 секунд, writeTimeout — 15. Внешний timeout Compose для up — 900 секунд, для прочих команд обычно 180. Timeout клиента не доказывает завершение DDL на сервере. После ошибки deploy сохраняет backup, сообщает этап/dirty и не выполняет retry/down/force/restore автоматически.
 
 ## `1795059644_auth_sessions`
 

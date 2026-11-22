@@ -148,7 +148,7 @@ Google Fonts и внешних font CSS нет. `src/shared/styles/globals.css` 
 
 Файлы находятся в `frontend/public/assets/fonts/inter-v1/InterVariable.woff2` и `OFL.txt` (оба присутствуют в текущем дереве). Vite копирует их без переименования в `web/app/assets/fonts/inter-v1/`. URL — `/app/assets/fonts/inter-v1/InterVariable.woff2`; кириллица зависит от покрытия файла, дополнительных CSS-настроек не требует.
 
-Сборка допускает отсутствие WOFF2: браузер получает настоящий 404 и использует системные fallback, JavaScript от этого не ломается. Новое содержимое опубликованного immutable-шрифта требует нового каталога (`inter-v2`) и обновления URL; существующий файл не перезаписывают. Docker и shared assets release manager доставляют его тем же механизмом, что CSS/JS, без отдельного volume для шрифтов. См. [deployment](../operations/deployment.md#статические-ресурсы).
+Сборка допускает отсутствие WOFF2: браузер получает настоящий 404 и использует системные fallback, JavaScript от этого не ломается. Новое содержимое опубликованного immutable-шрифта требует нового каталога (`inter-v2`) и обновления URL; существующий файл не перезаписывают. Docker и shared assets deploy доставляют его тем же механизмом, что CSS/JS, без отдельного volume для шрифтов. См. [deployment](../operations/deployment.md#статические-ресурсы).
 
 SVG-планы этажей в `frontend/assets/building-plans/` преобразуются `npm run generate:plans` в `src/features/current-duty/building-plan/generated/plans.ts`; build и dev запускают генератор. Генерируемый файл не редактируют вручную.
 

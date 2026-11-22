@@ -177,6 +177,6 @@ Fiber: ReadTimeout 15 секунд, WriteTimeout 120, IdleTimeout 60. Конте
 
 `diagnostics.go` генерирует Request ID (`X-Request-ID`), делает access logging через slog, panic recovery и централизованный JSON ErrorHandler. Deadline возвращает 504, отмена 503, внутренние детали скрыты. Логи используют шаблон route, без query и credentials; медленный запрос — от 2 секунд.
 
-`GET /health/live` возвращает 204; `/health/ready` делает PingContext до 2 секунд и возвращает 204 либо 503. Docker healthcheck использует live, release manager дополнительно ready.
+`GET /health/live` возвращает 204; `/health/ready` делает PingContext до 2 секунд и возвращает 204 либо 503. Docker healthcheck использует live, deploy дополнительно ready.
 
 `cmd/main.go` обрабатывает SIGINT/SIGTERM с общим бюджетом 20 секунд: останавливает scheduler, завершает HTTP, ожидает event handlers, закрывает SQL pool. Compose даёт контейнеру 30 секунд. Production DI перед стартом проверяет готовность Argon2id; `dorm --check-config` проверяет только конфигурацию, без подключения к БД.
