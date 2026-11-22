@@ -358,7 +358,7 @@ for command in bash docker rsync flock gzip mktemp timeout curl find sha256sum c
 done
 timeout 15 docker info >/dev/null
 version=$(docker compose version --short)
-printf '%s\n' "$version" | grep -Eq '^v?2\.'
+printf '%s\n' "$version" | grep -Eq '^v?[2-9][0-9]*\.'
 REQUIRE
 IMAGE="dorm-app:deploy-$(date -u +%Y%m%d-%H%M%S)-${LOCAL_DIR##*/}"
 BUILD_ARGS=()
