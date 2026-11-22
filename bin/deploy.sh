@@ -6,7 +6,7 @@ remote_deploy() {
   set -Eeuo pipefail
   umask 077
   root=$1 upload=$2
-  local image=$3 expected_id=$4
+  local image=$3 expected_sha256=$4 expected_platform=$5 server_id platform
   config_dir=$upload
   stage=preflight backup='' dump='' pid='' asset_container=''
   local file path target size docker_root db_name names has_app=0 has_db=0 service
@@ -152,6 +152,8 @@ remote_deploy() {
     done < "$upload/asset-paths"
   }
 
+  [[ "$expected_sha256" =~ ^[0-9a-f]{64}$ ]] || fail 'Invalid expected Docker archive checksum'
+  [[ "$expected_platform" =~ ^[a-z0-9_]+/[a-z0-9_]+$ ]] || fail 'Invalid expected Docker image platform'
   [[ ! -L "$root/.deployment.lock" && ( ! -e "$root/.deployment.lock" || -f "$root/.deployment.lock" ) ]] || fail 'Unsafe deployment lock'
   exec 9>>"$root/.deployment.lock"
   flock -n 9 || fail 'Another deployment is running'
@@ -205,12 +207,20 @@ remote_deploy() {
   run 30 docker compose -p dorm --project-directory "$upload" --env-file "$upload/.env" \
     -f "$upload/docker-compose.yml" -f "$upload/docker-compose.prod.yml" config --quiet
   stage=image
+  [[ -f "$upload/image.tar" && ! -L "$upload/image.tar" && -s "$upload/image.tar" ]] || fail 'Missing or empty Docker archive'
+  actual=$(sha256sum < "$upload/image.tar" | awk '{print $1}')
+  [[ "$actual" == "$expected_sha256" ]] || fail 'Transferred Docker archive checksum mismatch'
+  names=$(timeout 10 docker image ls --filter "reference=$image" --format '{{.Repository}}:{{.Tag}}')
+  [[ -z "$names" ]] || fail 'Deployment image tag already exists on server'
   size=$(wc -c < "$upload/image.tar")
   space "$root" "$((size * 2 + 67108864))"
   docker_root=$(timeout 10 docker info --format '{{.DockerRootDir}}')
   space "$docker_root" "$((size * 2 + 67108864))"
   run 180 docker load -i "$upload/image.tar"
-  [[ $(timeout 10 docker image inspect --format '{{.Id}}' "$image") == "$expected_id" ]] || fail 'Loaded image identity mismatch'
+  server_id=$(timeout 10 docker image inspect --format '{{.Id}}' "$image")
+  [[ "$server_id" =~ ^sha256:[0-9a-f]{64}$ ]] || fail 'Invalid loaded Docker image ID'
+  platform=$(timeout 10 docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")
+  [[ "$platform" == "$expected_platform" ]] || fail 'Loaded Docker image platform mismatch'
   rm -- "$upload/image.tar"
   stage=configuration
   sed -E '/^[[:space:]]*(export[[:space:]]+)?DORM_(IMAGE|ASSETS_DIR)[[:space:]]*=/d' "$upload/.env" > "$upload/env-pinned"
@@ -298,7 +308,8 @@ DUMP
   stage=health
   end=$((SECONDS+120))
   while :; do
-    [[ $(timeout 10 docker inspect --format '{{.Image}}' dorm-app) == "$expected_id" ]] || fail 'Application image identity mismatch'
+    [[ $(timeout 10 docker inspect --format '{{.Image}}' dorm-app) == "$server_id" ]] || fail 'Application image identity mismatch'
+    [[ $(timeout 10 docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}} {{index .Config.Labels "com.docker.compose.service"}}' dorm-app) == 'dorm app' ]] || fail 'Application Compose identity mismatch'
     health=$(timeout 10 docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' dorm-app)
     [[ "$health" != exited* && "$health" != dead* && "$health" != *unhealthy ]] || fail 'Backend exited or became unhealthy'
     if [[ "$health" == 'running healthy' ]] && \
@@ -325,7 +336,7 @@ cd "$(dirname "$0")/.."
 [[ $# == 1 || ( $# == 2 && "$2" == --pull ) ]] || { echo "Usage: $0 user@host [--pull]" >&2; exit 1; }
 REMOTE=$1
 [[ "$REMOTE" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*@[a-zA-Z0-9._-]+$ ]] || { echo 'Expected SSH destination user@host' >&2; exit 1; }
-for command in docker ssh scp rsync mktemp date timeout; do command -v "$command" >/dev/null; done
+for command in docker ssh scp rsync mktemp date timeout sha256sum awk; do command -v "$command" >/dev/null; done
 for path in Dockerfile docker-compose.yml docker-compose.prod.yml .env.prod mysql; do [[ -e "$path" ]] || { echo "Missing required path: $path" >&2; exit 1; }; done
 timeout 15 docker info >/dev/null
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
@@ -381,9 +392,12 @@ services:
 CHECK
 docker compose -p "dorm-check-$(printf '%s' "${LOCAL_DIR##*.}" | tr '[:upper:]' '[:lower:]')" --project-directory "$LOCAL_DIR" --env-file "$LOCAL_DIR/.env" \
   -f "$LOCAL_DIR/check.yml" run --rm -T --no-deps app sh -c 'for value in "$DB_USER" "$DB_PASSWORD" "$DB_ROOT_PASSWORD" "$DB_NAME"; do [ -n "$value" ] && [ "$value" != TODO ] || { echo "Incomplete production database configuration" >&2; exit 1; }; done; test "$DB_HOST" = db && test "$DB_PORT" = 3306 && test "$DB_DRIVER" = mysql || exit 1; exec ./dorm --check-config'
-EXPECTED_ID=$(timeout 10 docker image inspect --format '{{.Id}}' "$IMAGE")
+EXPECTED_PLATFORM=$(timeout 10 docker image inspect --format '{{.Os}}/{{.Architecture}}' "$IMAGE")
+[[ "$EXPECTED_PLATFORM" =~ ^[a-z0-9_]+/[a-z0-9_]+$ ]] || { echo 'Invalid local Docker image platform' >&2; exit 1; }
 LOCAL_STAGE=archive
 docker save "$IMAGE" -o "$LOCAL_DIR/image.tar"
+EXPECTED_SHA256=$(sha256sum < "$LOCAL_DIR/image.tar" | awk '{print $1}')
+[[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid local Docker archive checksum' >&2; exit 1; }
 BYTES=$(wc -c < "$LOCAL_DIR/image.tar")
 LOCAL_STAGE=upload
 UPLOAD=$("${SSH[@]}" "$REMOTE" bash -s -- "$ROOT" "$BYTES" <<'PREPARE'
@@ -402,4 +416,4 @@ scp -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAli
 rsync -a -e 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3' -- mysql/ "$REMOTE:$UPLOAD/mysql/"
 STARTED=1
 LOCAL_STAGE=server
-"${SSH[@]}" "$REMOTE" bash -s -- "$ROOT" "$UPLOAD" "$IMAGE" "$EXPECTED_ID" < <(declare -f remote_deploy; printf 'remote_deploy "$@"\n')
+"${SSH[@]}" "$REMOTE" bash -s -- "$ROOT" "$UPLOAD" "$IMAGE" "$EXPECTED_SHA256" "$EXPECTED_PLATFORM" < <(declare -f remote_deploy; printf 'remote_deploy "$@"\n')
