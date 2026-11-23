@@ -31,5 +31,5 @@ migrate
 
 # Database backups
 backups/
-dorm-backup*.sql
 *.sql.gz
+*.sql
